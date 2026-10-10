@@ -2,6 +2,8 @@ name: CI
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   go:
     runs-on: ubuntu-latest
@@ -10,16 +12,35 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
-      - run: go test ./apps/orcon ./packages/go/config ./packages/go/workflow ./packages/go/engine
-  web:
+      - name: Test Go modules
+        run: go test ./apps/orcon ./packages/go/config ./packages/go/workflow ./packages/go/engine
+  integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm --filter @orcon/web build
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Build embedded frontend and Go binary
+        run: make build
+      - name: Smoke test standalone
+        shell: bash
+        run: |
+          ./bin/orcon --role=standalone --addr=127.0.0.1:18080 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:18080/healthz; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/healthz | grep -q ok
+          curl -fsS http://127.0.0.1:18080/ | grep -q 'id="root"'
+          ./bin/orcon --role=invalid >/dev/null 2>&1 && exit 1 || true
