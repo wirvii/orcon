@@ -1,36 +1,30 @@
 # Orcon — Design System Foundations
 
-Status: **Proposed** | Version: 0.1
+Status: **Visual direction approved; implementation tokens proposed** | Version: 0.2
 
-## Identity
+## Canonical visual reference
+See [brand/README.md](../../brand/README.md). The product owner approved **two original visual concept boards** showing a semi-3D green orc engineer with tied dark hair, glasses, beard and dark hoodie, together with a geometric green-to-teal logo and the Orcon wordmark. Any design that materially differs from these boards must be rejected, even if it is technically valid SVG.
 
-Product: **Orcon**; expanded name: **Orchestration Controller**. Working tagline: **Build. Orchestrate. Execute. Your way.** Brand naming remains provisional.
+## Brand
+Name: **Orcon**. Expanded: **Orchestration Controller**. Tagline: **Build. Orchestrate. Execute. Your way.** Keep mascot and geometric mark separate. Mascot art is detailed, textured and polished; not a flat cartoon or primitive SVG approximation.
 
-## Brand architecture
+## Approved reference colors (primary board)
+- Green #22C55E
+- Dark green #16A34A
+- Cyan #06B6D4
+- Navy #0F172A
+- Slate #64748B
 
-- **Primary symbol:** compact geometric mark legible at favicon and CLI sizes.
-- **Mascot:** an original, friendly, capable orc engineer combining the strength of a guardian with the precision of an engineer. Never imitate a specific fictional franchise.
-- **Product interface:** professional, restrained, accessible; mascot should not obstruct operational screens.
-- **Documentation/community:** expressive mascot poses and educational illustrations are welcome.
+These are **visual reference colors**, not an accessibility-certified semantic token system. Light backgrounds and text must meet contrast requirements. Earlier exploratory #10221B/#BAF4C9 palettes are superseded as brand references.
 
-## Preliminary palette (subject to visual review)
+## System requirements
+Complete primitive and semantic tokens; light/dark themes; spacing, typography, radii, elevation, motion; focus, hover, disabled, error and loading states; responsive app shell; workflow canvas, nodes, connections, inspector, execution debugger, migration wizard and approvals. Components must reference semantic tokens. Target WCAG 2.2 AA; accessible keyboard alternative to graph drag/drop, descriptive node/edge labels, reduced-motion support and no color-only status.
 
-- Deep charcoal: `#10221B`
-- Emerald: `#22C55E`
-- Soft mint: `#BAF4C9`
-- Off-white: `#F7FAF8`
-- Slate text: `#334155`
+## Required deliverables
+1. Commit the **original two approved concept boards** under brand/references/.
+2. Create logo/mascot production masters based on those boards; review side-by-side.
+3. Publish detailed component specifications and a token package with contrast tests.
+4. Do not declare the Brand Kit complete until original assets and approved exports exist.
 
-These are proposed seed colors, **not yet an accessibility-validated token system**. Agents must not invent an approved comprehensive design system from this draft.
-
-## Required design deliverables
-
-Token taxonomy (color, spacing, radius, elevation, motion, typography); light/dark themes; semantic state colors; interaction and focus states; accessible contrast tests; components and variants; responsive shell; workflow canvas and nodes; keyboard interactions; execution traces and debugging UI; asset export formats; mascot usage and exclusions.
-
-## Accessibility
-
-Target WCAG 2.2 AA where applicable. Workflow graph operations require a keyboard-accessible alternative and understandable screen-reader labels. Do not encode status solely by color.
-
-## Asset status
-
-Earlier mascot and logo concepts were generated in conversation. **Original master assets have not yet been committed to this repository.** Do not claim this document supplies production SVG/vector masters.
+## Important
+Previous substitute SVGs did not match approved visuals and were removed. Agents must not regenerate arbitrary replacements or mistake the preliminary scaffold for approved design.
