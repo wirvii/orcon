@@ -1,3 +1,10 @@
 # Claude Code instructions
 
 Follow [AGENTS.md](AGENTS.md) and [docs/agents/implementation-contract.md](docs/agents/implementation-contract.md). All implementation work must derive from accepted requirements and ADRs. Stop for unresolved architectural decisions rather than guessing.
+
+<!-- mneme:managed:start v=1 -->
+Process and operating instructions are managed globally via mneme.
+See the mneme operating manual in your global ~/.claude/CLAUDE.md.
+
+Project scope: see this file's sections below for stack, conventions, and module structure.
+<!-- mneme:managed:end -->
