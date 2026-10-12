@@ -7,7 +7,7 @@ Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
 Accepted by the owner on 2026-10-12 via SPEC-002.
 
 ## Context
-BL-002 (owner decisions T1–T7) defines what starts a flow execution. The owner requires the V1 trigger catalog to cover at least every trigger kind n8n offers. SPEC-001 (ADR-0007…0019, Proposed) defines the engine; triggers must only *create executions atomically* through it. ADR-0002 assigns trigger management to the scheduler role and HTTP to the api role.
+BL-002 (owner decisions T1–T7) defines what starts a flow execution. The owner requires the V1 trigger catalog to cover at least every trigger kind n8n offers. SPEC-001 (ADR-0007…0019, Accepted) defines the engine; triggers must only *create executions atomically* through it. ADR-0002 assigns trigger management to the scheduler role and HTTP to the api role.
 
 ## Decision
 

@@ -29,6 +29,9 @@ Publication and activation never fail because of a registration (owner decision 
 ### 5. Manual-setup providers
 Where a provider requires manual configuration (app-level webhooks), the trigger is a plain `WEBHOOK` trigger with a verification preset; the editor shows the address and setup steps.
 
+### 6. Tests
+Fault-injection addition to ADR-0019 (a row of its §3 matrix): FI-56 kill the reconciler between `Register` and its commit, and deactivate the flow while a registration is in flight. Outcome after convergence: the provider holds no registration for the deactivated flow and exactly one per address of active flows; an event arriving on an unwanted registration gets `410 Gone` and enqueues a removal; the periodic sweep removes a seeded orphan.
+
 ## Consequences
 Registrations converge to the desired state despite crashes; orphans are detectable and removed.
 

@@ -28,6 +28,9 @@ The scheduler claims due `schedule_state` rows (`next_slot_at ≤ now()` by data
 - Inactive periods (flow deactivated or deleted) are not missed slots; reactivation starts from the next future slot.
 - Backpressure (ADR-0021 §4) records `SKIPPED_BACKPRESSURE`.
 
+### 5. Tests
+Fault-injection addition to ADR-0019 (a row of its §3 matrix; PostgreSQL, since several scheduler processes need a shared database): FI-57 three scheduler processes with random `kill -9` while 1,000 schedules fire every second. Outcome: exactly one `schedule_fire` row and at most one execution per slot; no slot within grace is left unfired.
+
 ## Consequences
 Single firing is verifiable by a unique constraint; DST behaviour is explicit and tested.
 

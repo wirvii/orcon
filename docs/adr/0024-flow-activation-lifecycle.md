@@ -7,7 +7,7 @@ Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
 Accepted by the owner on 2026-10-12 via SPEC-002.
 
 ## Context
-T3: saving edits a draft and never touches production; drafts are testable via their own test URL and with sample or past events; publishing is separate and gated by validation; switching versions loses no events; one-click rollback; stable production URL; "unpublished changes" indicator. ADR-0007 (Proposed) defines draft/version/snapshot. ADR-0077 §4 makes flow deletion a soft delete with a 30-day recovery window and leaves trigger behaviour to this ADR.
+T3: saving edits a draft and never touches production; drafts are testable via their own test URL and with sample or past events; publishing is separate and gated by validation; switching versions loses no events; one-click rollback; stable production URL; "unpublished changes" indicator. ADR-0007 (Accepted) defines draft/version/snapshot. ADR-0077 §4 makes flow deletion a soft delete with a 30-day recovery window and leaves trigger behaviour to this ADR.
 
 ## Decision
 

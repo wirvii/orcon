@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0057 — Flows as code: repository layout, Git sync modes, environments and credential binding
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 enum form; ADR-0077 schema rules)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 enum form, including the values of the `orcon/repo@1` files; ADR-0077 schema rules)
 
 Accepted by the owner on 2026-10-12 via SPEC-005.
 
@@ -18,13 +18,13 @@ An environment is a **project bound to a Git branch** with an environment label 
 ```
 orcon.yaml                            # format: orcon/repo@1; projects: [{ slug, path }]
 projects/<project-slug>/
-  project.yaml                        # name, description, tags, activation map { <flow-slug>: active|inactive }
+  project.yaml                        # name, description, tags, activation map { <flow-slug>: ACTIVE|INACTIVE }
   flows/<flow-slug>.flow.json         # orcon/flow@1 (deterministic pretty serialization)
   credentials/<credential-name>.yaml  # name, type, description; per environment, optional field values that are ONLY $secrets references; never literal secrets
   variables.yaml                      # non-secret project variables (defaults)
   environments/<env>.yaml             # per-environment non-secret overrides
 ```
-Flow slugs are stored in the flow (`ext."orcon.git".slug`) so renaming a flow does not move its file unless requested. Pinned test data, sample events and execution data are never exported. This is a file format, not an API representation; its values keep the form shown.
+Flow slugs are stored in the flow (`ext."orcon.git".slug`) so renaming a flow does not move its file unless requested. Pinned test data, sample events and execution data are never exported. `orcon/repo@1` is a public Orcon format: its enum and state values are UPPER_SNAKE like every public value (ADR-0080 §3), and the flow files carry the values `orcon/flow@1` defines; keys, slugs, environment labels and format tags are identifiers and keep their form.
 
 ### 3. Deterministic serialization
 UTF-8, LF, 2-space indented JSON, keys in schema order (unknown `ext` keys sorted), arrays in document order, trailing newline. `write(read(file))` is byte-identical for files Orcon wrote. `contentHash` remains SHA-256 over JCS (ADR-0007 §6).
@@ -57,7 +57,7 @@ Nodes reference credentials by name (`credentials: { <slot>: { name } }`, additi
 - Authentication: federated workload identity (ADR-0056 §9, recommended: no Orcon secret stored in CI), or service-account keys / OAuth client credentials (`private_key_jwt`).
 
 ## Consequences
-Reviewable, promotable flows without secrets in Git; production can be locked to Git; Git outages never stop production in Orcon-leads mode.
+Reviewable, promotable flows without secrets in Git; production can be locked to Git; Git outages never stop production in Orcon-leads mode; a value reads the same in Git, in the API and in the editor.
 
 ## Alternatives considered
-Environment = separate instance only (still possible, not mandated); committing drafts (noisy, not deployable state); shelling out to `git` (breaks the self-contained binary); last-write-wins between Git and Orcon (rejected by P3).
+Environment = separate instance only (still possible, not mandated); committing drafts (noisy, not deployable state); shelling out to `git` (breaks the self-contained binary); last-write-wins between Git and Orcon (rejected by P3); lowercase values in repository files as a separate file convention (rejected by ADR-0080 §3 as revised: one spelling for every public value).

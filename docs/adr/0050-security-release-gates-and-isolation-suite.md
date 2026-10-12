@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0050 — Security release gates and adversarial isolation suite
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (cross-organization webhook path collision case)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -15,6 +15,7 @@ S3 requires adversarial cross-organization tests on every subsystem on both stor
 - A registry enumerates every HTTP route and every store method; a test fails if one lacks an isolation case.
 - Fixtures: organizations A and B with projects, flows, versions, credentials (owned and shared), secret stores, executions with data, blobs, webhooks, schedules, audit events, SIEM sinks, human-attention notification channels and rules, groups, roles, SCIM tokens.
 - For every role of A (including Owner and a custom role with all permissions) and every route/method: attempts to read, list, count, update, delete, export, reference (`$secrets`, credential ids in flow documents, sub-flow targets, blob ids, webhook paths, notification recipients) B's resources by direct id, filters, pagination cursors and caches; expected: 404/empty/validation error, never B's data, never B-derived counts or timing beyond a fixed tolerance.
+- Webhook path collision (defined by ADR-0022 §3; same test as criterion E-ADDR-5 of SPEC-002, `TestCrossOrgWebhookPathCollision`): with organization A owning an active route and method, publishing or importing in organization B a flow with the same route and method fails with a generic "path unavailable" problem; nothing returned to or stored for B — body, headers, the `address.collision` event, logs — contains the id, name or project of A's flow, or A's id or name (checked by searching for sentinel values); the warning for an overlapping pattern does not either; within one organization the error still names the owning flow.
 - Engine cases: tokens of B processed under A's context fail closed; batched writes mixing A and B land in the right organizations; credential resolution never crosses organizations; `resolve_*` lookups return only the matching organization and never another organization's data.
 - Runs on SQLite, PostgreSQL, and PostgreSQL "RLS-only" (wall 1 predicates removed by a test-only build tag) to prove wall 3 alone blocks every case that reaches the database.
 

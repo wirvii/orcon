@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0048 — Tamper-evident audit log, SIEM export and retention
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077, including UPPER_SNAKE values in the public format)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -12,7 +12,7 @@ S5: coverage of logins, flow changes, credential changes and each credential use
 ## Decision
 
 ### 1. Event schema `orcon/audit@1`
-`{ id, chain, seq, at, org_id?, actor{kind, id, display, auth_source, session_ref}, action, target{type, id, name?}, outcome: success|failure|denied, reason?, details{…no secrets, no execution data}, request{id, ip, user_agent}, prev_hash, hash }`. Failed-login identifiers stored as HMAC with the instance key. This is a public document format for SIEM consumers; its field names are not database identifiers. In the database the actor is kept as `actor_principal_id` **without** a foreign key (the identity outlives a deleted principal; ADR-0077 §8), `actor_kind` and the keyed hash of the visible identity.
+`{ id, chain, seq, at, org_id?, actor{kind, id, display, auth_source, session_ref}, action, target{type, id, name?}, outcome, reason?, details{…no secrets, no execution data}, request{id, ip, user_agent}, prev_hash, hash }`, with `outcome` in `SUCCESS`, `FAILURE`, `DENIED` and `actor.kind` in `USER`, `SERVICE_ACCOUNT`, `SCIM_CLIENT`, `API_KEY`, `SYSTEM`. This is a public document format for SIEM consumers and the audit API; like every public Orcon format its enumerated values are UPPER_SNAKE (ADR-0080 §3, ADR-0077 decision 11), while action names (`login.succeeded`) and field names are identifiers and keep their form. Failed-login identifiers stored as HMAC with the instance key. In the database the actor is kept as `actor_principal_id` **without** a foreign key (the identity outlives a deleted principal; ADR-0077 §8), `actor_kind` (stored in the same UPPER_SNAKE spelling, so the document is stored and returned without translation) and the keyed hash of the visible identity.
 
 ### 2. Write path
 - The acting transaction inserts the event into `audit_pending(org_id, id, occurred_at, body_document, body_document_format)` — atomic with the action — or, for instance-level events, into `instance_audit_pending(id, occurred_at, body_document, body_document_format)`. Denied actions are recorded in their own transaction.
@@ -37,10 +37,10 @@ Default 365 days, configurable per organization above the instance floor. Prunin
 SPEC-004 Annex B is normative, including the human-action and notification-configuration events required from ADR-0073; a test enumerates audited actions per route/command and fails if a route marked `audit: required` emits nothing. Human-attention notifications (ADR-0073) are not audit sinks and never replace audit events.
 
 ## Consequences
-Every committed action has an audit record; alterations and deletions are detected; SIEMs receive events within seconds; the write cost is one insert in an existing transaction plus asynchronous sealing.
+Every committed action has an audit record; alterations and deletions are detected; SIEMs receive events within seconds; the write cost is one insert in an existing transaction plus asynchronous sealing; consumers see the same value spelling as in the API.
 
 ## Alternatives considered
-Synchronous chaining in each action transaction (rejected: global hot row); external append-only store as the only copy (rejected: mandatory service); signing each event with an asymmetric key (rejected: cost; block MACs plus anchors suffice); requiring an external sink before enabling multi-organization (rejected: SPEC-004 Q17, a persistent warning instead); one audit table with an optional `org_id` for both chains (rejected by ADR-0077).
+Synchronous chaining in each action transaction (rejected: global hot row); external append-only store as the only copy (rejected: mandatory service); signing each event with an asymmetric key (rejected: cost; block MACs plus anchors suffice); requiring an external sink before enabling multi-organization (rejected: SPEC-004 Q17, a persistent warning instead); one audit table with an optional `org_id` for both chains (rejected by ADR-0077); lowercase outcome and actor-kind values (rejected by ADR-0080 §3 as revised: one spelling for every public value).
 
 ## Amendments
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.

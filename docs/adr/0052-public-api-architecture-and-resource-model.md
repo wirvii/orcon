@@ -22,9 +22,9 @@ Owner decision P1 (BL-005): Orcon exposes a single public REST API described by 
 - Individual resources have a flat canonical URL by globally unique id (`/api/v1/projects/{projectId}`, `/api/v1/flows/{flowId}`, `/api/v1/executions/{executionId}`, `/api/v1/api-keys/{apiKeyId}`), or sit under their parent when they are dependent sub-resources (`/flows/{flowId}/versions/{version}`, `/executions/{executionId}/awaiting-human/{attentionId}`).
 - Path parameters are `<resource>Id` in camelCase with `format: uuid`, never `{id}`; `{version}` for version numbers.
 - Relations that are not ownership use typed filters, never extra nesting: executions of a flow are listed with `GET /projects/{projectId}/executions?flowId=`.
-- Non-CRUD actions are `POST <item or singleton>/<verb>` with one of the thirty verbs of ADR-0080 §2: `/flows/{flowId}/publish`, `/flows/{flowId}/activate`, `/flows/{flowId}/deactivate`, `/flows/{flowId}/rollback`, `/executions/{executionId}/cancel`, `/executions/{executionId}/retry`, `/api-keys/{apiKeyId}/rotate`, `/api-keys/{apiKeyId}/revoke`.
+- Non-CRUD actions are `POST <item or singleton>/<verb>` with one of the thirty-one verbs of ADR-0080 §2: `/flows/{flowId}/publish`, `/flows/{flowId}/activate`, `/flows/{flowId}/deactivate`, `/flows/{flowId}/rollback`, `/executions/{executionId}/cancel`, `/executions/{executionId}/retry`, `/api-keys/{apiKeyId}/rotate`, `/api-keys/{apiKeyId}/revoke`.
 - Ids are opaque strings (UUIDs per ADR-0015). Field names are `camelCase`. Timestamps are RFC 3339 UTC; durations ISO-8601. Bodies are JSON; flow documents are `orcon/flow@1` verbatim.
-- Enum and state values in requests, responses and event payloads are UPPER_SNAKE (ADR-0080 §3), e.g. `UNCERTAIN_OPERATION`, `GROUPED`, `PROTECTED_ONLY`, `SERVICE_ACCOUNT`. Identifier catalogs keep their own form and are marked `x-orcon-enum-kind: identifier`: event types, permission names, problem codes, `operationId`s, MCP tool names, media types and values fixed by external standards (OAuth, CloudEvents, PagerDuty). Value lists in the logical-schema descriptions of ADR-0052..0059 are storage values governed by the database rulebook (ADR-0077); adapters map them to the API form.
+- Enum and state values in requests, responses and event payloads are UPPER_SNAKE (ADR-0080 §3), e.g. `UNCERTAIN_OPERATION`, `GROUPED`, `PROTECTED_ONLY`, `SERVICE_ACCOUNT`. The rule also covers documents the API returns verbatim (`orcon/flow@1` flow documents, connector manifests) and the public file formats of ADR-0057 (`orcon/repo@1`): their enum and state values are UPPER_SNAKE too, so a value has one spelling everywhere it is public. Identifier catalogs keep their own form and are marked `x-orcon-enum-kind: identifier`: event types, permission names, problem codes, `operationId`s, MCP tool names, media types and values fixed by external standards (OAuth, CloudEvents, PagerDuty). Value lists in the logical-schema descriptions of ADR-0052..0059 are storage values governed by the database rulebook (ADR-0077); adapters map them to the API form.
 - Responses carry no envelope (ADR-0080 §7, ADR-0053 §9).
 - Organization context: for interactive sessions, the organization comes from the route or the `Orcon-Org` header (ADR-0038 §6); for `apiKey` principals it is fixed to the key's organization and a different `Orcon-Org` yields 404.
 - Visibility follows ADR-0041 §6: another organization or no read permission → `404`; read permission without the requested action → `403`. Identifiers from the request authorize; handlers operate on rows loaded within the organization scope and check parent/child consistency (SPEC-004 R-ISO-07).
@@ -82,6 +82,7 @@ ADR-0073 defines when an execution waits for a person, the reasons, notification
 - Every new UI feature costs an OpenAPI change first (spec-first, ADR-0054).
 - One pipeline means one place for authentication, authorization, isolation, auditing and limits; the MCP server and CLI inherit them.
 - Every installation serves the reference for exactly the API it runs.
+- A value is spelled the same way in API bodies, events and the documents the API returns.
 
 ## Alternatives considered
 - **Private editor API + smaller public API** (n8n-style): rejected by P1.
@@ -89,6 +90,7 @@ ADR-0073 defines when an execution waits for a person, the reasons, notification
 - **GraphQL**: rejected; per-field authorization and rate limiting are harder; P1 chose REST.
 - **Fully nested item URLs**: rejected; long URLs and moves between projects break links; global ids plus server-side authorization suffice.
 - **Lowercase enum values** (the first draft of this ADR): rejected by ADR-0080 §3; they differ from the engine states.
+- **Keeping documents returned verbatim outside the enum rule**: rejected by ADR-0080 §3 as revised; clients would see two spellings of the same value.
 
 ## Amendments
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.

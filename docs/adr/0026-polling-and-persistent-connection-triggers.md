@@ -28,7 +28,7 @@ T4: polling cursor advance and execution creation committed together (no duplica
 - Hosting: polls, listeners and registration calls run only on workers with `--trigger-hosting=true` (owner decision SPEC-002 Q2); the scheduler never runs them.
 
 ### 3. Tests
-FI-19 kill the poll worker between `Poll` and commit; FI-20 kill a listener holder with messages in flight; FI-21 SIGSTOP the holder 60 s; FI-22 broker redelivery storm. Outcomes: no lost acknowledged-source message for `AT_LEAST_ONCE`/`CURSOR_EXACT`; one execution per message id/offset.
+Fault-injection additions to ADR-0019 (rows of its §3 matrix): FI-52 kill the poll worker between `Poll` and commit; FI-53 kill a listener holder with messages in flight; FI-54 SIGSTOP the holder 60 s; FI-55 broker redelivery storm. Outcomes: no lost acknowledged-source message for `AT_LEAST_ONCE`/`CURSOR_EXACT`; one execution per message id/offset.
 
 ## Consequences
 The same lease/fencing proofs as tokens; duplicates from redelivery are absorbed by the deduplication index or cursor.

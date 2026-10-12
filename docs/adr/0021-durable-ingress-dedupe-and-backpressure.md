@@ -53,7 +53,7 @@ Enumerated values stored in these tables (`family`, `scope`, `response_profile`,
 ### 6. Failure semantics
 - Crash before commit: no 2xx was sent; the client's retry is accepted normally (deduplicated if keyed).
 - Crash after commit, before the response is written to the socket: the event and execution exist; the client may retry; with a deduplication key it receives the original execution id. Without a key, a retry creates a second execution — documented; the editor recommends a deduplication key for webhook senders that retry.
-- Fault-injection additions to ADR-0019: FI-17 kill api before/after ingress commit; FI-18 duplicate deliveries across three api processes.
+- Fault-injection additions to ADR-0019 (rows of its §3 matrix): FI-50 kill api before/after ingress commit; FI-51 duplicate deliveries across three api processes.
 
 ## Consequences
 Every acknowledged event survives any single-process crash; throughput relies on batching; one flood is contained to its flow; every ingress row carries its organization, so row-level security applies to the ingress path.

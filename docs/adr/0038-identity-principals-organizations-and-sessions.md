@@ -2,12 +2,12 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0038 — Identity, principals, organizations and sessions
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077, including its value-spelling decision)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
 ## Context
-BL-004 S3 requires multi-organization isolation from V1; S4 requires organization- and project-level roles; S6 requires several authentication methods with organization-wide enforcement; S1 requires every capability to be open and stricter policy to be configuration only. SPEC-001 reserved `project_id` only. SPEC-005 will add API keys and must plug into the same model. ADR-0077 fixes the database naming and actor rules this ADR follows.
+BL-004 S3 requires multi-organization isolation from V1; S4 requires organization- and project-level roles; S6 requires several authentication methods with organization-wide enforcement; S1 requires every capability to be open and stricter policy to be configuration only. SPEC-001 reserved `project_id` only. SPEC-005 will add API keys and must plug into the same model. ADR-0077 fixes the database naming, actor and value-spelling rules this ADR follows.
 
 ## Decision
 
@@ -22,7 +22,7 @@ Each project has a `handle` unique per instance (owner decision, SPEC-004 Q11): 
 
 ### 3. Principals
 `user`, `serviceAccount` (organization-scoped, non-interactive), `scimClient` (organization-scoped token), `system:<role>` (engine processes; attributed in audit). ADR-0056 defines the `apiKey` principal (API keys and OAuth access tokens of service-account clients), always bound to a user or service account and limited to a subset of its permissions.
-In the database (ADR-0077 §8), whoever acts is one row of the instance table `principal(id, kind: user|service_account|system, created_at)`, with exactly one `system` row per installation (engine processes, the role goes into audit details). `application_user` and `service_account` reference it through a unique `principal_id` with `ON DELETE CASCADE`. Every column that records who did something is `<verb>_by_principal_id`, nullable, a single-column foreign key to `principal(id)` with `ON DELETE SET NULL` and a supporting index; deleting a principal therefore never deletes history, and the audit log keeps the actor's identity (ADR-0048). API keys and OAuth tokens write the principal they are bound to into actor columns (the audit record keeps the key); SCIM clients write no actor columns and are identified in the audit record.
+In the database (ADR-0077 §8), whoever acts is one row of the instance table `principal(id, kind, created_at)` with `kind` in `USER`, `SERVICE_ACCOUNT`, `SYSTEM` — the spelling the API exposes (ADR-0077 decision 11) — enforced by `CONSTRAINT ck_principal_kind CHECK (kind IN ('USER', 'SERVICE_ACCOUNT', 'SYSTEM'))`, and exactly one `SYSTEM` row per installation (partial unique index `uq_principal_kind … WHERE kind = 'SYSTEM'`; engine processes, the role goes into audit details). `application_user` and `service_account` reference it through a unique `principal_id` with `ON DELETE CASCADE`. Every column that records who did something is `<verb>_by_principal_id`, nullable, a single-column foreign key to `principal(id)` with `ON DELETE SET NULL` and a supporting index; deleting a principal therefore never deletes history, and the audit log keeps the actor's identity (ADR-0048). API keys and OAuth tokens write the principal they are bound to into actor columns (the audit record keeps the key); SCIM clients write no actor columns and are identified in the audit record.
 
 ### 4. Instance administration
 Instance roles `instanceOwner` and `instanceAdmin` (table `instance_role_binding`), separate from organization roles (owner decision, SPEC-004 Q1), govern: master key operations, connector installation and trust policy, organization lifecycle, policy floors, per-organization limits, instance SIEM sinks, ambient-cloud-identity grants. They grant no access to organization data; joining an organization requires an explicit membership, audited as `instance_admin.joined_org`. In a single-organization install the first user receives `instanceOwner` and org `Owner`.
@@ -44,10 +44,10 @@ Create (instance admins; self-service only if `orgs.selfService=true`), suspend 
 All security settings are configuration with three layers: engine defaults < instance floors < organization settings. An organization may only tighten relative to instance floors; an instance setting marked `locked: true` is read only from the configuration file or environment and read-only in UI and API. No capability is compiled out or license-gated: every security capability ships in the Apache-2.0 engine. A commercial platform built around Orcon may only tighten policy through this same configuration; there are no withheld capabilities to unlock.
 
 ## Consequences
-One identity model serves all methods and SPEC-005; organizations are hard boundaries; instance operators are separated from tenant data; deleting a person or service account never erases who did what.
+One identity model serves all methods and SPEC-005; organizations are hard boundaries; instance operators are separated from tenant data; deleting a person or service account never erases who did what; a principal kind is spelled the same way in the database and in the API.
 
 ## Alternatives considered
-Users owned by organizations (rejected: duplicates accounts for consultants working for several organizations); first organization's Owner as instance admin (rejected: mixes planes); stateless JWT sessions (rejected: no immediate revocation); actor columns without foreign keys (rejected by ADR-0077: loses integrity).
+Users owned by organizations (rejected: duplicates accounts for consultants working for several organizations); first organization's Owner as instance admin (rejected: mixes planes); stateless JWT sessions (rejected: no immediate revocation); actor columns without foreign keys (rejected by ADR-0077: loses integrity); lowercase stored principal kinds translated by the adapter (rejected by ADR-0077 decision 11: the API spelling is stored directly).
 
 ## Amendments
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
