@@ -164,6 +164,7 @@ export function emitTailwindTheme(model) {
   }
   const target = scales.find((x) => x.key === 'size.target-min');
   add('--spacing-target', v(target));
+  add('--spacing-port', v(scales.find((x) => x.key === 'size.port')));
 
   lines.push('', '  /* Radius and elevation */');
   for (const t of scales.filter((x) => x.path[0] === 'radius')) add(`--radius-${t.path[1]}`, v(t));

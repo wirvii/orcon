@@ -12,6 +12,10 @@
         "$value": "24px"
       }
     },
+    "port": {
+      "$value": "10px",
+      "$description": "Diameter of a canvas connection port."
+    },
     "target-min": {
       "$value": "24px",
       "$description": "Minimum interactive target for fine pointers."
