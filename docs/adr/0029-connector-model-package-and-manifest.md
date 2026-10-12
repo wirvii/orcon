@@ -69,7 +69,7 @@ Rules (validated at install and at publication, ADR-0007 §9 level 5): `UNKNOWN`
 - Connectors never receive credential values by default. The host passes a `CredentialHandle`; the egress client applies the declared scheme to outgoing requests (headers, query, signing, OAuth bearer).
 - `credentialRawAccess` (approved by the admin at install) enables `Field(name)` for connectors that must compute signatures or speak non-HTTP protocols. Native connectors use the same handle API.
 - Values are never serialized into items, events, logs or history (ADR-0008 §4, ADR-0017). On a 401 from a request using an OAuth credential, the host may refresh once and retry the request if the operation is `READ` or `retrySafe`.
-- Storage, encryption, key management, OAuth consent and refresh, sharing and roles are defined by the security design (BL-004). Until then, "admin" means the instance owner via SPEC-001's minimal authorization hook.
+- Storage, encryption, key management, OAuth consent and refresh, sharing and roles are defined by the security design (BL-004). Connector grants are approved per organisation by holders of `connector:approve`; installation of packages is instance-level (`instance:connectors`).
 
 ### 7. Role placement
 Actions execute in `worker`. Trigger `Verify/Handshake/Decode` run in `api`; poll, listen and registration run in `worker` (ADR-0020 §6). No new roles.
@@ -104,3 +104,8 @@ One manifest drives editor, importer, catalog, validation and runtime checks for
 - **A connector-specific notification mechanism for uncertain writes**: rejected — ADR-0073 is the single human-attention mechanism.
 - **Treating a 5xx on a write as a definite failure**: rejected (ADR-0079 §4) — a write applied before the error could be repeated by hand and duplicated without warning.
 - **Lowercase values in document formats and UPPER_SNAKE only in the API**: rejected — the API returns documents verbatim, so two spellings of the same value would cross the same interface.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §6: connector grants are approved per organisation by holders of `connector:approve`; installing packages is instance-level (`instance:connectors`). The credential handle carries `allowedHosts` (ADR-0043 §4); OAuth refresh follows ADR-0045.

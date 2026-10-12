@@ -41,3 +41,8 @@ Production never runs unpublished content; version switches are atomic and obser
 
 ## Alternatives considered
 Publish implies activate (n8n 2.x style; rejected by the owner, SPEC-002 Q6). Pausing ingress during switches (rejected: loses or delays events). Reactivating triggers on restore (rejected: a restored flow could start running unattended).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** Publishing requires `flow:publish` and activating requires `flow:activate`; rule T-V3 verifies credential sharing.

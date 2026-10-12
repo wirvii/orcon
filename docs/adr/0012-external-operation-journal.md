@@ -58,3 +58,4 @@ One transaction per item state change (rejected: D1b); journal in memory with pe
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-003.** §1: the full contract schema is ADR-0029 §5. Suspension for `UNCERTAIN` of an `UNSAFE` operation emits the human-attention notification of ADR-0073; its actions are the existing supervised resolution (ADR-0029 §5). The values of the runtime contract of §1 are UPPER_SNAKE, as in the connector manifest.
+- **SPEC-004.** §4 adds: "Journal batches spanning several organisations are written as one transaction with per-organisation statements (ADR-0047 §3)." Credential use is audited at the confirmation point (ADR-0048 §2).

@@ -91,3 +91,8 @@ Defined in ADR-0011 §7.
 - Global reachability analysis for OR-joins (BPMN "non-local" semantics): rejected — expensive, hard to explain, not needed with completion signals.
 - Token-level XOR for IF nodes: rejected — silently changes the behaviour of every imported n8n flow with multi-item batches.
 - In-memory short waits (n8n < 65 s): rejected by D9.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §7: sub-flows never cross organizations.

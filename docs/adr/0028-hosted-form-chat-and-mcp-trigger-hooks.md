@@ -29,3 +29,8 @@ Forms, chat and MCP reuse ingress, deduplication, backpressure and response deli
 
 ## Alternatives considered
 Client-side rendered form app (rejected: requires JavaScript, harder accessibility). Sticky routing for MCP (rejected, ADR-0023).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** A form restricted to "Orcon user" means a member of the organization holding `flow:submit-form` in the project; public forms and chats are resolved with `orcon_engine.resolve_public_entry`.

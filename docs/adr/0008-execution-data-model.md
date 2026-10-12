@@ -37,7 +37,7 @@ A token carries: `id` (deterministic, §6), `executionId`, position (`nodeId`, i
 4. **Flow data** (persists across executions; key/value per flow): `get`, `set`, `increment(delta) → newValue`, `compareAndSet(expected, new) → bool`, `delete`. Each operation is an *internal effect*: executed in its own fenced transaction together with the token checkpoint and a result record (`flow_data_operation`) keyed by `operation_key = H(nodeExecutionId, itemIndex, operationIndex)`. Recomputation after a crash returns the recorded result and never reapplies the operation. (Exactly-once applies here only because the operation and its record share one local transaction; no claim is made for external systems.)
 5. **Execution context** (read-only): execution id, mode, flow id/version, trigger metadata, iteration index, multi-instance index, call chain.
 
-Credentials are outside all layers: encrypted at rest, resolved per dispatch, injected only into the call context of the node they are assigned to, never serialized into payloads, events or history.
+Credentials are outside all layers: encrypted under ADR-0042, resolved per dispatch under ADR-0043 (share check at every dispatch, host binding), injected only into the call context of the node they are assigned to, never serialized into payloads, events or history.
 
 ### 5. Node purity classes
 Each node type declares one: `PURE` (output is a function of inputs, parameters and recorded nondeterministic values), `READ` (external read without side effects; output persisted at the next confirmation point; re-executed if lost), `EFFECT` (journaled per item, ADR-0012), `INTERNAL_EFFECT` (flow data, §4.4).
@@ -56,3 +56,8 @@ Deterministic ids make recomputation idempotent (`INSERT … ON CONFLICT DO NOTH
 ## Alternatives considered
 - **Single mutable execution context map (N2N, n8n-like global data)**: rejected — last-write-wins between branches.
 - **One database row per item for every node output**: rejected for throughput; per-item rows exist only in the external-operation journal.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §4: credentials are encrypted under ADR-0042 and resolved per dispatch under ADR-0043 (share check at every dispatch, host binding); they are never serialized.

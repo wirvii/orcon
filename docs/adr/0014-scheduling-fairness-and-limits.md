@@ -29,3 +29,8 @@ Hot rows are avoided (snapshots, permit chunks). Global fairness is approximate;
 
 ## Alternatives considered
 Central dispatcher process (rejected: new role and single point of failure); exact global fair queue in one table row per key (rejected: contention under many workers).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §1: `fairness_key` is the hierarchical `org/flow` with per-organization weights (deficit round robin first across organizations, then across flows). §2 adds level 0, **organization** (in-flight tokens, executions per minute, pending ingress, history bytes), with batched permits in `limit_bucket` under the key `org:<id>:…`, and instance ceilings.

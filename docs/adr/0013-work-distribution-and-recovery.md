@@ -62,7 +62,7 @@ Deliveries that leave the database (execution-event subscribers, webhook respons
 - Every node invocation runs under `recover()`; a panic fails that node execution only.
 - Per-execution active-time limit and memory accounting (ADR-0016) fail only that execution.
 - User code and expressions run in the sandbox (ADR-0018); third-party extensions run under ADR-0032.
-- All data access is keyed by execution id; blob reads check ownership; credentials are injected only into the assigned node's call context.
+- All data access is keyed by organisation and execution id; blob reads check ownership; credentials are injected only into the assigned node's call context.
 - A whole-server crash affects only tokens it held; others continue; its tokens resume from the last confirmation point after lease expiry.
 
 ### 11. Out of V1
@@ -78,3 +78,4 @@ NATS JetStream redelivery as lease (N2N; rejected: no fencing, extra mandatory s
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-003.** §10: third-party extensions run under ADR-0032.
+- **SPEC-004.** §3: the claim runs as `orcon_engine.claim_tokens(...)` (ADR-0047 §2) and returns `org_id`; §4: lease renewal and the reaper also run as engine functions; §10: all data access is keyed by organisation and execution id.

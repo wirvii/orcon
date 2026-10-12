@@ -24,3 +24,8 @@ Bounded memory regardless of payload size; one runaway execution cannot exhaust 
 
 ## Alternatives considered
 PostgreSQL large objects (rejected: operational friction, vacuum issues); copying payloads through every token (rejected: memory and write amplification).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** Blob paths carry the prefix `org/<orgId>/`; the owner check includes the organization.

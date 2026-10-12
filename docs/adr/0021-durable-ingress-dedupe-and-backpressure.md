@@ -60,3 +60,8 @@ Every acknowledged event survives any single-process crash; throughput relies on
 
 ## Alternatives considered
 Acknowledge then persist from memory (rejected by T1). Separate ingress queue converted to executions later (rejected: double writes, a second backlog to reason about). Exact pending counter row per flow (rejected: hot row under high rates; snapshot with bounded overshoot instead). Count-only cap (rejected by the owner, SPEC-002 Q3: 100,000 × 16 MiB could reach 1.6 TB for one flow). Storing allowed methods as an array (rejected by ADR-0077: arrays are not used and methods are filtered).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §2: ingress batches are split per organization inside the transaction; §4: pending counts are also kept per organization (level 0 of ADR-0014).

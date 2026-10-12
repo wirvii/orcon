@@ -82,3 +82,8 @@ Trust is explicit, revocable and verifiable offline; the strict policy is free, 
 
 ## Alternatives considered
 Plain detached signatures (rejected: no rotation, freshness or revocation model); Sigstore keyless signing alone (rejected for runtime trust: depends on online transparency services and identity providers; may complement review provenance later); build-time edition flag or paid unlock for `STRICT` (rejected: creates a fork and contradicts the no-paid-features principle); a fourth "organisation-trusted" seal (rejected, SPEC-003 Q2: dilutes the meaning of seals); revocation that only warns (rejected, SPEC-003 Q3: lets known-malicious code keep running).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §4: the trust policy is instance-level; an organization may only restrict it further (`allowedSeals` must be a subset). `connector_grant.project_id` becomes `connector_grant(org_id, project_id?, …)`: the table gains `org_id` (ADR-0077 §5).

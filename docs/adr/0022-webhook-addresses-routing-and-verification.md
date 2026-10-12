@@ -42,3 +42,8 @@ Senders can be migrated gradually; native addresses are hard to guess and verifi
 
 ## Alternatives considered
 Address table outside versions (faster changes, less auditable; rejected by the owner, SPEC-002 Q7). Only n8n paths (rejected: perpetuates n8n naming and offers no project namespace). Resolving routes with an ordinary query (rejected by ADR-0077: with row-level security and no organization context it returns no rows). Naming the owning flow in every collision error (rejected: it reveals another organization's data).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-004.** §1: the `<project>` segment of native addresses is the instance-unique project identifier (the project slug; if it is already taken, `<org>-<project>`; SPEC-004 Q11). §3: a collision with an address of another organization returns a generic error without the flow name. §4: address authentication secrets come from the organization's credential store; an ingress host per organization is optional; resolving an incoming address before the organization is known is `orcon_engine.resolve_trigger_address` (ADR-0047 §2).

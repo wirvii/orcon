@@ -30,6 +30,8 @@ Machine-readable schema, proof levels, exception workflow, trust model, cancella
 
 Resolved on 2026-10-12 (SPEC-003): machine-readable schema and proof levels → ADR-0029 §5; trust model → ADR-0033. SPEC-003 lists as still open: the exception workflow beyond the supervised resolution of ADR-0012, and credential handling (BL-004).
 
+Resolved on 2026-10-12 (SPEC-004): credential handling → ADR-0043 and ADR-0045.
+
 ## Notes
 The safety policy of this ADR is unchanged.
 - Runtime journal, lifecycle details (VERIFYING, NOT_DISPATCHED, RESOLVED_*), group commit and recovery specified by ADR-0012; contract schema remains Proposed until the connector SDK ADR. (SPEC-001, accepted 2026-10-12.)
