@@ -20,4 +20,4 @@ Orcon will use materialized persistent workflow state and append-only execution 
 WorkflowDefinition, WorkflowExecution, NodeExecution, TaskAttempt, ExecutionEvent, TaskLease, Timer, PayloadReference, ExternalOperation.
 
 ## Deferred
-Exact state machine, storage schema, event catalog, replay contract, scheduling fairness, isolation levels, retention and failure-injection acceptance matrix. Agents must author specifications before implementing these details.
+Exact state machine, storage schema, event catalog, replay contract, scheduling fairness, isolation levels, retention and failure-injection acceptance matrix. Specifications must be written and accepted before these details are implemented.

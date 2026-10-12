@@ -1,6 +1,6 @@
 # Claude Code instructions
 
-Follow [AGENTS.md](AGENTS.md) and [docs/agents/implementation-contract.md](docs/agents/implementation-contract.md). All implementation work must derive from accepted requirements and ADRs. Stop for unresolved architectural decisions rather than guessing.
+Follow [AGENTS.md](AGENTS.md) and [docs/engineering/implementation-contract.md](docs/engineering/implementation-contract.md). All implementation work must derive from accepted requirements and ADRs. Stop for unresolved architectural decisions rather than guessing.
 
 <!-- mneme:managed:start v=1 -->
 Process and operating instructions are managed globally via mneme.

@@ -76,7 +76,7 @@ spec, la salida es ampliar el archivo, no aceptar el hallazgo por fuera del cont
 - Convención de commits: Conventional Commits in English (feat:, fix:, docs:, ci:, chore:, test:, refactor:). No Claude/Anthropic signatures or Co-Authored-By lines.
 - Stack: English for everything in the repository (code, comments, docs, ADRs, commit messages, PR descriptions) because Orcon is an Apache-2.0 open-source project meant for community adoption. Spanish only for team memories and mneme artifacts (specs, backlog, QA reports, mem_save).
 - Layout: Hybrid monorepo (ADR 0001): pnpm 9 + Turborepo for JS (apps/*, packages/js/*), go.work for independent Go modules (apps/orcon, packages/go/config, packages/go/workflow, packages/go/engine). One multi-role Go binary (apps/orcon) embeds the Vite build of apps/web via embed.FS (ui/dist).
-- Regla cross-cutting: Source-of-truth precedence (docs/agents/implementation-contract.md): Accepted ADRs > Accepted product requirements/invariants > Accepted API/schema/design-system specs > Proposed docs (research input only) > existing scaffold code.
+- Regla cross-cutting: Source-of-truth precedence (docs/engineering/implementation-contract.md): Accepted ADRs > Accepted product requirements/invariants > Accepted API/schema/design-system specs > Proposed docs (research input only) > existing scaffold code.
 - Regla cross-cutting: Only implement what derives from Accepted documents. Proposed/Experimental documents are never authorization to implement. If two Accepted sources conflict, stop and request an explicit decision.
 - Regla cross-cutting: Changing a foundational architecture choice requires an Accepted ADR first.
 - Regla cross-cutting: Never copy n8n source, implementation, or branding; Orcon is an independent implementation.
@@ -89,7 +89,7 @@ spec, la salida es ampliar el archivo, no aceptar el hallazgo por fuera del cont
 ## Area: product and architecture design (docs/, all apps)
 
 ### Documents to read before designing anything
-- `docs/product/vision.md` (Accepted), `docs/product/principles.md` (Accepted), `docs/architecture/overview.md` (Accepted at conceptual level), `docs/architecture/README.md`, `docs/agents/implementation-contract.md` (Accepted), every file under `docs/adr/`.
+- `docs/product/vision.md` (Accepted), `docs/product/principles.md` (Accepted), `docs/architecture/overview.md` (Accepted at conceptual level), `docs/architecture/README.md`, `docs/engineering/implementation-contract.md` (Accepted), every file under `docs/adr/`.
 - `docs/product/n8n-compatibility.md` and `docs/design-system/foundations.md` are **Proposed**: research input only. A design may cite them, but must never treat them as approved requirements.
 
 ### Status discipline

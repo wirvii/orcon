@@ -37,7 +37,7 @@ A new user can install Orcon and open the editor with one binary; create, execut
 
 ## Delivery model
 
-The product owner and architecture collaborators produce product specifications, ADRs, brand assets, design system, and agent contracts. Implementation agents own code and tests, subject to reviewed specifications and quality gates.
+The product owner and architecture collaborators produce product specifications, ADRs, brand assets, design system, and implementation contracts. Implementers own code and tests, subject to reviewed specifications and quality gates.
 
 ## Open questions
 

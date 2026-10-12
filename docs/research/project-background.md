@@ -1,12 +1,11 @@
-# Orcon — Handoff for Mneme
+# Orcon — Project Background
 
-Date: 2026-10-10. Status: historical context, not a blanket implementation approval.
+Date: 2026-10-10. Status: historical context, not a blanket implementation approval. Accepted ADRs and specifications supersede anything stated here.
 
 ## Vision
 
 Orcon (Orchestration Controller) is a genuinely open-source, Apache-2.0 alternative to n8n. The aim is community adoption, not direct monetization. Users must be free to fork, embed, modify, self-host and commercialize. Independent implementation, never a fork or direct port of n8n source. The founder previously explored N2N (Node to Node), a BPM engine.
 
-Our role in this conversation is **only** architecture, ADRs, product specifications, brand kit, design system and agent handoff. Local Mneme agents implement and test. Proposed ideas are not automatically approved.
 
 ## Agreed technology
 
@@ -38,8 +37,4 @@ Two conceptual contracts:
 
 ## Brand and design
 
-Working name Orcon, tagline "Build. Orchestrate. Execute. Your way." Identity: original muscular, intelligent, friendly **orc engineer/guardian** mascot; distinct minimal geometric logo. No copying characters from fictional franchises. Palette direction: dark charcoal, emerald, mint/teal, white. Preliminary unvalidated colors: #10221B, #22C55E, #BAF4C9, #F7FAF8, #334155. Prior generated concept boards showed mascot with laptop, wordmark, icon, UI and merchandise. Full master SVGs and brand kit are **not yet confirmed in GitHub**. Need complete accessible design system: semantic tokens, dark/light themes, typography, spacing, components, workflow editor states, keyboard accessibility, WCAG 2.2 AA, icons, mascot variants, usage rules. The name has potential pre-existing commercial use; do not block work, but do not assert legal clearance.
-
-## Agent instructions
-
-Read AGENTS.md, CLAUDE.md, docs/product/*, docs/architecture/*, docs/design-system/* and accepted ADRs. Accepted ADRs supersede proposals and scaffold. Open ADRs include execution semantics, storage, EOSC, optional coordination, workflow graph, compatibility, connector isolation, AI/MCP, security, observability, editor, design system, deployment and benchmarks. Mneme should use bounded risk-based review rather than endless expensive certification. No implementation without acceptance criteria and approved scope.
+Working name Orcon, tagline "Build. Orchestrate. Execute. Your way." Identity: original muscular, intelligent, friendly **orc engineer/guardian** mascot; distinct minimal geometric logo. No copying characters from fictional franchises. The approved reference boards and the exact palette are recorded in `brand/README.md`, which supersedes the preliminary palette explored earlier. Need complete accessible design system: semantic tokens, dark/light themes, typography, spacing, components, workflow editor states, keyboard accessibility, WCAG 2.2 AA, icons, mascot variants, usage rules. The name has potential pre-existing commercial use; do not block work, but do not assert legal clearance.

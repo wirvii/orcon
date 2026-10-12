@@ -27,4 +27,4 @@ Complete primitive and semantic tokens; light/dark themes; spacing, typography, 
 4. Do not declare the Brand Kit complete until original assets and approved exports exist.
 
 ## Important
-Previous substitute SVGs did not match approved visuals and were removed. Agents must not regenerate arbitrary replacements or mistake the preliminary scaffold for approved design.
+Previous substitute SVGs did not match approved visuals and were removed. Do not regenerate arbitrary replacements or mistake the preliminary scaffold for approved design.

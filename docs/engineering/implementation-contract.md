@@ -1,10 +1,10 @@
-# Orcon — Agent Implementation Contract
+# Orcon — Implementation Contract
 
 Status: **Accepted** | Version: 0.1
 
 ## Role separation
 
-Product/architecture work authors requirements, ADRs, design specifications and brand assets. Implementation agents author code, tests and operational artifacts. Agents must not treat speculative documents as approved implementation instructions.
+Product/architecture work authors requirements, ADRs, design specifications and brand assets. Implementation work produces code, tests and operational artifacts. Contributors must not treat speculative documents as approved implementation instructions.
 
 ## Source-of-truth precedence
 

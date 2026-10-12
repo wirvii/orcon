@@ -17,4 +17,4 @@ Status: **Accepted** | Version: 0.1
 
 ## Specification discipline
 
-Mark each document or decision **Proposed**, **Accepted**, **Experimental**, or **Superseded**. Acceptance criteria must be measurable. Agents may choose implementation details only where specifications explicitly delegate them. Changes to architecture require an ADR.
+Mark each document or decision **Proposed**, **Accepted**, **Experimental**, or **Superseded**. Acceptance criteria must be measurable. Implementers may choose implementation details only where specifications explicitly delegate them. Changes to architecture require an ADR.

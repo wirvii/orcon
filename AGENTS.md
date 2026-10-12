@@ -1,6 +1,6 @@
 # Instructions for coding agents
 
-Read `docs/product/vision.md`, `docs/product/principles.md`, `docs/architecture/overview.md`, `docs/agents/implementation-contract.md`, and relevant ADRs **before implementing**.
+Read `docs/product/vision.md`, `docs/product/principles.md`, `docs/architecture/overview.md`, `docs/engineering/implementation-contract.md`, and relevant ADRs **before implementing**.
 
 This repository is an early scaffold. Do not infer that an engine, persistence layer, or worker is production-ready. Decisions labeled Proposed or Experimental are not authorization to implement them as settled architecture.
 

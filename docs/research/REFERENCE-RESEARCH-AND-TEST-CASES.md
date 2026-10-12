@@ -76,12 +76,11 @@ Workflow editor must visually distinguish: invalid safety contract, verified saf
 
 ## References to read together
 
-- docs/PROJECT-KNOWLEDGE-TRANSFER.md
+- docs/research/project-background.md
 - docs/product/vision.md
 - docs/product/principles.md
 - docs/product/n8n-compatibility.md
 - docs/architecture/overview.md
 - docs/design-system/foundations.md
-- docs/agents/implementation-contract.md
+- docs/engineering/implementation-contract.md
 - docs/adr/0001-monorepo.md
-- AGENTS.md
