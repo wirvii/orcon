@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Architecture layers
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon server code is divided into Go packages and which package may depend on which. It applies to every package in the root module `github.com/wirvii/orcon` and to the community modules under `packages/go/`. The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`AL-…`) are stable and are cited by linter messages, reviews and other rulebook files.
 

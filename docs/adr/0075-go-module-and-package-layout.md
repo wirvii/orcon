@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0075: Go module and package layout
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 ADR 0001 joined four independent Go modules with go.work, and ADR-0002 placed shared libraries in packages/go. No package has external consumers, yet every new package costs a module, a go.work entry, a require line and CI edits. The accepted roadmap plans about forty server packages. Independent modules for server-internal code give no versioning benefit and fragment tooling. Community-facing Go code (API client SDK, connector SDK, WASM guest SDK) does need independent semantic versions.

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Data access
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon reads and writes its durable state in SQLite (standalone) and PostgreSQL (distributed). It applies to the storage adapters `internal/adapter/sqlite`, `internal/adapter/postgres` and `internal/adapter/storetest`, and to the area ports they implement. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`DA-…`) are stable. The foundational choices are recorded in ADR 0076 §3.
 

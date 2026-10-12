@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Tooling
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines the commands that check Orcon Go code, the pinned tools behind them, the CI jobs that run them, the provenance check and the role of mneme. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`TOOL-…`) are stable.
 

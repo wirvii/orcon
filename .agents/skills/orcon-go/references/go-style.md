@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Go style
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon Go code is written. It applies to every `.go` file in the repository, including tests, tools and community modules. It builds on [Effective Go](https://go.dev/doc/effective_go), [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) and [Go Doc Comments](https://go.dev/doc/comment), and uses the [Google Go Style Guide](https://google.github.io/styleguide/go/) where this file is silent; precedence is defined in architecture-layers.md. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`GS-…`) are stable.
 

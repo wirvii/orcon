@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0076: Go foundational libraries and code generators
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 Foundational dependencies need an accepted ADR (implementation contract, docs/engineering/implementation-contract.md). Earlier designs proposed pgx/v5 and modernc.org/sqlite and left the Go OpenAPI generator to measurement. The maintainers decided the remaining choices.

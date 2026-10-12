@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Go engineering standards
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 Orcon Go code follows idiomatic Go as described by [Effective Go](https://go.dev/doc/effective_go), [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments), [Go Doc Comments](https://go.dev/doc/comment) and the [Google Go Style Guide](https://google.github.io/styleguide/go/), organized as ports and adapters: business areas declare the small interfaces they need, technology adapters implement them, and one composition root wires everything together. The module and package layout is recorded in [ADR 0075](../adr/0075-go-module-and-package-layout.md) and the foundational libraries in [ADR 0076](../adr/0076-go-foundational-libraries-and-code-generators.md).
 

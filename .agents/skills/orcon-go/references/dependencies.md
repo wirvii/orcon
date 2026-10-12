@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Dependencies
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines when a Go dependency may be added to Orcon, which licenses are acceptable, and how vulnerabilities and the bill of materials are handled. It applies to every module in the repository: the root module, the community modules under `packages/go/` and the `tools/` module. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`DEP-…`) are stable.
 

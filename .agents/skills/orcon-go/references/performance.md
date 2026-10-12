@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Performance
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon measures performance, how regressions are gated, the initial performance budgets and the reference hardware they are measured on. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`PERF-…`, `PB-…`) are stable. The release gate itself remains D20 (ADR 0019 §4); the budgets below are internal absolute targets.
 

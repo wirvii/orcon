@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # API and code generation
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon's HTTP API is specified, generated and served. It applies to `packages/openapi/v1/`, `internal/adapter/httpapi` and its generated package `apigen`. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`API-…`) are stable. The foundational choices are recorded in ADR 0076 §1–§2.
 
