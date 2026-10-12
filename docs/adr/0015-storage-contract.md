@@ -93,3 +93,4 @@ ORM-level abstraction (rejected: hides locking semantics); SQLite as a shared mu
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-002.** Adds the tables of ADR-0021 §5 under the rules of ADR-0077; the column `flow.activation_state` (`ACTIVE` | `INACTIVE`); the column `ingress_event.size_bytes`, indexed for the byte caps; the engine functions `orcon_engine.resolve_trigger_address` and `orcon_engine.resolve_public_entry`.
+- **SPEC-003.** Adds the tables of ADR-0029 §8 and ADR-0037 §7 under the rules of ADR-0077.

@@ -42,7 +42,7 @@ SQLite is not a shared distributed coordinator. PostgreSQL task claims are plann
 
 ## Deferred architecture decisions
 
-Still deferred: idempotency protocol at the connector SDK level; secrets and tenancy; plugin execution; API versioning; auth/IAM; observability schema. Object storage is partially specified by ADR-0016. Do not implement these based on assumptions.
+Still deferred: secrets and tenancy; API versioning; auth/IAM; observability schema. Object storage is partially specified by ADR-0016. Do not implement these based on assumptions.
 
 Resolved by accepted ADRs:
 - Engine state machine → ADR-0009 (SPEC-001, 2026-10-12).
@@ -50,3 +50,5 @@ Resolved by accepted ADRs:
 - SQLite/PostgreSQL abstraction → ADR-0015 (SPEC-001, 2026-10-12).
 - Scheduling and fairness → ADR-0014 (SPEC-001, 2026-10-12).
 - n8n expression compatibility → ADR-0018 (SPEC-001, 2026-10-12).
+- Plugin execution → ADR-0032 (SPEC-003, 2026-10-12).
+- Idempotency protocol at the connector SDK level → ADR-0029 §5 and ADR-0030 (SPEC-003, 2026-10-12).

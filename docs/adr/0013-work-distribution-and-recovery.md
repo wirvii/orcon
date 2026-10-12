@@ -61,7 +61,7 @@ Deliveries that leave the database (execution-event subscribers, webhook respons
 ### 10. Isolation guarantees (D5)
 - Every node invocation runs under `recover()`; a panic fails that node execution only.
 - Per-execution active-time limit and memory accounting (ADR-0016) fail only that execution.
-- User code and expressions run in the sandbox (ADR-0018); third-party extensions wait for their own ADR.
+- User code and expressions run in the sandbox (ADR-0018); third-party extensions run under ADR-0032.
 - All data access is keyed by execution id; blob reads check ownership; credentials are injected only into the assigned node's call context.
 - A whole-server crash affects only tokens it held; others continue; its tokens resume from the last confirmation point after lease expiry.
 
@@ -73,3 +73,8 @@ No execution can remain owned by a dead worker; stale workers cannot commit; for
 
 ## Alternatives considered
 NATS JetStream redelivery as lease (N2N; rejected: no fencing, extra mandatory service); Temporal (rejected: mandatory external service, ADR-0004); one transaction per node (rejected: throughput); advisory locks as leases (rejected: tied to sessions, no fencing across reconnects).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-003.** §10: third-party extensions run under ADR-0032.

@@ -42,3 +42,8 @@ True isolation for expressions and Code nodes inside the single binary; performa
 
 ## Alternatives considered
 goja in-process (rejected, §3); V8 via CGO (rejected: CGO, binary size, cross-compilation); separate Node.js runner process (rejected: second runtime, contradicts single-binary simplicity); custom expression language (rejected: breaks n8n familiarity).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-003.** The JavaScript profile of the Code node is defined in ADR-0036 §3; the QuickJS module is reused for WASM connectors written in JavaScript (ADR-0032 §7) and for the n8n community node converter (ADR-0035 §2).

@@ -11,7 +11,7 @@ ADR-0005 mandates the operation lifecycle. D1 requires per-item tracking (or per
 
 ## Decision
 
-### 1. Runtime contract (minimum the engine needs; full schema stays with the connector SDK ADR)
+### 1. Runtime contract (minimum the engine needs; full schema: ADR-0029 §5)
 `effect` (`READ|WRITE|DELETE|UNKNOWN`), `idempotency { mode: PROVIDER_KEY | NATURAL_KEY | NONE, ttl, keyField }`, `verification { reconcile: bool }`, `onUncertain: RESEND_WITH_KEY | RECONCILE | SUSPEND`, `retrySafe: bool`, `compensation?`. The values are the ones of the connector manifest (ADR-0080 §3). An effect node without a valid contract cannot be published or dispatched.
 
 ### 2. Lifecycle per item (or per batch call)
@@ -53,3 +53,8 @@ Per-item safety at batch-level write cost. Throughput is bounded by concurrency 
 
 ## Alternatives considered
 One transaction per item state change (rejected: D1b); journal in memory with periodic flush before dispatch confirmation (rejected: violates "persist intent before dispatch").
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-003.** §1: the full contract schema is ADR-0029 §5. Suspension for `UNCERTAIN` of an `UNSAFE` operation emits the human-attention notification of ADR-0073; its actions are the existing supervised resolution (ADR-0029 §5). The values of the runtime contract of §1 are UPPER_SNAKE, as in the connector manifest.

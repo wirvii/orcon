@@ -30,7 +30,7 @@ All families converge on one operation, `AcceptEvents(batch)` (ADR-0021), which 
 `trigger.configHash` = SHA-256 of the JCS form of the block plus node `type` and `parameters`.
 Enumerated values in this block are UPPER_SNAKE (ADR-0080 §3): the flow document is returned verbatim by the API, so it follows the same spelling as every other public value.
 
-### 3. Connector trigger contract (Go; packaging and sandboxing of third-party connectors are deferred to the connector SDK ADR)
+### 3. Connector trigger contract (Go; packaging and sandboxing of third-party connectors: ADR-0029 and ADR-0032)
 Every trigger node type declares: `family`, `delivery` (`AT_LEAST_ONCE` | `AT_MOST_ONCE` | `CURSOR_EXACT`), `dedupeKeySource`, `sensitiveFields`, `maxPayload`, `n8nTypes` (n8n node type names it replaces), and implements the hooks of its family:
 - `WEBHOOK` / `APP_EVENT`: `Routes(params) []RouteSpec`; `Verify(req, secret) error`; `Handshake(req) (resp, handled bool)`; `Decode(req) ([]Item, dedupeKey string, err error)`. `Verify`, `Handshake` and `Decode` must be pure (no network), bounded to 50 ms and to the request size.
 - `APP_EVENT` additionally: `Register(ctx, cred, callbackURL, params) (externalRef, secret, expiresAt, error)`, `Deregister(ctx, cred, externalRef)`, `List(ctx, cred) ([]Registered, error)`, `Renew(ctx, cred, externalRef) (expiresAt, error)`.
@@ -69,3 +69,8 @@ Triggers as long-running executions (n8n-style "trigger node keeps running"): re
 
 ## Related
 Human waits started by triggers (multi-page form pages, Wait-node resume by form or webhook) are SPEC-001 durable waits; any notification about them is governed by ADR-0073 (human-attention notifications), where they are the `END_USER_WAIT` kind: no notification by default, enabled per node with `attention.notify: ON` (owner decision SPEC-002 N1). This ADR defines none.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-003.** §3: packaging and sandboxing are defined by ADR-0029 and ADR-0032; declarative triggers are defined by ADR-0030 §8; WASM connectors may implement `WEBHOOK`, `POLL` and `APP_EVENT`, not `LISTEN`.

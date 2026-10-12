@@ -61,3 +61,4 @@ Synthetic micro-benchmarks only (rejected: not comparable); gating only on throu
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-002.** Adds the fault-injection cases FI-17..FI-24 of ADR-0021, ADR-0025, ADR-0026 and ADR-0027; the n8n response-mode compatibility suite (ADR-0023 §3) runs next to the expression suite; benchmark scenario S2 uses both native and imported addresses.
+- **SPEC-003.** New gates: the conformance kit over every official connector (ADR-0031 §5); the WASM escape suite (FI-25, ADR-0032 §9); TUF attacks (ADR-0033); unweighted coverage ≥ 90 % (ADR-0037 §4); the Code node measurement reports (ADR-0036); a single notification for an `UNSAFE` operation left uncertain after a crash.
