@@ -21,7 +21,8 @@
     "test:stories": "node scripts/check-story-coverage.mjs --strict",
     "test:a11y": "vitest run --project a11y",
     "test:targets": "vitest run --project targets --project density",
-    "test:density": "vitest run --project density"
+    "test:density": "vitest run --project density",
+    "test:expansion": "vitest run --project expansion"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.0",

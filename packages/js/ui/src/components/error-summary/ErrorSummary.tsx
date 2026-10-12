@@ -53,11 +53,11 @@ export function ErrorSummary({ errors, focusOnMount = false, className }: ErrorS
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className={cn('border-status-danger bg-status-danger-bg text-status-danger rounded-md border p-3', className)}
+      className={cn('border-status-danger bg-status-danger-bg text-status-danger rounded-md border p-3 break-words', className)}
     >
       <h2 className="flex items-center gap-2 text-base font-semibold">
         <CircleAlert aria-hidden className="size-icon-20 shrink-0" />
-        {intl.formatMessage(messages.title, { count: errors.length })}
+        <span className="min-w-0">{intl.formatMessage(messages.title, { count: errors.length })}</span>
       </h2>
       <ul className="mt-2 flex list-none flex-col gap-1 pl-0">
         {errors.map((error) => (

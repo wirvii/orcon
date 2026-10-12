@@ -10,8 +10,13 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
   return <table className={cn('text-fg w-full border-separate border-spacing-0 text-base', className)} {...props} />;
 }
 
-export function TableCaption({ className, ...props }: HTMLAttributes<HTMLTableCaptionElement>) {
-  return <caption className={cn('text-fg-muted pb-2 text-left text-sm', className)} {...props} />;
+export interface TableCaptionProps extends HTMLAttributes<HTMLTableCaptionElement> {
+  /** Keep the caption for screen readers only. It still names the table. */
+  visuallyHidden?: boolean;
+}
+
+export function TableCaption({ className, visuallyHidden = false, ...props }: TableCaptionProps) {
+  return <caption className={cn(visuallyHidden ? 'sr-only' : 'text-fg-muted pb-2 text-left text-sm', className)} {...props} />;
 }
 
 export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {

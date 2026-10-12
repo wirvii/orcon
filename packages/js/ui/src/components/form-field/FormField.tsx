@@ -116,11 +116,11 @@ export function FormField({ label, description, error: errorProp, required = fal
   return (
     <FieldContext.Provider value={value}>
       {group ? (
-        <fieldset aria-describedby={[value.descriptionId, value.errorId].filter(Boolean).join(' ') || undefined} className={cn('flex min-w-0 flex-col gap-1', className)}>
+        <fieldset aria-describedby={[value.descriptionId, value.errorId].filter(Boolean).join(' ') || undefined} className={cn('flex min-w-0 flex-col gap-1 break-words', className)}>
           {body}
         </fieldset>
       ) : (
-        <div className={cn('flex flex-col gap-1', className)}>{body}</div>
+        <div className={cn('flex flex-col gap-1 break-words', className)}>{body}</div>
       )}
     </FieldContext.Provider>
   );

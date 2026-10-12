@@ -63,6 +63,15 @@ export default defineConfig({
         },
       },
       {
+        // Pseudo-locale xx-LS: no text container overflows unless truncation is declared.
+        extends: true,
+        test: {
+          name: 'expansion',
+          include: ['test/expansion/**/*.test.tsx'],
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
         // Touch and a coarse pointer: every interactive control is at least 44x44 px.
         extends: true,
         test: {

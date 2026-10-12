@@ -19,7 +19,7 @@ function Demo({ selected, sticky, hover }: { selected?: string; sticky?: boolean
   return (
     <div className="bg-surface max-h-node-width max-w-screen-sm overflow-auto rounded-md border border-border" role="region" aria-label="Executions table" tabIndex={0}>
       <Table>
-        <TableCaption className="sr-only">Recent executions</TableCaption>
+        <TableCaption visuallyHidden>Recent executions</TableCaption>
         <TableHeader>
           <TableRow header>
             <TableHead sticky={sticky}>Execution</TableHead>
