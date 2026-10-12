@@ -25,3 +25,9 @@ export const menuItem = [
 
 /** The floating panel behind menus, selects and popovers. */
 export const floatingPanel = 'z-dropdown rounded-md border border-border bg-surface-raised text-fg shadow-md';
+
+/** Backdrop behind a modal dialog or sheet. Dims the page in both themes. */
+export const scrim = 'fixed inset-0 z-overlay bg-scrim opacity-60';
+
+/** The surface of a modal dialog or sheet. */
+export const modalPanel = 'z-modal border border-border bg-surface-raised text-fg shadow-lg';
