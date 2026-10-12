@@ -14,6 +14,7 @@ package.json  # JSON has no comment syntax
 turbo.json  # JSON has no comment syntax
 pnpm-lock.yaml  # generated lock file
 internal/adapter/webui/dist/**  # build output of the web app, replaced by make web
+tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it carries the SPDX lines as comments)
 
 # JavaScript side: headers are added by SPEC-008 slice G4b (frontend owner).
 # TEMPORARY - remove these two lines when G4b lands.
