@@ -17,9 +17,9 @@ importers:
 
   apps/web:
     dependencies:
-      '@xyflow/react':
-        specifier: ^12.0.0
-        version: 12.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@orcon/ui':
+        specifier: workspace:*
+        version: link:../../packages/js/ui
       react:
         specifier: ^19.0.0
         version: 19.3.0
@@ -27,12 +27,36 @@ importers:
         specifier: ^19.0.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
+      '@axe-core/playwright':
+        specifier: ^4.10.0
+        version: 4.13.0(playwright-core@1.64.0)
+      '@orcon/lint-config':
+        specifier: workspace:*
+        version: link:../../packages/js/lint-config
+      '@playwright/test':
+        specifier: 1.64.0
+        version: 1.64.0
+      '@tailwindcss/vite':
+        specifier: ^4.1.17
+        version: 4.3.3(vite@6.4.4(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.1))
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.3.0(@types/react@19.3.0)
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      stylelint:
+        specifier: ^16.15.0
+        version: 16.26.1(typescript@5.9.3)
+      tailwindcss:
+        specifier: ^4.1.17
+        version: 4.3.3
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -238,6 +262,11 @@ packages:
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
+
+  '@axe-core/playwright@4.13.0':
+    resolution: {integrity: sha512-6YLx+kxXu5GJceG4ozFg+33a2EMTdjYwWGloJ3sb9Kta5pp+ZNS53uxGVog5JetIY8s++P5UrtX+cri+u0VAVg==}
+    peerDependencies:
+      playwright-core: '>= 1.0.0'
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -910,6 +939,11 @@ packages:
   '@pkgr/core@0.3.6':
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
+
+  '@playwright/test@1.64.0':
+    resolution: {integrity: sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -2261,6 +2295,10 @@ packages:
   available-typed-arrays@1.0.7:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
+
+  axe-core@4.13.0:
+    resolution: {integrity: sha512-UzGt8zg7Ny8djbYMhxl2zuEevVa7r2gJjYY5Lwr1xM7+XU2nd6CkIWFTVcCIbAP63vSz71NaVyyuSk9lHKcy0A==}
+    engines: {node: '>=4'}
 
   axe-core@4.14.0:
     resolution: {integrity: sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ==}
@@ -4376,6 +4414,11 @@ snapshots:
       '@csstools/css-tokenizer': 3.0.4
       lru-cache: 10.4.3
 
+  '@axe-core/playwright@4.13.0(playwright-core@1.64.0)':
+    dependencies:
+      axe-core: 4.13.0
+      playwright-core: 1.64.0
+
   '@babel/code-frame@7.29.7':
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
@@ -4998,6 +5041,10 @@ snapshots:
     optional: true
 
   '@pkgr/core@0.3.6': {}
+
+  '@playwright/test@1.64.0':
+    dependencies:
+      playwright: 1.64.0
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -6409,6 +6456,8 @@ snapshots:
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
+
+  axe-core@4.13.0: {}
 
   axe-core@4.14.0: {}
 

@@ -5,6 +5,9 @@
   "description": "Orcon design system: themed, accessible React components built on Radix and the Orcon tokens.",
   "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/index.css"

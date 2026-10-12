@@ -1,1 +1,17 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Orcon</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Orcon</title>
+    <!-- No favicon until the approved brand assets exist; an empty one avoids a failed request. -->
+    <link rel="icon" href="data:," />
+    <!-- Sets the saved theme, density and language before the first paint. A file, not inline script, so a strict Content-Security-Policy works. -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
