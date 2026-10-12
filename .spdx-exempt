@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Files exempt from the SPDX header check (tools/spdxcheck). One glob per line,
+# each with a reason: "glob  # reason". Binary files are skipped automatically.
+
+# Tool-managed configuration directories and instruction files are exempt
+# built in (tools/provenance/configpaths); they are not repeated here.
+
+# Formats without comment syntax, or whose bytes are significant.
+LICENSE  # canonical license text, must stay byte-identical
+**/go.sum  # generated checksum list; comments are not allowed
+package.json  # JSON has no comment syntax
+turbo.json  # JSON has no comment syntax
+pnpm-lock.yaml  # generated lock file
+internal/adapter/webui/dist/**  # build output of the web app, replaced by make web
+
+# JavaScript side: headers are added by SPEC-008 slice G4b (frontend owner).
+# TEMPORARY - remove these two lines when G4b lands.
+apps/web/**  # TEMPORARY: SPDX headers for the web app arrive in SPEC-008 G4b
+packages/js/**  # TEMPORARY: SPDX headers for the JS packages arrive in SPEC-008 G4b
