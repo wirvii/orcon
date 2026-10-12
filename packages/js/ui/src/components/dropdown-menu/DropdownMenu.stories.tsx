@@ -3,29 +3,44 @@
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Ellipsis } from 'lucide-react';
+import type { ComponentProps, ComponentType } from 'react';
+import { useIntl, type MessageDescriptor } from 'react-intl';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
+import { storyMessages as m } from '../../stories/messages';
 import { IconButton } from '../icon-button/IconButton';
 
 import { DropdownMenu, type MenuEntry } from './DropdownMenu';
 
 const onSelect = fn();
-const items: MenuEntry[] = [
-  { type: 'label', label: 'Flow' },
-  { type: 'item', label: 'Rename', onSelect },
-  { type: 'item', label: 'Duplicate', onSelect },
-  { type: 'item', label: 'Export', disabled: true },
-  { type: 'separator' },
-  { type: 'item', label: 'Delete flow', destructive: true, onSelect },
-];
 
-const trigger = <IconButton variant="secondary" icon={Ellipsis} label="Flow actions" />;
+type Args = Partial<ComponentProps<typeof DropdownMenu>> & { only?: 'destructive' | 'disabled'; triggerLabel?: MessageDescriptor };
 
-const meta = {
+/** The menu with its sample text from the message catalog, so the pseudo-locale lengthens it. */
+function FlowMenu({ only, triggerLabel = m.menuTrigger, ...props }: Args) {
+  const intl = useIntl();
+  const items: MenuEntry[] = [
+    { type: 'label', label: intl.formatMessage(m.menuLabel) },
+    { type: 'item', label: intl.formatMessage(m.menuRename), onSelect },
+    { type: 'item', label: intl.formatMessage(m.menuDuplicate), onSelect },
+    { type: 'item', label: intl.formatMessage(m.menuExport), disabled: true },
+    { type: 'separator' },
+    { type: 'item', label: intl.formatMessage(m.deleteFlow), destructive: true, onSelect },
+  ];
+  const shown =
+    only === 'destructive'
+      ? items.filter((entry) => entry.type !== 'item' || entry.destructive)
+      : only === 'disabled'
+        ? items.map((entry) => (entry.type === 'item' ? { ...entry, disabled: true } : entry))
+        : items;
+  return <DropdownMenu trigger={<IconButton variant="secondary" icon={Ellipsis} label={intl.formatMessage(triggerLabel)} />} items={shown} {...props} />;
+}
+
+const meta: Meta<Args> = {
   title: 'Components/DropdownMenu',
-  component: DropdownMenu,
-  args: { trigger, items },
+  component: DropdownMenu as ComponentType<Args>,
+  render: (args) => <FlowMenu {...args} />,
   decorators: [
     (Story, context) =>
       context.name === 'Matrix' ? (
@@ -36,10 +51,10 @@ const meta = {
         </div>
       ),
   ],
-} satisfies Meta<typeof DropdownMenu>;
+};
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<Args>;
 
 export const Default: Story = {
   play: async ({ canvasElement }) => {
@@ -54,8 +69,8 @@ export const Default: Story = {
 };
 
 export const Open: Story = { args: { defaultOpen: true } };
-export const Destructive: Story = { args: { defaultOpen: true, items: items.filter((entry) => entry.type !== 'item' || entry.destructive) } };
-export const Disabled: Story = { args: { defaultOpen: true, items: items.map((entry) => (entry.type === 'item' ? { ...entry, disabled: true } : entry)) } };
+export const Destructive: Story = { args: { defaultOpen: true, only: 'destructive' } };
+export const Disabled: Story = { args: { defaultOpen: true, only: 'disabled' } };
 
 export const Matrix: Story = {
   render: () => (
@@ -67,10 +82,10 @@ export const Matrix: Story = {
           label: 'menu',
           cells: [
             <div key="d" className="h-12">
-              <DropdownMenu trigger={<IconButton variant="secondary" icon={Ellipsis} label="Actions, closed" />} items={items} />
+              <FlowMenu triggerLabel={m.menuClosed} />
             </div>,
             <div key="o" className="h-node-width w-node-width">
-              <DropdownMenu defaultOpen trigger={<IconButton variant="secondary" icon={Ellipsis} label="Actions, open" />} items={items} />
+              <FlowMenu defaultOpen triggerLabel={m.menuOpen} />
             </div>,
           ],
         },

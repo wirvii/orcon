@@ -119,7 +119,7 @@ export function CommandPalette({ commands, open: controlledOpen, defaultOpen = f
                           }}
                           className={commandItem}
                         >
-                          <span className="min-w-0 flex-1 truncate">{command.label}</span>
+                          <span className="min-w-0 flex-1 wrap-anywhere">{command.label}</span>
                           {command.shortcut ? <KbdCombination keys={command.shortcut} /> : null}
                         </Command.Item>
                       ))}

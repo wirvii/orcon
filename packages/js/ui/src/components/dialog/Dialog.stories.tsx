@@ -2,44 +2,59 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { ComponentProps, ComponentType } from 'react';
+import { useIntl } from 'react-intl';
 import { expect, userEvent, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
+import { storyMessages as m } from '../../stories/messages';
 import { Button } from '../button/Button';
 import { FormField } from '../form-field/FormField';
 import { Input } from '../input/Input';
 
 import { Dialog, DialogClose } from './Dialog';
 
-const footer = (
-  <>
-    <DialogClose asChild>
-      <Button variant="secondary">Cancel</Button>
-    </DialogClose>
-    <Button>Save</Button>
-  </>
-);
+type Args = Partial<ComponentProps<typeof Dialog>> & { withFooter?: boolean; withTrigger?: boolean };
 
-const meta = {
-  title: 'Components/Dialog',
-  component: Dialog,
-  args: {
-    title: 'Rename flow',
-    description: 'The new name appears in the flow list and in notifications.',
-    children: (
-      <FormField label="Flow name">
-        <Input defaultValue="Nightly sync" />
+/** The dialog with its sample text from the message catalog, so the pseudo-locale lengthens it. */
+function RenameDialog({ withFooter, withTrigger, ...props }: Args) {
+  const intl = useIntl();
+  return (
+    <Dialog
+      title={intl.formatMessage(m.renameTitle)}
+      trigger={withTrigger ? <Button variant="secondary">{intl.formatMessage(m.renameTitle)}</Button> : undefined}
+      description={intl.formatMessage(m.renameDescription)}
+      footer={
+        withFooter ? (
+          <>
+            <DialogClose asChild>
+              <Button variant="secondary">{intl.formatMessage(m.cancel)}</Button>
+            </DialogClose>
+            <Button>{intl.formatMessage(m.save)}</Button>
+          </>
+        ) : undefined
+      }
+      {...props}
+    >
+      <FormField label={intl.formatMessage(m.renameField)}>
+        <Input defaultValue={intl.formatMessage(m.renameValue)} />
       </FormField>
-    ),
-  },
-} satisfies Meta<typeof Dialog>;
+    </Dialog>
+  );
+}
+
+const meta: Meta<Args> = {
+  title: 'Components/Dialog',
+  component: Dialog as ComponentType<Args>,
+  render: (args) => <RenameDialog {...args} />,
+};
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<Args>;
 
 /** Closed, with its trigger. Opening it moves focus inside; Escape returns focus to the trigger. */
 export const Default: Story = {
-  args: { trigger: <Button variant="secondary">Rename flow</Button> },
+  args: { withTrigger: true },
   play: async ({ canvasElement }) => {
     const trigger = within(canvasElement).getByRole('button', { name: 'Rename flow' });
     await userEvent.click(trigger);
@@ -51,19 +66,14 @@ export const Default: Story = {
 };
 
 export const Open: Story = { args: { defaultOpen: true } };
-export const Footer: Story = { args: { defaultOpen: true, footer } };
+export const Footer: Story = { args: { defaultOpen: true, withFooter: true } };
 
 export const Matrix: Story = {
   render: () => (
     <MatrixTable
       caption="Dialog (the open states are their own stories)"
       columns={['default']}
-      rows={[
-        {
-          label: 'trigger',
-          cells: [<Dialog key="d" title="Rename flow" trigger={<Button variant="secondary">Rename flow</Button>} />],
-        },
-      ]}
+      rows={[{ label: 'trigger', cells: [<RenameDialog key="d" withTrigger />] }]}
     />
   ),
 };

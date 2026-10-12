@@ -222,7 +222,7 @@ export function AttentionInboxScreen({
             />
           </div>
           <aside aria-labelledby="notifications-heading" className="bg-surface border-border rounded-lg border p-3 lg:w-node-width lg:shrink-0">
-            <h2 id="notifications-heading" className="text-md font-semibold break-words">
+            <h2 id="notifications-heading" className="text-md font-semibold wrap-anywhere">
               {intl.formatMessage(messages.notifications)}
             </h2>
             <ul aria-label={intl.formatMessage(messages.notificationsLabel)} className="mt-2 flex flex-col gap-3">
@@ -233,8 +233,8 @@ export function AttentionInboxScreen({
                   <li key={note.id} className="flex items-start gap-2">
                     <Icon aria-hidden className={cn('mt-1 size-icon-16 shrink-0', meta.color)} />
                     <div className="min-w-0">
-                      <p className={cn('text-sm font-medium break-words', meta.color)}>{intl.formatMessage(meta.text)}</p>
-                      <p className="break-words">{note.text}</p>
+                      <p className={cn('text-sm font-medium wrap-anywhere', meta.color)}>{intl.formatMessage(meta.text)}</p>
+                      <p className="wrap-anywhere">{note.text}</p>
                       <p className="text-fg-muted text-sm">
                         <RelativeTime value={note.at} now={now} />
                       </p>

@@ -45,8 +45,8 @@ export function ErrorPageScreen({ problem = exampleProblem, onRetry }: ErrorPage
         <BrandMark />
       </header>
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col gap-4 p-4">
-        <h1 className="text-2xl font-semibold break-words">{intl.formatMessage(messages.title)}</h1>
-        <p className="text-fg-muted break-words">{intl.formatMessage(messages.text)}</p>
+        <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
+        <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.text)}</p>
         <ProblemAlert problem={problem} />
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={onRetry}>{intl.formatMessage(messages.retry)}</Button>

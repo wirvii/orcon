@@ -47,7 +47,7 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
       <dl className="flex flex-col gap-2">
         {shortcutList().map((shortcut) => (
           <div key={shortcut.description.id} className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-            <dt className="break-words">{intl.formatMessage(shortcut.description)}</dt>
+            <dt className="wrap-anywhere">{intl.formatMessage(shortcut.description)}</dt>
             <dd>
               <KbdCombination keys={shortcut.keys} />
             </dd>

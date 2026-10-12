@@ -40,7 +40,7 @@ export function RadioGroupItem({ label, className, ...props }: RadioGroupItemPro
           <span className="bg-action-primary-fg size-1 rounded-full" />
         </RadioGroupPrimitive.Indicator>
       </span>
-      <span>{label}</span>
+      <span className="min-w-0 wrap-break-word">{label}</span>
     </RadioGroupPrimitive.Item>
   );
 }

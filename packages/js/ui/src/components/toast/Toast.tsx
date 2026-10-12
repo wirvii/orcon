@@ -20,13 +20,19 @@ const messages = defineMessages({
  * their own. They are announced politely and never take focus. Do not use a toast
  * for anything the person must read, decide or act on: use a Banner or a Dialog.
  */
-export function Toaster() {
+export interface ToasterProps {
+  /** How many toasts show at once; older ones wait behind. Defaults to 3. */
+  visibleToasts?: number;
+}
+
+export function Toaster({ visibleToasts }: ToasterProps) {
   const intl = useIntl();
   return (
     <Sonner
       position="bottom-right"
       closeButton
       expand
+      visibleToasts={visibleToasts}
       containerAriaLabel={intl.formatMessage(messages.region)}
       icons={{
         success: <CircleCheck aria-hidden className="size-icon-16" />,

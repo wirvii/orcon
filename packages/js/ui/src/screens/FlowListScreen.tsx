@@ -167,10 +167,10 @@ export function FlowListScreen({ flows = fixtureFlows, status = 'ready', now = F
               <ul aria-label={intl.formatMessage(messages.listLabel)} className="flex flex-col gap-3">
                 {flows.map((flow) => (
                   <li key={flow.id} className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-3">
-                    <Link href={`#flows/${flow.id}`} className="font-medium break-words">
+                    <Link href={`#flows/${flow.id}`} className="font-medium wrap-anywhere">
                       {flow.name}
                     </Link>
-                    <p className="text-fg-muted text-sm break-words">{flow.description}</p>
+                    <p className="text-fg-muted text-sm wrap-anywhere">{flow.description}</p>
                     <div className="flex flex-wrap items-center gap-2">
                       {flow.lastStatus ? <StatusBadge status={flow.lastStatus} /> : null}
                       <span className="text-fg-muted text-sm">

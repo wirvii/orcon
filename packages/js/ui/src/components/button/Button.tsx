@@ -10,8 +10,8 @@ import { Spinner } from '../spinner/Spinner';
 
 export const buttonVariants = cva(
   [
-    'inline-flex min-h-target min-w-target shrink-0 items-center justify-center gap-2 rounded-md',
-    'text-base font-medium whitespace-nowrap select-none transition-colors',
+    'inline-flex min-w-target max-w-full items-center justify-center gap-2 rounded-md',
+    'text-center text-base font-medium wrap-anywhere select-none transition-colors',
     'disabled:pointer-events-none disabled:border disabled:border-border disabled:bg-surface disabled:text-fg-disabled',
     'aria-disabled:pointer-events-none',
   ],
@@ -25,8 +25,8 @@ export const buttonVariants = cva(
       },
       size: {
         // Height and padding come from the density tokens.
-        default: 'h-control px-control-x',
-        icon: 'h-control w-control',
+        default: 'min-h-control-target px-control-x py-1',
+        icon: 'h-control min-h-target w-control',
       },
     },
     defaultVariants: { variant: 'primary', size: 'default' },

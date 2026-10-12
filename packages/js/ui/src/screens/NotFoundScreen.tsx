@@ -29,8 +29,8 @@ export function NotFoundScreen() {
       </header>
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col items-center justify-center gap-4 p-4 text-center">
         <Mascot pose="explorer" />
-        <h1 className="text-2xl font-semibold break-words">{intl.formatMessage(messages.title)}</h1>
-        <p className="text-fg-muted max-w-screen-sm break-words">{intl.formatMessage(messages.text)}</p>
+        <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
+        <p className="text-fg-muted max-w-screen-sm wrap-anywhere">{intl.formatMessage(messages.text)}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button asChild>
             <a href="#flows">{intl.formatMessage(messages.home)}</a>

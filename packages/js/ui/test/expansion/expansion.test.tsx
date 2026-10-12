@@ -64,4 +64,15 @@ describe.each([
     await settle();
     expect(overflowing(document.body)).toEqual([]);
   });
+
+  it.each(entries.filter((entry) => entry.title.startsWith('Screens/')).map((entry) => [entry.label, entry] as const))('%s does not scroll the page sideways', async (_label, entry) => {
+    render(<entry.Story />);
+    await settle();
+    const root = document.documentElement;
+    const wide = Array.from(document.body.querySelectorAll<HTMLElement>('*'))
+      .filter((el) => el.getBoundingClientRect().right > root.clientWidth + 1 && !el.closest('[data-truncate]'))
+      .slice(0, 4)
+      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)} in ${[...Array(4)].reduce<[HTMLElement | null, string[]]>(([n, a]) => [n?.parentElement ?? null, [...a, n ? `${n.tagName.toLowerCase()}.${String(n.className).slice(0, 30)}` : '']], [el, []])[1].join('<')}`);
+    expect(root.scrollWidth, `the page scrolls horizontally: ${wide.join(' | ')}`).toBeLessThanOrEqual(root.clientWidth);
+  });
 });

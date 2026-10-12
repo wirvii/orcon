@@ -32,7 +32,7 @@ export function Switch({ label, className, ...rest }: SwitchProps) {
           )}
         />
       </span>
-      <span>{label}</span>
+      <span className="min-w-0 wrap-break-word">{label}</span>
     </SwitchPrimitive.Root>
   );
 }

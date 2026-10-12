@@ -62,7 +62,7 @@ export function NodeCard({ node, selected = false, live = false, connectable = t
       <div className="flex items-start gap-3">
         {node.connector ? <ConnectorIcon src={node.connector.src} name={node.connector.name} /> : null}
         <div className="min-w-0 flex-1">
-          <p className="text-fg text-base font-semibold break-words">{node.name}</p>
+          <p className="text-fg text-base font-semibold wrap-anywhere">{node.name}</p>
           {node.summary ? (
             <Tooltip content={node.summary}>
               <p data-truncate className="text-fg-muted truncate text-xs">

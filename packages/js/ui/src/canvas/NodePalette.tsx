@@ -74,8 +74,8 @@ export function NodePalette({ catalog, open, onOpenChange, onPick }: NodePalette
                           className={cn(commandItem, 'h-auto py-1')}
                         >
                           <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="break-words">{item.name}</span>
-                            {item.summary ? <span className="text-fg-muted text-sm break-words">{item.summary}</span> : null}
+                            <span className="wrap-anywhere">{item.name}</span>
+                            {item.summary ? <span className="text-fg-muted text-sm wrap-anywhere">{item.summary}</span> : null}
                           </span>
                         </Command.Item>
                       ))}

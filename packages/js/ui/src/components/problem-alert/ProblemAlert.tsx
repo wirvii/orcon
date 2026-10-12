@@ -93,7 +93,7 @@ export function ProblemAlert({ problem, currentResult, className }: ProblemAlert
               .map(([label, value]) => (
                 <div key={label} className="flex gap-3">
                   <dt className="shrink-0 font-medium">{label}</dt>
-                  <dd className="min-w-0 break-words">{value}</dd>
+                  <dd className="min-w-0 wrap-anywhere">{value}</dd>
                 </div>
               ))}
           </dl>

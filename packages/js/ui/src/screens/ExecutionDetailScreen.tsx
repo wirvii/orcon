@@ -118,14 +118,14 @@ export function ExecutionDetailScreen({
       ) : null}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <section aria-labelledby="timeline-heading" className="min-w-0 flex-1">
-          <h2 id="timeline-heading" className="text-lg font-semibold break-words">
+          <h2 id="timeline-heading" className="text-lg font-semibold wrap-anywhere">
             {intl.formatMessage(messages.timeline)}
           </h2>
           <ol className="mt-3 flex flex-col gap-3">
             {timeline.map((node) => (
               <li key={node.id} data-timeline-node={node.id} className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold break-words">{node.name}</h3>
+                  <h3 className="font-semibold wrap-anywhere">{node.name}</h3>
                   <StatusBadge status={node.status} />
                   <span className="text-fg-muted text-sm">{intl.formatMessage(messages.items, { count: node.items })}</span>
                 </div>

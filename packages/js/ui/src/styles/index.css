@@ -43,6 +43,11 @@
   z-index: var(--orcon-z-tooltip);
 }
 
+/* A control grows with wrapped text, but is never shorter than its density height or the minimum target. */
+@utility min-h-control-target {
+  min-height: max(var(--orcon-size-control), var(--orcon-size-target-min));
+}
+
 /* Floating content sizes from the trigger and the space the browser leaves it. */
 @utility min-w-trigger {
   min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, var(--radix-dropdown-menu-trigger-width, 0px)));

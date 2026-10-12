@@ -20,8 +20,8 @@ export function PageHeader({ title, description, breadcrumb, actions }: PageHead
       {breadcrumb ? <Breadcrumb items={breadcrumb} /> : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold break-words">{title}</h1>
-          {description ? <p className="text-fg-muted break-words">{description}</p> : null}
+          <h1 className="text-xl font-semibold wrap-anywhere">{title}</h1>
+          {description ? <p className="text-fg-muted wrap-anywhere">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

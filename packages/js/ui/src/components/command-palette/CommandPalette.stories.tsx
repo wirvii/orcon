@@ -2,38 +2,57 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { ComponentProps, ComponentType } from 'react';
+import { useIntl } from 'react-intl';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
+import { storyMessages as m } from '../../stories/messages';
 import { Kbd } from '../kbd/Kbd';
 
 import { CommandPalette, type PaletteCommand } from './CommandPalette';
 
 const onSelect = fn();
-const commands: PaletteCommand[] = [
-  { id: 'new-flow', label: 'Create a flow', group: 'Flows', shortcut: ['N'], onSelect },
-  { id: 'open-flow', label: 'Open a flow', group: 'Flows', onSelect },
-  { id: 'executions', label: 'Go to executions', group: 'Navigate', keywords: ['runs', 'history'], onSelect },
-  { id: 'inbox', label: 'Go to the attention inbox', group: 'Navigate', onSelect },
-  { id: 'theme', label: 'Change theme', onSelect },
-];
 
-const meta = {
+type Args = Partial<ComponentProps<typeof CommandPalette>>;
+
+/** The palette with its sample commands from the message catalog, so the pseudo-locale lengthens them. */
+function SamplePalette(props: Args) {
+  const intl = useIntl();
+  const flows = intl.formatMessage(m.paletteGroupFlows);
+  const navigate = intl.formatMessage(m.paletteGroupNavigate);
+  const commands: PaletteCommand[] = [
+    { id: 'new-flow', label: intl.formatMessage(m.paletteCreate), group: flows, shortcut: ['N'], onSelect },
+    { id: 'open-flow', label: intl.formatMessage(m.paletteOpenFlow), group: flows, onSelect },
+    { id: 'executions', label: intl.formatMessage(m.paletteExecutions), group: navigate, keywords: ['runs', 'history'], onSelect },
+    { id: 'inbox', label: intl.formatMessage(m.paletteInbox), group: navigate, onSelect },
+    { id: 'theme', label: intl.formatMessage(m.paletteTheme), onSelect },
+  ];
+  return <CommandPalette commands={commands} {...props} />;
+}
+
+function Hint() {
+  const intl = useIntl();
+  return (
+    <p className="text-fg-muted">
+      {intl.formatMessage(m.paletteHint, { first: <Kbd key="a">Ctrl</Kbd>, second: <Kbd key="b">K</Kbd> })}
+    </p>
+  );
+}
+
+const meta: Meta<Args> = {
   title: 'Components/CommandPalette',
-  component: CommandPalette,
-  args: { commands },
+  component: CommandPalette as ComponentType<Args>,
   render: (args) => (
     <>
-      <p className="text-fg-muted">
-        Press <Kbd>Ctrl</Kbd> + <Kbd>K</Kbd> to open the palette.
-      </p>
-      <CommandPalette {...args} />
+      <Hint />
+      <SamplePalette {...args} />
     </>
   ),
-} satisfies Meta<typeof CommandPalette>;
+};
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<Args>;
 
 /** Closed. Ctrl+K opens it; typing filters; Enter runs the first match; Escape closes. */
 export const Default: Story = {
@@ -53,10 +72,6 @@ export const Empty: Story = { args: { defaultOpen: true, defaultSearch: 'zzzz' }
 
 export const Matrix: Story = {
   render: () => (
-    <MatrixTable
-      caption="CommandPalette (open states are their own stories)"
-      columns={['closed']}
-      rows={[{ label: 'palette', cells: [<CommandPalette key="p" commands={commands} />] }]}
-    />
+    <MatrixTable caption="CommandPalette (open states are their own stories)" columns={['closed']} rows={[{ label: 'palette', cells: [<SamplePalette key="p" />] }]} />
   ),
 };

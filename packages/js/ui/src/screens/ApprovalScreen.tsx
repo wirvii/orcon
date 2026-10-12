@@ -153,8 +153,8 @@ export function ApprovalScreen({ request = approvalRequest, argumentsHidden = fa
       </header>
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col gap-4 p-4">
         <div>
-          <h1 className="text-xl font-semibold break-words">{intl.formatMessage(messages.title)}</h1>
-          <p className="text-fg-muted break-words">{intl.formatMessage(messages.intro, { flow: request.flowName })}</p>
+          <h1 className="text-xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
+          <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.intro, { flow: request.flowName })}</p>
         </div>
 
         {conflict ? (
@@ -175,15 +175,15 @@ export function ApprovalScreen({ request = approvalRequest, argumentsHidden = fa
 
         <dl className="bg-surface border-border grid gap-3 rounded-lg border p-4 sm:grid-cols-3">
           <div>
-            <dt className="text-fg-muted text-sm break-words">{intl.formatMessage(messages.tool)}</dt>
+            <dt className="text-fg-muted text-sm wrap-anywhere">{intl.formatMessage(messages.tool)}</dt>
             <dd className="font-mono text-mono break-all">{request.tool}</dd>
           </div>
           <div>
-            <dt className="text-fg-muted text-sm break-words">{intl.formatMessage(messages.requestedBy)}</dt>
-            <dd className="break-words">{request.requestedBy}</dd>
+            <dt className="text-fg-muted text-sm wrap-anywhere">{intl.formatMessage(messages.requestedBy)}</dt>
+            <dd className="wrap-anywhere">{request.requestedBy}</dd>
           </div>
           <div>
-            <dt className="text-fg-muted text-sm break-words">{intl.formatMessage(messages.expires)}</dt>
+            <dt className="text-fg-muted text-sm wrap-anywhere">{intl.formatMessage(messages.expires)}</dt>
             <dd>
               <RelativeTime value={request.expiresAt} now={now} />
               <span className="text-fg-muted block text-sm">
@@ -194,7 +194,7 @@ export function ApprovalScreen({ request = approvalRequest, argumentsHidden = fa
         </dl>
 
         <section aria-labelledby="approval-arguments" className="flex flex-col gap-2">
-          <h2 id="approval-arguments" className="text-lg font-semibold break-words">
+          <h2 id="approval-arguments" className="text-lg font-semibold wrap-anywhere">
             {intl.formatMessage(messages.argumentsLabel)}
           </h2>
           {argumentsHidden ? (

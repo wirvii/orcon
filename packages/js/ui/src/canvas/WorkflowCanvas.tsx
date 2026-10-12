@@ -4,10 +4,13 @@
 import {
   Background,
   BackgroundVariant,
+  getNodesBounds,
+  getViewportForBounds,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
   type Connection,
@@ -58,6 +61,12 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import { useMediaQuery, wideQuery } from './useMediaQuery';
 
 const edgeTypes = { orcon: OrconEdge };
+
+/** Below these zoom levels node text stops being readable, so fitting never goes lower: the view is anchored to the first node instead. */
+const READABLE_ZOOM_WIDE = 0.75;
+const READABLE_ZOOM_NARROW = 0.6;
+const FIT_PADDING = 0.2;
+const ANCHOR_MARGIN = 24;
 
 const arrowDirection: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
 const arrowStep: Record<Direction, { x: number; y: number }> = {
@@ -193,6 +202,39 @@ function Canvas({
   const [nodes, setNodes, onNodesChange] = useNodesState<OrconFlowNode>(firstNodes);
   const selectNext = useRef<ReadonlySet<string> | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Shows the whole flow when that keeps the text readable. When the flow is too
+   * wide for that, it keeps the readable zoom and starts at the first node (the
+   * trigger), so the start of the flow is always on screen; pan to see the rest.
+   */
+  const fitFlow = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const all = flow.getNodes();
+    if (!rect || rect.width === 0 || all.length === 0) return;
+    const readable = wide ? READABLE_ZOOM_WIDE : READABLE_ZOOM_NARROW;
+    const bounds = getNodesBounds(all);
+    const fitted = getViewportForBounds(bounds, rect.width, rect.height, 0.05, 2, FIT_PADDING);
+    if (fitted.zoom >= readable) {
+      void flow.setViewport(fitted);
+      return;
+    }
+    const first = all.find((node) => node.id === readingOrder(graphRef.current)[0]?.id) ?? all[0]!;
+    void flow.setViewport({
+      x: ANCHOR_MARGIN - first.position.x * readable,
+      y: rect.height / 2 - (bounds.y + bounds.height / 2) * readable,
+      zoom: readable,
+    });
+  }, [flow, wide]);
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
+  const nodesReady = useNodesInitialized();
+  const fittedOnOpen = useRef(false);
+  useEffect(() => {
+    if (!nodesReady || fittedOnOpen.current) return;
+    fittedOnOpen.current = true;
+    fitFlow();
+  }, [nodesReady, fitFlow]);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
@@ -431,7 +473,7 @@ function Canvas({
         onRedo={redo}
         onZoomIn={() => void flow.zoomIn()}
         onZoomOut={() => void flow.zoomOut()}
-        onFit={() => void flow.fitView({ padding: 0.2 })}
+        onFit={fitFlow}
         onToggleOutline={() => setOutlineOpen((open) => !open)}
         onShortcuts={() => setShortcutsOpen(true)}
       />
@@ -483,8 +525,6 @@ function Canvas({
             selectionMode={SelectionMode.Partial}
             snapToGrid
             snapGrid={[GRID, GRID]}
-            fitView
-            fitViewOptions={{ padding: 0.2, minZoom: wide ? 0.25 : 0.6 }}
             minZoom={0.25}
             maxZoom={2}
             attributionPosition="bottom-left"

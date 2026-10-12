@@ -65,15 +65,15 @@ export function CanvasOutline({ graph, editable = false, onFocusNode, onDisconne
   return (
     <section aria-labelledby={titleId} data-canvas-outline className={cn('bg-surface text-fg flex flex-col gap-3', className)}>
       <div className="flex flex-col gap-1">
-        <Heading id={titleId} className="text-md font-semibold break-words">
+        <Heading id={titleId} className="text-md font-semibold wrap-anywhere">
           {intl.formatMessage(canvasMessages.outlineTitle)}
         </Heading>
-        <p className="text-fg-muted text-sm break-words">
+        <p className="text-fg-muted text-sm wrap-anywhere">
           {intl.formatMessage(canvasMessages.outlineSummary, { nodes: graph.nodes.length, edges: graph.edges.length })}
         </p>
       </div>
       {nodes.length === 0 ? (
-        <p className="text-fg-muted text-sm break-words">{intl.formatMessage(canvasMessages.outlineEmpty)}</p>
+        <p className="text-fg-muted text-sm wrap-anywhere">{intl.formatMessage(canvasMessages.outlineEmpty)}</p>
       ) : (
         <ol className="flex flex-col gap-3">
           {nodes.map((node) => {
@@ -81,22 +81,22 @@ export function CanvasOutline({ graph, editable = false, onFocusNode, onDisconne
             return (
               <li key={node.id} data-outline-node={node.id} className="border-border flex flex-col gap-2 border-t pt-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold break-words">{node.name}</span>
+                  <span className="font-semibold wrap-anywhere">{node.name}</span>
                   {node.kind === 'control' ? (
                     <span className="text-fg-muted text-sm">{intl.formatMessage(canvasMessages.controlType, { type: node.controlType ?? 'other' })}</span>
                   ) : null}
                   {node.status ? <StatusBadge status={node.status} /> : null}
                 </div>
-                {node.summary ? <p className="text-fg-muted text-sm break-words">{node.summary}</p> : null}
+                {node.summary ? <p className="text-fg-muted text-sm wrap-anywhere">{node.summary}</p> : null}
                 {connections.length === 0 ? (
-                  <p className="text-fg-muted text-sm break-words">{intl.formatMessage(canvasMessages.outlineNoConnections)}</p>
+                  <p className="text-fg-muted text-sm wrap-anywhere">{intl.formatMessage(canvasMessages.outlineNoConnections)}</p>
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {connections.map(({ edge, outgoing }) => {
                       const { text, otherName } = describe(node, edge, outgoing);
                       return (
                         <li key={`${edge.id}-${outgoing ? 'out' : 'in'}`} className="flex flex-wrap items-center gap-2 text-sm">
-                          <span className="break-words">{text}</span>
+                          <span className="wrap-anywhere">{text}</span>
                           {editable && outgoing ? (
                             <Button variant="ghost" className={wrapLabel} onClick={() => onDisconnect?.(edge.id)}>
                               {intl.formatMessage(canvasMessages.outlineDisconnect, { name: node.name, other: otherName })}

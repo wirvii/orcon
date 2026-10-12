@@ -138,14 +138,14 @@ export function ExecutionListScreen({ executions = fixtureExecutions, status = '
           <ul aria-label={intl.formatMessage(messages.listLabel)} className="flex flex-col gap-3">
             {rows.map((row) => (
               <li key={row.id} className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-3">
-                <Link href={`#executions/${row.id}`} className="font-medium break-words">
+                <Link href={`#executions/${row.id}`} className="font-medium wrap-anywhere">
                   {row.flowName}
                 </Link>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={row.status} />
                   <span className="text-fg-muted font-mono text-mono">{row.id}</span>
                 </div>
-                <p className="text-fg-muted text-sm break-words">
+                <p className="text-fg-muted text-sm wrap-anywhere">
                   <RelativeTime value={row.startedAt} now={now} />
                   {' · '}
                   {row.durationMs === undefined ? intl.formatMessage(messages.running) : <Duration ms={row.durationMs} />}

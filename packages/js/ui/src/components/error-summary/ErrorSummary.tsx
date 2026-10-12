@@ -53,7 +53,7 @@ export function ErrorSummary({ errors, focusOnMount = false, className }: ErrorS
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className={cn('border-status-danger bg-status-danger-bg text-status-danger rounded-md border p-3 break-words', className)}
+      className={cn('border-status-danger bg-status-danger-bg text-status-danger rounded-md border p-3 wrap-anywhere', className)}
     >
       <h2 className="flex items-center gap-2 text-base font-semibold">
         <CircleAlert aria-hidden className="size-icon-20 shrink-0" />

@@ -32,15 +32,17 @@ export interface TabsProps {
 export function Tabs({ tabs, label, value, defaultValue, onValueChange, className }: TabsProps) {
   return (
     <TabsPrimitive.Root value={value} defaultValue={defaultValue ?? tabs[0]?.value} onValueChange={onValueChange} className={className}>
-      <TabsPrimitive.List aria-label={label} className="border-border flex border-b">
+      <TabsPrimitive.List aria-label={label} className="border-border flex flex-wrap border-b">
         {tabs.map((tab) => (
           <TabsPrimitive.Trigger
             key={tab.value}
             value={tab.value}
             disabled={tab.disabled}
             className={cn(
-              'text-fg-muted inline-flex min-h-target min-w-target items-center border-b-2 border-transparent px-control-x py-2 text-base wrap-anywhere whitespace-normal transition-colors',
-              'hover:text-fg data-[state=active]:border-action-primary data-[state=active]:text-fg data-[state=active]:font-semibold',
+              'text-fg-muted relative inline-flex min-h-target min-w-target max-w-full items-center rounded-md px-control-x py-2 text-base wrap-break-word whitespace-normal transition-colors',
+              // The selected bar is drawn inside the trigger, so the focus ring can follow the control radius.
+              'after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-transparent',
+              'hover:text-fg data-[state=active]:text-fg data-[state=active]:font-semibold data-[state=active]:after:border-action-primary',
               'disabled:pointer-events-none disabled:text-fg-disabled',
               tab.className,
             )}
@@ -50,7 +52,7 @@ export function Tabs({ tabs, label, value, defaultValue, onValueChange, classNam
         ))}
       </TabsPrimitive.List>
       {tabs.map((tab) => (
-        <TabsPrimitive.Content key={tab.value} value={tab.value} className="pt-3">
+        <TabsPrimitive.Content key={tab.value} value={tab.value} className="mt-3 rounded-md">
           {tab.content}
         </TabsPrimitive.Content>
       ))}

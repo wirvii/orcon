@@ -31,7 +31,7 @@ const icons: Record<BannerTone, LucideIcon> = {
 };
 
 // Every text in a banner uses the family color, which is certified on the family background.
-const bannerVariants = cva('flex items-start gap-3 rounded-md border p-3 text-base break-words', {
+const bannerVariants = cva('flex items-start gap-3 rounded-md border p-3 text-base wrap-anywhere', {
   variants: {
     tone: {
       info: 'border-status-neutral bg-status-neutral-bg text-status-neutral',

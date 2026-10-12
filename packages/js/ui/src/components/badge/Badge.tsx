@@ -7,7 +7,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../../lib/cn';
 
 export const badgeVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap',
+  'inline-flex max-w-full items-center gap-1 rounded-full px-2 text-xs font-medium wrap-anywhere',
   {
     variants: {
       /** Color families are for meaning: use them only for status. `neutral` is the default. */

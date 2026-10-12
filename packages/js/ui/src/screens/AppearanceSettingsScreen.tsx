@@ -48,24 +48,24 @@ export function AppearanceSettingsScreen() {
       <PageHeader title={intl.formatMessage(messages.title)} description={intl.formatMessage(messages.description)} />
       <div className="flex max-w-screen-md flex-col gap-4">
         <section aria-labelledby="appearance-theme" className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-4">
-          <h2 id="appearance-theme" className="text-lg font-semibold break-words">
+          <h2 id="appearance-theme" className="text-lg font-semibold wrap-anywhere">
             {intl.formatMessage(messages.themeTitle)}
           </h2>
-          <p className="text-fg-muted break-words">{intl.formatMessage(messages.themeText)}</p>
+          <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.themeText)}</p>
           <ThemeSwitcher />
         </section>
         <section aria-labelledby="appearance-density" className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-4">
-          <h2 id="appearance-density" className="text-lg font-semibold break-words">
+          <h2 id="appearance-density" className="text-lg font-semibold wrap-anywhere">
             {intl.formatMessage(messages.densityTitle)}
           </h2>
-          <p className="text-fg-muted break-words">{intl.formatMessage(messages.densityText)}</p>
+          <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.densityText)}</p>
           <DensitySwitcher />
         </section>
         <section aria-labelledby="appearance-language" className="bg-surface border-border flex flex-col gap-2 rounded-lg border p-4">
-          <h2 id="appearance-language" className="text-lg font-semibold break-words">
+          <h2 id="appearance-language" className="text-lg font-semibold wrap-anywhere">
             {intl.formatMessage(messages.languageTitle)}
           </h2>
-          <p className="text-fg-muted break-words">{intl.formatMessage(messages.languageText)}</p>
+          <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.languageText)}</p>
           <LocaleSwitcher />
         </section>
       </div>

@@ -111,25 +111,25 @@ export function UncertainResolutionPanel({ nodeName, manualCheck, actions, onRes
       <div className="text-status-attention flex items-start gap-2">
         <ShieldQuestion aria-hidden className="size-icon-20 shrink-0" />
         <div className="min-w-0">
-          <h2 id={titleId} className="text-md font-semibold break-words">
+          <h2 id={titleId} className="text-md font-semibold wrap-anywhere">
             {intl.formatMessage(messages.title)}
           </h2>
-          <p className="text-sm font-medium break-words">{`${nodeName} · ${intl.formatMessage(statusMessages.uncertain)}`}</p>
+          <p className="text-sm font-medium wrap-anywhere">{`${nodeName} · ${intl.formatMessage(statusMessages.uncertain)}`}</p>
         </div>
       </div>
-      <p className="break-words">{intl.formatMessage(statusMessages.uncertainDescription)}</p>
+      <p className="wrap-anywhere">{intl.formatMessage(statusMessages.uncertainDescription)}</p>
       {manualCheck ? (
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-semibold break-words">{intl.formatMessage(messages.manualCheck)}</p>
-          <p className="break-words whitespace-pre-wrap" data-manual-check>
+          <p className="text-sm font-semibold wrap-anywhere">{intl.formatMessage(messages.manualCheck)}</p>
+          <p className="wrap-anywhere whitespace-pre-wrap" data-manual-check>
             {manualCheck}
           </p>
         </div>
       ) : null}
       <div className="flex flex-col gap-2">
-        <p className="text-sm font-semibold break-words">{intl.formatMessage(messages.actions)}</p>
+        <p className="text-sm font-semibold wrap-anywhere">{intl.formatMessage(messages.actions)}</p>
         {actions.length === 0 ? (
-          <p className="break-words">{intl.formatMessage(messages.noActions)}</p>
+          <p className="wrap-anywhere">{intl.formatMessage(messages.noActions)}</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {actions.map((action) => (

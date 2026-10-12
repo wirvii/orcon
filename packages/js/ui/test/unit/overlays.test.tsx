@@ -57,7 +57,7 @@ describe('Tabs', () => {
   it('marks the selected tab with more than color: a bar and a heavier weight', () => {
     renderWithProviders(<Tabs label="Sections" tabs={tabs} />);
     const selected = screen.getByRole('tab', { name: 'A' }).className;
-    expect(selected).toContain('data-[state=active]:border-action-primary');
+    expect(selected).toContain('data-[state=active]:after:border-action-primary');
     expect(selected).toContain('data-[state=active]:font-semibold');
   });
 });

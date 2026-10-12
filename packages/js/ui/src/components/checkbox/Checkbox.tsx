@@ -30,7 +30,7 @@ export function Checkbox({ label, className, ...rest }: CheckboxProps) {
           <Minus aria-hidden className="size-icon-16 hidden group-data-[state=indeterminate]:block" />
         </CheckboxPrimitive.Indicator>
       </span>
-      <span>{label}</span>
+      <span className="min-w-0 wrap-break-word">{label}</span>
     </CheckboxPrimitive.Root>
   );
 }

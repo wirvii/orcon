@@ -51,7 +51,7 @@ export function NavItem({
       {...props}
     >
       <Icon aria-hidden className="size-icon-20 shrink-0" />
-      <span className={cn('min-w-0 break-words', labelClass)}>{label}</span>
+      <span className={cn('min-w-0 wrap-anywhere', labelClass)}>{label}</span>
       {hasBadge ? (
         <span
           className={cn(

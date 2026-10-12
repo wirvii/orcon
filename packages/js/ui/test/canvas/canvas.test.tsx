@@ -269,3 +269,50 @@ describe('execution overlay', () => {
     expect(card).toHaveTextContent('Running');
   });
 });
+
+describe('the canvas opens fitted to the flow with readable text', () => {
+  const zoomOf = (container: HTMLElement) => {
+    const viewport = container.querySelector<HTMLElement>('.react-flow__viewport');
+    return Number(/matrix\(([\d.]+)/.exec(getComputedStyle(viewport!).transform)?.[1] ?? 'NaN');
+  };
+  const inside = (inner: DOMRect, outer: DOMRect) =>
+    inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right && inner.bottom <= outer.bottom;
+
+  it('keeps the trigger on screen when the view is too narrow to show the whole flow (phone)', async () => {
+    await page.viewport(390, 844);
+    try {
+      const { container } = renderCanvas({ defaultGraph: exampleGraph });
+      const trigger = await node('Order received');
+      const region = container.querySelector<HTMLElement>('[role="region"]')!;
+      await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
+      // The zoom never drops below the readable minimum to make everything fit.
+      expect(zoomOf(container)).toBeGreaterThanOrEqual(0.6 - 0.01);
+    } finally {
+      await page.viewport(1440, 900);
+    }
+  });
+
+  it('shows the whole flow when it fits, and never below the readable zoom on a tablet', async () => {
+    await page.viewport(1024, 768);
+    try {
+      const { container } = renderCanvas({ defaultGraph: exampleGraph });
+      const trigger = await node('Order received');
+      const region = container.querySelector<HTMLElement>('[role="region"]')!;
+      await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
+      expect(zoomOf(container)).toBeGreaterThanOrEqual(0.75 - 0.01);
+    } finally {
+      await page.viewport(1440, 900);
+    }
+  });
+
+  it('fits the whole flow on a wide screen', async () => {
+    const { container } = renderCanvas({ defaultGraph: exampleGraph });
+    await node('Order received');
+    const region = container.querySelector<HTMLElement>('[role="region"]')!;
+    await waitFor(() => {
+      const nodes = Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node'));
+      expect(nodes.length).toBe(exampleGraph.nodes.length);
+      for (const element of nodes) expect(inside(element.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true);
+    });
+  });
+});

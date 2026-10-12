@@ -45,7 +45,7 @@ export function ErrorFallback({ error, reset }: ErrorFallbackProps) {
         <summary className="inline-flex min-h-target cursor-pointer items-center rounded-sm underline underline-offset-2">
           {intl.formatMessage(messages.details)}
         </summary>
-        <p className="font-mono text-mono break-words">{error.message}</p>
+        <p className="font-mono text-mono wrap-anywhere">{error.message}</p>
       </details>
     </Banner>
   );

@@ -23,7 +23,7 @@ export interface EmptyStateProps {
 export function EmptyState({ title, description, action, mascot, headingLevel = 2, className }: EmptyStateProps) {
   const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
   return (
-    <div className={cn('flex flex-col items-center gap-3 px-4 py-8 text-center break-words', className)}>
+    <div className={cn('flex flex-col items-center gap-3 px-4 py-8 text-center wrap-anywhere', className)}>
       {mascot}
       <Heading className="text-fg text-lg font-semibold">{title}</Heading>
       {description ? <p className="text-fg-muted max-w-screen-sm">{description}</p> : null}

@@ -77,7 +77,7 @@ export function AttentionInboxItem({
       aria-labelledby={titleId}
       data-state={selected ? 'selected' : undefined}
       className={cn(
-        'border-border flex items-start gap-2 border-b px-2 py-2 text-base break-words',
+        'border-border flex items-start gap-2 border-b px-2 py-2 text-base wrap-anywhere',
         selected && 'bg-surface-sunken',
         className,
       )}
