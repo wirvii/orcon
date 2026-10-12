@@ -54,6 +54,15 @@ export default defineConfig({
         },
       },
       {
+        // Fine pointer: rows and controls are exactly as tall as the density tokens say.
+        extends: true,
+        test: {
+          name: 'density',
+          include: ['test/density/**/*.test.tsx'],
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
         // Touch and a coarse pointer: every interactive control is at least 44x44 px.
         extends: true,
         test: {

@@ -51,10 +51,20 @@ describe.each(['comfortable', 'compact'] as const)('targets with a coarse pointe
 
     expect(targetsBelow(MIN)).toEqual([]);
 
-    // Data rows follow the density tokens: 40 px comfortable, 32 px compact.
-    const expectedRow = density === 'compact' ? 32 : 40;
+    // Data rows follow the density tokens (40 px comfortable, 32 px compact). A row that holds a
+    // control grows to the 44 px minimum target on a coarse pointer; the fine pointer density test
+    // measures every row exactly.
+    const token = density === 'compact' ? 32 : 40;
     for (const row of document.body.querySelectorAll<HTMLElement>('[data-row]')) {
-      expect(row.getBoundingClientRect().height, 'row height').toBeCloseTo(expectedRow, 0);
+      const holdsControl = row.querySelector('a[href], button, input, select, textarea, [role="button"], [role="checkbox"]') !== null;
+      const height = row.getBoundingClientRect().height;
+      if (holdsControl) {
+        // The control sets the height (plus the 1 px divider).
+        expect(height, 'row with a control').toBeGreaterThanOrEqual(Math.max(token, MIN) - 0.5);
+        expect(height, 'row with a control').toBeLessThanOrEqual(Math.max(token, MIN) + 1.5);
+      } else {
+        expect(height, 'row height').toBeCloseTo(token, 0);
+      }
     }
   });
 });

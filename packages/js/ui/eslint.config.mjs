@@ -14,4 +14,9 @@ export default [
     tailwindEntryPoint: resolve(here, 'src/styles/index.css'),
     cwd: here,
   }),
+  {
+    // Stories force interaction states with the pseudo-* classes of the Storybook pseudo-states addon.
+    files: ['**/*.stories.tsx'],
+    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^pseudo-(hover|focus|focus-visible|active)$'] }] },
+  },
 ];
