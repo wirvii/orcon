@@ -1,20 +1,16 @@
 package main
 
 import (
- "embed"
  "flag"
  "fmt"
- "io/fs"
  "log"
  "net/http"
  "os"
  "strings"
 
- "github.com/wirvii/orcon/packages/go/config"
+ "github.com/wirvii/orcon/internal/adapter/webui"
+ "github.com/wirvii/orcon/internal/platform/config"
 )
-
-//go:embed ui/dist
-var embeddedUI embed.FS
 
 func main() {
  role := flag.String("role", "standalone", "standalone|api|scheduler|worker")
@@ -24,7 +20,7 @@ func main() {
  if !selected.Valid() { fmt.Fprintln(os.Stderr, "invalid role:", *role); os.Exit(2) }
  switch selected {
  case config.RoleStandalone, config.RoleAPI:
-  assets, err := fs.Sub(embeddedUI, "ui/dist"); if err != nil { log.Fatal(err) }
+  assets, err := webui.Assets(); if err != nil { log.Fatal(err) }
   mux := http.NewServeMux()
   mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK); _, _ = w.Write([]byte("ok")) })
   mux.Handle("/", http.FileServer(http.FS(assets)))

@@ -13,7 +13,7 @@ jobs:
         with:
           go-version-file: go.work
       - name: Test Go modules
-        run: go test ./apps/orcon ./packages/go/config ./packages/go/workflow ./packages/go/engine
+        run: go test ./...
   integration:
     runs-on: ubuntu-latest
     steps:

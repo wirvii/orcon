@@ -1,10 +1,10 @@
 .PHONY: web build test
 web:
 	pnpm --filter @orcon/web build
-	mkdir -p apps/orcon/ui/dist
-	cp -R apps/web/dist/. apps/orcon/ui/dist/
+	mkdir -p internal/adapter/webui/dist
+	cp -R apps/web/dist/. internal/adapter/webui/dist/
 build: web
 	mkdir -p bin
-	go build -o bin/orcon ./apps/orcon
+	go build -o bin/orcon ./cmd/orcon
 test:
-	go test ./apps/orcon ./packages/go/config ./packages/go/workflow ./packages/go/engine
+	go test ./...
