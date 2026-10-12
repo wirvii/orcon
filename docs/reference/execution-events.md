@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Execution event catalog
 
-Status: **Accepted** | Source: ADR-0009 §7–§9 (accepted 2026-10-12 via SPEC-001)
+Status: **Accepted** | Source: ADR-0009 §7–§9 (accepted 2026-10-12 via SPEC-001), with the `ai.*` events added by SPEC-006
 
 This page publishes the execution event catalog defined by ADR-0009. The ADR is normative; if this page and the ADR disagree, the ADR wins. Changing a payload shape bumps `schemaVersion`.
 
@@ -59,3 +59,17 @@ Not tied to one execution.
 
 ### Flows (ADR-0077 §4; recorded in the audit log)
 `flow.deleted`, `flow.restored`, `flow.purged`.
+
+## AI events (schemaVersion 2; ADR-0009 as amended by SPEC-006)
+| Type | Notes |
+|---|---|
+| `ai.run.started`, `ai.run.finished`, `ai.run.limit_exceeded` | Agent run lifecycle (ADR-0060). |
+| `ai.model_call.finished` | Usage, cost, model, attempt, fallback. |
+| `ai.tool_call.requested`, `ai.tool_call.finished`, `ai.tool_call.denied` | |
+| `ai.approval.requested`, `ai.approval.resolved`, `ai.approval.expired` | AI-specific detail; notifications to people come from the human-attention events above (ADR-0073). |
+| `ai.redaction.applied` | Counts per type only. |
+| `ai.injection.tainted` | |
+| `ai.delta` | Live-only. |
+| `knowledge.ingested` | |
+
+Enumerated values inside these payloads are UPPER_SNAKE (ADR-0080 §3).

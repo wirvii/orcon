@@ -34,3 +34,8 @@ Waiting responses work across processes without sticky load balancing or a new s
 
 ## Alternatives considered
 Direct worker→api RPC (rejected: new internal network contract and discovery). Requiring sticky routing (rejected: fragile, n8n's MCP limitation). No timeout on n8n-profile addresses (rejected by the owner, SPEC-002 Q1: connections could hang indefinitely).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-006.** §2: model token fragments travel through the ephemeral channel of ADR-0063; fragments of non-AI nodes keep the persisted mechanism.

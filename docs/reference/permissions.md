@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Permission catalog
 
-Status: **Accepted** | Catalog version: 2 | Source: ADR-0041 §2–§3 (accepted 2026-10-12 via SPEC-004) and its version 2 amendment (SPEC-005)
+Status: **Accepted** | Catalog version: 3 | Source: ADR-0041 §2–§3 (accepted 2026-10-12 via SPEC-004) and its version 2 (SPEC-005) and version 3 (SPEC-006) amendments
 
 This page publishes the permission catalog and predefined roles of ADR-0041. The ADR is normative; if this page and the ADR disagree, the ADR wins. Once `internal/authz/permissions.yaml` exists, this page is generated from it (ADR-0041 §2) and must match it.
 
@@ -42,6 +42,8 @@ Permission names are identifiers and keep their `resource:action` form. A new pe
 | `apikey:create-personal` | Version 2 (SPEC-005). |
 | `event-subscription:manage` | Version 2 (SPEC-005). |
 | `mcp:use` | Version 2 (SPEC-005). |
+| `ai-budget:manage` | Version 3 (SPEC-006). |
+| `ai-price:manage` | Version 3 (SPEC-006). |
 
 ## Project scope
 | Permission | Note |
@@ -78,9 +80,17 @@ Permission names are identifiers and keep their `resource:action` form. A new pe
 | `variable:manage` | |
 | `git:manage` | Version 2 (SPEC-005). |
 | `git:sync` | Version 2 (SPEC-005). |
+| `knowledge:read` | Version 3 (SPEC-006). |
+| `knowledge:manage` | Version 3 (SPEC-006); also required to reindex. |
+| `conversation:read` | Version 3 (SPEC-006). |
+| `conversation:read-data` | Version 3 (SPEC-006). |
+| `conversation:delete` | Version 3 (SPEC-006). |
+| `evaluation:read` | Version 3 (SPEC-006). |
+| `evaluation:manage` | Version 3 (SPEC-006). |
+| `evaluation:run` | Version 3 (SPEC-006). |
 
 ## Instance scope (ADR-0038 §4)
-`instance:orgs`, `instance:keys`, `instance:connectors`, `instance:policy`, `instance:limits`, `instance:siem`, `instance:users`.
+`instance:orgs`, `instance:keys`, `instance:connectors`, `instance:policy`, `instance:limits`, `instance:siem`, `instance:users`, `instance:ai-prices` (version 3, SPEC-006).
 
 ## Predefined roles (immutable)
 | Role | Scope | Permissions |
@@ -94,5 +104,7 @@ Permission names are identifiers and keep their `resource:action` form. A new pe
 | Viewer | Project | `project:read`, `flow:read`, `execution:read`, `credential:read`, `variable:read`. |
 
 Version 2 grants (SPEC-005 Q14): `apikey:create-personal` and `mcp:use` to Owner, Admin and Member; `event-subscription:manage` to Owner and Admin; `git:manage` to Project Admin; `git:sync` to Project Admin and Editor.
+
+Version 3 grants (SPEC-006 Q14): Editor and Project Admin receive every new project permission; Operator `conversation:read`, `evaluation:read`, `evaluation:run`; Viewer `conversation:read`, `evaluation:read`, `knowledge:read`; no `*:read-data` permission (such as `conversation:read-data`) is granted to Operator or Viewer by default; `ai-budget:manage` and `ai-price:manage` to organization Owner and Admin; `instance:ai-prices` to the instance administrator.
 
 Custom roles are composed from this catalog (ADR-0041 §4); an actor can only include permissions it holds in the same scope.

@@ -53,3 +53,8 @@ Real-time and push integrations with standard, verifiable signatures, isolated p
 
 ## Alternatives considered
 Per-subscription outbox rows at write time (multiplies hot-path writes); WebSocket (no bidirectional need); custom signatures (Standard Webhooks is documented and matches the inbound preset); strict ordering (one bad event blocks all later ones); array columns for types and projects (rejected by ADR-0077: no foreign keys, no portable index).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-006.** The public catalog gains `ai.budget.threshold`, `ai.budget.exceeded`, `ai.approval.requested`, `evaluation.run.finished` and `conversation.created`; enum values inside their payloads are UPPER_SNAKE and each type is described in the `webhooks` section with `x-orcon-event` (ADR-0080).

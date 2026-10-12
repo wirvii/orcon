@@ -89,3 +89,8 @@ ADR-0073 defines when an execution waits for a person, the reasons, notification
 - **GraphQL**: rejected; per-field authorization and rate limiting are harder; P1 chose REST.
 - **Fully nested item URLs**: rejected; long URLs and moves between projects break links; global ids plus server-side authorization suffice.
 - **Lowercase enum values** (the first draft of this ADR): rejected by ADR-0080 §3; they differ from the engine states.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-006.** Adds the AI resources (ADR-0080 rules): `projects/{projectId}/knowledge-stores`, `knowledge-stores/{knowledgeStoreId}`, the action `knowledge-stores/{knowledgeStoreId}/reindex` (`202` with a long-running operation, ADR-0053 §7; permission `knowledge:manage`), `knowledge-stores/{knowledgeStoreId}/documents`, `projects/{projectId}/conversations`, `conversations/{conversationId}`, `conversations/{conversationId}/messages`, `orgs/{orgId}/ai-budgets`, `ai-budgets/{aiBudgetId}`, `ai-prices`, `orgs/{orgId}/ai-price-overrides`, `instance/ai-price-overrides`, `instance/ai-price-tables`, `orgs/{orgId}/ai-usage`, `projects/{projectId}/evaluation-datasets`, `evaluation-datasets/{evaluationDatasetId}/cases`, `projects/{projectId}/evaluation-runs`, `evaluation-runs/{evaluationRunId}/cancel`, `projects/{projectId}/mcp-servers`, `projects/{projectId}/approvals` and `approvals/{approvalId}/approve|reject`.

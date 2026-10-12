@@ -61,3 +61,4 @@ Deterministic ids make recomputation idempotent (`INSERT … ON CONFLICT DO NOTH
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §4: credentials are encrypted under ADR-0042 and resolved per dispatch under ADR-0043 (share check at every dispatch, host binding); they are never serialized.
+- **SPEC-006.** §5: a fifth purity class, `AGENTIC`: a stepped node with its own durable state and multiple waits (ADR-0060 §1).

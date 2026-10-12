@@ -30,3 +30,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-004.** §3: the per-execution data key is wrapped by the organisation key (ADR-0042). Deleting an organization destroys its keys.
 - **SPEC-005.** Retention of `public_event` 7 days, `webhook_delivery` 30 days, `idempotency_record` 24 hours and `api_operation` 30 days; the audit log keeps its own retention (ADR-0048 §6).
+- **SPEC-006.** Adds retention classes for conversations (their own; default 90 days of inactivity) and for evaluation results (as data of `EVALUATION` executions); the redaction vault is kept under the execution or conversation data key (ADR-0068 §3).

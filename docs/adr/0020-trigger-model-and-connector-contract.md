@@ -74,3 +74,4 @@ Human waits started by triggers (multi-page form pages, Wait-node resume by form
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-003.** §3: packaging and sandboxing are defined by ADR-0029 and ADR-0032; declarative triggers are defined by ADR-0030 §8; WASM connectors may implement `WEBHOOK`, `POLL` and `APP_EVENT`, not `LISTEN`.
+- **SPEC-006.** §8: the evaluation trigger is defined by ADR-0069.

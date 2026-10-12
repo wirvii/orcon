@@ -34,3 +34,4 @@ Central dispatcher process (rejected: new role and single point of failure); exa
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §1: `fairness_key` is the hierarchical `org/flow` with per-organization weights (deficit round robin first across organizations, then across flows). §2 adds level 0, **organization** (in-flight tokens, executions per minute, pending ingress, history bytes), with batched permits in `limit_bucket` under the key `org:<id>:…`, and instance ceilings.
+- **SPEC-006.** Adds a concurrency key dimension (one `RUNNING` execution per key, FIFO); provider buckets per credential (requests and tokens per minute); AI budgets use the same batched-permit mechanism (ADR-0062 §5).

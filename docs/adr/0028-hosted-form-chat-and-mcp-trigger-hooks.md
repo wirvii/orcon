@@ -35,3 +35,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-004.** A form restricted to "Orcon user" means a member of the organization holding `flow:submit-form` in the project; public forms and chats are resolved with `orcon_engine.resolve_public_entry`.
 - **SPEC-005.** The administration MCP server (ADR-0059, `/api/v1/mcp`) is distinct from the MCP trigger (`/mcp*`, `/mcp-servers/*`).
+- **SPEC-006.** §2 is completed by ADR-0070 (chat trigger) and §3 by ADR-0067 (MCP server trigger).

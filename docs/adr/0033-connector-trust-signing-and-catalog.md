@@ -87,3 +87,4 @@ Plain detached signatures (rejected: no rotation, freshness or revocation model)
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §4: the trust policy is instance-level; an organization may only restrict it further (`allowedSeals` must be a subset). `connector_grant.project_id` becomes `connector_grant(org_id, project_id?, …)`: the table gains `org_id` (ADR-0077 §5).
+- **SPEC-006.** Adds the catalog package type `PRICE_TABLE` (ADR-0062 §3).

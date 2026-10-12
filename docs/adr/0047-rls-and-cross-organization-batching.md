@@ -48,3 +48,4 @@ One transaction per organization (rejected: multiplies WAL flushes); BYPASSRLS e
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-005.** `resolve_api_key` and `resolve_oauth_token` are the lookups of ADR-0056 §4 and §7 before the organization is known.
+- **SPEC-006.** `resolve_public_entry` and `resolve_trigger_address` also cover the public entry of the chat trigger and the address of the MCP server trigger.

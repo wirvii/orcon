@@ -14,7 +14,7 @@ One Go executable, built from a monorepo, embeds the production React/React Flow
 - **Worker:** leases tasks, executes trusted connectors or isolated extensions, records outcomes and heartbeats.
 - **State store:** transactional workflow versions, executions, attempts, task leases, events and timers.
 - **Connector subsystem:** versioned node contracts, credentials and external side-effect policies.
-- **Agent subsystem:** model-provider abstraction, tools/MCP, memory, human approval, observability.
+- **Agent subsystem:** model-provider abstraction, tools/MCP, memory, human approval, observability; specified by ADR-0060…ADR-0072, without a second runtime.
 
 ## Deployment profiles
 
@@ -55,3 +55,4 @@ Resolved by accepted ADRs:
 - Secrets and tenancy → ADR-0042…ADR-0047 (SPEC-004, 2026-10-12).
 - Auth/IAM → ADR-0038…ADR-0041 (SPEC-004, 2026-10-12).
 - API versioning → ADR-0054 (SPEC-005, 2026-10-12).
+- Agent subsystem → ADR-0060…ADR-0072, without a second runtime (SPEC-006, 2026-10-12).

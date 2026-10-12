@@ -52,3 +52,8 @@ Per-item retries and outcome routing preserve n8n familiarity while making uncer
 
 ## Alternatives considered
 Whole-node retries (rejected: re-runs succeeded items); retrying uncertain writes after timeout (rejected by ADR-0005); treating a 5xx on a write without an idempotency key as a definite failure (rejected by ADR-0079 §4: the write may have been applied).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-006.** §1: engine errors `AgentLimitExceeded` and `AiBudgetExceeded` (final). §6: cancellation includes agent runs (ADR-0060 §7).

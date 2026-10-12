@@ -109,3 +109,4 @@ One manifest drives editor, importer, catalog, validation and runtime checks for
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §6: connector grants are approved per organisation by holders of `connector:approve`; installing packages is instance-level (`instance:connectors`). The credential handle carries `allowedHosts` (ADR-0043 §4); OAuth refresh follows ADR-0045.
+- **SPEC-006.** §9: the semantics of `ai.tool` and of `kind` `MODEL | EMBEDDING | RERANKER | VECTOR_STORE | MEMORY` are defined by ADR-0061, ADR-0065, ADR-0064 and ADR-0066 (manifest values in UPPER_SNAKE).
