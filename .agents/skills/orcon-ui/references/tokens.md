@@ -26,7 +26,23 @@ Tokens are organized in five layers. A layer may reference only the layers liste
 
 1. Token paths use dots in DTCG (`fg.muted`, `action.primary.bg-hover`, `status.attention.fg`).
 2. CSS custom properties use the prefix `--orcon-` and the pattern `--orcon-<category>-<role>[-<variant>]`, with dots replaced by hyphens: `fg.muted` → `--orcon-fg-muted`; `action.primary.bg-hover` → `--orcon-action-primary-bg-hover`; `size.row` → `--orcon-size-row`; `duration.fast` → `--orcon-duration-fast`.
-3. Tailwind utilities exist only for semantic, density and scale tokens, and their names mirror the token role: `bg-surface`, `bg-surface-raised`, `text-fg`, `text-fg-muted`, `text-fg-link`, `border-control`, `ring-focus`, `bg-action-primary`, `text-action-primary-fg`, `bg-status-attention`, `text-status-attention`, `h-control`, `h-row`, `px-control`, `gap-control`, `rounded-md`, `shadow-sm`.
+3. Tailwind utilities exist only for semantic, density and scale tokens. The utility name follows the generated `tailwind-theme.css` (`--color-*`, `--spacing-*`, `--radius-*`, `--shadow-*`), which is the source of truth; it does not always equal the token path:
+
+| Token | Utility |
+|---|---|
+| `bg.app`, `surface.default`, `surface.raised`, `surface.sunken`, `surface.inverse` | `bg-app`, `bg-surface`, `bg-surface-raised`, `bg-surface-sunken`, `bg-surface-inverse` |
+| `fg.default`, `fg.muted`, `fg.subtle`, `fg.disabled`, `fg.link`, `fg.accent`, `fg.inverse` | `text-fg`, `text-fg-muted`, `text-fg-subtle`, `text-fg-disabled`, `text-fg-link`, `text-fg-accent`, `text-fg-inverse` |
+| `border.default`, `border.control`, `focus.ring` | `border-border`, `border-control`, `ring-focus` / `outline-focus` |
+| `action.primary.bg`, `.bg-hover`, `.fg` | `bg-action-primary`, `bg-action-primary-hover`, `text-action-primary-fg` |
+| `action.danger.bg`, `.bg-hover`, `.fg` | `bg-action-danger`, `bg-action-danger-hover`, `text-action-danger-fg` |
+| `status.<x>.fg` / `status.<x>.bg` | `text-status-<x>` / `bg-status-<x>-bg` (for example `text-status-attention`, `bg-status-attention-bg`) |
+| `canvas.*` | `bg-canvas`, `text-canvas-grid`, `stroke-canvas-edge`, `stroke-canvas-edge-active`, `border-canvas-node-border`, … |
+| `size.control` / `size.row` | `h-control` / `h-row` (also `min-h-*`, `size-*`) |
+| `space.control-x` / `space.gap` | `px-control-x` / `gap-density` (also `p*`, `m*`, `space-*`) |
+| `size.node-width`, `size.control-node-height`, `size.target-min` | `w-node-width`, `h-control-node`, `min-h-target` / `min-w-target` |
+| `size.icon-16/20/24` | `size-icon-16`, `size-icon-20`, `size-icon-24` |
+| Radius, shadow | `rounded-md`, `shadow-sm` |
+
 4. Tailwind's default palette and scales are reset (`--color-*: initial;` and the equivalent for spacing, radius, shadow, font size and z). Utilities such as `bg-red-500`, `text-slate-600` or `p-7` do not exist.
 5. Names describe a role, never a hue (`status.danger.fg`, not `red.fg`).
 

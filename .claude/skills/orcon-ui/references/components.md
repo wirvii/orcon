@@ -16,7 +16,7 @@ Every component in `@orcon/ui` MUST satisfy all of the following:
 6. **Accessible name**: every interactive element has an accessible name from the message catalog. Icon-only controls require an explicit label prop.
 7. **Focus**: a visible `:focus-visible` ring of 2 px in `focus.ring` with a 2 px offset. Focus styles MUST NOT be removed or replaced by color change alone.
 8. **States**: loading, empty and error states are implemented wherever they are meaningful for the component.
-9. **Themes and densities**: correct in light and dark, comfortable and compact; heights and paddings come from density tokens (`h-control`, `h-row`, `px-control`).
+9. **Themes and densities**: correct in light and dark, comfortable and compact; heights and paddings come from density tokens (`h-control`, `h-row`, `px-control-x`, `gap-density`).
 10. **Touch targets**: hit area ≥ 44×44 px on coarse pointers, ≥ 24×24 px otherwise ([accessibility.md#targets](accessibility.md#targets)).
 11. **Strings**: every user-visible string, including `aria-label`, `title`, `placeholder` and `alt`, comes from the catalogs ([content-and-i18n.md#strings](content-and-i18n.md#strings)).
 12. **Direction**: right-to-left layout is not required in V1; use logical CSS properties (`ps`, `pe`, `ms`, `me`) where Tailwind offers them so it can be added later.
