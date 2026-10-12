@@ -38,6 +38,8 @@ SQLite is not a shared distributed coordinator. PostgreSQL task claims are plann
 
 ## Development layout
 
+> Amended by [ADR 0075](../adr/0075-go-module-and-package-layout.md) for the Go module layout (proposed).
+
 `apps/orcon` contains the binary; `apps/web` the editor; `packages/go/*` shared modules coordinated with `go.work`; pnpm/Turborepo coordinates frontend tasks. Additional apps and packages are allowed.
 
 ## Deferred architecture decisions
