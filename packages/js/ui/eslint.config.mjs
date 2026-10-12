@@ -15,8 +15,13 @@ export default [
     cwd: here,
   }),
   {
+    // React Flow marks parts of a node that must not start a drag, a pan or a wheel zoom with these classes.
+    files: ['**/*.{ts,tsx}'],
+    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^(nodrag|nopan|nowheel)$'] }] },
+  },
+  {
     // Stories force interaction states with the pseudo-* classes of the Storybook pseudo-states addon.
     files: ['**/*.stories.tsx'],
-    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^pseudo-(hover|focus|focus-visible|active)$'] }] },
+    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^pseudo-(hover|focus|focus-visible|active)$', '^(nodrag|nopan|nowheel)$'] }] },
   },
 ];

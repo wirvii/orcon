@@ -33,6 +33,8 @@ export default defineConfig({
       'storybook/test',
       'tailwind-merge',
       '@testing-library/react',
+      '@testing-library/user-event',
+      '@xyflow/react',
     ],
   },
   test: {
@@ -53,6 +55,16 @@ export default defineConfig({
           name: 'a11y',
           setupFiles: quiet,
           include: ['test/a11y/**/*.test.tsx'],
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
+        // The flow canvas end to end, in a real browser: keyboard operation of every graph operation.
+        extends: true,
+        test: {
+          name: 'canvas',
+          setupFiles: quiet,
+          include: ['test/canvas/**/*.test.tsx'],
           browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
         },
       },

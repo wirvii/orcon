@@ -120,3 +120,48 @@ export { Tooltip } from './components/tooltip/Tooltip';
 export type { TooltipProps } from './components/tooltip/Tooltip';
 export { TopBar } from './components/top-bar/TopBar';
 export type { TopBarProps } from './components/top-bar/TopBar';
+
+// Canvas
+export { OrconEdge, loopBackPath } from './canvas/Edge';
+export type { OrconEdgeData, OrconFlowEdge } from './canvas/Edge';
+export { EdgeCount } from './canvas/EdgeCount';
+export type { EdgeCountProps } from './canvas/EdgeCount';
+export { CanvasOutline } from './canvas/CanvasOutline';
+export type { CanvasOutlineProps } from './canvas/CanvasOutline';
+export { CanvasToolbar } from './canvas/CanvasToolbar';
+export type { CanvasToolbarProps } from './canvas/CanvasToolbar';
+export { ControlNode } from './canvas/ControlNode';
+export type { ControlNodeProps } from './canvas/ControlNode';
+export { NodeCard } from './canvas/NodeCard';
+export type { NodeCardProps } from './canvas/NodeCard';
+export { NodeStatus } from './canvas/NodeStatus';
+export type { NodeStatusProps } from './canvas/NodeStatus';
+export { Port } from './canvas/Port';
+export type { PortProps } from './canvas/Port';
+export { WorkflowCanvas } from './canvas/WorkflowCanvas';
+export type { WorkflowCanvasProps, NodeExecutionState } from './canvas/WorkflowCanvas';
+export { useAnnouncer, ANNOUNCE_INTERVAL_MS } from './canvas/announcer';
+export type {
+  CatalogItem,
+  ConnectError,
+  ConnectRequest,
+  ControlType,
+  Direction,
+  Graph,
+  GraphEdge,
+  GraphNode,
+  NodeKind,
+  PortSpec,
+} from './canvas/model';
+export {
+  GRID,
+  addNode,
+  connect,
+  connectError,
+  itemCounts,
+  moveNodes,
+  nextFocus,
+  readingOrder,
+  removeEdge,
+  removeNodes,
+} from './canvas/model';

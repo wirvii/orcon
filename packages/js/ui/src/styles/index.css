@@ -3,9 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* React Flow's structural rules sit in their own layer, below the utilities, so Orcon classes always win. */
+@layer theme, base, xyflow, components, utilities;
+
 @import 'tailwindcss';
 @import '@orcon/tokens/tokens.css';
 @import '@orcon/tokens/tailwind-theme.css';
+@import '@xyflow/react/dist/base.css' layer(xyflow);
 @import './fonts.css';
 
 /* Scan the component sources wherever this stylesheet is imported from. */
@@ -71,5 +75,27 @@
   /* One visible focus ring for every interactive element: 2 px ring, 2 px offset. */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-focus;
+  }
+}
+
+/*
+ * The React Flow credit stays visible, as the library asks. It is restyled with the Orcon tokens and
+ * given a full-size hit area so it meets the contrast and target rules like every other link.
+ */
+@layer components {
+  .react-flow__attribution {
+    background-color: var(--orcon-surface-raised);
+    color: var(--orcon-fg-muted);
+    border-radius: var(--orcon-radius-sm);
+    font-size: var(--orcon-font-size-xs);
+  }
+
+  .react-flow__attribution a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--orcon-size-target-min);
+    min-width: var(--orcon-size-target-min);
+    padding-inline: var(--orcon-space-2);
+    color: inherit;
   }
 }

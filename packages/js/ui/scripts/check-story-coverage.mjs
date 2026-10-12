@@ -3,7 +3,7 @@
 
 // Story coverage gate.
 //
-// Every component has a `<Name>.meta.ts` that exports `states`, a
+// Every component, canvas primitive and screen template has a `<Name>.meta.ts` that exports `states`, a
 // `<Name>.stories.tsx` with one story per declared state, and a `Matrix` story.
 // The stories are read from the built Storybook index, so this checks what
 // Storybook actually serves, not what the source files claim.
@@ -43,8 +43,11 @@ function walk(dir) {
   });
 }
 
-const componentsRoot = join(root, 'src/components');
-const files = walk(componentsRoot);
+// Base components, canvas primitives and screen templates all follow the same meta + stories contract.
+const files = ['src/components', 'src/canvas', 'src/screens']
+  .map((dir) => join(root, dir))
+  .filter((dir) => existsSync(dir))
+  .flatMap(walk);
 const metaFiles = files.filter((file) => file.endsWith('.meta.ts'));
 const storyFiles = files.filter((file) => file.endsWith('.stories.tsx'));
 const problems = [];
@@ -84,13 +87,13 @@ for (const metaFile of metaFiles) {
   }
 }
 
-// Inventory: base components that must exist before the design system can be reviewed.
+// Inventory: components, canvas primitives and screen templates that must exist before the design system can be reviewed.
 const inventory = JSON.parse(readFileSync(join(root, 'scripts/inventory.json'), 'utf8'));
 const have = new Set(metaFiles.map((file) => file.split('/').pop().replace(/\.meta\.ts$/, '')));
 const remaining = inventory.filter((name) => !have.has(name));
 
 if (remaining.length > 0) {
-  const text = `inventory components without meta and stories (${remaining.length}/${inventory.length}): ${remaining.join(', ')}`;
+  const text = `inventory entries without meta and stories (${remaining.length}/${inventory.length}): ${remaining.join(', ')}`;
   if (strict) problems.push(text);
   else console.warn(`story coverage: pending ${text}`);
 }

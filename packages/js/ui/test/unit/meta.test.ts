@@ -10,7 +10,7 @@ interface Meta {
   pairs: readonly { fg: string; bg: string }[];
 }
 
-const metas = import.meta.glob<Meta>('../../src/components/**/*.meta.ts', { eager: true });
+const metas = import.meta.glob<Meta>('../../src/{components,canvas,screens}/**/*.meta.ts', { eager: true });
 
 // The certified pairs live in the tokens package; a component may only use a declared pair.
 const declared = new Set(pairsSource.pairs.map(({ fg, bg }) => `${fg} on ${bg}`));
