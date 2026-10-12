@@ -9,3 +9,4 @@ coverage/
 .turbo/
 
 **/storybook-static/
+packages/js/ui/test/**/__screenshots__/

@@ -69,7 +69,7 @@ for (const metaFile of metaFiles) {
     problems.push(`${rel(metaFile)} declares no states`);
     continue;
   }
-  if (!/export const pairs = /.test(source)) problems.push(`${rel(metaFile)} must export "pairs"`);
+  if (!/export const pairs = |export \{[^}]*\bpairs\b[^}]*\} from /.test(source)) problems.push(`${rel(metaFile)} must export "pairs"`);
 
   const storyFile = metaFile.replace(/\.meta\.ts$/, '.stories.tsx');
   const importPath = `./${rel(storyFile)}`;

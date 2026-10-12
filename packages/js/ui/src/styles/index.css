@@ -16,6 +16,35 @@
   --default-transition-duration: var(--orcon-duration-base);
   --default-transition-timing-function: var(--orcon-easing-standard);
   --animate-spin-slow: orcon-spin 1s linear infinite;
+  --animate-pulse-soft: orcon-pulse 1.5s ease-in-out infinite;
+}
+
+/* Stacking layers from the z tokens. */
+@utility z-sticky {
+  z-index: var(--orcon-z-sticky);
+}
+@utility z-dropdown {
+  z-index: var(--orcon-z-dropdown);
+}
+@utility z-overlay {
+  z-index: var(--orcon-z-overlay);
+}
+@utility z-modal {
+  z-index: var(--orcon-z-modal);
+}
+@utility z-toast {
+  z-index: var(--orcon-z-toast);
+}
+@utility z-tooltip {
+  z-index: var(--orcon-z-tooltip);
+}
+
+/* Floating content sizes from the trigger and the space the browser leaves it. */
+@utility min-w-trigger {
+  min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, var(--radix-dropdown-menu-trigger-width, 0px)));
+}
+@utility max-h-available {
+  max-height: var(--radix-select-content-available-height, var(--radix-popover-content-available-height, var(--radix-dropdown-menu-content-available-height, none)));
 }
 
 @keyframes orcon-spin {

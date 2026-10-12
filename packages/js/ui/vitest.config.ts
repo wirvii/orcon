@@ -30,7 +30,7 @@ export default defineConfig({
         test: {
           name: 'a11y',
           include: ['test/a11y/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium' }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce' } }] },
         },
       },
       {
@@ -41,7 +41,7 @@ export default defineConfig({
           include: ['test/targets/**/*.test.tsx'],
           browser: {
             ...browser,
-            instances: [{ browser: 'chromium', context: { hasTouch: true, isMobile: true } }],
+            instances: [{ browser: 'chromium', context: { hasTouch: true, isMobile: true, reducedMotion: 'reduce' } }],
           },
         },
       },

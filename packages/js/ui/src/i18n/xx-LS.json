@@ -1,3 +1,7 @@
 {
+  "common.errorSummary.title": "{count,plural,one{There is # problem to fix} other{There are # problems to fix}}SSSSSSSSSSSSSSSSSSSSSSSSS",
+  "common.field.errorPrefix": "Error:SSSSSSSSSSSSSSSSSSSSSSSSS",
+  "common.field.required": "requiredSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "common.link.opensInNewTab": "(opens in a new tab)SSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.spinner.loading": "LoadingSSSSSSSSSSSSSSSSSSSSSSSSS"
 }

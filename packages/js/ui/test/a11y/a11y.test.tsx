@@ -39,7 +39,11 @@ describe.each(['light', 'dark'] as const)('axe in the %s theme', (theme) => {
     await entry.Story.play?.({ canvasElement: container });
     await settle();
 
-    const violations = await axeViolations();
+    const rules = (entry.Story.parameters?.a11y as { config?: { rules?: { id: string; enabled?: boolean }[] } } | undefined)?.config?.rules ?? [];
+    const violations = await axeViolations(
+      document.body,
+      rules.filter((rule) => rule.enabled === false).map((rule) => rule.id),
+    );
     expect(violations, violations.join('\n')).toEqual([]);
   });
 });

@@ -33,6 +33,9 @@ const storage = new MemoryStorage();
 Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
 Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
 
+// jsdom does not implement scrolling.
+Element.prototype.scrollIntoView = () => undefined;
+
 // jsdom has no matchMedia. Tests that need a dark system theme override this stub.
 beforeEach(() => {
   vi.stubGlobal(

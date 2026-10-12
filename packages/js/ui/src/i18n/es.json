@@ -1,3 +1,7 @@
 {
+  "common.errorSummary.title": "{count, plural, one {Hay # problema por corregir} other {Hay # problemas por corregir}}",
+  "common.field.errorPrefix": "Error:",
+  "common.field.required": "obligatorio",
+  "common.link.opensInNewTab": "(se abre en una pestaña nueva)",
   "common.spinner.loading": "Cargando"
 }

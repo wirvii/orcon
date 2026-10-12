@@ -21,7 +21,7 @@ export interface MatrixTableProps {
  */
 export function MatrixTable({ caption, columns, rows }: MatrixTableProps) {
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="border-collapse text-sm">
         <caption className="text-fg-muted pb-2 text-left">{caption}</caption>
         <thead>

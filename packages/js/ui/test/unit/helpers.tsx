@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { render, type RenderResult } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { Providers, type ProvidersProps } from '../../src/providers/Providers';
 
@@ -11,9 +11,11 @@ export function renderWithProviders(
   ui: ReactElement,
   { theme = 'light', density = 'comfortable', locale = 'en' }: Omit<ProvidersProps, 'children'> = {},
 ): RenderResult {
-  return render(
+  const wrap = (element: ReactNode) => (
     <Providers theme={theme} density={density} locale={locale}>
-      {ui}
-    </Providers>,
+      {element}
+    </Providers>
   );
+  const result = render(wrap(ui));
+  return { ...result, rerender: (next: ReactNode) => result.rerender(wrap(next)) };
 }

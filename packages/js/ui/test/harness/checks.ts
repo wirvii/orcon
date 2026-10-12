@@ -11,8 +11,15 @@ export const settle = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
 /** Runs axe on the document and returns one readable line per violation (empty when clean). */
-export async function axeViolations(root: Element = document.body): Promise<string[]> {
-  const results = await axe.run(root, { runOnly: { type: 'tag', values: wcagTags } });
+export async function axeViolations(
+  root: Element = document.body,
+  /** Rule ids a story turned off in parameters.a11y.config.rules, each with a written reason in the story. */
+  disabledRules: readonly string[] = [],
+): Promise<string[]> {
+  const results = await axe.run(root, {
+    runOnly: { type: 'tag', values: wcagTags },
+    rules: Object.fromEntries(disabledRules.map((id) => [id, { enabled: false }])),
+  });
   return results.violations.map(
     (violation) =>
       `${violation.id} (${violation.impact}): ${violation.help}\n` +
