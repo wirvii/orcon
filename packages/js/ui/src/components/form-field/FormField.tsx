@@ -7,7 +7,10 @@ import { defineMessages, useIntl } from 'react-intl';
 
 import { cn } from '../../lib/cn';
 
+import { fieldIdForName } from '../problem-alert/problem';
+
 import { FieldContext, type FieldContextValue } from './field-context';
+import { useFieldProblemError } from './problem-errors';
 
 const messages = defineMessages({
   required: {
@@ -34,7 +37,13 @@ export interface FormFieldProps {
    * legend and no single control id is needed.
    */
   group?: boolean;
-  /** Fixed control id. Defaults to a generated one. Error summaries link to this id. */
+  /**
+   * Field name: a JSON pointer such as "/title" or a plain name. A server error
+   * whose pointer equals the name appears on this field (see ProblemErrorsProvider),
+   * and the control gets the id `fieldIdForName(name)` so an ErrorSummary can link to it.
+   */
+  name?: string;
+  /** Fixed control id. Defaults to one built from `name`, else a generated one. */
   id?: string;
   className?: string;
   children: ReactNode;
@@ -45,10 +54,12 @@ export interface FormFieldProps {
  * the invalid and required state from here, so a control placed inside needs no
  * extra wiring. A server error maps to a field by its `name` (see ProblemAlert).
  */
-export function FormField({ label, description, error, required = false, group = false, id, className, children }: FormFieldProps) {
+export function FormField({ label, description, error: errorProp, required = false, group = false, name, id, className, children }: FormFieldProps) {
   const intl = useIntl();
   const generated = useId();
-  const controlId = id ?? `field-${generated}`;
+  const problemError = useFieldProblemError(name);
+  const error = errorProp ?? problemError;
+  const controlId = id ?? (name ? fieldIdForName(name) : `field-${generated}`);
   const value: FieldContextValue = {
     controlId,
     labelId: `${controlId}-label`,

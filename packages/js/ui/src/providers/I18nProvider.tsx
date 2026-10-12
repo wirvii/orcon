@@ -21,7 +21,7 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 function initialLocale(): Locale {
   const saved = readPreference(LOCALE_STORAGE_KEY);
   if (isLocale(saved)) return saved;
-  return matchProductLocale(typeof navigator === 'undefined' ? [] : navigator.languages);
+  return matchProductLocale(typeof navigator === 'undefined' ? [] : Array.from(navigator.languages ?? []));
 }
 
 export interface I18nProviderProps {
