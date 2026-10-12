@@ -7,7 +7,7 @@
 import type { CatalogItem, Graph, GraphNode } from './model';
 
 export const placeholderLogo =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGRAQQAACgAAwP5pKKLAAAAAElFTkSuQmCC';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGNIKekGIgYIBQAmRgWNPOJSIgAAAABJRU5ErkJggg==';
 
 const main = [{ id: 'main' }];
 

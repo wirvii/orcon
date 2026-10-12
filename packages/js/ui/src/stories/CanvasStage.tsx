@@ -43,7 +43,7 @@ export function EdgePreview({ data, selected = false, loopBack = false }: { data
   ];
   return (
     <ReactFlowProvider>
-      <div className="bg-canvas h-node-width w-full overflow-hidden rounded-lg">
+      <div className="bg-canvas h-node-width w-screen max-w-screen-sm overflow-hidden rounded-lg">
         <ReactFlow<OrconFlowNode, OrconFlowEdge>
           nodes={nodes}
           edges={edges}

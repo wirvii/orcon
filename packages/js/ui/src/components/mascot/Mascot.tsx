@@ -27,7 +27,7 @@ export function Mascot({ pose = 'welcome', className }: MascotProps) {
       aria-hidden
       data-mascot-pose={pose}
       data-placeholder
-      className={cn('border-border size-16 shrink-0 rounded-xl border border-dashed', className)}
+      className={cn('border-control size-16 shrink-0 rounded-xl border border-dashed', className)}
     />
   );
 }

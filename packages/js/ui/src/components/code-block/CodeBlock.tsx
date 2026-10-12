@@ -47,7 +47,7 @@ export function CodeBlock({ code, label, copyable = false, className }: CodeBloc
         role="region"
         aria-label={label}
         tabIndex={0}
-        className={cn('text-fg overflow-x-auto rounded-md p-3 font-mono text-mono', copyable && 'pr-12')}
+        className={cn('text-fg overflow-x-auto rounded-md p-3 font-mono text-mono', copyable && 'mr-10')}
       >
         <code>{code}</code>
       </pre>

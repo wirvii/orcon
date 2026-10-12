@@ -20,7 +20,7 @@ export interface BrandMarkProps {
 export function BrandMark({ variant = 'lockup', className }: BrandMarkProps) {
   return (
     <span data-placeholder className={cn('text-fg inline-flex items-center gap-2', className)} role="img" aria-label={PRODUCT_NAME}>
-      <span aria-hidden className="border-border size-connector-icon shrink-0 rounded-md border" />
+      <span aria-hidden className="border-control size-connector-icon shrink-0 rounded-md border" />
       {variant === 'lockup' ? (
         <span aria-hidden className="text-lg font-bold">
           {PRODUCT_NAME}

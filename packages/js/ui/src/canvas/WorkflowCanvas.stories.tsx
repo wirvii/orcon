@@ -67,7 +67,7 @@ export const Matrix: Story = {
         {
           label: 'editing',
           cells: [
-            <div key="a" className="h-screen">
+            <div key="a" className="h-screen w-screen max-w-screen-md">
               <WorkflowCanvas defaultGraph={exampleDraft} catalog={exampleCatalog} />
             </div>,
           ],
@@ -75,7 +75,7 @@ export const Matrix: Story = {
         {
           label: 'with an execution',
           cells: [
-            <div key="b" className="h-screen">
+            <div key="b" className="h-screen w-screen max-w-screen-md">
               <WorkflowCanvas defaultGraph={exampleGraph} readOnly />
             </div>,
           ],

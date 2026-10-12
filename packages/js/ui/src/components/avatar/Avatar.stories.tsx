@@ -9,7 +9,7 @@ import { Avatar } from './Avatar';
 
 // A 2x2 PNG, so the image state renders without a network request.
 const image =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGRAQQAACgAAwP5pKKLAAAAAElFTkSuQmCC';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGNIKekGIgYIBQAmRgWNPOJSIgAAAABJRU5ErkJggg==';
 
 const meta = {
   title: 'Components/Avatar',

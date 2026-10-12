@@ -10,7 +10,7 @@ import { ConnectorIcon } from './ConnectorIcon';
 
 // A 2x2 PNG stands in for a connector logo, so no network request is made.
 const logo =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGRAQQAACgAAwP5pKKLAAAAAElFTkSuQmCC';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGNIKekGIgYIBQAmRgWNPOJSIgAAAABJRU5ErkJggg==';
 
 const meta = {
   title: 'Components/ConnectorIcon',
