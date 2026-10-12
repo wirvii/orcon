@@ -72,6 +72,7 @@
     {"fg": "canvas.selection", "bg": "canvas.bg", "kind": "ui", "min": 3},
     {"fg": "canvas.selection", "bg": "surface.default", "kind": "ui", "min": 3},
     {"fg": "border.default", "bg": "surface.default", "kind": "decorative", "reason": "Decorative divider; WCAG 1.4.11 does not apply to separators that carry no information."},
+    {"fg": "border.default", "bg": "surface.sunken", "kind": "decorative", "reason": "Decorative outline of a framed logo on the sunken surface; the logo is identified by its text alternative, not by the frame."},
     {"fg": "canvas.grid", "bg": "canvas.bg", "kind": "decorative", "reason": "Decorative dotted grid behind the canvas; it conveys no information."},
     {"fg": "canvas.node.border", "bg": "canvas.bg", "kind": "decorative", "reason": "Decorative node outline; a node is identified by its text, not by its border."},
     {"fg": "fg.disabled", "bg": "surface.default", "kind": "disabled-exempt", "reason": "Disabled content is exempt from contrast minimums (WCAG 1.4.3, inactive components); use only for disabled content."},
