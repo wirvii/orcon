@@ -23,6 +23,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter '@orcon/ui^...' build
       - name: Build Storybook on the host
         run: pnpm --filter @orcon/ui build-storybook
       - name: Generate baselines in the pinned container

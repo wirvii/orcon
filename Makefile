@@ -1,6 +1,6 @@
 .PHONY: web build test
 web:
-	pnpm --filter @orcon/web build
+	pnpm --filter '@orcon/web...' build
 	mkdir -p apps/orcon/ui/dist
 	cp -R apps/web/dist/. apps/orcon/ui/dist/
 build: web

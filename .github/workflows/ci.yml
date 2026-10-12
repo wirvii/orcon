@@ -56,6 +56,10 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter '@orcon/ui^...' build
+      - name: Install the Chromium browser for component and web accessibility checks
+        run: pnpm --filter @orcon/ui exec playwright install --with-deps chromium
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -88,8 +92,6 @@ jobs:
           fi
           find apps/web/dist/assets -iname '*inter*.woff2' | grep -q .
           find apps/web/dist/assets -iname '*jetbrains*.woff2' | grep -q .
-      - name: Install the browser for the web accessibility check
-        run: pnpm --filter @orcon/web exec playwright install --with-deps chromium
       - name: Web accessibility
         run: pnpm --filter @orcon/web test:a11y
   ui-visual:
@@ -104,6 +106,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter '@orcon/ui^...' build
       - name: Baselines are committed
         shell: bash
         run: |
