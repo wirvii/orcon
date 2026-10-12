@@ -1,4 +1,4 @@
-.PHONY: web build test
+.PHONY: web build test smoke
 web:
 	pnpm --filter @orcon/web build
 	mkdir -p internal/adapter/webui/dist
@@ -8,3 +8,5 @@ build: web
 	go build -o bin/orcon ./cmd/orcon
 test:
 	go test ./...
+smoke:
+	bash scripts/smoke.sh

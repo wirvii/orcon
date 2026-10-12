@@ -32,15 +32,4 @@ jobs:
       - name: Build embedded frontend and Go binary
         run: make build
       - name: Smoke test standalone
-        shell: bash
-        run: |
-          ./bin/orcon --role=standalone --addr=127.0.0.1:18080 &
-          pid=$!
-          trap 'kill "$pid" 2>/dev/null || true' EXIT
-          for attempt in {1..30}; do
-            if curl -fsS http://127.0.0.1:18080/healthz; then break; fi
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:18080/healthz | grep -q ok
-          curl -fsS http://127.0.0.1:18080/ | grep -q 'id="root"'
-          ./bin/orcon --role=invalid >/dev/null 2>&1 && exit 1 || true
+        run: make smoke
