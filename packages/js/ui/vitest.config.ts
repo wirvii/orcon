@@ -13,6 +13,26 @@ const browser = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Pre-bundle everything the browser projects import, so Vite never re-optimizes (and reloads) mid-run.
+  optimizeDeps: {
+    include: [
+      'axe-core',
+      'class-variance-authority',
+      'clsx',
+      'cmdk',
+      'lucide-react',
+      'radix-ui',
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-dev-runtime',
+      'react-intl',
+      'sonner',
+      'storybook/test',
+      'tailwind-merge',
+      '@testing-library/react',
+    ],
+  },
   test: {
     projects: [
       {
@@ -30,7 +50,7 @@ export default defineConfig({
         test: {
           name: 'a11y',
           include: ['test/a11y/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
         },
       },
       {
@@ -41,7 +61,7 @@ export default defineConfig({
           include: ['test/targets/**/*.test.tsx'],
           browser: {
             ...browser,
-            instances: [{ browser: 'chromium', context: { hasTouch: true, isMobile: true, reducedMotion: 'reduce' } }],
+            instances: [{ browser: 'chromium', context: { hasTouch: true, isMobile: true, reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }],
           },
         },
       },

@@ -1,4 +1,6 @@
 {
+  "codeBlock.copied": "CopiedSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "codeBlock.copy": "Copy codeSSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.banner.attention": "Needs attentionSSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.banner.danger": "ErrorSSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.banner.info": "InformationSSSSSSSSSSSSSSSSSSSSSSSSS",
@@ -16,6 +18,11 @@
   "common.field.required": "requiredSSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.link.opensInNewTab": "(opens in a new tab)SSSSSSSSSSSSSSSSSSSSSSSSS",
   "common.spinner.loading": "LoadingSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "common.toast.region": "NotificationsSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "density.comfortable": "ComfortableSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "density.compact": "CompactSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "density.label": "DensitySSSSSSSSSSSSSSSSSSSSSSSSS",
+  "locale.label": "LanguageSSSSSSSSSSSSSSSSSSSSSSSSS",
   "problem.attention-already-resolved": "Someone already resolved this request.SSSSSSSSSSSSSSSSSSSSSSSSS",
   "problem.code": "CodeSSSSSSSSSSSSSSSSSSSSSSSSS",
   "problem.copied": "CopiedSSSSSSSSSSSSSSSSSSSSSSSSS",
@@ -45,5 +52,9 @@
   "status.suspended": "Needs actionSSSSSSSSSSSSSSSSSSSSSSSSS",
   "status.uncertain": "UncertainSSSSSSSSSSSSSSSSSSSSSSSSS",
   "status.uncertain.description": "The external system may or may not have applied this operation. Review it before continuing.SSSSSSSSSSSSSSSSSSSSSSSSS",
-  "status.waiting": "WaitingSSSSSSSSSSSSSSSSSSSSSSSSS"
+  "status.waiting": "WaitingSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "theme.dark": "DarkSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "theme.label": "ThemeSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "theme.light": "LightSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "theme.system": "SystemSSSSSSSSSSSSSSSSSSSSSSSSS"
 }

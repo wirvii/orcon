@@ -1,4 +1,6 @@
 {
+  "codeBlock.copied": "Copiado",
+  "codeBlock.copy": "Copiar el código",
   "common.banner.attention": "Requiere atención",
   "common.banner.danger": "Error",
   "common.banner.info": "Información",
@@ -16,6 +18,11 @@
   "common.field.required": "obligatorio",
   "common.link.opensInNewTab": "(se abre en una pestaña nueva)",
   "common.spinner.loading": "Cargando",
+  "common.toast.region": "Notificaciones",
+  "density.comfortable": "Cómoda",
+  "density.compact": "Compacta",
+  "density.label": "Densidad",
+  "locale.label": "Idioma",
   "problem.attention-already-resolved": "Alguien ya resolvió esta solicitud.",
   "problem.code": "Código",
   "problem.copied": "Copiado",
@@ -45,5 +52,9 @@
   "status.suspended": "Requiere acción",
   "status.uncertain": "Incierto",
   "status.uncertain.description": "El sistema externo puede haber aplicado o no esta operación. Revísala antes de continuar.",
-  "status.waiting": "En espera"
+  "status.waiting": "En espera",
+  "theme.dark": "Oscuro",
+  "theme.label": "Tema",
+  "theme.light": "Claro",
+  "theme.system": "Sistema"
 }

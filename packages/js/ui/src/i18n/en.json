@@ -1,4 +1,6 @@
 {
+  "codeBlock.copied": "Copied",
+  "codeBlock.copy": "Copy code",
   "common.banner.attention": "Needs attention",
   "common.banner.danger": "Error",
   "common.banner.info": "Information",
@@ -16,6 +18,11 @@
   "common.field.required": "required",
   "common.link.opensInNewTab": "(opens in a new tab)",
   "common.spinner.loading": "Loading",
+  "common.toast.region": "Notifications",
+  "density.comfortable": "Comfortable",
+  "density.compact": "Compact",
+  "density.label": "Density",
+  "locale.label": "Language",
   "problem.attention-already-resolved": "Someone already resolved this request.",
   "problem.code": "Code",
   "problem.copied": "Copied",
@@ -45,5 +52,9 @@
   "status.suspended": "Needs action",
   "status.uncertain": "Uncertain",
   "status.uncertain.description": "The external system may or may not have applied this operation. Review it before continuing.",
-  "status.waiting": "Waiting"
+  "status.waiting": "Waiting",
+  "theme.dark": "Dark",
+  "theme.label": "Theme",
+  "theme.light": "Light",
+  "theme.system": "System"
 }

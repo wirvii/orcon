@@ -33,6 +33,14 @@ const storage = new MemoryStorage();
 Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
 Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
 
+// jsdom does not implement ResizeObserver, which Radix scroll areas use.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver = ResizeObserverStub;
+
 // jsdom does not implement scrolling.
 Element.prototype.scrollIntoView = () => undefined;
 
