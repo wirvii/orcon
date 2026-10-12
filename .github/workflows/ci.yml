@@ -111,7 +111,7 @@ jobs:
       - name: Baselines are committed
         shell: bash
         run: |
-          if ! find packages/js/ui/visual/__screenshots__ -name '*.png' 2>/dev/null | grep -q .; then
+          if [ -z "$(find packages/js/ui/visual/__screenshots__ -name '*.png' -print -quit 2>/dev/null)" ]; then
             echo "::error title=Visual baselines missing::packages/js/ui/visual/__screenshots__ has no screenshots. Run the 'Visual baselines' workflow (workflow_dispatch), download its artifact, commit the folder, then re-run this job."
             exit 1
           fi
