@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # make skill-check (SPEC-008 E.4): the orcon-go skill conforms to the Agent
-# Skills standard and its generated Claude copy is identical.
+# Skills standard and its generated copies (the projections written by the
+# skill's project.sh into the tool directories) are identical.
 #
 # The skill is completed by SPEC-008 slice G6 (SKILL.md, scripts/, validation/).
 # Until then this target fails with a clear message instead of passing.
@@ -25,7 +26,17 @@ done
 
 sh "$skill/validation/run.sh"
 sh "$skill/scripts/check-frontmatter.sh"
-diff -r "$skill" .claude/skills/orcon-go
+
+# Every other hidden directory with skills/orcon-go is a generated copy and must
+# be byte-identical; at least one has to exist.
+copies=$(find . -maxdepth 3 -type d -path './.*/skills/orcon-go' ! -path './.agents/*' | sort)
+if [ -z "$copies" ]; then
+  echo "skill-check: no generated copy of $skill found; run 'make skill-sync'" >&2
+  exit 1
+fi
+for copy in $copies; do
+  diff -r "$skill" "$copy"
+done
 if ! command -v uvx >/dev/null 2>&1; then
   echo "skill-check: uv is required for the Agent Skills reference validator (https://docs.astral.sh/uv/)" >&2
   exit 1
