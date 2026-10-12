@@ -5,6 +5,8 @@ module github.com/wirvii/orcon/tools
 
 go 1.26.0
 
+toolchain go1.26.9
+
 tool (
 	github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod
 	github.com/google/go-licenses/v2
