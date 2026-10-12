@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package httpapi is the HTTP adapter of Orcon. It translates HTTP requests
 // into calls on area ports and area results into HTTP responses.
 package httpapi

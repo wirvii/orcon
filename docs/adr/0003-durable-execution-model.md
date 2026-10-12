@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0003 — Durable state plus execution history
 
 Status: **Accepted (architectural direction); detailed schema Proposed** | Date: 2026-10-10

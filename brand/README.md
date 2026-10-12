@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon brand — approved visual direction
 
 **Status:** The two original concept boards approved by the product owner are the **visual source of truth**. The simplified replacement SVGs formerly committed under brand/logos and brand/mascot were inaccurate and have been deleted.

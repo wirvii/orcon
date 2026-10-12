@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Command orcon is the Orcon server. It is the composition root: it parses
 // flags, builds every dependency for the selected role and owns the process
 // lifetime. All other packages receive their dependencies as arguments.
@@ -49,24 +52,29 @@ func main() {
 }
 
 // run is the testable body of the process. It returns the exit code and never
-// calls os.Exit. The process runs until ctx is cancelled, then shuts down
-// within the configured shutdown timeout.
+// calls os.Exit. The process runs until ctx is canceled, then shuts down
+// within the configured shutdown timeout. Help goes to stdout, diagnostics
+// and logs to stderr.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("orcon", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	role := fs.String("role", "standalone", "standalone|api|scheduler|worker")
-	addr := fs.String("addr", ":8080", "HTTP listen address")
-	shutdownTimeout := fs.Duration("shutdown-timeout", defaultShutdownTimeout, "maximum time to drain in-flight requests on shutdown")
-	if err := fs.Parse(args); err != nil {
+	flags := flag.NewFlagSet("orcon", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	role := flags.String("role", "standalone", "standalone|api|scheduler|worker")
+	addr := flags.String("addr", ":8080", "HTTP listen address")
+	shutdownTimeout := flags.Duration("shutdown-timeout", defaultShutdownTimeout, "maximum time to drain in-flight requests on shutdown")
+	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			printUsage(stdout, flags)
 			return exitOK
 		}
+		_, _ = fmt.Fprintln(stderr, "orcon:", err)
+		printUsage(stderr, flags)
 		return exitUsage
 	}
 
 	selected := config.Role(strings.ToLower(*role))
 	if !selected.Valid() {
-		fmt.Fprintln(stderr, "invalid role:", *role)
+		// A failed write to stderr leaves nothing better to do.
+		_, _ = fmt.Fprintln(stderr, "invalid role:", *role)
 		return exitUsage
 	}
 
@@ -88,6 +96,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 }
 
+func printUsage(w io.Writer, flags *flag.FlagSet) {
+	_, _ = fmt.Fprintln(w, "usage: orcon [flags]")
+	flags.SetOutput(w)
+	flags.PrintDefaults()
+}
+
 // newHandler assembles the HTTP routes served by the standalone and api roles.
 func newHandler() (http.Handler, error) {
 	assets, err := webui.Assets()
@@ -100,7 +114,7 @@ func newHandler() (http.Handler, error) {
 	return mux, nil
 }
 
-// serve listens on addr and serves HTTP until ctx is cancelled, then drains
+// serve listens on addr and serves HTTP until ctx is canceled, then drains
 // in-flight requests for at most shutdownTimeout.
 func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration) error {
 	handler, err := newHandler()
@@ -136,7 +150,7 @@ func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr stri
 	}
 
 	logger.InfoContext(ctx, "shutting down", "role", role)
-	// Shutdown must outlive the cancelled ctx, so detach cancellation and bound it explicitly.
+	// Shutdown must outlive the canceled ctx, so detach cancellation and bound it explicitly.
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancel()
 	shutdownErr := srv.Shutdown(shutdownCtx)

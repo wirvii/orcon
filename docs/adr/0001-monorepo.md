@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0001: Hybrid monorepo
 
 Status: Accepted

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon — Design System Foundations
 
 Status: **Visual direction approved; implementation tokens proposed** | Version: 0.2

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package flow holds the flow definition model: the versioned graph of nodes
 // and edges that describes a workflow. It is a business-area package.
 package flow

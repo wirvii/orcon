@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package webui embeds the built web editor and exposes it as a file system.
 // The build output is copied into dist by "make web".
 package webui

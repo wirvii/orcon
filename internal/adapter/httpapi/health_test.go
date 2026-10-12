@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package httpapi_test
 
 import (
@@ -33,7 +36,7 @@ func TestHealthz(t *testing.T) {
 			mux.ServeHTTP(rec, req)
 
 			res := rec.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }() // nothing to recover from a failed close in a test
 			if res.StatusCode != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", res.StatusCode, tt.wantStatus)
 			}

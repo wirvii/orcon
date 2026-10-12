@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon component and UX specification v0.1
 
 **Status: Proposed.** All components must support keyboard navigation, accessible names, loading/empty/error states, dark/light themes and reduced motion.

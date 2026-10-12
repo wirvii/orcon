@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
@@ -137,7 +140,7 @@ func waitForListenAddr(t *testing.T, stderr *syncBuffer, done <-chan int) string
 				return rec.ListenAddr
 			}
 		}
-		time.Sleep(10 * time.Millisecond) //nolint:forbidigo // polling a real server socket; no injected clock exists in the composition root
+		time.Sleep(10 * time.Millisecond) // polling a real server socket: there is no injected clock in the composition root
 	}
 	t.Fatalf("server never reported its address; stderr: %s", stderr.String())
 	return ""
@@ -154,7 +157,7 @@ func assertGet(t *testing.T, url string, wantStatus int, wantBody string) {
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }() // nothing to recover from a failed close in a test
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("read %s: %v", url, err)

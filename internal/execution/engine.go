@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package execution holds the flow execution engine contract and, later, its
 // state machines. It is a business-area package.
 package execution
