@@ -10,7 +10,7 @@ export const pairs = [
   pair('fg.muted', 'surface.raised'),
   pair('fg.default', 'surface.default'),
   pair('fg.muted', 'surface.default'),
-  pair('fg.muted', 'canvas.bg'),
+  pair('fg.muted', 'bg.app'),
   pair('canvas.edge', 'canvas.bg'),
   pair('canvas.edge-active', 'canvas.bg'),
   pair('canvas.port', 'canvas.bg'),

@@ -41,7 +41,7 @@ export function NavItem({
       ref={ref}
       aria-current={current ? 'page' : undefined}
       className={cn(
-        'text-fg-muted flex h-control min-h-target w-full items-center gap-3 rounded-md border-l-2 border-transparent px-control-x text-base transition-colors',
+        'text-fg-muted flex min-h-target w-full items-center gap-3 py-2 rounded-md border-l-2 border-transparent px-control-x text-base transition-colors',
         'hover:bg-surface-sunken hover:text-fg',
         current && 'bg-surface-sunken text-fg border-action-primary font-semibold',
         (collapsed || responsiveLabel) && 'justify-center px-0',
@@ -51,7 +51,7 @@ export function NavItem({
       {...props}
     >
       <Icon aria-hidden className="size-icon-20 shrink-0" />
-      <span className={cn('min-w-0 truncate', labelClass)}>{label}</span>
+      <span className={cn('min-w-0 break-words', labelClass)}>{label}</span>
       {hasBadge ? (
         <span
           className={cn(

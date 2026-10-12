@@ -39,7 +39,7 @@ export function Tabs({ tabs, label, value, defaultValue, onValueChange, classNam
             value={tab.value}
             disabled={tab.disabled}
             className={cn(
-              'text-fg-muted inline-flex h-control min-h-target items-center border-b-2 border-transparent px-control-x text-base whitespace-nowrap transition-colors',
+              'text-fg-muted inline-flex min-h-target min-w-target items-center border-b-2 border-transparent px-control-x py-2 text-base wrap-anywhere whitespace-normal transition-colors',
               'hover:text-fg data-[state=active]:border-action-primary data-[state=active]:text-fg data-[state=active]:font-semibold',
               'disabled:pointer-events-none disabled:text-fg-disabled',
               tab.className,

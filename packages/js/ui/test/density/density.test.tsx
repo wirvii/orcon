@@ -52,6 +52,8 @@ describe.each(['comfortable', 'compact'] as const)('%s density with a fine point
 
     // Table rows are as tall as the row token.
     for (const element of document.body.querySelectorAll<HTMLElement>('[data-row]')) {
+      // A table that a breakpoint hides (the phone shows a list instead) has no layout to measure.
+      if (element.getClientRects().length === 0) continue;
       expect(element.getBoundingClientRect().height, 'row').toBeCloseTo(row, 0);
     }
     // Controls built on the control height (buttons, inputs, selects, tabs, menu items) match the token.

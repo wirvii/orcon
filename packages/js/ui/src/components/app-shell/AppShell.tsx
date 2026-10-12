@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
+import { cn } from '../../lib/cn';
 import { NavItem } from '../nav-item/NavItem';
 import { Sheet } from '../sheet/Sheet';
 import { TopBar } from '../top-bar/TopBar';
@@ -47,6 +48,12 @@ export interface AppShellProps {
   children: ReactNode;
   /** Open the drawer when the page loads. Only for stories and tests. */
   defaultDrawerOpen?: boolean;
+  /**
+   * The shell is exactly one viewport tall and the page content fills the space
+   * between the bars, scrolling inside it. For screens that need a definite
+   * height, such as the flow editor.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -54,12 +61,12 @@ export interface AppShellProps {
  * lg it is a rail of icons; below md the sections are a bottom bar plus a drawer
  * opened from the top bar. A skip link jumps to the content.
  */
-export function AppShell({ navigation, currentId, brand, actions, children, defaultDrawerOpen = false }: AppShellProps) {
+export function AppShell({ navigation, currentId, brand, actions, children, defaultDrawerOpen = false, fill = false }: AppShellProps) {
   const intl = useIntl();
   const [drawerOpen, setDrawerOpen] = useState(defaultDrawerOpen);
 
   return (
-    <div className="bg-app flex min-h-screen flex-col">
+    <div className={cn('bg-app flex flex-col', fill ? 'h-screen' : 'min-h-screen')}>
       <a
         href="#main-content"
         className="text-fg-link sr-only focus:not-sr-only focus:bg-surface focus:absolute focus:top-2 focus:left-2 focus:z-toast focus:inline-flex focus:min-h-target focus:items-center focus:rounded-md focus:px-3"
@@ -76,7 +83,11 @@ export function AppShell({ navigation, currentId, brand, actions, children, defa
             <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} responsiveLabel />
           ))}
         </nav>
-        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-16 outline-hidden md:pb-4">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={cn('min-w-0 flex-1 p-4 pb-16 outline-hidden md:pb-4', fill && 'flex min-h-0 flex-col overflow-y-auto')}
+        >
           {children}
         </main>
       </div>

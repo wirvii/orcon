@@ -74,6 +74,8 @@ describe.each(['comfortable', 'compact'] as const)('targets with a coarse pointe
     // measures every row exactly.
     const token = density === 'compact' ? 32 : 40;
     for (const row of document.body.querySelectorAll<HTMLElement>('[data-row]')) {
+      // A table that a breakpoint hides (the phone shows a list instead) has no layout to measure.
+      if (row.getClientRects().length === 0) continue;
       const holdsControl = row.querySelector('a[href], button, input, select, textarea, [role="button"], [role="checkbox"]') !== null;
       const height = row.getBoundingClientRect().height;
       if (holdsControl) {

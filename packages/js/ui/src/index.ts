@@ -101,6 +101,8 @@ export { Skeleton } from './components/skeleton/Skeleton';
 export type { SkeletonProps } from './components/skeleton/Skeleton';
 export { Spinner } from './components/spinner/Spinner';
 export type { SpinnerProps } from './components/spinner/Spinner';
+export { UncertainResolutionPanel } from './components/uncertain-resolution/UncertainResolutionPanel';
+export type { UncertainResolutionAction, UncertainResolutionPanelProps } from './components/uncertain-resolution/UncertainResolutionPanel';
 export { StatusBadge } from './components/status-badge/StatusBadge';
 export type { StatusBadgeProps } from './components/status-badge/StatusBadge';
 export { statusMessages, statusMap, statusKeys } from './components/status-badge/status-map';
@@ -165,3 +167,27 @@ export {
   removeEdge,
   removeNodes,
 } from './canvas/model';
+
+// Screen templates (sample data, no HTTP)
+export { AppearanceSettingsScreen } from './screens/AppearanceSettingsScreen';
+export { ApprovalScreen } from './screens/ApprovalScreen';
+export type { ApprovalOutcome, ApprovalScreenProps } from './screens/ApprovalScreen';
+export { AttentionInboxScreen } from './screens/AttentionInboxScreen';
+export type { AttentionInboxScreenProps } from './screens/AttentionInboxScreen';
+export { EmptyStatesScreen } from './screens/EmptyStatesScreen';
+export { ErrorPageScreen } from './screens/ErrorPageScreen';
+export type { ErrorPageScreenProps } from './screens/ErrorPageScreen';
+export { ExecutionDetailScreen } from './screens/ExecutionDetailScreen';
+export type { ExecutionDetailScreenProps } from './screens/ExecutionDetailScreen';
+export { ExecutionListScreen } from './screens/ExecutionListScreen';
+export type { ExecutionListScreenProps } from './screens/ExecutionListScreen';
+export { FlowEditorScreen } from './screens/FlowEditorScreen';
+export type { FlowEditorScreenProps } from './screens/FlowEditorScreen';
+export { FlowListScreen } from './screens/FlowListScreen';
+export type { FlowListScreenProps } from './screens/FlowListScreen';
+export { NotFoundScreen } from './screens/NotFoundScreen';
+export { ProductShell } from './screens/ProductShell';
+export type { ProductShellProps, ShellSection } from './screens/ProductShell';
+export { WelcomeScreen } from './screens/WelcomeScreen';
+export type { WelcomeScreenProps } from './screens/WelcomeScreen';
+export { FIXTURE_NOW } from './screens/fixtures';
