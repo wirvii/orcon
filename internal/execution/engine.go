@@ -1,3 +1,5 @@
+// Package execution holds the flow execution engine contract and, later, its
+// state machines. It is a business-area package.
 package execution
 
 import "context"
