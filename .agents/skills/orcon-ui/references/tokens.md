@@ -141,7 +141,7 @@ Rules:
 
 5. `fg.subtle` is **not** certified on `surface.sunken` (light 4.34 < 4.5). The pair is not declared, so the `pairs-declared` check rejects any component that uses it.
 6. `border.control` in the dark theme on `surface.raised` is certified with a minimal margin (3.07:1). Any drift in either token fails the test; do not adjust one without recomputing.
-7. `border.default`, `canvas.grid` and `canvas.node.border` are declared `decorative` (decorative dividers, WCAG 1.4.11 does not apply). `fg.disabled` is declared `disabled-exempt`.
+7. `border.default`, `canvas.grid` and `canvas.node.border` are declared `decorative` (decorative dividers, WCAG 1.4.11 does not apply). `fg.disabled` is declared `disabled-exempt` on `surface.default` and on `surface.raised` (disabled items in floating panels).
 8. No `text` pair may use a brand-exact hue token as foreground or background (`test/brand-exact.test.ts`).
 9. Every semantic color token appears in at least one pair or is marked decorative with a reason (`test/coverage.test.ts`).
 
