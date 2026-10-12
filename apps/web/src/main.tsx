@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ReactFlow, Background, Controls } from '@xyflow/react';
