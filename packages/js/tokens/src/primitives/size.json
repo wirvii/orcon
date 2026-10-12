@@ -1,0 +1,24 @@
+{
+  "size": {
+    "$type": "dimension",
+    "icon": {
+      "16": {
+        "$value": "16px"
+      },
+      "20": {
+        "$value": "20px"
+      },
+      "24": {
+        "$value": "24px"
+      }
+    },
+    "target-min": {
+      "$value": "24px",
+      "$description": "Minimum interactive target for fine pointers."
+    },
+    "target-min-coarse": {
+      "$value": "44px",
+      "$description": "Minimum interactive target under a coarse pointer."
+    }
+  }
+}

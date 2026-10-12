@@ -1,0 +1,32 @@
+{
+  "size": {
+    "$type": "dimension",
+    "row": {
+      "$value": "40px"
+    },
+    "control": {
+      "$value": "36px"
+    },
+    "connector-icon": {
+      "$value": "32px"
+    },
+    "connector-icon-safe": {
+      "$value": "20px"
+    },
+    "node-width": {
+      "$value": "240px"
+    },
+    "control-node-height": {
+      "$value": "40px"
+    }
+  },
+  "space": {
+    "$type": "dimension",
+    "control-x": {
+      "$value": "12px"
+    },
+    "gap": {
+      "$value": "12px"
+    }
+  }
+}

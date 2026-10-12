@@ -1,0 +1,36 @@
+{
+  "component": {
+    "node-card": {
+      "width": {
+        "$type": "dimension",
+        "$value": "{size.node-width}"
+      },
+      "bg": {
+        "$type": "color",
+        "$value": "{surface.default}"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "{canvas.node.border}"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": "{elevation.sm}"
+      }
+    },
+    "control-node": {
+      "height": {
+        "$type": "dimension",
+        "$value": "{size.control-node-height}"
+      },
+      "bg": {
+        "$type": "color",
+        "$value": "{surface.default}"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "{canvas.node.border}"
+      }
+    }
+  }
+}

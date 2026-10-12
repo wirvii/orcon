@@ -1,0 +1,35 @@
+{
+  "name": "@orcon/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Orcon design tokens: DTCG sources compiled to CSS variables, a Tailwind v4 theme, and typed values.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./tokens.css": "./dist/tokens.css",
+    "./tailwind-theme.css": "./dist/tailwind-theme.css",
+    "./tokens.json": "./dist/tokens.json",
+    ".": {
+      "types": "./dist/tokens.d.ts",
+      "default": "./dist/tokens.js"
+    }
+  },
+  "scripts": {
+    "build": "node style-dictionary.config.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@orcon/lint-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.20.0",
+    "style-dictionary": "^4.4.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}
