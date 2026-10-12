@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+version: "2"
+sql:
+  - engine: sqlite
+    schema: internal/adapter/sqlite/migrations
+    queries: internal/adapter/sqlite/queries
+    strict_function_checks: true
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/adapter/sqlite/sqlcgen
+        emit_interface: false
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_empty_slices: true
+        emit_exact_table_names: false
+        emit_result_struct_pointers: false
+        emit_params_struct_pointers: false
+        query_parameter_limit: 3
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+  - engine: postgresql
+    schema: internal/adapter/postgres/migrations
+    queries: internal/adapter/postgres/queries
+    strict_function_checks: true
+    strict_order_by: true
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_interface: false
+        emit_json_tags: false
+        emit_empty_slices: true
+        emit_enum_valid_method: true
+        emit_all_enum_values: true
+        emit_result_struct_pointers: false
+        emit_params_struct_pointers: false
+        query_parameter_limit: 3
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
