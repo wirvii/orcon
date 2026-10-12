@@ -4,6 +4,8 @@
 
 Status: Accepted
 
+> Amended 2026-10-12 (owner decision, SPEC-009 P4): DA-3 aligned with the orcon-db rule against querying inside JSON documents.
+
 This document defines how Orcon reads and writes its durable state in SQLite (standalone) and PostgreSQL (distributed). It applies to the storage adapters `internal/adapter/sqlite`, `internal/adapter/postgres` and `internal/adapter/storetest`, and to the area ports they implement. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`DA-…`) are stable. The foundational choices are recorded in ADR 0076 §3.
 
 ## Principles
@@ -24,8 +26,11 @@ This document defines how Orcon reads and writes its durable state in SQLite (st
 ## Two dialects
 
 - **DA-3** Each dialect uses its strengths behind the same area ports:
-  - SQLite: FTS5 for search, JSON1 functions, WAL mode with `synchronous=FULL`, a single writer connection with group commit.
-  - PostgreSQL: `FOR UPDATE SKIP LOCKED` for task claims, `LISTEN/NOTIFY` for wake-ups, row-level security as a second tenant barrier, native `jsonb`.
+  - SQLite: FTS5 for search, WAL mode with `synchronous=FULL`, a single writer connection with group commit.
+  - PostgreSQL: `FOR UPDATE SKIP LOCKED` for task claims, `LISTEN/NOTIFY` for wake-ups, row-level security as a second tenant barrier.
+- **DA-3a** SQL does not query inside JSON documents: no JSON-path expressions, no `jsonb` operators (`->`, `->>`, `#>`, `@>`, `?` and similar) and no SQLite `json_*` functions in `WHERE`, `ORDER BY` or `JOIN`, unless a written, justified exception exists for that query.
+- **DA-3b** Every value that is filtered, sorted or joined on lives in a real column with its own type and constraints.
+- **DA-3c** JSON columns hold whole documents only, written and read as a unit. In PostgreSQL their type is `bytea` by default; `jsonb` is used only together with an approved exception (DA-3a).
 - **DA-3.1** The two query sets are separate files, not one portable subset. Do not lower one dialect to the other's capabilities.
 - **DA-3.2** Behavior visible to areas MUST be identical in both dialects, including ordering, error mapping (AL-5.3) and timestamp precision; the contract suite proves it (DA-4).
 
