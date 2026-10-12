@@ -135,6 +135,13 @@
       }
     }
   },
+  "overlay": {
+    "$type": "color",
+    "scrim": {
+      "$value": "{color.slate.950}",
+      "$description": "Dims the page behind a modal dialog or sheet. Used with opacity; decorative."
+    }
+  },
   "canvas": {
     "$type": "color",
     "bg": {

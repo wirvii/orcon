@@ -36,6 +36,7 @@ Tokens are organized in five layers. A layer may reference only the layers liste
 | `action.primary.bg`, `.bg-hover`, `.fg` | `bg-action-primary`, `bg-action-primary-hover`, `text-action-primary-fg` |
 | `action.danger.bg`, `.bg-hover`, `.fg` | `bg-action-danger`, `bg-action-danger-hover`, `text-action-danger-fg` |
 | `status.<x>.fg` / `status.<x>.bg` | `text-status-<x>` / `bg-status-<x>-bg` (for example `text-status-attention`, `bg-status-attention-bg`) |
+| `overlay.scrim` | `bg-scrim` (combine with `opacity-60`) |
 | `canvas.*` | `bg-canvas`, `text-canvas-grid`, `stroke-canvas-edge`, `stroke-canvas-edge-active`, `border-canvas-node-border`, … |
 | `size.control` / `size.row` | `h-control` / `h-row` (also `min-h-*`, `size-*`) |
 | `space.control-x` / `space.gap` | `px-control-x` / `gap-density` (also `p*`, `m*`, `space-*`) |
@@ -94,6 +95,7 @@ Brand (role `brand-exact`, references to primitives): `brand.green` = green-500,
 | `status.warning.fg` / `.bg` | #92400E / #FFFBEB | #FCD34D / #451A03 | Text / background |
 | `status.danger.fg` / `.bg` | #B91C1C / #FEF2F2 | #FCA5A5 / #450A0A | Text / background |
 | `status.attention.fg` / `.bg` | #6D28D9 / #F5F3FF | #C4B5FD / #2E1065 | Text / background |
+| `overlay.scrim` | #0F172A | #020617 | Decorative (dims the page behind a modal; used with `opacity`) |
 | `canvas.bg` | #F8FAFC | #0B1120 | Background |
 | `canvas.grid` | #CBD5E1 | #1E293B | Decorative |
 | `canvas.edge` | #64748B | #94A3B8 | UI |
@@ -141,7 +143,7 @@ Rules:
 
 5. `fg.subtle` is **not** certified on `surface.sunken` (light 4.34 < 4.5). The pair is not declared, so the `pairs-declared` check rejects any component that uses it.
 6. `border.control` in the dark theme on `surface.raised` is certified with a minimal margin (3.07:1). Any drift in either token fails the test; do not adjust one without recomputing.
-7. `border.default` (on `surface.default` and on `surface.sunken`), `canvas.grid` and `canvas.node.border` are declared `decorative` (decorative dividers and frames, WCAG 1.4.11 does not apply). `fg.disabled` is declared `disabled-exempt` on `surface.default` and on `surface.raised` (disabled items in floating panels).
+7. `border.default` (on `surface.default` and on `surface.sunken`), `overlay.scrim`, `canvas.grid` and `canvas.node.border` are declared `decorative` (decorative dividers and frames, WCAG 1.4.11 does not apply). `fg.disabled` is declared `disabled-exempt` on `surface.default` and on `surface.raised` (disabled items in floating panels).
 8. No `text` pair may use a brand-exact hue token as foreground or background (`test/brand-exact.test.ts`).
 9. Every semantic color token appears in at least one pair or is marked decorative with a reason (`test/coverage.test.ts`).
 
