@@ -5,7 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { MatrixTable } from '../../stories/MatrixTable';
 import { Button } from '../button/Button';
-import { Mascot } from '../mascot/Mascot';
+import { Mascot as MascotFrame } from '../mascot/Mascot';
 
 import { EmptyState } from './EmptyState';
 import { states } from './EmptyState.meta';
@@ -24,12 +24,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Action: Story = { args: { action: <Button>Create a flow</Button> } };
-export const WithMascot: Story = { name: 'Mascot', args: { mascot: <Mascot pose="thinking" />, action: <Button>Create a flow</Button> } };
+export const Mascot: Story = { args: { mascot: <MascotFrame pose="thinking" />, action: <Button>Create a flow</Button> } };
 
 const props: Record<(typeof states)[number], Partial<React.ComponentProps<typeof EmptyState>>> = {
   default: {},
   action: { action: <Button>Create a flow</Button> },
-  mascot: { mascot: <Mascot pose="thinking" />, action: <Button>Create a flow</Button> },
+  mascot: { mascot: <MascotFrame pose="thinking" />, action: <Button>Create a flow</Button> },
 };
 
 export const Matrix: Story = {
