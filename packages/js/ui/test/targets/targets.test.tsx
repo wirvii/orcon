@@ -31,6 +31,24 @@ describe('the target gate itself', () => {
     expect(targetsBelow(MIN)).toHaveLength(1);
   });
 
+  it('measures a visually hidden skip link by its size on focus', () => {
+    // Hidden at 1 px and still 1 px when focused: too small.
+    const { unmount } = render(
+      <a href="#x" className="sr-only">
+        Skip
+      </a>,
+    );
+    expect(targetsBelow(MIN)).toHaveLength(1);
+    unmount();
+    // Hidden, then 44 px high and wide enough when focused: fine.
+    render(
+      <a href="#x" className="sr-only focus:not-sr-only focus:inline-flex focus:min-h-target focus:min-w-target">
+        Skip
+      </a>,
+    );
+    expect(targetsBelow(MIN)).toEqual([]);
+  });
+
   it('exempts inline links inside running text', () => {
     render(
       <p data-prose>

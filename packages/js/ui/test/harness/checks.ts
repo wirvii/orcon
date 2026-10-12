@@ -78,8 +78,14 @@ export function targetsBelow(min: number, root: ParentNode = document.body): str
   const tooSmall: string[] = [];
   for (const element of root.querySelectorAll<HTMLElement>(interactive)) {
     if (isHidden(element) || isInactive(element) || element.closest('[data-prose]')) continue;
-    const rect = hitRect(element);
+    let rect = hitRect(element);
     if (rect.width === 0 || rect.height === 0) continue;
+    // A visually hidden control (a skip link) only needs the size when it shows, which is on focus.
+    if (rect.width <= 2 && rect.height <= 2) {
+      element.focus();
+      rect = hitRect(element);
+      element.blur();
+    }
     if (rect.width < min - 0.5 || rect.height < min - 0.5) {
       const name = element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 24) ?? '';
       tooSmall.push(`${element.tagName.toLowerCase()}[${name}] is ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`);

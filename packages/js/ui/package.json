@@ -18,7 +18,7 @@
     "build-storybook": "storybook build",
     "test": "vitest run --project unit",
     "test:unit": "vitest run --project unit",
-    "test:stories": "node scripts/check-story-coverage.mjs",
+    "test:stories": "node scripts/check-story-coverage.mjs --strict",
     "test:a11y": "vitest run --project a11y",
     "test:targets": "vitest run --project targets --project density",
     "test:density": "vitest run --project density"

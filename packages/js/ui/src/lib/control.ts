@@ -19,7 +19,7 @@ export const textControl = [
  */
 export const menuItem = [
   'relative flex h-control min-h-target cursor-default items-center gap-2 rounded-sm px-control-x text-base text-fg outline-hidden select-none',
-  'data-[highlighted]:bg-surface-sunken data-[highlighted]:outline-2 data-[highlighted]:-outline-offset-2 data-[highlighted]:outline-focus',
+  'data-[highlighted]:bg-surface-sunken data-[highlighted]:outline-solid data-[highlighted]:outline-2 data-[highlighted]:-outline-offset-2 data-[highlighted]:outline-focus',
   'data-[disabled]:pointer-events-none data-[disabled]:text-fg-disabled',
 ].join(' ');
 
@@ -31,3 +31,10 @@ export const scrim = 'fixed inset-0 z-overlay bg-scrim opacity-60';
 
 /** The surface of a modal dialog or sheet. */
 export const modalPanel = 'z-modal border border-border bg-surface-raised text-fg shadow-lg';
+
+/** An item in a cmdk list (combobox, command palette). cmdk marks the active item with data-selected. */
+export const commandItem = [
+  'relative flex h-control min-h-target cursor-default items-center gap-2 rounded-sm px-control-x text-base text-fg outline-hidden select-none',
+  'data-[selected=true]:bg-surface-sunken data-[selected=true]:outline-solid data-[selected=true]:outline-2 data-[selected=true]:-outline-offset-2 data-[selected=true]:outline-focus',
+  'data-[disabled=true]:pointer-events-none data-[disabled=true]:text-fg-disabled',
+].join(' ');
