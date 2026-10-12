@@ -56,3 +56,8 @@ Reliability and performance claims are backed by published evidence (principle 1
 
 ## Alternatives considered
 Synthetic micro-benchmarks only (rejected: not comparable); gating only on throughput (rejected: D20 requires latency, memory, safety and regression).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-002.** Adds the fault-injection cases FI-17..FI-24 of ADR-0021, ADR-0025, ADR-0026 and ADR-0027; the n8n response-mode compatibility suite (ADR-0023 §3) runs next to the expression suite; benchmark scenario S2 uses both native and imported addresses.

@@ -17,3 +17,4 @@ Simpler distribution and consistent versioning; binary size includes frontend as
 ## Notes
 No decision of this ADR changes; these notes record how later accepted ADRs apply it.
 - ADR-0013 assigns concrete responsibilities to the `scheduler` and `worker` roles without adding roles (SPEC-001, accepted 2026-10-12).
+- ADR-0020 §6 assigns trigger responsibilities: api receives HTTP ingress; scheduler fires schedules and drives trigger reconciliation; workers host connector-side trigger code (polling, persistent listeners, external registration). No new roles. (SPEC-002, accepted 2026-10-12.)

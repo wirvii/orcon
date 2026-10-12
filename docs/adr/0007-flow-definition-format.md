@@ -82,3 +82,8 @@ The API returns this document verbatim, so every enumerated value in it is UPPER
 - **n8n JSON as the canonical format**: rejected — no formal semantics for joins/loops/waits, couples Orcon to n8n's format evolution and branding.
 - **Mutable versions / in-place edits of published versions**: rejected — breaks ADR-0003 version pinning.
 - **Lowercase values in the document and UPPER_SNAKE only in other API fields**: rejected — the API returns the document verbatim, so two spellings would cross the same interface.
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-002.** Nodes of type `startEvent` gain an optional `trigger` block, additive within `orcon/flow@1` (§7), with UPPER_SNAKE values: `{ family, addresses[], response, dedupe, schedule?, poll?, listen?, registration? }` (ADR-0020 §2). Publication validation (§9) adds the trigger rules T-V1..T-V9 (ADR-0024 §2). Publishing and activating are distinct: publishing creates a version; activation is the separate state `flow.activation_state` (`ACTIVE` | `INACTIVE`, ADR-0024).

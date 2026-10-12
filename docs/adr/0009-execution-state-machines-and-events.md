@@ -82,3 +82,8 @@ History is explainable from events plus materialized state, without full event s
 
 ## Alternatives considered
 Pure event sourcing (rejected by ADR-0003); deriving execution status by query at read time (rejected: listing and timeouts need it materialized); ordering events by an application-generated id (rejected: worker clocks may be skewed, FI-10).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-002.** Execution modes are `WEBHOOK`, `TRIGGER`, `TEST`, `MANUAL`, `CHILD`, `ERROR`, `RETRY` and `EVALUATION` (ADR-0080 §3); `execution.created` carries `trigger.kind` and `eventId`.

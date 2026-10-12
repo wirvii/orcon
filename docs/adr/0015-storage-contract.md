@@ -88,3 +88,8 @@ One semantics, two adapters, one conformance suite; capacity differences documen
 
 ## Alternatives considered
 ORM-level abstraction (rejected: hides locking semantics); SQLite as a shared multi-process coordinator (rejected by ADR-0004); natural primary keys on high-volume tables (rejected by ADR-0077: contradicts the `id` rule and complicates composite foreign keys); querying inside JSON with SQLite JSON1 functions or PostgreSQL `jsonb` (rejected by ADR-0077 and DA-3 as amended); lowercase stored values mapped to UPPER_SNAKE in the API (rejected: two spellings of one value invite mapping bugs).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-002.** Adds the tables of ADR-0021 §5 under the rules of ADR-0077; the column `flow.activation_state` (`ACTIVE` | `INACTIVE`); the column `ingress_event.size_bytes`, indexed for the byte caps; the engine functions `orcon_engine.resolve_trigger_address` and `orcon_engine.resolve_public_entry`.
