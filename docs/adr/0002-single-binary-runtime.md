@@ -13,3 +13,7 @@ Frontend build tools (Node/pnpm) are build-time only. Never interpret one binary
 
 ## Consequences
 Simpler distribution and consistent versioning; binary size includes frontend assets; deploys must coordinate protocol/schema compatibility across roles. Detailed CLI, lifecycle and startup contracts remain to be specified.
+
+## Notes
+No decision of this ADR changes; these notes record how later accepted ADRs apply it.
+- ADR-0013 assigns concrete responsibilities to the `scheduler` and `worker` roles without adding roles (SPEC-001, accepted 2026-10-12).

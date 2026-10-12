@@ -27,3 +27,7 @@ No universal exactly-once remote side effects or cross-API atomicity is claimed.
 
 ## Open
 Machine-readable schema, proof levels, exception workflow, trust model, cancellation behavior, credential handling and fault-injection acceptance tests.
+
+## Notes
+The safety policy of this ADR is unchanged.
+- Runtime journal, lifecycle details (VERIFYING, NOT_DISPATCHED, RESOLVED_*), group commit and recovery specified by ADR-0012; contract schema remains Proposed until the connector SDK ADR. (SPEC-001, accepted 2026-10-12.)

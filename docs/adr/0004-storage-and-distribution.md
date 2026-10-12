@@ -10,3 +10,14 @@ PostgreSQL task claiming may use SKIP LOCKED with leases and fencing, subject to
 
 ## Open
 Migrations, SQLite concurrency strategy, PostgreSQL isolation and locking, leader election, partition handling, schema versioning, backups, timers, fair scheduling, quotas, disaster recovery and benchmark thresholds.
+
+Resolved on 2026-10-12 (SPEC-001):
+- Migrations and schema versioning → ADR-0015.
+- SQLite concurrency strategy → ADR-0015 §5.
+- PostgreSQL isolation and locking → ADR-0013 §3, ADR-0015 §6.
+- Timers → ADR-0010 §8 and ADR-0013.
+- Fair scheduling and quotas → ADR-0014.
+- Benchmark thresholds → ADR-0019.
+- Leader election: not needed (singleton jobs use an advisory lock; timers use `SKIP LOCKED`).
+
+Still open: partition handling, backups, disaster recovery.
