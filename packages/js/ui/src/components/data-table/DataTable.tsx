@@ -108,7 +108,7 @@ export function DataTable<Row>({
                   className={column.align === 'end' ? 'text-right' : undefined}
                 >
                   {column.sortable ? (
-                    <Button variant="ghost" onClick={() => toggle(column)} className="-mx-control-x text-fg-muted text-sm font-medium">
+                    <Button variant="ghost" onClick={() => toggle(column)} className="-mx-control-x text-fg-muted text-sm font-medium focus-visible:-outline-offset-2">
                       {column.header}
                       <SortIcon aria-hidden className="size-icon-16" />
                     </Button>

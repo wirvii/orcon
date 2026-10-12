@@ -59,7 +59,7 @@ describe.each([
   const entries = composeAll({ locale: 'xx-LS' });
 
   it.each(entries.map((entry) => [entry.label, entry] as const))('%s keeps its text inside its boxes', async (_label, entry) => {
-    const { container } = render(<entry.Story />);
+    render(<entry.Story />);
     // Play functions assert on English text, so they are not run here; this gate only measures the layout.
     await settle();
     expect(overflowing(document.body)).toEqual([]);

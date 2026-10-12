@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+const quiet = ['test/harness/quiet.ts'];
+
 const browser = {
   enabled: true,
   provider: 'playwright',
@@ -49,6 +51,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'a11y',
+          setupFiles: quiet,
           include: ['test/a11y/**/*.test.tsx'],
           browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
         },
@@ -58,6 +61,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'density',
+          setupFiles: quiet,
           include: ['test/density/**/*.test.tsx'],
           browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
         },
@@ -67,6 +71,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'expansion',
+          setupFiles: quiet,
           include: ['test/expansion/**/*.test.tsx'],
           browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
         },
@@ -76,6 +81,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'targets',
+          setupFiles: quiet,
           include: ['test/targets/**/*.test.tsx'],
           browser: {
             ...browser,
