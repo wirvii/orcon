@@ -1,0 +1,46 @@
+/*
+ * SPDX-FileCopyrightText: The Orcon Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import 'tailwindcss';
+@import '@orcon/tokens/tokens.css';
+@import '@orcon/tokens/tailwind-theme.css';
+@import './fonts.css';
+
+/* Scan the component sources wherever this stylesheet is imported from. */
+@source '../';
+
+/* Transitions follow the motion tokens, so reduced motion (0 ms) turns them off. */
+@theme inline {
+  --default-transition-duration: var(--orcon-duration-base);
+  --default-transition-timing-function: var(--orcon-easing-standard);
+  --animate-spin-slow: orcon-spin 1s linear infinite;
+}
+
+@keyframes orcon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orcon-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-app text-fg font-sans text-base antialiased;
+  }
+
+  /* One visible focus ring for every interactive element: 2 px ring, 2 px offset. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
+}

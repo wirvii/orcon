@@ -1,0 +1,45 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { axeViolations, settle } from '../harness/checks';
+import { composeAll } from '../harness/stories';
+
+afterEach(() => {
+  cleanup();
+  document.documentElement.removeAttribute('data-theme');
+  document.documentElement.removeAttribute('data-density');
+});
+
+describe('the axe gate itself', () => {
+  it('rejects a control without an accessible name', async () => {
+    render(<button type="button" />);
+    const violations = await axeViolations();
+    expect(violations.join('\n')).toContain('button-name');
+  });
+
+  it('rejects an image without alternative text', async () => {
+    render(<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />);
+    const violations = await axeViolations();
+    expect(violations.join('\n')).toContain('image-alt');
+  });
+});
+
+describe.each(['light', 'dark'] as const)('axe in the %s theme', (theme) => {
+  const entries = composeAll({ theme });
+
+  it('finds stories to check', () => {
+    expect(entries.length).toBeGreaterThan(0);
+  });
+
+  it.each(entries.map((entry) => [entry.label, entry] as const))('%s has no violations', async (_label, entry) => {
+    const { container } = render(<entry.Story />);
+    await entry.Story.play?.({ canvasElement: container });
+    await settle();
+
+    const violations = await axeViolations();
+    expect(violations, violations.join('\n')).toEqual([]);
+  });
+});
