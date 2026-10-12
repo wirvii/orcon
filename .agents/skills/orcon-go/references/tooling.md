@@ -76,7 +76,7 @@ After cloning, run `make hooks` once to enable the commit-message check.
 | golang.org/x/tools/go/analysis | `orconvet` analyzers | BSD-3-Clause | `tools/go.mod` |
 | `tools/spdxcheck`, `tools/provenance`, `tools/benchgate`, `tools/orconvet` | Project tools | Apache-2.0 | this repository |
 | mneme | Project tool: backlog, specs, criteria, QA reports, project memory, skill lint and validation | Apache-2.0 (not distributed) | contributor installation; not run in CI |
-| skills-ref | Agent Skills reference validator | verified when adopted | pinned commit, run with `uvx` |
+| skills-ref | Agent Skills reference validator | Apache-2.0 (not distributed) | pinned commit `69ef37e9424c0a7ea9dd2293b559e43ec8176379` (same as the UI skill check), run with `uvx` |
 | goleak (tests) | Goroutine leak checks | MIT | root `go.mod` |
 | go-cmp (tests) | Comparisons | BSD-3-Clause | root `go.mod` |
 
