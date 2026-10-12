@@ -8,26 +8,119 @@ on:
 permissions:
   contents: read
 jobs:
-  go:
+  # ---------------------------------------------------------------------------
+  # SPEC-008 G5 block: Go gate (tooling.md TOOL-3). Required jobs: check, provenance.
+  # ---------------------------------------------------------------------------
+
+  # check runs the one gate on the two latest Go releases. GOTOOLCHAIN=local keeps
+  # the product code on the toolchain under test. The tools module needs a newer Go
+  # than oldstable; the Makefile lets only those tool commands fetch it
+  # (GOTOOLCHAIN=auto for tools/go.mod), so no workflow step changes the toolchain.
+  check:
+    name: check (go ${{ matrix.go }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [oldstable, stable]
+    env:
+      GOTOOLCHAIN: local
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version-file: go.work
-      - name: Test Go modules
-        run: go test ./...
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .bin
+          key: bin-${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('tools/versions.mk') }}
+      - run: make check
+
+  # provenance keeps AI authorship marks out of the pull request range, its title
+  # and its description (SPEC-008 4.11). Pushes to main check before..after.
+  provenance:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+          cache-dependency-path: tools/go.sum
+      - name: Build the provenance tool
+        run: cd tools && GOWORK=off go build -o ../.bin/provenance ./provenance
+      - name: Check the pull request range, title and description
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          .bin/provenance range "$BASE_SHA" "$HEAD_SHA" --pr-title "$PR_TITLE" --pr-body-file "$RUNNER_TEMP/pr-body.md"
+      - name: Check the commits of the push
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.event.after }}
+        run: .bin/provenance range "$BEFORE_SHA" "$AFTER_SHA"
+
+  # postgres runs the adapter contract suites against a real PostgreSQL.
+  postgres:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+      - name: Adapter tests against PostgreSQL
+        run: make test-postgres
+
+  # sbom publishes the CycloneDX bill of materials of a release (dependencies.md DEP-4).
+  sbom:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+          cache-dependency-path: tools/go.sum
+      - name: Generate the SBOM
+        run: make sbom
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom
+          path: dist/sbom/orcon.cdx.json
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # End of the SPEC-008 G5 block. Jobs below are not part of the Go gate.
+  # ---------------------------------------------------------------------------
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.work
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 9.15.4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Install dependencies

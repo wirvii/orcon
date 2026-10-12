@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Nightly fuzzing (tooling.md TOOL-3.4). No workflow provisions the reference
+# hardware of the macro benchmarks (performance.md PERF-4).
+name: Nightly
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+      - name: Fuzz every target for five minutes
+        run: make fuzz FUZZTIME=5m
+      - name: Keep the failing inputs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fuzz-failures
+          path: "**/testdata/fuzz"
+          if-no-files-found: ignore
