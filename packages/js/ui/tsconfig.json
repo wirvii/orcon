@@ -14,5 +14,5 @@
     "allowImportingTsExtensions": false,
     "types": ["vite/client", "node", "@vitest/browser/matchers", "@vitest/browser/providers/playwright", "@testing-library/jest-dom"]
   },
-  "include": ["src", "test", ".storybook", "vitest.config.ts"]
+  "include": ["src", "test", "visual", ".storybook", "vitest.config.ts"]
 }

@@ -14,3 +14,4 @@ packages/js/ui/test/**/__screenshots__/
 # Playwright output
 test-results/
 playwright-report/
+packages/js/ui/visual/report/

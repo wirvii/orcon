@@ -6,5 +6,8 @@
   "NumberFormat", "RedactedValue", "CommandPalette", "Separator", "ScrollArea", "ConnectorIcon", "BrandMark",
   "Mascot", "AppShell", "TopBar", "NavItem", "NotificationBell", "AttentionInboxItem", "ThemeSwitcher",
   "DensitySwitcher", "LocaleSwitcher",
-  "NodeCard", "ControlNode", "Port", "Edge", "EdgeCount", "NodeStatus", "CanvasOutline", "CanvasToolbar", "WorkflowCanvas"
+  "NodeCard", "ControlNode", "Port", "Edge", "EdgeCount", "NodeStatus", "CanvasOutline", "CanvasToolbar", "WorkflowCanvas",
+  "UncertainResolutionPanel",
+  "WelcomeScreen", "FlowListScreen", "FlowEditorScreen", "ExecutionListScreen", "ExecutionDetailScreen", "AttentionInboxScreen",
+  "ApprovalScreen", "EmptyStatesScreen", "NotFoundScreen", "ErrorPageScreen", "AppearanceSettingsScreen"
 ]
