@@ -87,3 +87,4 @@ Pure event sourcing (rejected by ADR-0003); deriving execution status by query a
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-002.** Execution modes are `WEBHOOK`, `TRIGGER`, `TEST`, `MANUAL`, `CHILD`, `ERROR`, `RETRY` and `EVALUATION` (ADR-0080 §3); `execution.created` carries `trigger.kind` and `eventId`.
+- **SPEC-005.** Internal events map to CloudEvents and public event types as defined by ADR-0055 §2; live-only events are delivered through the per-execution SSE stream (ADR-0055 §3).

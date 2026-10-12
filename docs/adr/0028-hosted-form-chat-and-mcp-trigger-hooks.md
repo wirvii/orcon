@@ -34,3 +34,4 @@ Client-side rendered form app (rejected: requires JavaScript, harder accessibili
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** A form restricted to "Orcon user" means a member of the organization holding `flow:submit-form` in the project; public forms and chats are resolved with `orcon_engine.resolve_public_entry`.
+- **SPEC-005.** The administration MCP server (ADR-0059, `/api/v1/mcp`) is distinct from the MCP trigger (`/mcp*`, `/mcp-servers/*`).

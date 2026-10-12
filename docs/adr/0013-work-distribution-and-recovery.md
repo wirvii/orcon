@@ -79,3 +79,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-003.** §10: third-party extensions run under ADR-0032.
 - **SPEC-004.** §3: the claim runs as `orcon_engine.claim_tokens(...)` (ADR-0047 §2) and returns `org_id`; §4: lease renewal and the reaper also run as engine functions; §10: all data access is keyed by organisation and execution id.
+- **SPEC-005.** §8: the outbox also delivers Git commits and the advance of event subscription cursors. Long-running operations use leases with epochs (§4) and are claimed through an `orcon_engine` function (ADR-0047 §2).

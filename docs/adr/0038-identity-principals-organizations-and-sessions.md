@@ -21,7 +21,7 @@ Each project has a `handle` unique per instance (owner decision, SPEC-004 Q11): 
 - `external_identity(org_id, id, application_user_id, authentication_source_id, issuer, subject)`, unique `(org_id, authentication_source_id, issuer, subject)`; identity sources belong to an organization (ADR-0040 §1), so the link does too.
 
 ### 3. Principals
-`user`, `serviceAccount` (organization-scoped, non-interactive), `scimClient` (organization-scoped token), `system:<role>` (engine processes; attributed in audit). SPEC-005 adds `apiKey`, always bound to a user or service account and limited to a subset of its permissions.
+`user`, `serviceAccount` (organization-scoped, non-interactive), `scimClient` (organization-scoped token), `system:<role>` (engine processes; attributed in audit). ADR-0056 defines the `apiKey` principal (API keys and OAuth access tokens of service-account clients), always bound to a user or service account and limited to a subset of its permissions.
 In the database (ADR-0077 §8), whoever acts is one row of the instance table `principal(id, kind: user|service_account|system, created_at)`, with exactly one `system` row per installation (engine processes, the role goes into audit details). `application_user` and `service_account` reference it through a unique `principal_id` with `ON DELETE CASCADE`. Every column that records who did something is `<verb>_by_principal_id`, nullable, a single-column foreign key to `principal(id)` with `ON DELETE SET NULL` and a supporting index; deleting a principal therefore never deletes history, and the audit log keeps the actor's identity (ADR-0048). API keys and OAuth tokens write the principal they are bound to into actor columns (the audit record keeps the key); SCIM clients write no actor columns and are identified in the audit record.
 
 ### 4. Instance administration
@@ -48,3 +48,8 @@ One identity model serves all methods and SPEC-005; organizations are hard bound
 
 ## Alternatives considered
 Users owned by organizations (rejected: duplicates accounts for consultants working for several organizations); first organization's Owner as instance admin (rejected: mixes planes); stateless JWT sessions (rejected: no immediate revocation); actor columns without foreign keys (rejected by ADR-0077: loses integrity).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** §2: a project gains `environment` (optional label) and `protected` (boolean; default `true` for every new project, including the default project of each organization; column `is_protected`), changed with `project:update` and audited as `project.protection_changed`; lowering `protected` at the request of an `apiKey` principal always goes through confirmation (ADR-0059 §5). §8: new configurable policies: forbid personal keys; maximum lifetime of personal keys (default 30 days). §3: ADR-0056 defines the `apiKey` principal (API keys and OAuth access tokens of service-account clients), bound to a user or service account; the `service_account` row hangs from `principal` (ADR-0077 §8). §6: the authenticator chain includes `apiKeyAuthenticator` after the session cookie; the `OrgID` of an `apiKey` principal is fixed.

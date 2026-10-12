@@ -126,3 +126,8 @@ Every enumerated value this ADR defines is UPPER_SNAKE wherever it crosses a pub
 - Delaying the first message to batch bursts (rejected: the first notice must be immediate).
 - A separate notification service or message broker (rejected: single binary; ADR-0004 forbids mandatory services beyond the database).
 - A nullable `org_id` on operational alerts for instance-level alerts (rejected by ADR-0077: breaks NOT NULL scoping and row-level security).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** Cross-reference: "Programmatic surface (public events `execution.awaiting_human`, `execution.awaiting_human.escalated`, `execution.human_resolved`; REST operations to list items awaiting human action and to continue/repeat/cancel; MCP tools) is defined by ADR-0052 §3, ADR-0055 §2 and ADR-0059; this ADR defines the semantics, notification routing and escalation."

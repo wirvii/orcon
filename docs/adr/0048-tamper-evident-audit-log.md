@@ -41,3 +41,8 @@ Every committed action has an audit record; alterations and deletions are detect
 
 ## Alternatives considered
 Synchronous chaining in each action transaction (rejected: global hot row); external append-only store as the only copy (rejected: mandatory service); signing each event with an asymmetric key (rejected: cost; block MACs plus anchors suffice); requiring an external sink before enabling multi-organization (rejected: SPEC-004 Q17, a persistent warning instead); one audit table with an optional `org_id` for both chains (rejected by ADR-0077).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** SPEC-004 Annex B adds `apikey.created|rotated|revoked|expired|used_during_overlap`, `api.request` (with channel), `oauth_client.created|rotated|revoked`, `oauth.token_issued|token_revoked` (with issuer and subject when the token comes from federated identity), `workload_identity.created|updated|deleted`, `apikey.personal_keys_forbidden` (enabling the organization switch, with the number of revoked keys), `project.protection_changed`, `confirmation.requested|approved|rejected|expired`, `git.binding_changed|sync_applied|sync_failed|conflict_resolved|secret_finding_overridden`, `event_subscription.created|updated|deleted|disabled` and `webhook.redelivered`.

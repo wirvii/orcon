@@ -41,3 +41,8 @@ Isolation claims are backed by executable evidence on both stores.
 
 ## Alternatives considered
 Sampling endpoints (rejected: new endpoints would escape coverage).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** The isolation suite generates cases from the OpenAPI contract (every operation) and from the MCP tool catalog (every tool), and includes the non-bypass tests of ADR-0059 §7.

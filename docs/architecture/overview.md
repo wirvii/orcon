@@ -8,7 +8,7 @@ One Go executable, built from a monorepo, embeds the production React/React Flow
 
 ## Responsibilities
 
-- **API / web:** authentication, workflow CRUD, versioning, execution management, static editor hosting, authorization.
+- **API / web:** authentication, workflow CRUD, versioning, execution management, static editor hosting, authorization; public REST API is the only management API; the editor is a client of it (ADR-0052).
 - **Workflow engine:** graph validation, scheduling eligibility, node transitions, branch/join semantics, lifecycle and cancellation.
 - **Scheduler:** trigger handling, durable timers, retries, fair dispatch, concurrency quotas.
 - **Worker:** leases tasks, executes trusted connectors or isolated extensions, records outcomes and heartbeats.
@@ -42,7 +42,7 @@ SQLite is not a shared distributed coordinator. PostgreSQL task claims are plann
 
 ## Deferred architecture decisions
 
-Still deferred: API versioning; observability schema. Object storage is partially specified by ADR-0016. Do not implement these based on assumptions.
+Still deferred: observability schema. Object storage is partially specified by ADR-0016. Do not implement these based on assumptions.
 
 Resolved by accepted ADRs:
 - Engine state machine → ADR-0009 (SPEC-001, 2026-10-12).
@@ -54,3 +54,4 @@ Resolved by accepted ADRs:
 - Idempotency protocol at the connector SDK level → ADR-0029 §5 and ADR-0030 (SPEC-003, 2026-10-12).
 - Secrets and tenancy → ADR-0042…ADR-0047 (SPEC-004, 2026-10-12).
 - Auth/IAM → ADR-0038…ADR-0041 (SPEC-004, 2026-10-12).
+- API versioning → ADR-0054 (SPEC-005, 2026-10-12).

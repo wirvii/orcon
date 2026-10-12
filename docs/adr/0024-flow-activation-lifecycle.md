@@ -46,3 +46,4 @@ Publish implies activate (n8n 2.x style; rejected by the owner, SPEC-002 Q6). Pa
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** Publishing requires `flow:publish` and activating requires `flow:activate`; rule T-V3 verifies credential sharing.
+- **SPEC-005.** Publish, activate, deactivate, rollback and test sessions are exposed as operations of ADR-0052. In a protected project in `GIT_LEADS` mode, publishing happens only by applying from Git (ADR-0057 §7). Actions of an `apiKey` principal in a protected project go through confirmation when the policy requires it (ADR-0059 §5).

@@ -47,3 +47,4 @@ goja in-process (rejected, §3); V8 via CGO (rejected: CGO, binary size, cross-c
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-003.** The JavaScript profile of the Code node is defined in ADR-0036 §3; the QuickJS module is reused for WASM connectors written in JavaScript (ADR-0032 §7) and for the n8n community node converter (ADR-0035 §2).
+- **SPEC-005.** `$vars` resolves the non-secret project variables of the environment (ADR-0057 §2), approved by the owner (SPEC-005 Q3).

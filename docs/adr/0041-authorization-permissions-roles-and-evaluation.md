@@ -55,3 +55,8 @@ Fine-grained and predictable; the Operator role and execution-data separation ex
 
 ## Alternatives considered
 Policy engine such as OPA/Cedar (rejected for V1: extra runtime and evaluation cost for a closed catalog); per-request database evaluation (rejected: cost on every request); a polymorphic `(subject, subject_id)` pair in bindings (rejected by ADR-0077: no foreign key can protect it).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** §2: permission catalog **version 2** adds `apikey:create-personal`, `event-subscription:manage` and `mcp:use` (organization scope) and `git:manage` and `git:sync` (project scope), granted in predefined roles per SPEC-005 Q14: `apikey:create-personal` and `mcp:use` to Owner, Admin and Member; `event-subscription:manage` to Owner and Admin; `git:manage` to Project Admin; `git:sync` to Project Admin and Editor. §6: for `apiKey` principals, evaluation adds the step scope ∩ permissions of `boundTo`. §7: key changes increment `authorization_epoch`. §8: the per-route permission declaration is the OpenAPI extension `x-orcon-permission`.

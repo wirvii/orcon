@@ -43,3 +43,8 @@ Group commit and cross-organization fairness survive; RLS remains a wall for eve
 
 ## Alternatives considered
 One transaction per organization (rejected: multiplies WAL flushes); BYPASSRLS engine role for all engine statements (rejected: removes the second wall exactly on the busiest paths); per-organization worker pools (rejected: breaks fairness and wastes capacity with many organizations); requiring only that D20 keeps passing (rejected by the owner in favour of an explicit RLS budget, SPEC-004 Q13); global lookup tables without `org_id` for routes and key hashes (rejected by ADR-0077: rows of an organization always carry `org_id`).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-005.** `resolve_api_key` and `resolve_oauth_token` are the lookups of ADR-0056 §4 and §7 before the organization is known.

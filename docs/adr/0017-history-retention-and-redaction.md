@@ -29,3 +29,4 @@ Masking working state too (rejected: breaks recovery of flows whose later nodes 
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §3: the per-execution data key is wrapped by the organisation key (ADR-0042). Deleting an organization destroys its keys.
+- **SPEC-005.** Retention of `public_event` 7 days, `webhook_delivery` 30 days, `idempotency_record` 24 hours and `api_operation` 30 days; the audit log keeps its own retention (ADR-0048 §6).

@@ -47,3 +47,4 @@ Address table outside versions (faster changes, less auditable; rejected by the 
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §1: the `<project>` segment of native addresses is the instance-unique project identifier (the project slug; if it is already taken, `<org>-<project>`; SPEC-004 Q11). §3: a collision with an address of another organization returns a generic error without the flow name. §4: address authentication secrets come from the organization's credential store; an ingress host per organization is optional; resolving an incoming address before the organization is known is `orcon_engine.resolve_trigger_address` (ADR-0047 §2).
+- **SPEC-005.** The "Standard Webhooks" preset is the signature format of Orcon's outbound webhooks (ADR-0055 §5).
