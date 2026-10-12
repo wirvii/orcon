@@ -1,0 +1,32 @@
+name: Visual baselines
+# Generates the visual regression baselines in the pinned Playwright container on an amd64 runner.
+# It never commits or pushes: download the artifact and commit the folder yourself.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baselines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Storybook on the host
+        run: pnpm --filter @orcon/ui build-storybook
+      - name: Generate baselines in the pinned container
+        run: sh packages/js/ui/visual/run-docker.sh --update-snapshots
+      - name: Upload baselines
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: visual-baselines
+          path: packages/js/ui/visual/__screenshots__
+          if-no-files-found: error
