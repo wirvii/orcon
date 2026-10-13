@@ -32,8 +32,9 @@ const (
 	ReasonCommunity Reason = "COMMUNITY_NODE"
 	// ReasonExpression: an expression the analyzer of ADR-0018 does not accept.
 	ReasonExpression Reason = "EXPRESSION"
-	// ReasonAINode and ReasonAIExpression depend on the AI design, not on
-	// connectors; they are counted apart (ADR-0037 section 3).
+	// ReasonAINode and ReasonAIExpression: an AI node, or the $fromAI()
+	// function, that the measured catalog does not map. No connector fixes
+	// them: they depend on the AI importer of SPEC-006.
 	ReasonAINode       Reason = "AI_NODE"
 	ReasonAIExpression Reason = "AI_EXPRESSION"
 )
@@ -58,24 +59,24 @@ type Blocker struct {
 type Result struct {
 	ID    int
 	Views int
-	// Nodes is the number of nodes of the template.
+	// Nodes is the number of nodes of the template, sticky notes not counted.
 	Nodes int
-	// HasAI is set when the template uses an AI node or an AI-only expression.
+	// StickyNotes is the number of sticky notes, which are editor data.
+	StickyNotes int
+	// HasAI is set when the template uses an AI node, a Tool variant or an
+	// AI-only expression, whether or not the catalog maps them.
 	HasAI bool
-	// Blockers are the reasons other than the AI design, without repeats.
+	// Blockers are the reasons the template does not import completely,
+	// without repeats.
 	Blockers []Blocker
 	// Units are the units of coverage the template uses, sorted, without
 	// repeats; core and AI nodes are not listed.
 	Units []Unit
 }
 
-// ImportableIgnoringAI reports whether nothing but the AI design stands in
-// the way.
-func (r *Result) ImportableIgnoringAI() bool { return len(r.Blockers) == 0 }
-
-// Importable reports whether the template imports completely today: no
-// blocker and no AI node.
-func (r *Result) Importable() bool { return len(r.Blockers) == 0 && !r.HasAI }
+// Importable reports whether the template imports completely with the
+// catalog it was classified against.
+func (r *Result) Importable() bool { return len(r.Blockers) == 0 }
 
 // Fixed reports whether some blocker cannot be removed by adding a connector.
 func (r *Result) Fixed() bool {
@@ -85,13 +86,12 @@ func (r *Result) Fixed() bool {
 // Classify decides, node by node, whether a template imports completely
 // against the catalog.
 func Classify(t *Template, cat *Catalog) Result {
-	res := Result{ID: t.ID, Views: t.Views, Nodes: len(t.Nodes)}
+	res := Result{ID: t.ID, Views: t.Views}
 	seenBlocker := map[Blocker]bool{}
 	seenUnit := map[Unit]bool{}
 	add := func(b Blocker) {
 		if b.Reason.aiReason() {
 			res.HasAI = true
-			return
 		}
 		if !seenBlocker[b] {
 			seenBlocker[b] = true
@@ -101,18 +101,32 @@ func Classify(t *Template, cat *Catalog) Result {
 	for i := range t.Nodes {
 		n := &t.Nodes[i]
 		typ, tool := normalizeType(n.Type)
+		if IsStickyNote(typ) {
+			res.StickyNotes++
+			continue
+		}
+		res.Nodes++
 		if tool {
-			res.HasAI = true // a tool variant is a node offered to an agent
+			// A Tool variant is a node offered to an agent.
+			res.HasAI = true
+			if !cat.MapsToolVariants() {
+				add(Blocker{Reason: ReasonAINode, Unit: Unit{Type: typ}})
+			}
 		}
 		switch {
 		case IsAIType(typ):
-			add(Blocker{Reason: ReasonAINode, Unit: Unit{Type: typ}})
+			res.HasAI = true
+			if !cat.MapsAI(typ) {
+				add(Blocker{Reason: ReasonAINode, Unit: Unit{Type: typ}})
+			}
 		case !IsBuiltin(typ):
 			add(Blocker{Reason: ReasonCommunity, Unit: Unit{Type: typ}})
 		default:
 			classifyBuiltin(n, typ, cat, add, seenUnit, &res)
 		}
-		for _, b := range expressionBlockers(n, typ) {
+		blockers, usesAI := expressionBlockers(n, typ, cat)
+		res.HasAI = res.HasAI || usesAI
+		for _, b := range blockers {
 			add(b)
 		}
 	}
@@ -170,8 +184,7 @@ func normalizeType(t string) (base string, tool bool) {
 
 // expressionBlockers analyzes every expression of the node parameters with
 // the analyzer of ADR-0018.
-func expressionBlockers(n *Node, typ string) []Blocker {
-	var out []Blocker
+func expressionBlockers(n *Node, typ string, cat *Catalog) (out []Blocker, usesAI bool) {
 	walkStrings(n.Parameters, func(s string) {
 		if !expr.IsTemplate(s) {
 			return
@@ -189,7 +202,10 @@ func expressionBlockers(n *Node, typ string) []Blocker {
 			}
 		}
 		if onlyAI {
-			out = append(out, Blocker{Reason: ReasonAIExpression, Unit: Unit{Type: typ}})
+			usesAI = true
+			if !cat.MapsFromAI() {
+				out = append(out, Blocker{Reason: ReasonAIExpression, Unit: Unit{Type: typ}})
+			}
 			return
 		}
 		names := make([]string, 0, len(kinds))
@@ -199,7 +215,7 @@ func expressionBlockers(n *Node, typ string) []Blocker {
 		slices.Sort(names)
 		out = append(out, Blocker{Reason: ReasonExpression, Unit: Unit{Type: typ}, Detail: strings.Join(names, ",")})
 	})
-	return out
+	return out, usesAI
 }
 
 // walkStrings calls visit with every string value inside v.

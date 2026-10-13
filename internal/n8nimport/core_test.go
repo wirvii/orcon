@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wirvii/orcon/internal/n8nimport"
 )
@@ -30,6 +31,9 @@ var annexB = []string{
 	"n8nTrigger", "activationTrigger", "workflowTrigger", "evaluationTrigger", "formTrigger", "form",
 	"emailReadImap", "sseTrigger", "rssFeedReadTrigger", "localFileTrigger",
 	"dataTable",
+	// Added by Amendment 9 and by the pinned inventory.
+	"start", "n8n", "aiTransform", "htmlExtract", "readPDF", "iCal", "timeSaved", "simulate", "simulateTrigger",
+	"e2eTest", "e2eTestPollingTrigger",
 }
 
 func TestCoreNodeListComplete(t *testing.T) {
@@ -72,10 +76,21 @@ func TestCoreNodeListComplete(t *testing.T) {
 			t.Errorf("%s is in the table but not in Annex B", short)
 		}
 	}
-	// The only unsupported core type is the one the design defers.
+	// The only unsupported core types are the ones the design defers or that
+	// n8n keeps for its own tests.
 	for _, row := range n8nimport.CoreNodes() {
-		if !row.Mapped() && !slices.Equal(row.N8nTypes, []string{"dataTable"}) {
+		if row.Mapped() {
+			continue
+		}
+		if !slices.Equal(row.N8nTypes, []string{"dataTable"}) && !slices.Equal(row.N8nTypes, []string{"e2eTest", "e2eTestPollingTrigger"}) {
 			t.Errorf("unexpected unsupported row %v", row.N8nTypes)
+		}
+	}
+	for short, want := range map[string]n8nimport.Disposition{
+		"stickyNote": n8nimport.DispEditor, "start": n8nimport.DispTrigger, "n8n": n8nimport.DispConnector,
+	} {
+		if row, _ := n8nimport.LookupCore("n8n-nodes-base." + short); row.Disposition != want {
+			t.Errorf("%s: disposition %s, want %s", short, row.Disposition, want)
 		}
 	}
 }
@@ -118,23 +133,32 @@ func TestCoreNodeInventory(t *testing.T) {
 }
 
 // TestCoreNodeListAgainstPinnedRelease checks the core table against the
-// inventory of the pinned n8n release when ORCON_N8N_INVENTORY names its file.
-// Producing the inventory is a step outside this repository (it reads the
-// public node reference); without it the test is skipped.
+// inventory of the pinned n8n release, which tools/n8ncorpus writes next to the
+// corpus. The test is skipped only when ORCON_N8N_CORPUS is not set; with a
+// corpus and no inventory it fails.
 func TestCoreNodeListAgainstPinnedRelease(t *testing.T) {
-	path := os.Getenv("ORCON_N8N_INVENTORY")
-	if path == "" {
-		t.Skip("ORCON_N8N_INVENTORY is not set")
+	dir := os.Getenv("ORCON_N8N_CORPUS")
+	if dir == "" {
+		t.Skip("ORCON_N8N_CORPUS is not set")
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // G304: the path comes from the test environment
+	inv, err := n8nimport.ReadInventory(os.DirFS(dir), n8nimport.InventoryFile)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("the corpus has no inventory of the pinned release: %v", err)
 	}
-	inv, err := n8nimport.ParseInventory(data)
-	if err != nil {
-		t.Fatal(err)
+	if len(inv.Nodes) == 0 || inv.N8nVersion == "" {
+		t.Fatalf("empty inventory: %+v", inv)
 	}
 	if gaps := n8nimport.CheckInventory(inv); len(gaps) > 0 {
 		t.Fatalf("core types of n8n %s without a counterpart: %v", inv.N8nVersion, gaps)
+	}
+}
+
+func TestReadInventory(t *testing.T) {
+	good := fstest.MapFS{n8nimport.InventoryFile: {Data: []byte(`{"n8nVersion":"1","nodes":[{"type":"n8n-nodes-base.if","group":"CORE"}]}`)}}
+	if inv, err := n8nimport.ReadInventory(good, n8nimport.InventoryFile); err != nil || len(inv.Nodes) != 1 {
+		t.Fatalf("inventory = %+v, %v", inv, err)
+	}
+	if _, err := n8nimport.ReadInventory(fstest.MapFS{}, n8nimport.InventoryFile); err == nil {
+		t.Fatal("a missing inventory must be an error")
 	}
 }

@@ -119,7 +119,8 @@ type live struct {
 // unit of effort. When no single connector completes a template, ties go to
 // the one that brings the most templates closer (each template gives 1/k to
 // each of the k connectors it still lacks), then to the most used type, then
-// to the type name. AI nodes are not counted: they depend on the AI design.
+// to the type name. AI nodes count as the catalog maps them; the planned base
+// catalog maps them as SPEC-006 Annex B commits.
 func SelectWave(c *Corpus, base *Catalog, opts SelectOptions) (*Selection, error) {
 	if opts.Target == 0 {
 		opts.Target = DefaultTarget
@@ -137,7 +138,7 @@ func SelectWave(c *Corpus, base *Catalog, opts SelectOptions) (*Selection, error
 	cands := map[string]*candidate{}
 	for i := range results {
 		r := &results[i]
-		if r.ImportableIgnoringAI() {
+		if r.Importable() {
 			sel.Start++
 			sel.Ceiling++
 			continue
@@ -280,6 +281,9 @@ func withConnector(cat *Catalog, cd *candidate, eff Effort) (*Catalog, error) {
 	next, err := NewCatalog(all...)
 	if err != nil {
 		return nil, fmt.Errorf("n8nimport: add the connector for %s: %w", cd.typ, err)
+	}
+	if cat != nil {
+		next = next.WithAI(cat.AI...)
 	}
 	return next, nil
 }

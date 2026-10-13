@@ -6,6 +6,7 @@ package n8nimport
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"slices"
 
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
@@ -31,6 +32,19 @@ type InventoryNode struct {
 
 // GroupCore is the inventory group of the n8n core nodes.
 const GroupCore = "CORE"
+
+// InventoryFile is the name of the inventory inside a corpus directory.
+const InventoryFile = "inventory.json"
+
+// ReadInventory reads the inventory that travels with a corpus. A missing
+// file is an error: the core list cannot be verified without it.
+func ReadInventory(fsys fs.FS, name string) (*Inventory, error) {
+	data, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		return nil, fmt.Errorf("n8nimport: read inventory: %w", err)
+	}
+	return ParseInventory(data)
+}
 
 // ParseInventory reads an inventory file.
 func ParseInventory(data []byte) (*Inventory, error) {
@@ -71,4 +85,11 @@ func CheckInventory(inv *Inventory) []string {
 
 // documentedGap reports the core types the design leaves unsupported on
 // purpose, each with an owner backlog item.
-func documentedGap(nodeType string) bool { return nodeType == basePrefix+"dataTable" }
+func documentedGap(nodeType string) bool {
+	switch nodeType {
+	case basePrefix + "dataTable", basePrefix + "e2eTest", basePrefix + "e2eTestPollingTrigger":
+		return true
+	default:
+		return false
+	}
+}

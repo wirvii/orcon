@@ -312,6 +312,16 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"edge order negative", "effects-calls-and-settings", "/edges/0/order", `-1`},
 		{"edge default is a string", "linear", "/edges/0/default", `"yes"`},
 		{"unknown edge member", "linear", "/edges/0/label", `"x"`},
+		{"reserved key other than orcon.import in a node", "linear", "/nodes/1/ext", `{"orcon.mine":1}`},
+		{"orcon.import in the document ext", "linear", "/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1}}`},
+		{"import mark without a version", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x"}}`},
+		{"import mark with a string version", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":"1"}}`},
+		{"import mark with an unknown member", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"extra":true}}`},
+		{"import mark status without reasons", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"reviewStatus":"NEEDS_REVIEW"}}`},
+		{"import mark reasons without status", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"reviewReasons":["HTTP_WRITE"]}}`},
+		{"import mark with a repeated reason", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"reviewStatus":"NEEDS_REVIEW","reviewReasons":["HTTP_WRITE","HTTP_WRITE"]}}`},
+		{"import mark with a reason outside the set", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"reviewStatus":"NEEDS_REVIEW","reviewReasons":["POST"]}}`},
+		{"import mark original on an ordinary node", "linear", "/nodes/1/ext", `{"orcon.import":{"n8nType":"x","n8nTypeVersion":1,"original":{}}}`},
 	}
 	c := schemaChecked(t)
 	for _, tt := range cases {
@@ -564,5 +574,25 @@ func TestDecodeRefusesLoneSurrogates(t *testing.T) {
 	_, err := flowjson.Decode([]byte(`{"format":"orcon/flow@1","description":"a\ud800b"}`))
 	if !errors.Is(err, jsonvalue.ErrLoneSurrogate) {
 		t.Errorf("Decode error = %v, want ErrLoneSurrogate", err)
+	}
+}
+
+func TestSchemaAcceptsTheImportMark(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	marks := map[string]string{
+		"orcon.http@1":        `{"orcon.import":{"n8nType":"n8n-nodes-base.httpRequest","n8nTypeVersion":4.2,"n8nNodeId":"a1","reviewStatus":"NEEDS_REVIEW","reviewReasons":["HTTP_WRITE"]}}`,
+		"orcon.unsupported@1": `{"orcon.import":{"n8nType":"n8n-nodes-base.x","n8nTypeVersion":1,"original":{"type":"x"}}}`,
+	}
+	for nodeType, ext := range marks {
+		v := conformanceValue(t, "linear")
+		v = set(t, v, "/nodes/1/type", parse(t, `"`+nodeType+`"`))
+		v = set(t, v, "/nodes/1/ext", parse(t, ext))
+		if errs := c.errors(v); len(errs) > 0 {
+			t.Errorf("%s: the schema rejects a valid mark: %v", nodeType, errs)
+		}
+		if goRejectsShape(t, v) {
+			t.Errorf("%s: the reader and validator disagree with the schema", nodeType)
+		}
 	}
 }

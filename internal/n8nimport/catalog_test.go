@@ -191,8 +191,12 @@ func TestClassifyToolVariantCountsAsAI(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := n8nimport.Classify(&tp, nil)
-	if !res.HasAI || !res.ImportableIgnoringAI() || res.Importable() || res.Fixed() {
-		t.Errorf("result = %+v", res)
+	if !res.HasAI || res.Importable() || !res.Fixed() || res.Blockers[0].Reason != n8nimport.ReasonAINode {
+		t.Errorf("without an AI mapping a Tool variant blocks, and no connector fixes it: %+v", res)
+	}
+	res = n8nimport.Classify(&tp, n8nimport.PlannedBase())
+	if !res.HasAI || !res.Importable() {
+		t.Errorf("with the planned AI mapping a Tool variant imports: %+v", res)
 	}
 }
 

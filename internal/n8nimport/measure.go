@@ -60,21 +60,22 @@ type BlockerStat struct {
 // Counts are the figures from which every percentage of the report derives.
 type Counts struct {
 	Templates int
-	// Importable has no blocker and no AI node: it imports completely today.
+	// Importable has no blocker with the measured catalog: an AI node counts
+	// only if that catalog maps it.
 	Importable int
-	// ImportableIgnoringAI has no blocker; AI nodes are counted as handled by
-	// the AI design.
-	ImportableIgnoringAI int
-	WithAI               int
-	WithoutAI            int
-	// WithoutAIImportable is the importable figure inside the templates
-	// without AI nodes.
+	// WithAI and WithoutAI split the templates by whether they use an AI node,
+	// a Tool variant or an AI-only expression. They are information only.
+	WithAI    int
+	WithoutAI int
+	// WithAIImportable and WithoutAIImportable are the importable figure
+	// inside each group.
+	WithAIImportable    int
 	WithoutAIImportable int
-	// WithAIImportableIgnoringAI is the same inside the templates with AI nodes.
-	WithAIImportableIgnoringAI int
-	Views                      int64
-	ViewsImportable            int64
-	ViewsImportableIgnoringAI  int64
+	Views               int64
+	ViewsImportable     int64
+	// StickyNotes is the number of sticky notes, which are editor data and
+	// are not counted as nodes or types.
+	StickyNotes int
 }
 
 // UnitCounts count the operations the corpus uses.
@@ -131,23 +132,20 @@ func countResults(results []Result) Counts {
 		res := &results[i]
 		n.Templates++
 		n.Views += int64(res.Views)
+		n.StickyNotes += res.StickyNotes
 		if res.HasAI {
 			n.WithAI++
 		} else {
 			n.WithoutAI++
 		}
-		if res.ImportableIgnoringAI() {
-			n.ImportableIgnoringAI++
-			n.ViewsImportableIgnoringAI += int64(res.Views)
-			if res.HasAI {
-				n.WithAIImportableIgnoringAI++
-			} else {
-				n.WithoutAIImportable++
-			}
-		}
 		if res.Importable() {
 			n.Importable++
 			n.ViewsImportable += int64(res.Views)
+			if res.HasAI {
+				n.WithAIImportable++
+			} else {
+				n.WithoutAIImportable++
+			}
 		}
 	}
 	return n
@@ -159,6 +157,9 @@ func typeStats(c *Corpus, cat *Catalog) []TypeStat {
 		seen := map[string]bool{}
 		for j := range c.Templates[i].Nodes {
 			typ, _ := normalizeType(c.Templates[i].Nodes[j].Type)
+			if IsStickyNote(typ) {
+				continue
+			}
 			s := byType[typ]
 			if s == nil {
 				s = &TypeStat{Type: typ, Class: ClassOf(typ)}
@@ -168,7 +169,9 @@ func typeStats(c *Corpus, cat *Catalog) []TypeStat {
 					s.Mapped = row.Mapped()
 				case ClassIntegration:
 					s.Mapped = cat.Has(typ)
-				case ClassAI, ClassCommunity:
+				case ClassAI:
+					s.Mapped = cat.MapsAI(typ)
+				case ClassCommunity:
 				}
 				byType[typ] = s
 			}

@@ -4,16 +4,13 @@
 package n8nimport
 
 import (
-	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
-
-// ImportExtKey is the key under which an imported node keeps where it came
-// from (ADR-0034 section 8).
-const ImportExtKey = "orcon.import"
 
 // FindingCode classifies a finding of the node mapping.
 type FindingCode string
@@ -59,15 +56,6 @@ const (
 	SafetyRead Safety = "READ"
 	// SafetyUnsafe: a write without a declared idempotency key.
 	SafetyUnsafe Safety = "UNSAFE"
-)
-
-// Review reasons recorded in the node.
-const (
-	// ReasonHTTPWrite marks an HTTP request that changes remote state.
-	ReasonHTTPWrite = "HTTP_WRITE"
-	// ReasonHTTPMethodExpression marks an HTTP request whose method is an
-	// expression, so it cannot be shown to be a read.
-	ReasonHTTPMethodExpression = "HTTP_METHOD_EXPRESSION"
 )
 
 // MappedCredential is a credential reference after mapping. It holds a type
@@ -126,6 +114,10 @@ func MapNode(n *Node, cat *Catalog) Mapped {
 		m.Findings = append(m.Findings, Finding{Code: code, NodeID: n.ID, Node: n.Name, Field: field, Message: msg})
 	}
 	typ, _ := normalizeType(n.Type)
+	if _, err := jsonvalue.Number(n.TypeVersion); err != nil {
+		report(FindUnmappedTypeVersion, "typeVersion", "the typeVersion is not a number, so it cannot be kept")
+		return m
+	}
 	switch {
 	case IsAIType(typ):
 		report(FindUnmappedType, "type", "AI nodes are mapped by the AI design (SPEC-006)")
@@ -180,12 +172,12 @@ func mapHTTP(n *Node, m *Mapped, report func(FindingCode, string, string)) {
 		m.Safety = SafetyRead // n8n sends GET when the method is left out
 	case strings.HasPrefix(method, "="):
 		m.Safety = SafetyUnsafe
-		report(FindReviewRequired, field, ReasonHTTPMethodExpression+": the method is an expression, so the request is UNSAFE until a person reviews it")
+		report(FindReviewRequired, field, flow.ReasonHTTPMethodExpression+": the method is an expression, so the request is UNSAFE until a person reviews it")
 	case strings.EqualFold(method, "GET") || strings.EqualFold(method, "HEAD"):
 		m.Safety = SafetyRead
 	default:
 		m.Safety = SafetyUnsafe
-		report(FindReviewRequired, field, ReasonHTTPWrite+": "+strings.ToUpper(method)+" changes remote state without an idempotency key, so the node is UNSAFE until a person reviews it")
+		report(FindReviewRequired, field, flow.ReasonHTTPWrite+": "+strings.ToUpper(method)+" changes remote state without an idempotency key, so the node is UNSAFE until a person reviews it")
 	}
 }
 
@@ -218,7 +210,7 @@ func mapConnector(n *Node, typ string, cat *Catalog, m *Mapped, report func(Find
 		report(FindSelectorExpression, field, "the resource or operation is an expression, so the operation cannot be chosen; a person must choose it")
 		return
 	}
-	_, op, ok := cat.Lookup(unit)
+	info, ok := cat.LookupUnit(unit)
 	if !ok {
 		report(FindUnmappedOperation, "parameters.operation",
 			fmt.Sprintf("the pair resource %q, operation %q is not in the parameter map", sel.Resource, sel.Operation))
@@ -229,7 +221,12 @@ func mapConnector(n *Node, typ string, cat *Catalog, m *Mapped, report func(Find
 		return
 	}
 	m.OrconType = k.OrconType
-	m.Operation = op
+	m.Operation = info.Operation
+	if info.Unsafe {
+		m.Safety = SafetyUnsafe
+		report(FindReviewRequired, "parameters.operation",
+			flow.ReasonUnsafeOperation+": the contract of "+info.Operation+" has safety level UNSAFE, so the node waits for a person's review")
+	}
 }
 
 func isExpression(n *Node, key string) bool {
@@ -255,7 +252,7 @@ func mapCredentials(n *Node, cat *Catalog, report func(FindingCode, string, stri
 	return out
 }
 
-// reviewReasons lists the review reasons among the findings.
+// reviewReasons lists the review reasons among the findings, once each.
 func (m *Mapped) reviewReasons() []string {
 	var out []string
 	for _, f := range m.Findings {
@@ -263,17 +260,17 @@ func (m *Mapped) reviewReasons() []string {
 			continue
 		}
 		reason, _, _ := strings.Cut(f.Message, ":")
-		out = append(out, reason)
+		if !slices.Contains(out, reason) {
+			out = append(out, reason)
+		}
 	}
 	return out
 }
 
-// importExt builds the ext member of an imported node.
+// importExt builds the ext member of an imported node: the closed object of
+// ADR-0034 section 8 (amendment 9 of SPEC-003).
 func importExt(n *Node, reasons []string) jsonvalue.Value {
-	version, err := jsonvalue.Number(n.TypeVersion)
-	if err != nil {
-		version = jsonvalue.String(n.TypeVersion)
-	}
+	version, _ := jsonvalue.Number(n.TypeVersion) // checked by MapNode
 	members := []jsonvalue.Member{
 		{Key: "n8nType", Value: jsonvalue.String(n.Type)},
 		{Key: "n8nTypeVersion", Value: version},
@@ -286,16 +283,11 @@ func importExt(n *Node, reasons []string) jsonvalue.Value {
 		for i, r := range reasons {
 			rs[i] = jsonvalue.String(r)
 		}
-		review, _ := jsonvalue.Object(
-			jsonvalue.Member{Key: "required", Value: jsonvalue.Bool(true)},
-			jsonvalue.Member{Key: "reasons", Value: jsonvalue.Array(rs...)},
-		)
-		members = append(members, jsonvalue.Member{Key: "review", Value: review})
+		members = append(members,
+			jsonvalue.Member{Key: "reviewStatus", Value: jsonvalue.String(flow.ReviewNeeds)},
+			jsonvalue.Member{Key: "reviewReasons", Value: jsonvalue.Array(rs...)})
 	}
 	inner, _ := jsonvalue.Object(members...)
-	ext, _ := jsonvalue.Object(jsonvalue.Member{Key: ImportExtKey, Value: inner})
+	ext, _ := jsonvalue.Object(jsonvalue.Member{Key: flow.ImportExtKey, Value: inner})
 	return ext
 }
-
-// ErrReviewRequired marks a flow with imported nodes nobody reviewed.
-var ErrReviewRequired = errors.New("n8nimport: imported nodes need review before the flow can be activated")

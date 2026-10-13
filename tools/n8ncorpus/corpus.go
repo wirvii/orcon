@@ -52,6 +52,10 @@ type Manifest struct {
 	// CorpusSHA256 identifies the corpus without containing it: the digest of
 	// the sorted (template, path, SHA-256 of the expression) triples.
 	CorpusSHA256 string `json:"corpusSha256"`
+	// NodesBaseVersion and InventorySHA256 describe inventory.json, the node
+	// types of the pinned release that travel with the corpus.
+	NodesBaseVersion string `json:"nodesBaseVersion,omitempty"`
+	InventorySHA256  string `json:"inventorySha256,omitempty"`
 }
 
 type fetcher struct {
@@ -88,6 +92,12 @@ func (f *fetcher) get(ctx context.Context, path string, query url.Values) ([]byt
 	if len(query) > 0 {
 		u += "?" + query.Encode()
 	}
+	return f.fetch(ctx, u, 32<<20)
+}
+
+// fetch downloads one URL, retrying on rate limits and server errors, and
+// reads at most max bytes.
+func (f *fetcher) fetch(ctx context.Context, u string, max int64) ([]byte, error) {
 	for attempt := range 4 {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
@@ -98,7 +108,7 @@ func (f *fetcher) get(ctx context.Context, path string, query url.Values) ([]byt
 		if err != nil {
 			return nil, err
 		}
-		body, rerr := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		body, rerr := io.ReadAll(io.LimitReader(resp.Body, max))
 		resp.Body.Close()
 		if rerr != nil {
 			return nil, rerr

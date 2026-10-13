@@ -66,6 +66,13 @@ var coreNodes = []CoreNode{
 	{[]string{"ssh", "git"}, "orcon.host.*@1", "SPEC-003 CN13", DispHost, "local SSH and Git are host-access nodes"},
 	{[]string{"executeCommand", "readBinaryFile", "readBinaryFiles", "writeBinaryFile", "readWriteFile"},
 		"orcon.host.*@1", "SPEC-003 CN13", DispHost, "disabled by default; allowlists of the admin"},
+	{[]string{"aiTransform"}, "orcon.code@1", "SPEC-006", DispNode, "the generated code is kept (docs/reference/n8n-ai-coverage.md); added from the pinned inventory"},
+	{[]string{"htmlExtract"}, "orcon.html@1", "SPEC-003 CN13", DispNode, "legacy name of the HTML node; added from the pinned inventory"},
+	{[]string{"readPDF"}, "orcon.file.*@1", "SPEC-003 CN13", DispNode, "legacy PDF reader; added from the pinned inventory"},
+	{[]string{"iCal", "timeSaved", "simulate", "simulateTrigger"}, "orcon.<name>@1", "SPEC-003 CN13", DispNode, "added from the pinned inventory; CN13 confirms the design"},
+	{[]string{"n8n"}, "official declarative connector over the public n8n REST API", "SPEC-003 CN13", DispConnector,
+		"acts on the n8n instance the flow managed, never on the Orcon API; no n8n name or logo (Amendment 9)"},
+	{[]string{"start"}, "orcon.manual@1", "SPEC-002", DispTrigger, "legacy entry point of old n8n flows, a manual trigger (Amendment 9)"},
 	{[]string{"respondToWebhook"}, "orcon.respond@1", "SPEC-002 T3", DispTrigger, ""},
 	{[]string{"webhook"}, "orcon.webhook@1", "SPEC-002", DispTrigger, "family WEBHOOK"},
 	{[]string{"scheduleTrigger", "interval", "cron"}, "orcon.schedule@1", "SPEC-002", DispTrigger, "family SCHEDULE; Interval and Cron become rules"},
@@ -79,8 +86,9 @@ var coreNodes = []CoreNode{
 	{[]string{"sseTrigger"}, "orcon.sse@1", "SPEC-002", DispTrigger, "family LISTEN"},
 	{[]string{"rssFeedReadTrigger"}, "orcon.rss@1", "SPEC-002", DispTrigger, "family POLL"},
 	{[]string{"localFileTrigger"}, "orcon.localFile@1", "SPEC-002", DispTrigger, "family LISTEN; disabled by default"},
-	{[]string{"stickyNote"}, "editor sticky note", "SPEC-001 C1", DispEditor, "editor data (ADR-0007 section 2); not in Annex B, see the open questions of the cut"},
+	{[]string{"stickyNote"}, "editor.stickyNotes[]", "SPEC-014 (editor); importer CN2", DispEditor, "editor data (ADR-0007 section 2), not a node: left out of node and type counts (Amendment 9)"},
 	{[]string{"dataTable"}, "", "own backlog item", DispUnsupported, "tabular storage has no design yet (SPEC-003 Q14); the importer reports it"},
+	{[]string{"e2eTest", "e2eTestPollingTrigger"}, "", "none", DispUnsupported, "n8n's own end-to-end test nodes; no user flow imports them"},
 }
 
 // CoreNodes returns the core table. The caller owns the result.
@@ -118,6 +126,10 @@ func LookupCore(nodeType string) (CoreNode, bool) {
 
 // Mapped reports whether the row has a counterpart in Orcon.
 func (c CoreNode) Mapped() bool { return c.Disposition != DispUnsupported }
+
+// IsStickyNote reports whether the type is the n8n sticky note, which is
+// editor data and not a node.
+func IsStickyNote(nodeType string) bool { return nodeType == basePrefix+"stickyNote" }
 
 // IsHTTPRequest reports whether the type is the n8n HTTP Request node.
 func IsHTTPRequest(nodeType string) bool { return nodeType == basePrefix+"httpRequest" }

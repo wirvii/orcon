@@ -34,6 +34,7 @@ func corpusDir(t *testing.T) string {
 	}
 	files := map[string]string{
 		"manifest.json":    `{"n8nVersion":"9.9.9","source":"test","fetchedAt":"2026-01-01T00:00:00Z","templates":2,"corpusSha256":"abc"}`,
+		"inventory.json":   `{"n8nVersion":"9.9.9","nodes":[{"type":"n8n-nodes-base.manualTrigger","group":"CORE"},{"type":"n8n-nodes-base.slack","group":"OTHER"}]}`,
 		"templates/1.json": slackTemplate,
 		"templates/2.json": coreTemplate,
 	}
@@ -92,7 +93,7 @@ func TestN8nCoveragePlanned(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	for _, want := range []string{"2 templates", "n8n 9.9.9", "catalog: planned", "100.00 %", "wave 1: 1 connectors"} {
+	for _, want := range []string{"2 templates", "n8n 9.9.9", "catalog: planned", "with the planned catalog: 100.00 %", "wave 1: 1 connectors"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("summary lacks %q:\n%s", want, stdout)
 		}
@@ -111,19 +112,31 @@ func TestN8nCoveragePlanned(t *testing.T) {
 	}
 }
 
-func TestN8nCoverageCore(t *testing.T) {
-	code, stdout, stderr := run(t, "coverage", "--corpus", corpusDir(t), "--catalog", "core")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, stderr)
+func TestN8nCoverageCoreAndInstalled(t *testing.T) {
+	// "core" and "installed" both hold the core nodes only in this build: the
+	// template with a slack node does not import, the core one does.
+	for _, catalog := range []string{"core", "installed"} {
+		code, stdout, stderr := run(t, "coverage", "--corpus", corpusDir(t), "--catalog", catalog)
+		if code != 0 {
+			t.Fatalf("%s: exit %d: %s", catalog, code, stderr)
+		}
+		if !strings.Contains(stdout, "with the "+catalog+" catalog: 50.00 %") {
+			t.Errorf("%s: only the core template imports:\n%s", catalog, stdout)
+		}
 	}
-	if !strings.Contains(stdout, "50.00 %") {
-		t.Errorf("only the core template imports:\n%s", stdout)
+	// installed is the default.
+	if code, stdout, _ := run(t, "coverage", "--corpus", corpusDir(t)); code != 0 || !strings.Contains(stdout, "catalog: installed") {
+		t.Errorf("default catalog: exit %d\n%s", code, stdout)
 	}
 }
 
 func TestN8nCoverageFailures(t *testing.T) {
 	dir := corpusDir(t)
 	missing := filepath.Join(t.TempDir(), "absent")
+	noInventory := corpusDir(t)
+	if err := os.Remove(filepath.Join(noInventory, "inventory.json")); err != nil {
+		t.Fatal(err)
+	}
 	badCatalog := filepath.Join(t.TempDir(), "bad.json")
 	if err := os.WriteFile(badCatalog, []byte(`{}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -137,7 +150,7 @@ func TestN8nCoverageFailures(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"installed catalog", []string{"--corpus", dir, "--catalog", "installed"}, "not available yet"},
+		{"corpus without an inventory", []string{"--corpus", noInventory}, "read inventory"},
 		{"missing corpus", []string{"--corpus", missing}, "read corpus"},
 		{"missing catalog file", []string{"--corpus", dir, "--catalog", missing}, "read catalog"},
 		{"bad catalog file", []string{"--corpus", dir, "--catalog", badCatalog}, "connectors"},

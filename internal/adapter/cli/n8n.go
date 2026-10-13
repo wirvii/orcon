@@ -9,7 +9,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/wirvii/orcon/internal/n8nimport"
 )
@@ -57,15 +59,15 @@ func n8nCoverage(_ context.Context, args []string, stdout, stderr io.Writer) int
 	flags := flag.NewFlagSet("orcon n8n coverage", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.StringVar(&f.corpus, "corpus", "", "directory of the template corpus written by tools/n8ncorpus (required)")
-	flags.StringVar(&f.catalog, "catalog", catalogPlanned,
-		"catalog to measure: core (core nodes only), planned (core plus the connectors the wave-1 selection chooses), or the path of a catalog file")
+	flags.StringVar(&f.catalog, "catalog", catalogInstalled,
+		"catalog to measure: installed (what this build maps), planned (core nodes, the AI mapping of SPEC-006 Annex B and the connectors the wave-1 selection chooses), core (planned without connectors), or the path of a planned catalog file")
 	flags.Float64Var(&f.target, "target", n8nimport.DefaultTarget, "percentage of templates the selection aims for")
 	flags.IntVar(&f.maxConnectors, "max-connectors", 0, "stop the selection after this many connectors (0 means no limit)")
 	flags.StringVar(&f.out, "out", "", "write the JSON report to this file")
 	flags.StringVar(&f.markdown, "markdown", "", "write the coverage page (Markdown) to this file")
 	flags.StringVar(&f.roadmap, "roadmap", "", "write the wave-1 selection page (Markdown) to this file")
 	flags.StringVar(&f.catalogOut, "catalog-out", "", "write the planned catalog (JSON) to this file")
-	flags.StringVar(&f.inventory, "inventory", "", "inventory of the pinned n8n release (JSON); fails when a core type has no counterpart")
+	flags.StringVar(&f.inventory, "inventory", "", "inventory of the pinned n8n release (default: inventory.json in the corpus directory); the command fails when it is missing or a core type has no counterpart")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
@@ -92,17 +94,21 @@ func runCoverage(f *coverageFlags, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := checkInventory(f, os.DirFS(f.corpus)); err != nil {
+		return err
+	}
 	var (
 		cat   *n8nimport.Catalog
 		sel   *n8nimport.Selection
 		label = f.catalog
 	)
 	switch f.catalog {
-	case catalogCore:
 	case catalogInstalled:
-		return errors.New("--catalog installed is not available yet: the installed connector store arrives with the connector manifest cut (CN1)")
+		cat = n8nimport.Installed()
+	case catalogCore:
+		cat = n8nimport.PlannedBase()
 	case catalogPlanned:
-		sel, err = n8nimport.SelectWave(corpus, nil, n8nimport.SelectOptions{Target: f.target, MaxConnectors: f.maxConnectors})
+		sel, err = n8nimport.SelectWave(corpus, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: f.target, MaxConnectors: f.maxConnectors})
 		if err != nil {
 			return err
 		}
@@ -149,18 +155,21 @@ func runCoverage(f *coverageFlags, stdout io.Writer) error {
 		}
 	}
 	printSummary(stdout, report, sel)
-	if f.inventory != "" {
-		return checkInventory(f.inventory)
-	}
 	return nil
 }
 
-func checkInventory(path string) error {
-	data, err := os.ReadFile(path) //nolint:gosec // G304: the inventory path is a command-line argument
-	if err != nil {
-		return fmt.Errorf("read inventory: %w", err)
+// checkInventory verifies the core table against the inventory of the pinned
+// n8n release, which travels with the corpus. A missing inventory is an error.
+func checkInventory(f *coverageFlags, corpusFS fs.FS) error {
+	var (
+		inv *n8nimport.Inventory
+		err error
+	)
+	if f.inventory != "" {
+		inv, err = n8nimport.ReadInventory(os.DirFS(filepath.Dir(f.inventory)), filepath.Base(f.inventory))
+	} else {
+		inv, err = n8nimport.ReadInventory(corpusFS, n8nimport.InventoryFile)
 	}
-	inv, err := n8nimport.ParseInventory(data)
 	if err != nil {
 		return err
 	}
@@ -181,10 +190,10 @@ func printSummary(w io.Writer, r *n8nimport.Report, sel *n8nimport.Selection) {
 	c := r.Counts
 	_, _ = fmt.Fprintf(w, "corpus: %d templates (%d unreadable), n8n %s\n", c.Templates, r.Unreadable, r.Manifest.N8nVersion)
 	_, _ = fmt.Fprintf(w, "catalog: %s\n", r.Catalog)
-	_, _ = fmt.Fprintf(w, "fully importable: %.2f %% today, %.2f %% with the AI nodes mapped (unweighted)\n",
-		n8nimport.Pct(int64(c.Importable), int64(c.Templates)), n8nimport.Pct(int64(c.ImportableIgnoringAI), int64(c.Templates)))
-	_, _ = fmt.Fprintf(w, "weighted by views: %.2f %% today, %.2f %% with the AI nodes mapped\n",
-		n8nimport.Pct(c.ViewsImportable, c.Views), n8nimport.Pct(c.ViewsImportableIgnoringAI, c.Views))
+	_, _ = fmt.Fprintf(w, "fully importable with the %s catalog: %.2f %% (unweighted), %.2f %% weighted by views\n",
+		r.Catalog, n8nimport.Pct(int64(c.Importable), int64(c.Templates)), n8nimport.Pct(c.ViewsImportable, c.Views))
+	_, _ = fmt.Fprintf(w, "without AI nodes: %d templates, %.2f %% importable; with AI nodes: %d templates, %.2f %% importable\n",
+		c.WithoutAI, n8nimport.Pct(int64(c.WithoutAIImportable), int64(c.WithoutAI)), c.WithAI, n8nimport.Pct(int64(c.WithAIImportable), int64(c.WithAI)))
 	if sel != nil {
 		_, _ = fmt.Fprintf(w, "wave 1: %d connectors, stop: %s, ceiling %.2f %%\n", len(sel.Steps), sel.Stop,
 			n8nimport.Pct(int64(sel.Ceiling), int64(sel.Templates)))

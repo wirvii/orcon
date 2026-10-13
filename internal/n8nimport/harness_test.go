@@ -89,12 +89,12 @@ func TestCoverageHarness(t *testing.T) {
 
 	t.Run("core only", func(t *testing.T) {
 		r := n8nimport.Measure(c, nil, "core")
-		// Templates 1, 4 and 8 have no blocker besides the AI design; 4 and 8
-		// use it. Views: 100 + 20 + 5 = 125 ignoring the AI design.
+		// Template 1 is the only one with nothing but core nodes; 4 and 8 use
+		// the AI design, which a core-only catalog does not map. Template 1
+		// also holds a sticky note.
 		want := n8nimport.Counts{
-			Templates: 9, Importable: 1, ImportableIgnoringAI: 3, WithAI: 2, WithoutAI: 7,
-			WithoutAIImportable: 1, WithAIImportableIgnoringAI: 2,
-			Views: 240, ViewsImportable: 100, ViewsImportableIgnoringAI: 125,
+			Templates: 9, Importable: 1, WithAI: 2, WithoutAI: 7, WithoutAIImportable: 1,
+			Views: 240, ViewsImportable: 100, StickyNotes: 1,
 		}
 		if r.Counts != want {
 			t.Fatalf("counts = %+v\nwant     %+v", r.Counts, want)
@@ -113,10 +113,19 @@ func TestCoverageHarness(t *testing.T) {
 		for reason, want := range map[n8nimport.Reason]int{
 			n8nimport.ReasonUnmappedType: 4, n8nimport.ReasonSelectorExpression: 1,
 			n8nimport.ReasonCommunity: 1, n8nimport.ReasonExpression: 1,
+			n8nimport.ReasonAINode: 1, n8nimport.ReasonAIExpression: 1,
 		} {
 			if byReason[reason] != want {
 				t.Errorf("blockers %s = %d, want %d", reason, byReason[reason], want)
 			}
+		}
+	})
+
+	t.Run("the planned AI mapping", func(t *testing.T) {
+		r := n8nimport.Measure(c, n8nimport.PlannedBase(), "planned")
+		// Templates 4 and 8 import once the catalog maps the chat model and $fromAI.
+		if r.Counts.Importable != 3 || r.Counts.WithAIImportable != 2 {
+			t.Fatalf("importable %d, with AI importable %d, want 3 and 2", r.Counts.Importable, r.Counts.WithAIImportable)
 		}
 	})
 
@@ -140,7 +149,7 @@ func TestCoverageHarness(t *testing.T) {
 
 func TestCoverageHarnessReportHoldsNoContent(t *testing.T) {
 	c := loadFixture(t)
-	sel, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{})
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +185,7 @@ func TestCoverageHarnessReportHoldsNoContent(t *testing.T) {
 
 func TestWaveSelection(t *testing.T) {
 	c := loadFixture(t)
-	sel, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{Target: 100})
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,12 +220,12 @@ func TestWaveSelection(t *testing.T) {
 
 	// Measuring against the planned catalog gives the same totals.
 	r := n8nimport.Measure(c, sel.Catalog, "planned")
-	if r.Counts.ImportableIgnoringAI != last.Importable {
-		t.Errorf("measured %d, selection says %d", r.Counts.ImportableIgnoringAI, last.Importable)
+	if r.Counts.Importable != last.Importable {
+		t.Errorf("measured %d, selection says %d", r.Counts.Importable, last.Importable)
 	}
 
 	// The selection is deterministic.
-	again, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{Target: 100})
+	again, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,14 +239,14 @@ func TestWaveSelection(t *testing.T) {
 func TestWaveSelectionStops(t *testing.T) {
 	c := loadFixture(t)
 	// 3 of 9 templates import at the start and 4 of 9 (44.44 %) once slack is in.
-	sel, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{Target: 40})
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: 40})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sel.Stop != n8nimport.StopTarget || len(sel.Steps) != 1 {
 		t.Errorf("stop %s after %d steps, want TARGET_REACHED after 1", sel.Stop, len(sel.Steps))
 	}
-	limited, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{Target: 100, MaxConnectors: 1})
+	limited, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: 100, MaxConnectors: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +258,7 @@ func TestWaveSelectionStops(t *testing.T) {
 func TestWaveSelectionOwnEffort(t *testing.T) {
 	c := loadFixture(t)
 	// Making slack expensive moves mongoDb ahead of it.
-	sel, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{
 		Target: 100,
 		EffortOf: func(typ string) n8nimport.Effort {
 			if typ == slack {
@@ -275,7 +284,11 @@ func TestWaveSelectionRunsOnTopOfACatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sel, err := n8nimport.SelectWave(c, base, n8nimport.SelectOptions{Target: 100})
+	merged, err := n8nimport.Merge(n8nimport.PlannedBase(), base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel, err := n8nimport.SelectWave(c, merged, n8nimport.SelectOptions{Target: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +305,7 @@ func TestWaveSelectionRunsOnTopOfACatalog(t *testing.T) {
 // TestCoverageHarnessRealCorpus runs the harness on a corpus fetched by
 // tools/n8ncorpus when ORCON_N8N_CORPUS names its directory. Without it the
 // test is skipped: the corpus is community content kept outside the
-// repository.
+// repository. With it, the inventory of the pinned release must be there.
 func TestCoverageHarnessRealCorpus(t *testing.T) {
 	dir := os.Getenv("ORCON_N8N_CORPUS")
 	if dir == "" {
@@ -302,24 +315,68 @@ func TestCoverageHarnessRealCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sel, err := n8nimport.SelectWave(c, nil, n8nimport.SelectOptions{})
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := n8nimport.Measure(c, sel.Catalog, "planned")
 	// A core type used by the corpus that has no counterpart blocks the gate.
 	for _, ts := range r.Types {
-		if ts.Class == n8nimport.ClassCore && !ts.Mapped && ts.Type != "n8n-nodes-base.dataTable" {
+		if ts.Class == n8nimport.ClassCore && !ts.Mapped && !isDocumentedGap(ts.Type) {
 			t.Errorf("core type %s has no counterpart", ts.Type)
 		}
 	}
-	if r.Counts.ImportableIgnoringAI < sel.Steps[len(sel.Steps)-1].Importable {
-		t.Errorf("measuring the planned catalog gives %d, the selection says %d", r.Counts.ImportableIgnoringAI, sel.Steps[len(sel.Steps)-1].Importable)
+	last := sel.Steps[len(sel.Steps)-1].Importable
+	if r.Counts.Importable != last {
+		t.Errorf("measuring the planned catalog gives %d, the selection says %d", r.Counts.Importable, last)
 	}
-	if sel.Stop == n8nimport.StopTarget && float64(r.Counts.ImportableIgnoringAI)*100 < n8nimport.DefaultTarget*float64(r.Counts.Templates) {
-		t.Errorf("selection claims the target with %d of %d templates", r.Counts.ImportableIgnoringAI, r.Counts.Templates)
+	if sel.Stop == n8nimport.StopTarget && float64(r.Counts.Importable)*100 < n8nimport.DefaultTarget*float64(r.Counts.Templates) {
+		t.Errorf("selection claims the target with %d of %d templates", r.Counts.Importable, r.Counts.Templates)
 	}
-	t.Logf("%d templates: %.2f %% importable today, %.2f %% with the AI nodes mapped; wave 1 has %d connectors",
-		r.Counts.Templates, n8nimport.Pct(int64(r.Counts.Importable), int64(r.Counts.Templates)),
-		n8nimport.Pct(int64(r.Counts.ImportableIgnoringAI), int64(r.Counts.Templates)), len(sel.Steps))
+	installed := n8nimport.Measure(c, n8nimport.Installed(), "installed")
+	if installed.Counts.Importable > r.Counts.Importable {
+		t.Errorf("the installed catalog (%d) cannot cover more than the planned one (%d)", installed.Counts.Importable, r.Counts.Importable)
+	}
+	t.Logf("%d templates: %.2f %% importable with the installed catalog, %.2f %% planned; wave 1 has %d connectors",
+		r.Counts.Templates, n8nimport.Pct(int64(installed.Counts.Importable), int64(r.Counts.Templates)),
+		n8nimport.Pct(int64(r.Counts.Importable), int64(r.Counts.Templates)), len(sel.Steps))
+}
+
+func isDocumentedGap(typ string) bool {
+	switch typ {
+	case "n8n-nodes-base.dataTable", "n8n-nodes-base.e2eTest", "n8n-nodes-base.e2eTestPollingTrigger":
+		return true
+	default:
+		return false
+	}
+}
+
+// TestCoverageHarnessPlannedEqualsItsFile proves that measuring with the
+// planned catalog and measuring with the file the same run writes with
+// --catalog-out give the same report.
+func TestCoverageHarnessPlannedEqualsItsFile(t *testing.T) {
+	c := loadFixture(t)
+	sel, err := n8nimport.SelectWave(c, n8nimport.PlannedBase(), n8nimport.SelectOptions{Target: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := sel.Catalog.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fromFile, err := n8nimport.ParseCatalog(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := n8nimport.Measure(c, sel.Catalog, "planned").JSON(sel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := n8nimport.Measure(c, fromFile, "planned").JSON(sel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(a, b) {
+		t.Fatal("the planned catalog and its file give different reports")
+	}
 }

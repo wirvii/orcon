@@ -45,6 +45,9 @@ type UnitMap struct {
 	// section 4). It is empty in a planned catalog, where the connector
 	// author still has to choose it.
 	OrconOperation string
+	// Unsafe is set when the operation's contract has safety level UNSAFE; an
+	// imported node of that operation waits for review (ADR-0034 section 8).
+	Unsafe bool
 }
 
 // Connector is a package of the catalog and the n8n units it replaces.
@@ -65,13 +68,39 @@ type Connector struct {
 // units each connector declares. The zero value is an empty catalog.
 type Catalog struct {
 	Connectors []Connector
+	// AI lists the n8n AI types the catalog maps. An AI node counts as mapped
+	// only if the measured catalog says so (ADR-0037 section 4).
+	AI []AIEntry
 
 	byUnit map[Unit]catalogEntry
+	byAI   map[string]AIEntry
+}
+
+// AIEntry declares that the catalog maps one n8n AI type.
+type AIEntry struct {
+	Type string
+	// Status is SUPPORTED, or ADAPTED when the import reports a difference.
+	Status string
+}
+
+// Special AIEntry types: the "Tool" variants of built-in nodes, and the
+// $fromAI() expression function.
+const (
+	AIToolVariants = "n8n-nodes-base.*Tool"
+	AIFromAI       = "$fromAI"
+)
+
+// UnitInfo is what the catalog knows about a mapped unit.
+type UnitInfo struct {
+	Connector string
+	Operation string
+	Unsafe    bool
 }
 
 type catalogEntry struct {
 	connector string
 	operation string
+	unsafe    bool
 }
 
 // NewCatalog indexes connectors. It rejects a unit declared twice, because the
@@ -89,7 +118,7 @@ func NewCatalog(connectors ...Connector) (*Catalog, error) {
 			if prev, dup := c.byUnit[u.Unit]; dup {
 				return nil, fmt.Errorf("n8nimport: unit %s is declared by %q and %q", u.Unit, prev.connector, k.ID)
 			}
-			c.byUnit[u.Unit] = catalogEntry{connector: k.ID, operation: u.OrconOperation}
+			c.byUnit[u.Unit] = catalogEntry{connector: k.ID, operation: u.OrconOperation, unsafe: u.Unsafe}
 		}
 	}
 	return c, nil
@@ -97,12 +126,47 @@ func NewCatalog(connectors ...Connector) (*Catalog, error) {
 
 // Lookup returns the connector and Orcon operation that handle a unit.
 func (c *Catalog) Lookup(u Unit) (connector, operation string, ok bool) {
+	info, ok := c.LookupUnit(u)
+	return info.Connector, info.Operation, ok
+}
+
+// LookupUnit returns everything the catalog declares about a unit.
+func (c *Catalog) LookupUnit(u Unit) (UnitInfo, bool) {
 	if c == nil {
-		return "", "", false
+		return UnitInfo{}, false
 	}
 	e, ok := c.byUnit[u]
-	return e.connector, e.operation, ok
+	return UnitInfo{Connector: e.connector, Operation: e.operation, Unsafe: e.unsafe}, ok
 }
+
+// WithAI returns a copy of the catalog that maps the given AI types, replacing
+// any it mapped before.
+func (c *Catalog) WithAI(entries ...AIEntry) *Catalog {
+	out := &Catalog{byAI: make(map[string]AIEntry, len(entries)), AI: slices.Clone(entries)}
+	if c != nil {
+		out.Connectors, out.byUnit = c.Connectors, c.byUnit
+	}
+	for _, e := range entries {
+		out.byAI[e.Type] = e
+	}
+	return out
+}
+
+// MapsAI reports whether the catalog maps the n8n AI type.
+func (c *Catalog) MapsAI(nodeType string) bool {
+	if c == nil {
+		return false
+	}
+	_, ok := c.byAI[nodeType]
+	return ok
+}
+
+// MapsToolVariants reports whether the catalog maps the Tool variants of
+// built-in nodes.
+func (c *Catalog) MapsToolVariants() bool { return c.MapsAI(AIToolVariants) }
+
+// MapsFromAI reports whether the catalog maps the $fromAI() function.
+func (c *Catalog) MapsFromAI() bool { return c.MapsAI(AIFromAI) }
 
 // Has reports whether any unit of the n8n type is declared.
 func (c *Catalog) Has(nodeType string) bool {
@@ -166,13 +230,18 @@ func (c *Catalog) Credential(n8nType string) (string, bool) {
 // both is an error.
 func Merge(a, b *Catalog) (*Catalog, error) {
 	var all []Connector
-	if a != nil {
-		all = append(all, a.Connectors...)
+	var ai []AIEntry
+	for _, c := range []*Catalog{a, b} {
+		if c != nil {
+			all = append(all, c.Connectors...)
+			ai = append(ai, c.AI...)
+		}
 	}
-	if b != nil {
-		all = append(all, b.Connectors...)
+	merged, err := NewCatalog(all...)
+	if err != nil {
+		return nil, err
 	}
-	return NewCatalog(all...)
+	return merged.WithAI(ai...), nil
 }
 
 // ParseCatalog reads a catalog file:
@@ -205,7 +274,9 @@ func ParseCatalog(data []byte) (*Catalog, error) {
 		}
 		units, _ := item.Get("units")
 		for _, u := range units.Items() {
+			unsafe, _ := boolMember(u, "unsafe")
 			k.Units = append(k.Units, UnitMap{
+				Unsafe: unsafe,
 				Unit: Unit{
 					Type: strMember(u, "type"), TypeVersion: strMember(u, "typeVersion"),
 					Resource: strMember(u, "resource"), Operation: strMember(u, "operation"),
@@ -215,7 +286,24 @@ func ParseCatalog(data []byte) (*Catalog, error) {
 		}
 		cs = append(cs, k)
 	}
-	return NewCatalog(cs...)
+	cat, err := NewCatalog(cs...)
+	if err != nil {
+		return nil, err
+	}
+	ai, _ := v.Get("ai")
+	var entries []AIEntry
+	for _, e := range ai.Items() {
+		entries = append(entries, AIEntry{Type: strMember(e, "type"), Status: strMember(e, "status")})
+	}
+	return cat.WithAI(entries...), nil
+}
+
+func boolMember(v jsonvalue.Value, key string) (value, ok bool) {
+	m, found := v.Get(key)
+	if !found {
+		return false, false
+	}
+	return m.Bool()
 }
 
 // Encode writes the catalog in the format [ParseCatalog] reads, with
@@ -231,7 +319,22 @@ func (c *Catalog) Encode() ([]byte, error) {
 		}
 		list = append(list, v)
 	}
-	root, err := jsonvalue.Object(jsonvalue.Member{Key: "connectors", Value: jsonvalue.Array(list...)})
+	members := []jsonvalue.Member{{Key: "connectors", Value: jsonvalue.Array(list...)}}
+	if len(c.AI) > 0 {
+		entries := slices.Clone(c.AI)
+		slices.SortFunc(entries, func(a, b AIEntry) int { return strings.Compare(a.Type, b.Type) })
+		items := make([]jsonvalue.Value, 0, len(entries))
+		for _, e := range entries {
+			obj, err := jsonvalue.Object(jsonvalue.Member{Key: "type", Value: jsonvalue.String(e.Type)},
+				jsonvalue.Member{Key: "status", Value: jsonvalue.String(e.Status)})
+			if err != nil {
+				return nil, fmt.Errorf("n8nimport: encode catalog: %w", err)
+			}
+			items = append(items, obj)
+		}
+		members = append(members, jsonvalue.Member{Key: "ai", Value: jsonvalue.Array(items...)})
+	}
+	root, err := jsonvalue.Object(members...)
 	if err != nil {
 		return nil, fmt.Errorf("n8nimport: encode catalog: %w", err)
 	}
@@ -293,6 +396,9 @@ func encodeUnit(u *UnitMap) (jsonvalue.Value, error) {
 	}
 	if u.OrconOperation != "" {
 		ms = append(ms, jsonvalue.Member{Key: "orcon", Value: jsonvalue.String(u.OrconOperation)})
+	}
+	if u.Unsafe {
+		ms = append(ms, jsonvalue.Member{Key: "unsafe", Value: jsonvalue.Bool(true)})
 	}
 	obj, err := jsonvalue.Object(ms...)
 	if err != nil {

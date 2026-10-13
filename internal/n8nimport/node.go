@@ -20,8 +20,11 @@ type Node struct {
 	// Type is the full n8n node type, such as "n8n-nodes-base.if".
 	Type string
 	// TypeVersion is the text of the number n8n wrote, such as "2.1". It is
-	// "1" when the workflow omits it, as n8n does.
+	// "1" when the workflow omits it, as n8n does, and empty when the workflow
+	// wrote something that is not a number: such a node is not mapped.
 	TypeVersion string
+	// Position is the place of the node on the n8n canvas.
+	Position [2]int
 	// Parameters is the parameters object, or the zero value when absent.
 	Parameters jsonvalue.Value
 	// Disabled reports a node switched off in the editor.
@@ -97,8 +100,13 @@ func nodeFrom(v jsonvalue.Value) (Node, error) {
 		return Node{}, errors.New("no type")
 	}
 	if tv, ok := v.Get("typeVersion"); ok {
-		if text, isNum := tv.NumberText(); isNum {
-			n.TypeVersion = text
+		n.TypeVersion, _ = tv.NumberText()
+	}
+	if pos, ok := v.Get("position"); ok {
+		for i, item := range pos.Items() {
+			if f, isNum := item.Float64(); isNum && i < len(n.Position) {
+				n.Position[i] = int(f)
+			}
 		}
 	}
 	if p, ok := v.Get("parameters"); ok && p.Kind() == jsonvalue.KindObject {

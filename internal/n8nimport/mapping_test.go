@@ -6,6 +6,7 @@ package n8nimport_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -35,6 +36,7 @@ func slackCatalog(t *testing.T) *n8nimport.Catalog {
 			{Unit: n8nimport.Unit{Type: slack, TypeVersion: "2.2", Resource: "message", Operation: "post"}, OrconOperation: "message.send"},
 			{Unit: n8nimport.Unit{Type: slack, TypeVersion: "2.2", Resource: "channel", Operation: "getAll"}, OrconOperation: "channel.getMany"},
 			{Unit: n8nimport.Unit{Type: slack, TypeVersion: "2.2"}, OrconOperation: "message.send"},
+			{Unit: n8nimport.Unit{Type: slack, TypeVersion: "2.2", Resource: "message", Operation: "delete"}, OrconOperation: "message.delete", Unsafe: true},
 		},
 	}, n8nimport.Connector{
 		ID: "planned", Effort: n8nimport.EffortDeclarative, // no Orcon type: planned, not installed
@@ -63,7 +65,8 @@ func TestNodeMappingNoSilentSubstitution(t *testing.T) {
 		{"community node", importNode(t, `{"id":"a","name":"Mystery","type":"n8n-nodes-someone.odd","typeVersion":1,"parameters":{}}`), n8nimport.FindUnmappedType, "type"},
 		{"AI node", importNode(t, `{"id":"a","name":"Mystery","type":"@n8n/n8n-nodes-langchain.agent","typeVersion":1,"parameters":{}}`), n8nimport.FindUnmappedType, "type"},
 		{"typeVersion without mapping", slackNode(t, "1", `{"resource":"message","operation":"post"}`), n8nimport.FindUnmappedTypeVersion, "typeVersion"},
-		{"pair outside the map", slackNode(t, "2.2", `{"resource":"message","operation":"delete"}`), n8nimport.FindUnmappedOperation, "parameters.operation"},
+		{"pair outside the map", slackNode(t, "2.2", `{"resource":"message","operation":"update"}`), n8nimport.FindUnmappedOperation, "parameters.operation"},
+		{"typeVersion that is not a number", importNode(t, `{"id":"a","name":"Odd","type":"n8n-nodes-base.if","typeVersion":"two","parameters":{}}`), n8nimport.FindUnmappedTypeVersion, "typeVersion"},
 		{"core node without counterpart", importNode(t, `{"id":"a","name":"Table","type":"n8n-nodes-base.dataTable","typeVersion":1,"parameters":{}}`), n8nimport.FindUnsupportedCore, "type"},
 		{"planned connector", importNode(t, fmt.Sprintf(`{"id":"a","name":"Mail","type":%q,"typeVersion":2,"parameters":{"resource":"message","operation":"getAll"}}`, gmail)), n8nimport.FindPlannedOnly, "type"},
 	}
@@ -103,9 +106,9 @@ func TestTypeVersionPreserved(t *testing.T) {
 			if !m.Mapped() {
 				t.Fatalf("not mapped: %+v", m.Findings)
 			}
-			imp, ok := m.Ext.Get(n8nimport.ImportExtKey)
+			imp, ok := m.Ext.Get(flow.ImportExtKey)
 			if !ok {
-				t.Fatalf("ext has no %s: %v", n8nimport.ImportExtKey, m.Ext)
+				t.Fatalf("ext has no %s: %v", flow.ImportExtKey, m.Ext)
 			}
 			if got := strMember(imp, "n8nType"); got != tc.node.Type {
 				t.Errorf("n8nType = %q, want %q", got, tc.node.Type)
@@ -137,17 +140,18 @@ func TestHttpWriteImportedUnsafe(t *testing.T) {
 		safety n8nimport.Safety
 		review bool
 		field  string
+		reason string
 	}{
-		{"GET", `{"method":"GET","url":"https://example.test"}`, n8nimport.SafetyRead, false, ""},
-		{"HEAD in lower case", `{"method":"head"}`, n8nimport.SafetyRead, false, ""},
-		{"method left out", `{"url":"https://example.test"}`, n8nimport.SafetyRead, false, ""},
-		{"POST", `{"method":"POST"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"PUT", `{"method":"PUT"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"PATCH", `{"method":"PATCH"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"DELETE", `{"method":"DELETE"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"post in lower case", `{"method":"post"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"method by expression", `{"method":"={{ $json.verb }}"}`, n8nimport.SafetyUnsafe, true, "parameters.method"},
-		{"typeVersion 1 spelling", `{"requestMethod":"POST"}`, n8nimport.SafetyUnsafe, true, "parameters.requestMethod"},
+		{"GET", `{"method":"GET","url":"https://example.test"}`, n8nimport.SafetyRead, false, "", ""},
+		{"HEAD in lower case", `{"method":"head"}`, n8nimport.SafetyRead, false, "", ""},
+		{"method left out", `{"url":"https://example.test"}`, n8nimport.SafetyRead, false, "", ""},
+		{"POST", `{"method":"POST"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_WRITE"},
+		{"PUT", `{"method":"PUT"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_WRITE"},
+		{"PATCH", `{"method":"PATCH"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_WRITE"},
+		{"DELETE", `{"method":"DELETE"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_WRITE"},
+		{"post in lower case", `{"method":"post"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_WRITE"},
+		{"method by expression", `{"method":"={{ $json.verb }}"}`, n8nimport.SafetyUnsafe, true, "parameters.method", "HTTP_METHOD_EXPRESSION"},
+		{"typeVersion 1 spelling", `{"requestMethod":"POST"}`, n8nimport.SafetyUnsafe, true, "parameters.requestMethod", "HTTP_WRITE"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -162,14 +166,18 @@ func TestHttpWriteImportedUnsafe(t *testing.T) {
 			if m.ReviewRequired() != tc.review {
 				t.Errorf("review required = %v, want %v", m.ReviewRequired(), tc.review)
 			}
-			imp, _ := m.Ext.Get(n8nimport.ImportExtKey)
-			review, hasReview := imp.Get("review")
-			if hasReview != tc.review {
-				t.Fatalf("ext review mark = %v, want %v", hasReview, tc.review)
+			imp, _ := m.Ext.Get(flow.ImportExtKey)
+			status, hasStatus := imp.Get("reviewStatus")
+			if hasStatus != tc.review {
+				t.Fatalf("ext review status present = %v, want %v", hasStatus, tc.review)
 			}
 			if tc.review {
-				if req, _ := review.Get("required"); !isTrue(req) {
-					t.Errorf("review.required = %v", req)
+				if got, _ := status.Str(); got != flow.ReviewNeeds {
+					t.Errorf("reviewStatus = %q, want %q", got, flow.ReviewNeeds)
+				}
+				reasons, _ := imp.Get("reviewReasons")
+				if first, _ := reasons.At(0); reasons.Len() != 1 || strMemberValue(first) != tc.reason {
+					t.Errorf("reviewReasons = %v, want [%s]", reasons, tc.reason)
 				}
 				for _, f := range m.Findings {
 					if f.Code == n8nimport.FindReviewRequired && f.Field != tc.field {
@@ -181,9 +189,74 @@ func TestHttpWriteImportedUnsafe(t *testing.T) {
 	}
 }
 
-func isTrue(v jsonvalue.Value) bool {
-	b, ok := v.Bool()
-	return ok && b
+func strMemberValue(v jsonvalue.Value) string {
+	s, _ := v.Str()
+	return s
+}
+
+func TestUnsafeConnectorOperationNeedsReview(t *testing.T) {
+	n := slackNode(t, "2.2", `{"resource":"message","operation":"delete"}`)
+	m := n8nimport.MapNode(&n, slackCatalog(t))
+	if !m.Mapped() || m.Operation != "message.delete" || m.Safety != n8nimport.SafetyUnsafe || !m.ReviewRequired() {
+		t.Fatalf("mapping = %+v", m)
+	}
+	imp, _ := m.Ext.Get(flow.ImportExtKey)
+	reasons, _ := imp.Get("reviewReasons")
+	if first, _ := reasons.At(0); strMemberValue(first) != flow.ReasonUnsafeOperation {
+		t.Errorf("reviewReasons = %v", reasons)
+	}
+	safe := slackNode(t, "2.2", `{"resource":"message","operation":"post"}`)
+	if sm := n8nimport.MapNode(&safe, slackCatalog(t)); sm.ReviewRequired() || sm.Safety != "" {
+		t.Errorf("a safe operation must not be marked: %+v", sm)
+	}
+}
+
+func TestLegacyAndRenamedCoreNodes(t *testing.T) {
+	start := importNode(t, `{"id":"s","name":"Start","type":"n8n-nodes-base.start","typeVersion":1,"parameters":{}}`)
+	if m := n8nimport.MapNode(&start, nil); m.OrconType != "orcon.manual@1" {
+		t.Errorf("start maps to %+v, want orcon.manual@1", m)
+	}
+	api := importNode(t, `{"id":"a","name":"Instance","type":"n8n-nodes-base.n8n","typeVersion":1,"parameters":{}}`)
+	m := n8nimport.MapNode(&api, nil)
+	if !m.Mapped() || !strings.Contains(m.Construct, "n8n REST API") {
+		t.Errorf("the n8n API node maps to %+v, want a connector over the n8n REST API", m)
+	}
+}
+
+func TestImportedFlowValidates(t *testing.T) {
+	data, err := os.ReadFile("../flow/testdata/conformance/linear.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := jsonvalue.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := flow.Read(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := []n8nimport.Node{
+		importNode(t, `{"id":"w","name":"Write","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"parameters":{"method":"POST"}}`),
+		importNode(t, `{"id":"e","name":"Expr","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"parameters":{"method":"={{ $json.m }}"}}`),
+		slackNode(t, "2.2", `{"resource":"message","operation":"delete"}`),
+	}
+	for i := range nodes {
+		doc.Nodes[i].Ext = n8nimport.MapNode(&nodes[i], slackCatalog(t)).Ext
+	}
+	if report := flow.Validate(&doc); report.HasErrors() {
+		t.Fatalf("an imported flow must validate: %v", report.Errors())
+	}
+	pending := flow.PendingImportReview(&doc)
+	if len(pending) != 3 {
+		t.Fatalf("pending = %v, want the three marked nodes", pending)
+	}
+	// The same mark in the document's ext is still an error.
+	bad := doc
+	bad.Ext = doc.Nodes[0].Ext
+	if report := flow.Validate(&bad); !report.HasErrors() {
+		t.Error("orcon.import in the document ext must fail")
+	}
 }
 
 func TestImportedUnsafeBlocksActivation(t *testing.T) {
@@ -196,41 +269,19 @@ func TestImportedUnsafeBlocksActivation(t *testing.T) {
 		doc.Nodes = append(doc.Nodes, flow.Node{ID: flow.NodeID(n.ID), Name: n.Name, Ext: m.Ext})
 	}
 
-	err := n8nimport.CheckActivation(doc)
-	var re *n8nimport.ReviewError
-	if !errors.Is(err, n8nimport.ErrReviewRequired) || !errors.As(err, &re) {
+	err := flow.CheckImportReview(doc)
+	var re *flow.ImportReviewError
+	if !errors.Is(err, flow.ErrImportReviewRequired) || !errors.As(err, &re) {
 		t.Fatalf("activation of a flow with unreviewed writes: %v", err)
 	}
 	if got := fmt.Sprint(re.Nodes); got != "[w d]" {
 		t.Errorf("pending = %s, want [w d]", got)
 	}
-	if !strings.Contains(err.Error(), "w, d") {
-		t.Errorf("the error does not name the nodes: %v", err)
+	if !flow.MarkImportReviewed(doc, "w") || !flow.MarkImportReviewed(doc, "d") {
+		t.Fatal("review failed")
 	}
-
-	if !n8nimport.MarkReviewed(doc, "w") {
-		t.Fatal("reviewing w failed")
-	}
-	if n8nimport.MarkReviewed(doc, "w") {
-		t.Error("a second review of w must report false")
-	}
-	if n8nimport.MarkReviewed(doc, "r") || n8nimport.MarkReviewed(doc, "missing") {
-		t.Error("a node without a mark, or a missing one, cannot be reviewed")
-	}
-	if err := n8nimport.CheckActivation(doc); !errors.Is(err, n8nimport.ErrReviewRequired) {
-		t.Fatalf("d is still unreviewed, got %v", err)
-	}
-	if !n8nimport.MarkReviewed(doc, "d") {
-		t.Fatal("reviewing d failed")
-	}
-	if err := n8nimport.CheckActivation(doc); err != nil {
+	if err := flow.CheckImportReview(doc); err != nil {
 		t.Fatalf("every marked node was reviewed, got %v", err)
-	}
-	// The reasons stay in the node after the review, as an audit trail.
-	imp, _ := doc.Nodes[0].Ext.Get(n8nimport.ImportExtKey)
-	review, _ := imp.Get("review")
-	if reasons, _ := review.Get("reasons"); reasons.Len() != 1 {
-		t.Errorf("review reasons were lost: %v", review)
 	}
 }
 

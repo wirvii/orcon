@@ -46,6 +46,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	base := flags.String("base", defaultBase, "base URL of the template library")
 	delay := flags.Duration("delay", 150*time.Millisecond, "pause between requests of one worker")
 	workers := flags.Int("workers", 4, "parallel downloads")
+	registry := flags.String("registry", defaultRegistry, "package registry the node inventory of the pinned release is read from")
+	noInventory := flags.Bool("no-inventory", false, "do not write inventory.json (the coverage command then refuses the corpus)")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -86,5 +88,30 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "n8ncorpus: %d templates, %d expressions, corpus %s\n", m.Templates, m.Expressions, m.CorpusSHA256)
+	if *noInventory {
+		return 0
+	}
+	inv, err := f.fetchInventory(ctx, *registry, *version)
+	if err != nil {
+		fmt.Fprintln(stderr, "n8ncorpus:", err)
+		return 1
+	}
+	digest, err := writeInventory(*dir, inv)
+	if err != nil {
+		fmt.Fprintln(stderr, "n8ncorpus:", err)
+		return 1
+	}
+	m.NodesBaseVersion, m.InventorySHA256 = inv.NodesBaseVersion, digest
+	if err := updateManifest(*dir, m); err != nil {
+		fmt.Fprintln(stderr, "n8ncorpus:", err)
+		return 1
+	}
+	core := 0
+	for _, n := range inv.Nodes {
+		if n.Group == "CORE" {
+			core++
+		}
+	}
+	fmt.Fprintf(stdout, "n8ncorpus: inventory of %s %s: %d node types, %d core, digest %s\n", basePackage, inv.NodesBaseVersion, len(inv.Nodes), core, digest)
 	return 0
 }
