@@ -16,7 +16,7 @@ import {
   type Connection,
   type OnConnectStartParams,
 } from '@xyflow/react';
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref, type RefObject } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
 import { toast } from 'sonner';
 
@@ -27,7 +27,7 @@ import { cn } from '../lib/cn';
 
 import { AddFirstStep } from './add-first-step/AddFirstStep';
 import { useAnnouncer } from './announcer';
-import { CanvasControls } from './canvas-controls/CanvasControls';
+import { CanvasControls, type CanvasControlsProps } from './canvas-controls/CanvasControls';
 import { CanvasEdge, type CanvasFlowEdge } from './canvas-edge/CanvasEdge';
 import { CanvasMinimap } from './canvas-minimap/CanvasMinimap';
 import { CanvasOutline } from './canvas-outline/CanvasOutline';
@@ -258,6 +258,29 @@ function syncNodes(previous: CanvasFlowNodeUnion[], graph: Graph, { intl, editab
   return [...notes, ...tiles];
 }
 
+/** The level of detail for a zoom: the lower it is, the less each node draws. */
+function detailOf(zoom: number): DetailLevel {
+  return zoom < metrics.lodMinimal ? 'minimal' : zoom < metrics.lodDetail ? 'detail' : 'full';
+}
+
+/** At the lowest level of detail no name is drawn, so the scale stays put and a zoom there rebuilds nothing. */
+function labelScaleOf(zoom: number): number {
+  return detailOf(zoom) === 'detail' ? Math.round(Math.min(3, Math.max(1, 10 / (13 * zoom))) * 100) / 100 : 1;
+}
+
+/**
+ * The zoom controls and the zoom the container reports (`data-zoom`, in percent). They follow every
+ * zoom step, so they live here and the canvas around them does not render again for each one.
+ */
+function ZoomControls({ containerRef, ...controls }: Omit<CanvasControlsProps, 'zoom'> & { containerRef: RefObject<HTMLDivElement | null> }) {
+  const zoom = useStore((state) => state.transform[2]);
+  const percent = Math.round(zoom * 100);
+  useLayoutEffect(() => {
+    containerRef.current?.setAttribute('data-zoom', String(percent));
+  }, [containerRef, percent]);
+  return <CanvasControls zoom={zoom} {...controls} />;
+}
+
 function Canvas({
   defaultGraph,
   catalog = [],
@@ -283,7 +306,6 @@ function Canvas({
   const editable = wide && !readOnly;
   const flow = useReactFlow();
   const { announce, region } = useAnnouncer();
-  const zoom = useStore((state) => state.transform[2]);
 
   const [history, setHistory] = useState<History<Graph>>(() => startHistory({ ...defaultGraph, notes: defaultGraph.notes ?? [] }));
   const historyRef = useRef(history);
@@ -332,9 +354,12 @@ function Canvas({
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNodeUnion>(firstNodes);
 
-  const detail: DetailLevel = zoom < metrics.lodMinimal ? 'minimal' : zoom < metrics.lodDetail ? 'detail' : 'full';
+  // The canvas reads the zoom through selectors that return only the level of detail and the label scale,
+  // so it renders again when these change and not on every wheel event: each render hands React Flow new
+  // callbacks, which it writes into its store and so wakes thousands of subscribers (orcon-web PF-4).
+  const detail = useStore((state) => detailOf(state.transform[2]));
   // Names and chips grow as the canvas shrinks, so their on-screen size stays at 10 px or more.
-  const labelScale = detail === 'full' ? 1 : Math.round(Math.min(3, Math.max(1, 10 / (13 * zoom))) * 100) / 100;
+  const labelScale = useStore((state) => labelScaleOf(state.transform[2]));
 
   /**
    * Shows the whole flow when that keeps the text readable. When the flow is too
@@ -950,7 +975,6 @@ function Canvas({
   const empty = graph.nodes.length === 0 && (graph.notes ?? []).length === 0;
   const detailsNode = graph.nodes.find((node) => node.id === detailsId);
   const canDelete = editable && (selectedIds.length > 0 || activeId !== undefined);
-  const percent = Math.round(zoom * 100);
 
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)} data-workflow-canvas data-editable={editable}>
@@ -978,7 +1002,6 @@ function Canvas({
           role="region"
           aria-label={intl.formatMessage(canvasMessages.canvasLabel, { nodes: graph.nodes.length })}
           data-lod={detail}
-          data-zoom={percent}
           tabIndex={0}
           className="bg-canvas relative min-h-canvas-node min-w-0 flex-1 overflow-hidden"
           onKeyDown={onKeyDown}
@@ -1075,8 +1098,8 @@ function Canvas({
               <Background variant={BackgroundVariant.Dots} gap={metrics.grid} size={1.4} color="var(--orcon-canvas-grid)" />
               {showMinimap ? <CanvasMinimap visible={minimapVisible} onPointerEnter={() => setMinimapHover(true)} onPointerLeave={() => setMinimapHover(false)} /> : null}
             </ReactFlow>
-            <CanvasControls
-              zoom={zoom}
+            <ZoomControls
+              containerRef={containerRef}
               onFit={() => zoomBy('fit')}
               onZoomIn={() => zoomBy('in')}
               onZoomOut={() => zoomBy('out')}

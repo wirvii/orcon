@@ -93,34 +93,42 @@ export function CanvasEdge({ id, sourceX, sourceY, targetX, targetY, data }: Edg
       <path d={d} fill="none" strokeWidth={8} strokeLinecap="round" className="orcon-edge-focus stroke-focus pointer-events-none opacity-0" />
       <path d={d} fill="none" strokeWidth={active ? 3 : 2} strokeLinecap="round" strokeDasharray={look.dash} data-edge-state={key} data-edge-id={id} className={cn(look.stroke, look.flows && 'motion-safe:animate-edge-flow')} />
       <path d={arrow} data-edge-arrow className={cn(arrowFill[key], 'stroke-none')} />
-      {/* A wide invisible stroke makes the thin line easy to hover and click. */}
-      <path d={d} fill="none" strokeWidth={20} className="stroke-transparent" />
-      {/* A straight line has no height, so it has nothing to point at: this disc at its middle gives the connection a target of its own. */}
-      <circle cx={mid.x} cy={mid.y} r={10} pointerEvents="all" data-edge-hit className="fill-transparent" />
-      <EdgeLabelRenderer>
-        <div
-          className="nodrag nopan pointer-events-none absolute"
-          // The label follows the curve, so its position is a runtime value from the canvas layout.
-          // eslint-disable-next-line orcon/no-inline-style -- label positioned from computed edge coordinates
-          style={{ transform: `translate(-50%, -50%) translate(${mid.x}px, ${mid.y}px)` }}
-        >
-          <div className={cn('flex flex-col items-center gap-1', showBar && '-translate-y-4')}>
-            {showLabel ? <EdgeLabel items={data?.items} state={state} pinned={data?.pinned} loopBack={loopBack} /> : null}
-            {showBar ? (
-              <div className="pointer-events-auto">
-                <EdgeActions
-                  source={data.sourceName ?? ''}
-                  target={data.targetName ?? ''}
-                  onAdd={data.onAdd}
-                  onDelete={data.onDelete}
-                  onPointerEnter={data.onBarEnter}
-                  onPointerLeave={data.onBarLeave}
-                />
-              </div>
-            ) : null}
+      {/* At the lowest level of detail nothing can be pointed at, so the invisible targets are not drawn: with hundreds of connections they cost more than the lines. */}
+      {data?.detail === 'minimal' ? null : (
+        <>
+          {/* A wide invisible stroke makes the thin line easy to hover and click. */}
+          <path d={d} fill="none" strokeWidth={20} className="stroke-transparent" />
+          {/* A straight line has no height, so it has nothing to point at: this disc at its middle gives the connection a target of its own. */}
+          <circle cx={mid.x} cy={mid.y} r={10} pointerEvents="all" data-edge-hit className="fill-transparent" />
+        </>
+      )}
+      {/* The label layer is a React Flow portal whose store subscription runs on every viewport change, so a connection without a label or actions must not mount one: with 500 nodes that cost 850 ms of every 3 s of panning. */}
+      {showLabel || showBar ? (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan pointer-events-none absolute"
+            // The label follows the curve, so its position is a runtime value from the canvas layout.
+            // eslint-disable-next-line orcon/no-inline-style -- label positioned from computed edge coordinates
+            style={{ transform: `translate(-50%, -50%) translate(${mid.x}px, ${mid.y}px)` }}
+          >
+            <div className={cn('flex flex-col items-center gap-1', showBar && '-translate-y-4')}>
+              {showLabel ? <EdgeLabel items={data?.items} state={state} pinned={data?.pinned} loopBack={loopBack} /> : null}
+              {showBar ? (
+                <div className="pointer-events-auto">
+                  <EdgeActions
+                    source={data.sourceName ?? ''}
+                    target={data.targetName ?? ''}
+                    onAdd={data.onAdd}
+                    onDelete={data.onDelete}
+                    onPointerEnter={data.onBarEnter}
+                    onPointerLeave={data.onBarLeave}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </EdgeLabelRenderer>
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 }
