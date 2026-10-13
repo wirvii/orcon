@@ -74,7 +74,7 @@ func TestEgressMoreMetadataAndTranslationRanges(t *testing.T) {
 	for _, ip := range []string{
 		"169.254.170.2", "169.254.169.253", "169.254.169.123", // AWS link-local services
 		"168.63.129.16", "192.0.0.192", "100.100.100.200", "169.254.169.254",
-		"fd00:ec2::254", "fd00:ec2::23", "fd00:ec2::1",
+		"fd00:ec2::254", "fd00:ec2::23", "fd00:ec2::1", "fd00:ec2:1::1", "fd00:ec2:ffff::1",
 		"::ffff:0:1:2", "::ffff:0:0:0", "::ffff:0:7f00:1", // SIIT
 		"2001:2::1",
 	} {
@@ -105,7 +105,13 @@ func TestEgressHostHeaderMustMatchURL(t *testing.T) {
 	c := mustNew(t, Config{Resolver: fixed("good.example.test", publicIP), Dialer: &serverDialer{target: hostPort(t, srv)}})
 	policy := Policy{Domains: []string{"good.example.test"}, Schemes: []string{"http"}}
 
-	for _, host := range []string{"evil.test", "internal.example.test", "good.example.test.evil.test", "127.0.0.1"} {
+	for _, host := range []string{
+		"evil.test", "internal.example.test", "good.example.test.evil.test", "127.0.0.1",
+		"good.example.test:8080", "good.example.test:", "good.example.test:80x", "good.example.test:443",
+		"good.example.test/evil.test", "good.example.test?x", "good.example.test#x", "user@good.example.test",
+		"good.example.test evil.test", "good.example.test\t", "good.example.test\\evil", "good.example.test\x00",
+		"[good.example.test]:80", "::1", "[::1", "good.example.test:80:80",
+	} {
 		req := newReq(t, "http://good.example.test/")
 		req.Host = host
 		_, err := c.Do(t.Context(), policy, req) //nolint:bodyclose // refused, no response

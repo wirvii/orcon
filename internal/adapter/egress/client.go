@@ -477,7 +477,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Host != "" {
 		// The Host header must name the host that was checked: a different
 		// one would let a granted domain front for another virtual host.
-		if hh, _, err := normalizeHost(hostnameOf(req.Host)); err != nil || hh != host {
+		if !hostHeaderMatches(req.Host, req.URL, host) {
 			derr := denied(ReasonBadURL, ev.Scheme, host, "the Host header differs from the URL host")
 			closeBody()
 			c.denyEvent(req.Context(), ev, start, derr)
@@ -564,12 +564,54 @@ func (c *Client) denyEvent(ctx context.Context, ev Event, start time.Time, err e
 	c.emit(ctx, ev)
 }
 
-// hostnameOf strips an optional port (and IPv6 brackets) from a Host header.
-func hostnameOf(h string) string {
-	if u, err := url.Parse("//" + h); err == nil && u.Hostname() != "" {
-		return u.Hostname()
+// hostHeaderMatches reports whether a Host header value names the checked
+// host and, when it carries a port, the port of the URL. Anything that is not
+// a plain host or host:port (path, query, fragment, userinfo, whitespace or
+// control characters) is rejected.
+func hostHeaderMatches(header string, u *url.URL, host string) bool {
+	for _, r := range header {
+		if r <= ' ' || r == 0x7f || strings.ContainsRune("/?#@\\", r) {
+			return false
+		}
 	}
-	return h
+	name, port := header, ""
+	switch {
+	case strings.HasPrefix(header, "["):
+		end := strings.Index(header, "]")
+		if end < 0 {
+			return false
+		}
+		name = header[1:end]
+		if !strings.Contains(name, ":") {
+			return false // brackets are for IPv6 literals only
+		}
+		if rest := header[end+1:]; rest != "" {
+			if rest[0] != ':' {
+				return false
+			}
+			port = rest[1:]
+			if port == "" {
+				return false
+			}
+		}
+	case strings.Count(header, ":") == 1:
+		name, port, _ = strings.Cut(header, ":")
+		if port == "" {
+			return false
+		}
+	case strings.Contains(header, ":"):
+		return false // a bare IPv6 address needs brackets
+	}
+	for _, r := range port {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	if port != "" && port != portOf(u) {
+		return false
+	}
+	norm, _, err := normalizeHost(name)
+	return err == nil && norm == host
 }
 
 func hostLiteral(host string) (netip.Addr, bool) {

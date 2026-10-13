@@ -40,11 +40,11 @@ var blockedRanges = []namedPrefix{
 	np("100.100.100.200/32", "cloud metadata", kindNever),
 	np("192.0.0.192/32", "cloud metadata", kindNever),
 	// AWS: ECS task credentials, DNS and time-sync link-local services, and
-	// the whole IPv6 instance-metadata network (fd00:ec2::254, fd00:ec2::23).
+	// the whole fd00:ec2::/32 IPv6 instance-metadata range (fd00:ec2::254, fd00:ec2::23).
 	np("169.254.170.2/32", "cloud metadata", kindNever),
 	np("169.254.169.253/32", "cloud metadata", kindNever),
 	np("169.254.169.123/32", "cloud metadata", kindNever),
-	np("fd00:ec2::/64", "cloud metadata", kindNever),
+	np("fd00:ec2::/32", "cloud metadata", kindNever),
 
 	// IPv4.
 	np("0.0.0.0/8", "unspecified", kindNever),
