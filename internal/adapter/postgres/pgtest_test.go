@@ -35,14 +35,6 @@ var server struct {
 	err      error
 }
 
-// enablePostgres turns the PostgreSQL tests on regardless of the environment, for a
-// test run that asked for PostgreSQL explicitly (-store=postgres). Call it
-// before [Run].
-func enablePostgres() { server.enabled = true }
-
-// postgresEnabled reports whether this run has a PostgreSQL server.
-func postgresEnabled() bool { return server.enabled }
-
 // runWithPostgres starts the server when the PostgreSQL tests are on, runs the tests and
 // stops the server. Use it as the body of TestMain.
 func runWithPostgres(m *testing.M) {
