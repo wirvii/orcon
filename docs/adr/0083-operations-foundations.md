@@ -2,7 +2,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0083: Operations foundations — distribution, configuration, first run, backups, upgrades, no phone-home, observability and user documentation
 
-Status: Proposed
+Status: Accepted
+
+Accepted by the owner on 2026-10-13 via SPEC-015
 
 ## Context
 Orcon promises an easy first run (principle 3), one artifact with many roles (principle 4, ADR 0002), operational minimalism (principle 5) and observability by design (principle 9). ADR 0004 leaves backups and disaster recovery open. The maintainers decided (BL-017, 2026-10-12): four official install paths verified on every release; flags over environment over a YAML file over secure defaults, with every secret readable from a file; a web first-run wizard and a headless equivalent; built-in encrypted backups with key material kept separately; no telemetry; a versioned English and Spanish documentation site; and a monitoring kit. Related decisions: ADR 0015 (storage, migrations, compatibility floor), ADR 0016 and 0017 (blobs, retention), ADR 0033 (connector catalog trust), ADR 0042 (key hierarchy and installation ceremony), ADR 0048 (audit), ADR 0052 (routes outside /api/v1), ADR 0073 (human-attention notifications), ADR 0075 and 0076 (layout and libraries), ADR 0081 (signed releases).

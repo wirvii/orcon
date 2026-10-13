@@ -2,7 +2,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0082: Editor test runs, pinned test data and effect confirmation
 
-Status: Proposed
+Status: Accepted
+
+Accepted by the owner on 2026-10-13 via SPEC-014
 
 ## Context
 
