@@ -101,35 +101,35 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | ThemeSwitcher | Base component | Pending | — | — | — | — |
 | DensitySwitcher | Base component | Pending | — | — | — | — |
 | LocaleSwitcher | Base component | Pending | — | — | — | — |
-| CanvasNode | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodeStatusBadge | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodeStatusChip | Canvas primitive (style A) | Pending | — | — | — | — |
-| PinnedBadge | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodePort | Canvas primitive (style A) | Pending | — | — | — | — |
-| PortAddButton | Canvas primitive (style A) | Pending | — | — | — | — |
-| OutputStub | Canvas primitive (style A) | Pending | — | — | — | — |
-| CanvasEdge | Canvas primitive (style A) | Pending | — | — | — | — |
-| EdgeLabel | Canvas primitive (style A) | Pending | — | — | — | — |
-| EdgeActions | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodeToolbar | Canvas primitive (style A) | Pending | — | — | — | — |
-| StickyNote | Canvas primitive (style A) | Pending | — | — | — | — |
-| CanvasControls | Canvas primitive (style A) | Pending | — | — | — | — |
-| CanvasMinimap | Canvas primitive (style A) | Pending | — | — | — | — |
-| AddFirstStep | Canvas primitive (style A) | Pending | — | — | — | — |
-| AiBlock | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodePalettePanel | Canvas primitive (style A) | Pending | — | — | — | — |
-| CanvasOutline | Canvas primitive (style A) | Pending | — | — | — | — |
-| NodeDetailsView | Editor component | Pending | — | — | — | — |
-| PaneSplitter | Editor component | Pending | — | — | — | — |
-| DataPane | Editor component | Pending | — | — | — | — |
-| DataTableView | Editor component | Pending | — | — | — | — |
-| JsonTreeView | Editor component | Pending | — | — | — | — |
-| SchemaView | Editor component | Pending | — | — | — | — |
+| CanvasNode | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodeStatusBadge | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodeStatusChip | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| PinnedBadge | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodePort | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| PortAddButton | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| OutputStub | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| CanvasEdge | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| EdgeLabel | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| EdgeActions | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodeToolbar | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| StickyNote | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| CanvasControls | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| CanvasMinimap | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| AddFirstStep | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| AiBlock | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodePalettePanel | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| CanvasOutline | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| NodeDetailsView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| PaneSplitter | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| DataPane | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| DataTableView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| JsonTreeView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
+| SchemaView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | S1 Shell and welcome/onboarding | Screen template | Pending | — | — | — | — |
 | S2 Flow list | Screen template | Pending | — | — | — | — |
-| S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Pending | — | — | — | Reopened by the style A decision (SPEC-007 Enmienda 1) |
+| S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Reopened by the style A decision (SPEC-007 Enmienda 1) |
 | S4 Execution list | Screen template | Pending | — | — | — | — |
-| S5 Execution detail, with the style A canvas | Screen template | Pending | — | — | — | Canvas reopened by the style A decision (SPEC-007 Enmienda 1) |
+| S5 Execution detail, with the style A canvas | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Canvas reopened by the style A decision (SPEC-007 Enmienda 1) |
 | S6 Human attention inbox and notifications panel | Screen template | Pending | — | — | — | — |
 | S7 Approval page | Screen template | Pending | — | — | — | — |
 | S8 Empty states, 404 and error page | Screen template | Pending | — | — | — | — |
@@ -141,33 +141,33 @@ The V1 bar for the flow editor is that every interaction of the parity table in 
 
 | Row | Interaction | Verdict | Date | Reviewed Storybook commit | Notes |
 |---|---|---|---|---|---|
-| P-01 | First step on an empty canvas | Pending | — | — | — |
-| P-02 | Add a node after a node | Pending | — | — | — |
-| P-03 | Add after a dangling output | Pending | — | — | — |
-| P-04 | Insert a node on a connection | Pending | — | — | — |
-| P-05 | Delete a connection | Pending | — | — | — |
-| P-06 | Connect two nodes | Pending | — | — | — |
-| P-07 | Move and multi-select | Pending | — | — | — |
-| P-08 | Node quick actions | Pending | — | — | — |
-| P-09 | Select and open a node | Pending | — | — | — |
-| P-10 | Node details view | Pending | — | — | — |
-| P-11 | Switch data view | Pending | — | — | — |
-| P-12 | Map an input field into a parameter | Pending | — | — | — |
-| P-13 | Execute one step | Pending | — | — | — |
-| P-14 | Execute the workflow | Pending | — | — | — |
-| P-15 | Pin output data | Pending | — | — | — |
-| P-16 | Disable a node | Pending | — | — | — |
-| P-17 | Read a failed node | Pending | — | — | — |
-| P-18 | Read an uncertain node | Pending | — | — | — |
-| P-19 | Sticky notes | Pending | — | — | — |
-| P-20 | Zoom | Pending | — | — | — |
-| P-21 | Minimap | Pending | — | — | — |
-| P-22 | Pan | Pending | — | — | — |
-| P-23 | Copy, paste, duplicate | Pending | — | — | — |
-| P-24 | Undo and redo | Pending | — | — | — |
-| P-25 | Rename a node | Pending | — | — | — |
-| P-26 | Tidy up | Pending | — | — | — |
-| P-27 | Find a node type | Pending | — | — | — |
-| P-28 | Multi-output node | Pending | — | — | — |
-| P-29 | Trigger node | Pending | — | — | — |
-| P-30 | Same experience in dark theme and by keyboard | Pending | — | — | — |
+| P-01 | First step on an empty canvas | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-02 | Add a node after a node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-03 | Add after a dangling output | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-04 | Insert a node on a connection | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-05 | Delete a connection | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-06 | Connect two nodes | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-07 | Move and multi-select | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-08 | Node quick actions | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-09 | Select and open a node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-10 | Node details view | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-11 | Switch data view | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-12 | Map an input field into a parameter | Pending | — | — | Pending SPEC-014, which delivers this row |
+| P-13 | Execute one step | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-14 | Execute the workflow | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-15 | Pin output data | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-16 | Disable a node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-17 | Read a failed node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-18 | Read an uncertain node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-19 | Sticky notes | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-20 | Zoom | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-21 | Minimap | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-22 | Pan | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-23 | Copy, paste, duplicate | Pending | — | — | Pending SPEC-014, which delivers this row |
+| P-24 | Undo and redo | Pending | — | — | Pending SPEC-014, which delivers this row |
+| P-25 | Rename a node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-26 | Tidy up | Pending | — | — | Pending SPEC-014, which delivers this row |
+| P-27 | Find a node type | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-28 | Multi-output node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-29 | Trigger node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+| P-30 | Same experience in dark theme and by keyboard | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
