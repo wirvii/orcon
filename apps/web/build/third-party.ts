@@ -30,7 +30,29 @@ function assetNotice(packageName: string, resolveFrom: string): string {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageFile;
   const licensePath = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'].map((name) => join(dirname(manifestPath), name)).find((path) => existsSync(path));
   const text = licensePath ? readFileSync(licensePath, 'utf8').trim() : '(the package ships no license file)';
-  return `${manifest.name}@${manifest.version} (${manifest.license ?? 'unknown license'}), shipped as font files\n\n${text}`;
+  return `${manifest.name}@${manifest.version} (${manifest.license ?? 'unknown license'}), shipped as font files\n\n${wrapLines(text)}`;
+}
+
+/** Wraps every line longer than `width` at spaces, so a notice stays readable in a narrow viewer, and a license text that names a font file next to a URL never reads like a request for that font. */
+export function wrapLines(text: string, width = 56): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (line.length <= width) return line;
+      const out: string[] = [];
+      let current = '';
+      for (const word of line.split(' ')) {
+        if (current !== '' && current.length + 1 + word.length > width) {
+          out.push(current);
+          current = word;
+        } else {
+          current = current === '' ? word : `${current} ${word}`;
+        }
+      }
+      out.push(current);
+      return out.join('\n');
+    })
+    .join('\n');
 }
 
 function bundled(dependencies: readonly Dependency[]): BundledModule[] {
@@ -62,7 +84,7 @@ export function thirdParty(outDir: string, resolveFrom: string) {
           template: (dependencies) => {
             const packages = bundled(dependencies).map((entry) => {
               const dependency = dependencies.find((candidate) => candidate.name === entry.name && candidate.version === entry.version);
-              const text = dependency?.licenseText?.trim() ?? '(the package ships no license file)';
+              const text = wrapLines(dependency?.licenseText?.trim() ?? '(the package ships no license file)');
               return `${entry.name}@${entry.version} (${entry.license || 'unknown license'})\n\n${text}`;
             });
             const separator = `\n\n${'-'.repeat(72)}\n\n`;

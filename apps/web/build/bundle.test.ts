@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { chunkModules, type ChunkModules } from './chunk-modules';
+import { wrapLines } from './third-party';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts');
 
@@ -128,5 +129,26 @@ describe('chunkModules plugin', () => {
       { file: 'assets/index.js', isEntry: true, modules: ['apps/web/src/main.tsx', 'node_modules/x/index.js'] },
     ]);
     expect(readFileSync(fileURLToPath(import.meta.url), 'utf8')).toContain('chunkModules');
+  });
+});
+
+describe('wrapLines', () => {
+  it('leaves short lines and blank lines alone', () => {
+    expect(wrapLines('one\n\ntwo three', 20)).toBe('one\n\ntwo three');
+  });
+
+  it('wraps a long line at spaces without losing a word', () => {
+    const wrapped = wrapLines('alpha beta gamma delta epsilon zeta eta theta', 20);
+    expect(wrapped.split('\n').every((line) => line.length <= 20)).toBe(true);
+    expect(wrapped.replaceAll('\n', ' ')).toBe('alpha beta gamma delta epsilon zeta eta theta');
+  });
+
+  it('keeps a word longer than the width whole', () => {
+    expect(wrapLines('a https://example.org/a-very-long-address b', 10).split('\n')).toEqual(['a', 'https://example.org/a-very-long-address', 'b']);
+  });
+
+  it('puts a URL and a font file name on different lines, as the CI font check needs', () => {
+    const line = 'Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter) Inter-Italic[opsz,wght].ttf: Copyright 2016';
+    expect(wrapLines(line).split('\n').some((part) => /https?:\/\/[^"]+\.(woff2?|ttf|otf)/.test(part))).toBe(false);
   });
 });
