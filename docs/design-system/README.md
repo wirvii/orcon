@@ -43,7 +43,7 @@ The brand mark and the mascot are shown as neutral placeholders (an empty outlin
 
 ## Rule status
 
-ADR 0074 and all normative references are `Accepted` (references at version 1.1.0): the owner accepted the ADR on 2026-10-13 and approved the rows of the table below on 2026-10-13, except the rows still marked `Pending` (NodePalettePanel, waiting for the owner to confirm its corrected capture). Product screens may rely on it as an accepted source (see [`docs/engineering/implementation-contract.md`](../engineering/implementation-contract.md)); changes to an approved visual baseline return the item to `Pending`.
+ADR 0074 and all normative references are `Accepted` (references at version 1.1.0): the owner accepted the ADR on 2026-10-13 and approved every row of the table below on 2026-10-13. Product screens may rely on it as an accepted source (see [`docs/engineering/implementation-contract.md`](../engineering/implementation-contract.md)); changes to an approved visual baseline return the item to `Pending`.
 
 ## Owner review status
 
@@ -117,7 +117,7 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | CanvasMinimap | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | AddFirstStep | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | AiBlock | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
-| NodePalettePanel | Canvas primitive (style A) | Pending | — | cf206d5 | Published Storybook catalog (light and dark) | Approved 2026-10-13 at 2f9aa73; the Matrix capture showed both panels clipped at the left edge, fixed in bb30e93 and the baselines regenerated in cf206d5, so the row returns to Pending until the owner confirms the corrected capture (review protocol, rule 5). |
+| NodePalettePanel | Canvas primitive (style A) | Approved | 2026-10-13 | cf206d5 | Published Storybook catalog (light and dark) | Approved by the owner after the style A review; its Matrix capture was corrected (panels were clipped, fixed in bb30e93) and the owner approved the corrected capture on 2026-10-13 (baseline cf206d5). |
 | CanvasOutline | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | NodeDetailsView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | PaneSplitter | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
