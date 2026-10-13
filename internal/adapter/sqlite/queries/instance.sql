@@ -6,12 +6,12 @@
 
 -- name: InsertOrganization :exec
 -- orcon:scope instance
-INSERT INTO org (id, name, status, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(status), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO org (id, name, slug, status, deletion_scheduled_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(slug), sqlc.arg(status), sqlc.arg(deletion_scheduled_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetOrganization :one
 -- orcon:scope instance
-SELECT id, name, status, created_at, updated_at
+SELECT id, name, slug, status, deletion_scheduled_at, created_at, updated_at
 FROM org
 WHERE id = sqlc.arg(id);
 

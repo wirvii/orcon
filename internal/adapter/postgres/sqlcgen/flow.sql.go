@@ -365,7 +365,7 @@ type InsertProjectParams struct {
 	OrgID       pgtype.UUID
 	Name        string
 	Slug        string
-	Environment string
+	Environment pgtype.Text
 	IsProtected bool
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz

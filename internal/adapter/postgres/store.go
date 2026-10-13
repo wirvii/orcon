@@ -21,9 +21,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/platform/clock"
-	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 // ApplicationRole is the runtime role every pooled connection switches to
@@ -160,7 +160,7 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
 // inOrg runs fn in a READ COMMITTED transaction whose organization context is
 // org (orcon-db TI-6: a transaction-local setting, never a session one).
-func (s *Store) inOrg(ctx context.Context, op string, org id.UUID, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
 	if s.pool == nil {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
@@ -201,9 +201,10 @@ func (s *Store) instance(ctx context.Context, op string, fn func(ctx context.Con
 }
 
 var (
-	_ flow.InstanceStore = (*Store)(nil)
-	_ flow.ProjectStore  = (*Store)(nil)
-	_ flow.Store         = (*Store)(nil)
-	_ flow.VersionStore  = (*Store)(nil)
-	_ flow.SnapshotStore = (*Store)(nil)
+	_ flow.InstanceStore    = (*Store)(nil)
+	_ flow.ProjectStore     = (*Store)(nil)
+	_ flow.Store            = (*Store)(nil)
+	_ flow.VersionStore     = (*Store)(nil)
+	_ flow.SnapshotStore    = (*Store)(nil)
+	_ execution.WorkerStore = (*Store)(nil)
 )

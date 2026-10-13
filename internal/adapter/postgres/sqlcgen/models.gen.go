@@ -52,11 +52,13 @@ type FlowVersion struct {
 }
 
 type Org struct {
-	ID        pgtype.UUID
-	Name      string
-	Status    string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Name                string
+	Slug                string
+	Status              string
+	DeletionScheduledAt pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
 }
 
 type Principal struct {
@@ -71,7 +73,7 @@ type Project struct {
 	OrgID       pgtype.UUID
 	Name        string
 	Slug        string
-	Environment string
+	Environment pgtype.Text
 	IsProtected bool
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz

@@ -364,7 +364,7 @@ type InsertProjectParams struct {
 	OrgID       []byte
 	Name        string
 	Slug        string
-	Environment string
+	Environment sql.NullString
 	IsProtected int64
 	CreatedAt   int64
 	UpdatedAt   int64

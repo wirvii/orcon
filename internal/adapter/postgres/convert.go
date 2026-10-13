@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/flow"
-	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 // timestamp converts an instant to the stored form: UTC, truncated to
@@ -30,23 +29,37 @@ func instant(ts pgtype.Timestamptz) time.Time {
 	return ts.Time.UTC()
 }
 
-// pgUUID converts a required identity.
-func pgUUID(u id.UUID) pgtype.UUID { return pgtype.UUID{Bytes: u, Valid: true} }
+// uuidLike is every identity type of the areas: an array of 16 bytes.
+type uuidLike interface{ ~[16]byte }
 
-// nullPGUUID converts an optional identity: the zero UUID becomes NULL.
-func nullPGUUID(u id.UUID) pgtype.UUID {
-	if u.IsZero() {
+// pgUUID converts a required identity.
+func pgUUID[T uuidLike](u T) pgtype.UUID { return pgtype.UUID{Bytes: [16]byte(u), Valid: true} }
+
+// nullPGUUID converts an optional identity: the zero value becomes NULL.
+func nullPGUUID[T uuidLike](u T) pgtype.UUID {
+	if u == (T{}) {
 		return pgtype.UUID{}
 	}
 	return pgUUID(u)
 }
 
-// fromPGUUID converts a stored identity; NULL becomes the zero UUID.
-func fromPGUUID(u pgtype.UUID) id.UUID {
+// fromPGUUID converts a stored identity; NULL becomes the zero value.
+func fromPGUUID[T uuidLike](u pgtype.UUID) T {
 	if !u.Valid {
-		return id.Nil
+		return T{}
 	}
-	return id.UUID(u.Bytes)
+	return T(u.Bytes)
+}
+
+// nullText converts an optional text: the empty string becomes NULL.
+func nullText(s string) pgtype.Text { return pgtype.Text{String: s, Valid: s != ""} }
+
+// nullTimestamp converts an optional instant: the zero time becomes NULL.
+func nullTimestamp(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{}
+	}
+	return timestamp(t)
 }
 
 // Violation classes of SQLSTATE (PostgreSQL appendix A).

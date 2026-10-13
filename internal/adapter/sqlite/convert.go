@@ -31,23 +31,46 @@ func nullInstant(v sql.NullInt64) time.Time {
 	return instant(v.Int64)
 }
 
-// uuidBytes converts a required identity to its 16 stored bytes.
-func uuidBytes(u id.UUID) []byte { return u.Bytes() }
+// uuidLike is every identity type of the areas: an array of 16 bytes.
+type uuidLike interface{ ~[16]byte }
 
-// nullUUIDBytes converts an optional identity: the zero UUID becomes NULL.
-func nullUUIDBytes(u id.UUID) []byte {
-	if u.IsZero() {
-		return nil
-	}
-	return u.Bytes()
+// uuidBytes converts a required identity to its 16 stored bytes.
+func uuidBytes[T uuidLike](u T) []byte {
+	b := [16]byte(u)
+	return b[:]
 }
 
-// uuidFrom converts stored bytes to an identity; NULL becomes the zero UUID.
-func uuidFrom(b []byte) (id.UUID, error) {
-	if b == nil {
-		return id.Nil, nil
+// nullUUIDBytes converts an optional identity: the zero value becomes NULL.
+func nullUUIDBytes[T uuidLike](u T) []byte {
+	if u == (T{}) {
+		return nil
 	}
-	return id.FromBytes(b)
+	return uuidBytes(u)
+}
+
+// uuidOf converts stored bytes to an identity type.
+func uuidOf[T uuidLike](b []byte) (T, error) {
+	u, err := id.FromBytes(b)
+	return T(u), err
+}
+
+// nullUUIDOf converts a nullable identity; NULL becomes the zero value.
+func nullUUIDOf[T uuidLike](b []byte) (T, error) {
+	if b == nil {
+		return T{}, nil
+	}
+	return uuidOf[T](b)
+}
+
+// nullText converts an optional text: the empty string becomes NULL.
+func nullText(s string) sql.NullString { return sql.NullString{String: s, Valid: s != ""} }
+
+// nullMicros converts an optional instant: the zero time becomes NULL.
+func nullMicros(t time.Time) sql.NullInt64 {
+	if t.IsZero() {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: micros(t), Valid: true}
 }
 
 // mapError turns a driver error into an area error. Constraint violations map

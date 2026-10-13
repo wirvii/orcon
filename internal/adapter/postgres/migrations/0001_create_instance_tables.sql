@@ -73,12 +73,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON worker TO orcon_engine;
 CREATE TABLE org (
   id uuid NOT NULL,
   name text NOT NULL,
+  slug text NOT NULL,
   status text NOT NULL,
+  -- NULL unless the organization is scheduled for deletion.
+  deletion_scheduled_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   CONSTRAINT pk_org PRIMARY KEY (id),
+  CONSTRAINT uq_org_slug UNIQUE (slug),
   CONSTRAINT ck_org_name_length CHECK (char_length(name) BETWEEN 1 AND 200),
-  CONSTRAINT ck_org_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETING'))
+  CONSTRAINT ck_org_slug_length CHECK (char_length(slug) BETWEEN 1 AND 100),
+  CONSTRAINT ck_org_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETION_SCHEDULED')),
+  CONSTRAINT ck_org_deletion_scheduled CHECK ((status = 'DELETION_SCHEDULED') = (deletion_scheduled_at IS NOT NULL))
 );
 
 ALTER TABLE org ENABLE ROW LEVEL SECURITY;

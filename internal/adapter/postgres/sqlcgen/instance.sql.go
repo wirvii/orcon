@@ -15,7 +15,7 @@ import (
 )
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, status, created_at, updated_at
+SELECT id, name, slug, status, deletion_scheduled_at, created_at, updated_at
 FROM org
 WHERE id = $1
 `
@@ -27,7 +27,9 @@ func (q *Queries) GetOrganization(ctx context.Context, id pgtype.UUID) (Org, err
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Slug,
 		&i.Status,
+		&i.DeletionScheduledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,16 +58,18 @@ func (q *Queries) GetSystemPrincipal(ctx context.Context) (Principal, error) {
 const insertOrganization = `-- name: InsertOrganization :exec
 
 
-INSERT INTO org (id, name, status, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO org (id, name, slug, status, deletion_scheduled_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type InsertOrganizationParams struct {
-	ID        pgtype.UUID
-	Name      string
-	Status    string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Name                string
+	Slug                string
+	Status              string
+	DeletionScheduledAt pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
 }
 
 // SPDX-FileCopyrightText: The Orcon Authors
@@ -77,7 +81,9 @@ func (q *Queries) InsertOrganization(ctx context.Context, arg InsertOrganization
 	_, err := q.db.Exec(ctx, insertOrganization,
 		arg.ID,
 		arg.Name,
+		arg.Slug,
 		arg.Status,
+		arg.DeletionScheduledAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)

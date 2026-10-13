@@ -124,6 +124,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/execution
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/identity
+              desc: platform packages are leaves (AL-1)
         pgx-confined:
           files:
             - "$all"
@@ -219,7 +221,21 @@ linters:
             - "!**/cmd/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/storetest
-              desc: only cmd/orcon wires adapters (AL-8); the tests of the sqlite and postgres adapters run the database rule checks of storetest/dbrules (SPEC-001 C2, SPEC-009 4.4)
+              desc: only cmd/orcon wires adapters (AL-8)
+        # The one declared exception of AL-2.4 beyond storetest itself (SPEC-001 C2, pending owner approval):
+        # the test files directly under internal/adapter/sqlite and internal/adapter/postgres run the
+        # database rule checks of storetest/dbrules against the real openers (SPEC-009 4.4). Nothing else of
+        # storetest is allowed to them.
+        adapter-private-storetest-dbrules:
+          list-mode: lax
+          files:
+            - "**/internal/adapter/sqlite/*_test.go"
+            - "**/internal/adapter/postgres/*_test.go"
+          allow:
+            - github.com/wirvii/orcon/internal/adapter/storetest/dbrules
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/storetest
+              desc: AL-2.4 allows adapter tests to import only internal/adapter/storetest/dbrules
         banned-everywhere:
           files:
             - "$all"

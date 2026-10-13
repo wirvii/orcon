@@ -39,13 +39,19 @@ CREATE TABLE worker (
 CREATE TABLE org (
   id BLOB NOT NULL,
   name TEXT NOT NULL,
+  slug TEXT NOT NULL,
   status TEXT NOT NULL,
+  -- NULL unless the organization is scheduled for deletion.
+  deletion_scheduled_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CONSTRAINT pk_org PRIMARY KEY (id),
+  CONSTRAINT uq_org_slug UNIQUE (slug),
   CONSTRAINT ck_org_id_length CHECK (length(id) = 16),
   CONSTRAINT ck_org_name_length CHECK (length(name) BETWEEN 1 AND 200),
-  CONSTRAINT ck_org_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETING'))
+  CONSTRAINT ck_org_slug_length CHECK (length(slug) BETWEEN 1 AND 100),
+  CONSTRAINT ck_org_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETION_SCHEDULED')),
+  CONSTRAINT ck_org_deletion_scheduled CHECK ((status = 'DELETION_SCHEDULED') = (deletion_scheduled_at IS NOT NULL))
 ) STRICT;
 
 

@@ -8,41 +8,48 @@ import (
 	"fmt"
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
-	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 var (
-	_ flow.InstanceStore = (*Store)(nil)
-	_ flow.ProjectStore  = (*Store)(nil)
-	_ flow.Store         = (*Store)(nil)
-	_ flow.VersionStore  = (*Store)(nil)
-	_ flow.SnapshotStore = (*Store)(nil)
+	_ flow.InstanceStore    = (*Store)(nil)
+	_ flow.ProjectStore     = (*Store)(nil)
+	_ flow.Store            = (*Store)(nil)
+	_ flow.VersionStore     = (*Store)(nil)
+	_ flow.SnapshotStore    = (*Store)(nil)
+	_ execution.WorkerStore = (*Store)(nil)
 )
 
 // CreateOrganization implements [flow.InstanceStore].
 func (s *Store) CreateOrganization(ctx context.Context, o flow.OrgRecord) error {
 	return s.write(ctx, "create organization", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.InsertOrganization(ctx, sqlcgen.InsertOrganizationParams{
-			ID: uuidBytes(o.ID), Name: o.Name, Status: o.Status,
-			CreatedAt: micros(o.CreatedAt), UpdatedAt: micros(o.UpdatedAt),
+			ID: uuidBytes(o.ID), Name: o.Name, Slug: o.Slug, Status: o.Status,
+			DeletionScheduledAt: nullMicros(o.DeletionScheduledAt),
+			CreatedAt:           micros(o.CreatedAt), UpdatedAt: micros(o.UpdatedAt),
 		})
 	})
 }
 
 // GetOrganization implements [flow.InstanceStore].
-func (s *Store) GetOrganization(ctx context.Context, org id.UUID) (flow.OrgRecord, error) {
+func (s *Store) GetOrganization(ctx context.Context, org identity.OrgID) (flow.OrgRecord, error) {
 	var out flow.OrgRecord
 	err := s.read(ctx, "get organization", func(ctx context.Context, q *sqlcgen.Queries) error {
 		row, err := q.GetOrganization(ctx, uuidBytes(org))
 		if err != nil {
 			return err
 		}
-		oid, err := id.FromBytes(row.ID)
+		oid, err := uuidOf[identity.OrgID](row.ID)
 		if err != nil {
 			return err
 		}
-		out = flow.OrgRecord{ID: oid, Name: row.Name, Status: row.Status, CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt)}
+		out = flow.OrgRecord{
+			ID: oid, Name: row.Name, Slug: row.Slug, Status: row.Status,
+			DeletionScheduledAt: nullInstant(row.DeletionScheduledAt),
+			CreatedAt:           instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		}
 		return nil
 	})
 	return out, err
@@ -65,7 +72,7 @@ func (s *Store) GetSystemPrincipal(ctx context.Context) (flow.PrincipalRecord, e
 		if err != nil {
 			return err
 		}
-		pid, err := id.FromBytes(row.ID)
+		pid, err := uuidOf[identity.PrincipalID](row.ID)
 		if err != nil {
 			return err
 		}
@@ -75,8 +82,8 @@ func (s *Store) GetSystemPrincipal(ctx context.Context) (flow.PrincipalRecord, e
 	return out, err
 }
 
-// RegisterWorker implements [flow.InstanceStore].
-func (s *Store) RegisterWorker(ctx context.Context, w flow.WorkerRecord) error {
+// RegisterWorker implements [execution.WorkerStore].
+func (s *Store) RegisterWorker(ctx context.Context, w execution.WorkerRecord) error {
 	now := s.clock.Now()
 	return s.write(ctx, "register worker", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.UpsertWorker(ctx, sqlcgen.UpsertWorkerParams{
@@ -92,7 +99,7 @@ func (s *Store) CreateProject(ctx context.Context, p flow.ProjectRecord) error {
 	return s.write(ctx, "create project", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.InsertProject(ctx, sqlcgen.InsertProjectParams{
 			ID: uuidBytes(p.ID), OrgID: uuidBytes(p.OrgID), Name: p.Name, Slug: p.Slug,
-			Environment: p.Environment, IsProtected: boolInt(p.IsProtected),
+			Environment: nullText(p.Environment), IsProtected: boolInt(p.IsProtected),
 			CreatedAt: micros(p.CreatedAt), UpdatedAt: micros(p.UpdatedAt),
 		})
 	})
@@ -105,37 +112,37 @@ func boolInt(b bool) int64 {
 	return 0
 }
 
-func projectFrom(row sqlcgen.Project) (flow.ProjectRecord, error) {
-	pid, err := id.FromBytes(row.ID)
+func projectFrom(row *sqlcgen.Project) (flow.ProjectRecord, error) {
+	pid, err := uuidOf[identity.ProjectID](row.ID)
 	if err != nil {
 		return flow.ProjectRecord{}, fmt.Errorf("project id: %w", err)
 	}
-	oid, err := id.FromBytes(row.OrgID)
+	oid, err := uuidOf[identity.OrgID](row.OrgID)
 	if err != nil {
 		return flow.ProjectRecord{}, fmt.Errorf("project org id: %w", err)
 	}
 	return flow.ProjectRecord{
-		ID: pid, OrgID: oid, Name: row.Name, Slug: row.Slug, Environment: row.Environment,
+		ID: pid, OrgID: oid, Name: row.Name, Slug: row.Slug, Environment: row.Environment.String,
 		IsProtected: row.IsProtected == 1, CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
 	}, nil
 }
 
 // GetProject implements [flow.ProjectStore].
-func (s *Store) GetProject(ctx context.Context, org, project id.UUID) (flow.ProjectRecord, error) {
+func (s *Store) GetProject(ctx context.Context, org identity.OrgID, project identity.ProjectID) (flow.ProjectRecord, error) {
 	var out flow.ProjectRecord
 	err := s.read(ctx, "get project", func(ctx context.Context, q *sqlcgen.Queries) error {
 		row, err := q.GetProject(ctx, uuidBytes(org), uuidBytes(project))
 		if err != nil {
 			return err
 		}
-		out, err = projectFrom(row)
+		out, err = projectFrom(&row)
 		return err
 	})
 	return out, err
 }
 
 // ListProjects implements [flow.ProjectStore].
-func (s *Store) ListProjects(ctx context.Context, org, after id.UUID, limit int) ([]flow.ProjectRecord, error) {
+func (s *Store) ListProjects(ctx context.Context, org identity.OrgID, after identity.ProjectID, limit int) ([]flow.ProjectRecord, error) {
 	var out []flow.ProjectRecord
 	err := s.read(ctx, "list projects", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ListProjects(ctx, uuidBytes(org), uuidBytes(after), clampPage(limit))
@@ -143,8 +150,7 @@ func (s *Store) ListProjects(ctx context.Context, org, after id.UUID, limit int)
 			return err
 		}
 		for i := range rows {
-			row := &rows[i]
-			p, err := projectFrom(*row)
+			p, err := projectFrom(&rows[i])
 			if err != nil {
 				return err
 			}

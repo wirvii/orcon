@@ -52,11 +52,13 @@ type FlowVersion struct {
 }
 
 type Org struct {
-	ID        []byte
-	Name      string
-	Status    string
-	CreatedAt int64
-	UpdatedAt int64
+	ID                  []byte
+	Name                string
+	Slug                string
+	Status              string
+	DeletionScheduledAt sql.NullInt64
+	CreatedAt           int64
+	UpdatedAt           int64
 }
 
 type Principal struct {
@@ -71,7 +73,7 @@ type Project struct {
 	OrgID       []byte
 	Name        string
 	Slug        string
-	Environment string
+	Environment sql.NullString
 	IsProtected int64
 	CreatedAt   int64
 	UpdatedAt   int64

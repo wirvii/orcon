@@ -9,7 +9,8 @@ CREATE TABLE project (
   org_id BLOB NOT NULL,
   name TEXT NOT NULL,
   slug TEXT NOT NULL,
-  environment TEXT NOT NULL,
+  -- A free label; NULL when the project has none.
+  environment TEXT,
   is_protected INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,

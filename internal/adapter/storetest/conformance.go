@@ -14,12 +14,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 )
 
@@ -30,6 +33,7 @@ type Store interface {
 	flow.Store
 	flow.VersionStore
 	flow.SnapshotStore
+	execution.WorkerStore
 }
 
 // Factory returns a store on a fresh, migrated database and registers its
@@ -45,10 +49,10 @@ type fixture struct {
 	t     *testing.T
 	s     Store
 	ids   *id.Sequence
-	orgA  id.UUID
-	orgB  id.UUID
-	projA id.UUID
-	projB id.UUID
+	orgA  identity.OrgID
+	orgB  identity.OrgID
+	projA identity.ProjectID
+	projB identity.ProjectID
 }
 
 func newFixture(t *testing.T, newStore Factory) *fixture {
@@ -61,27 +65,27 @@ func newFixture(t *testing.T, newStore Factory) *fixture {
 
 func (f *fixture) ctx() context.Context { return f.t.Context() }
 
-func (f *fixture) org(name string) id.UUID {
+func (f *fixture) org(name string) identity.OrgID {
 	f.t.Helper()
-	o := flow.OrgRecord{ID: f.ids.New(), Name: name, Status: flow.OrgActive, CreatedAt: base, UpdatedAt: base}
+	o := flow.OrgRecord{ID: next[identity.OrgID](f.ids), Name: name, Slug: name, Status: flow.OrgActive, CreatedAt: base, UpdatedAt: base}
 	if err := f.s.CreateOrganization(f.ctx(), o); err != nil {
 		f.t.Fatalf("create organization %s: %v", name, err)
 	}
 	return o.ID
 }
 
-func (f *fixture) project(org id.UUID, slug string) id.UUID {
+func (f *fixture) project(org identity.OrgID, slug string) identity.ProjectID {
 	f.t.Helper()
-	p := flow.ProjectRecord{ID: f.ids.New(), OrgID: org, Name: "Project " + slug, Slug: slug, Environment: "development", CreatedAt: base, UpdatedAt: base}
+	p := flow.ProjectRecord{ID: next[identity.ProjectID](f.ids), OrgID: org, Name: "Project " + slug, Slug: slug, Environment: "development", IsProtected: true, CreatedAt: base, UpdatedAt: base}
 	if err := f.s.CreateProject(f.ctx(), p); err != nil {
 		f.t.Fatalf("create project %s: %v", slug, err)
 	}
 	return p.ID
 }
 
-func (f *fixture) flow(org, project id.UUID, name string) flow.Record {
+func (f *fixture) flow(org identity.OrgID, project identity.ProjectID, name string) flow.Record {
 	f.t.Helper()
-	rec := flow.Record{ID: f.ids.New(), OrgID: org, ProjectID: project, Name: name, Draft: []byte(`{"format":"orcon/flow@1"}`), CreatedAt: base, UpdatedAt: base}
+	rec := flow.Record{ID: next[flow.FlowID](f.ids), OrgID: org, ProjectID: project, Name: name, Draft: []byte(`{"format":"orcon/flow@1"}`), CreatedAt: base, UpdatedAt: base}
 	if err := f.s.CreateFlow(f.ctx(), rec); err != nil {
 		f.t.Fatalf("create flow %s: %v", name, err)
 	}
@@ -92,7 +96,7 @@ func (f *fixture) firstVersion(rec flow.Record) flow.VersionRecord {
 	f.t.Helper()
 	const number = 1
 	v := flow.VersionRecord{
-		ID: f.ids.New(), OrgID: rec.OrgID, FlowID: rec.ID, Number: number, Document: []byte(fmt.Sprintf(`{"version":%d}`, number)),
+		ID: next[flow.FlowVersionID](f.ids), OrgID: rec.OrgID, FlowID: rec.ID, Number: number, Document: []byte(fmt.Sprintf(`{"version":%d}`, number)),
 		ContentHash: fmt.Sprintf("%064d", number), PublishedAt: base, CreatedAt: base,
 	}
 	if err := f.s.PublishVersion(f.ctx(), v); err != nil {
@@ -100,6 +104,9 @@ func (f *fixture) firstVersion(rec flow.Record) flow.VersionRecord {
 	}
 	return v
 }
+
+// next returns the next identity of the generator as the given identity type.
+func next[T ~[16]byte](ids id.Generator) T { return T(ids.New()) }
 
 func wantErr(t *testing.T, what string, got, want error) {
 	t.Helper()
@@ -157,7 +164,7 @@ func instanceCase(t *testing.T, newStore Factory) {
 	if _, err := s.GetSystemPrincipal(ctx); !errors.Is(err, flow.ErrNotFound) {
 		t.Fatalf("system principal before bootstrap: %v", err)
 	}
-	system := flow.PrincipalRecord{ID: ids.New(), Kind: flow.PrincipalSystem, CreatedAt: base, UpdatedAt: base}
+	system := flow.PrincipalRecord{ID: next[identity.PrincipalID](ids), Kind: flow.PrincipalSystem, CreatedAt: base, UpdatedAt: base}
 	if err := s.CreatePrincipal(ctx, system); err != nil {
 		t.Fatal(err)
 	}
@@ -165,13 +172,13 @@ func instanceCase(t *testing.T, newStore Factory) {
 	if err != nil || got.ID != system.ID || got.Kind != flow.PrincipalSystem {
 		t.Fatalf("system principal = %+v, %v", got, err)
 	}
-	wantErr(t, "a second SYSTEM principal", s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: ids.New(), Kind: flow.PrincipalSystem, CreatedAt: base, UpdatedAt: base}), flow.ErrConflict)
-	if err := s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: ids.New(), Kind: flow.PrincipalUser, CreatedAt: base, UpdatedAt: base}); err != nil {
+	wantErr(t, "a second SYSTEM principal", s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: next[identity.PrincipalID](ids), Kind: flow.PrincipalSystem, CreatedAt: base, UpdatedAt: base}), flow.ErrConflict)
+	if err := s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: next[identity.PrincipalID](ids), Kind: flow.PrincipalUser, CreatedAt: base, UpdatedAt: base}); err != nil {
 		t.Fatalf("a USER principal: %v", err)
 	}
-	wantErr(t, "an unknown principal kind", s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: ids.New(), Kind: "ROBOT", CreatedAt: base, UpdatedAt: base}), flow.ErrInvalidRecord)
+	wantErr(t, "an unknown principal kind", s.CreatePrincipal(ctx, flow.PrincipalRecord{ID: next[identity.PrincipalID](ids), Kind: "ROBOT", CreatedAt: base, UpdatedAt: base}), flow.ErrInvalidRecord)
 
-	org := flow.OrgRecord{ID: ids.New(), Name: "Acme", Status: flow.OrgActive, CreatedAt: base, UpdatedAt: base}
+	org := flow.OrgRecord{ID: next[identity.OrgID](ids), Name: "Acme", Slug: "acme", Status: flow.OrgActive, CreatedAt: base, UpdatedAt: base}
 	if err := s.CreateOrganization(ctx, org); err != nil {
 		t.Fatal(err)
 	}
@@ -182,15 +189,32 @@ func instanceCase(t *testing.T, newStore Factory) {
 		t.Fatalf("organization = %+v, %v; want %+v", gotOrg, err, want)
 	}
 	wantErr(t, "a duplicate organization", s.CreateOrganization(ctx, org), flow.ErrConflict)
-	_, err = s.GetOrganization(ctx, ids.New())
+	sameSlug := org
+	sameSlug.ID = next[identity.OrgID](ids)
+	wantErr(t, "a repeated organization slug", s.CreateOrganization(ctx, sameSlug), flow.ErrConflict)
+	scheduled := org
+	scheduled.ID, scheduled.Slug, scheduled.Status, scheduled.DeletionScheduledAt = next[identity.OrgID](ids), "going", flow.OrgDeletionScheduled, base.Add(time.Hour)
+	if err := s.CreateOrganization(ctx, scheduled); err != nil {
+		t.Fatalf("an organization scheduled for deletion: %v", err)
+	}
+	gotScheduled, err := s.GetOrganization(ctx, scheduled.ID)
+	if err != nil || !gotScheduled.DeletionScheduledAt.Equal(base.Add(time.Hour).Truncate(time.Microsecond)) {
+		t.Fatalf("scheduled organization = %+v, %v", gotScheduled, err)
+	}
+	scheduled.ID, scheduled.Slug, scheduled.DeletionScheduledAt = next[identity.OrgID](ids), "going-2", time.Time{}
+	wantErr(t, "DELETION_SCHEDULED without its instant", s.CreateOrganization(ctx, scheduled), flow.ErrInvalidRecord)
+	active := org
+	active.ID, active.Slug, active.DeletionScheduledAt = next[identity.OrgID](ids), "active-2", base
+	wantErr(t, "an instant on an active organization", s.CreateOrganization(ctx, active), flow.ErrInvalidRecord)
+	_, err = s.GetOrganization(ctx, next[identity.OrgID](ids))
 	wantErr(t, "an unknown organization", err, flow.ErrNotFound)
 	bad := org
-	bad.ID, bad.Status = ids.New(), "GONE"
+	bad.ID, bad.Slug, bad.Status = next[identity.OrgID](ids), "gone", "GONE"
 	wantErr(t, "an unknown status", s.CreateOrganization(ctx, bad), flow.ErrInvalidRecord)
 	bad.Status, bad.Name = flow.OrgActive, ""
 	wantErr(t, "an empty name", s.CreateOrganization(ctx, bad), flow.ErrInvalidRecord)
 
-	w := flow.WorkerRecord{ID: ids.New(), Role: "WORKER", Host: "host-1", Version: "1.0.0", StartedAt: base, HeartbeatAt: base}
+	w := execution.WorkerRecord{ID: next[execution.WorkerID](ids), Role: "WORKER", Host: "host-1", Version: "1.0.0", StartedAt: base, HeartbeatAt: base}
 	if err := s.RegisterWorker(ctx, w); err != nil {
 		t.Fatal(err)
 	}
@@ -198,33 +222,40 @@ func instanceCase(t *testing.T, newStore Factory) {
 	if err := s.RegisterWorker(ctx, w); err != nil {
 		t.Fatalf("a heartbeat refreshes the worker: %v", err)
 	}
-	w.ID, w.Role = ids.New(), "MINER"
+	w.ID, w.Role = next[execution.WorkerID](ids), "MINER"
 	wantErr(t, "an unknown worker role", s.RegisterWorker(ctx, w), flow.ErrInvalidRecord)
 }
 
 func projectsCase(t *testing.T, newStore Factory) {
 	t.Helper()
 	f := newFixture(t, newStore)
-	var created []id.UUID
+	var created []identity.ProjectID
 	for _, slug := range []string{"one", "two", "three"} {
 		created = append(created, f.project(f.orgA, slug))
 	}
 	got, err := f.s.GetProject(f.ctx(), f.orgA, created[0])
-	if err != nil || got.Slug != "one" || got.Environment != "development" || got.IsProtected {
+	if err != nil || got.Slug != "one" || got.Environment != "development" || !got.IsProtected {
 		t.Fatalf("project = %+v, %v", got, err)
 	}
-	p := flow.ProjectRecord{ID: f.ids.New(), OrgID: f.orgA, Name: "Again", Slug: "one", Environment: "production", IsProtected: true, CreatedAt: base, UpdatedAt: base}
+	p := flow.ProjectRecord{ID: next[identity.ProjectID](f.ids), OrgID: f.orgA, Name: "Again", Slug: "one", Environment: "production", IsProtected: true, CreatedAt: base, UpdatedAt: base}
 	wantErr(t, "a duplicate slug", f.s.CreateProject(f.ctx(), p), flow.ErrConflict)
-	p.Slug, p.OrgID = "fresh", f.ids.New()
+	p.Slug, p.OrgID = "fresh", next[identity.OrgID](f.ids)
 	wantErr(t, "an unknown organization", f.s.CreateProject(f.ctx(), p), flow.ErrReference)
-	_, err = f.s.GetProject(f.ctx(), f.orgA, f.ids.New())
+	_, err = f.s.GetProject(f.ctx(), f.orgA, next[identity.ProjectID](f.ids))
 	wantErr(t, "an unknown project", err, flow.ErrNotFound)
-	p.OrgID, p.Environment = f.orgA, ""
-	wantErr(t, "an empty environment", f.s.CreateProject(f.ctx(), p), flow.ErrInvalidRecord)
+	p.OrgID, p.Slug, p.Environment = f.orgA, "no-label", ""
+	if err := f.s.CreateProject(f.ctx(), p); err != nil {
+		t.Fatalf("a project without an environment label: %v", err)
+	}
+	if got, err := f.s.GetProject(f.ctx(), f.orgA, p.ID); err != nil || got.Environment != "" {
+		t.Fatalf("environment of a project without a label = %q, %v", got.Environment, err)
+	}
+	p.ID, p.Slug, p.Environment = next[identity.ProjectID](f.ids), "too-long", strings.Repeat("x", 101)
+	wantErr(t, "an environment label over 100 characters", f.s.CreateProject(f.ctx(), p), flow.ErrInvalidRecord)
 
-	// Keyset pages in identity order: alpha (fixture), one, two, three.
-	var all []id.UUID
-	after := id.Nil
+	// Keyset pages in identity order: alpha (fixture), one, two, three and the unlabeled one.
+	var all []identity.ProjectID
+	var after identity.ProjectID
 	for {
 		page, err := f.s.ListProjects(f.ctx(), f.orgA, after, 2)
 		if err != nil {
@@ -241,8 +272,8 @@ func projectsCase(t *testing.T, newStore Factory) {
 		}
 		after = page[len(page)-1].ID
 	}
-	if len(all) != 4 {
-		t.Fatalf("listed %d projects, want 4", len(all))
+	if len(all) != 5 {
+		t.Fatalf("listed %d projects, want 5", len(all))
 	}
 	for i := 1; i < len(all); i++ {
 		if bytes.Compare(all[i-1][:], all[i][:]) >= 0 {
@@ -271,14 +302,14 @@ func flowsCase(t *testing.T, newStore Factory) {
 	wantErr(t, "an unknown name", err, flow.ErrNotFound)
 
 	dup := rec
-	dup.ID = f.ids.New()
+	dup.ID = next[flow.FlowID](f.ids)
 	wantErr(t, "a duplicate name in the project", f.s.CreateFlow(f.ctx(), dup), flow.ErrConflict)
 	other := f.project(f.orgA, "beta")
 	dup.ProjectID = other
 	if err := f.s.CreateFlow(f.ctx(), dup); err != nil {
 		t.Fatalf("the same name in another project: %v", err)
 	}
-	dup.ID, dup.Name, dup.ProjectID = f.ids.New(), "orphan", f.ids.New()
+	dup.ID, dup.Name, dup.ProjectID = next[flow.FlowID](f.ids), "orphan", next[identity.ProjectID](f.ids)
 	wantErr(t, "an unknown project", f.s.CreateFlow(f.ctx(), dup), flow.ErrReference)
 	dup.ProjectID, dup.Name, dup.Draft = f.projA, "", nil
 	wantErr(t, "an empty name", f.s.CreateFlow(f.ctx(), dup), flow.ErrInvalidRecord)
@@ -286,7 +317,7 @@ func flowsCase(t *testing.T, newStore Factory) {
 	for _, n := range []string{"b", "c"} {
 		f.flow(f.orgA, f.projA, n)
 	}
-	page, err := f.s.ListFlows(f.ctx(), f.orgA, f.projA, id.Nil, 2)
+	page, err := f.s.ListFlows(f.ctx(), f.orgA, f.projA, flow.FlowID{}, 2)
 	if err != nil || len(page) != 2 {
 		t.Fatalf("first page = %d flows, %v", len(page), err)
 	}
@@ -310,7 +341,7 @@ func draftRevisionsCase(t *testing.T, newStore Factory) {
 	if got.DraftRevision != 1 || string(got.Draft) != `{"n":1}` || !got.UpdatedAt.Equal(base.Add(time.Second).Truncate(time.Microsecond)) {
 		t.Fatalf("a rejected update changed the flow: %+v", got)
 	}
-	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, f.ids.New(), []byte(`{}`), 0, base)
+	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, next[flow.FlowID](f.ids), []byte(`{}`), 0, base)
 	wantErr(t, "an unknown flow", err, flow.ErrNotFound)
 	if rev, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":3}`), 1, base.Add(3*time.Second)); err != nil || rev != 2 {
 		t.Fatalf("second update = %d, %v", rev, err)
@@ -321,12 +352,12 @@ func versionsCase(t *testing.T, newStore Factory) {
 	t.Helper()
 	f := newFixture(t, newStore)
 	rec := f.flow(f.orgA, f.projA, "versions")
-	actor := flow.PrincipalRecord{ID: f.ids.New(), Kind: flow.PrincipalUser, CreatedAt: base, UpdatedAt: base}
+	actor := flow.PrincipalRecord{ID: next[identity.PrincipalID](f.ids), Kind: flow.PrincipalUser, CreatedAt: base, UpdatedAt: base}
 	if err := f.s.CreatePrincipal(f.ctx(), actor); err != nil {
 		t.Fatal(err)
 	}
 	v1 := f.firstVersion(rec)
-	v2 := flow.VersionRecord{ID: f.ids.New(), OrgID: f.orgA, FlowID: rec.ID, Number: 2, Document: []byte(`{"v":2}`), ContentHash: "hash-2",
+	v2 := flow.VersionRecord{ID: next[flow.FlowVersionID](f.ids), OrgID: f.orgA, FlowID: rec.ID, Number: 2, Document: []byte(`{"v":2}`), ContentHash: "hash-2",
 		Warnings: []byte(`[{"code":"W1"}]`), PublishedByPrincipalID: actor.ID, PublishedAt: base.Add(time.Hour), CreatedAt: base.Add(time.Hour)}
 	if err := f.s.PublishVersion(f.ctx(), v2); err != nil {
 		t.Fatal(err)
@@ -349,7 +380,7 @@ func versionsCase(t *testing.T, newStore Factory) {
 	}
 	_, err = f.s.GetVersionByNumber(f.ctx(), f.orgA, rec.ID, 9)
 	wantErr(t, "an unknown number", err, flow.ErrVersionNotFound)
-	_, err = f.s.GetVersion(f.ctx(), f.orgA, f.ids.New())
+	_, err = f.s.GetVersion(f.ctx(), f.orgA, next[flow.FlowVersionID](f.ids))
 	wantErr(t, "an unknown version", err, flow.ErrVersionNotFound)
 	list, err := f.s.ListVersions(f.ctx(), f.orgA, rec.ID, 0, 10)
 	if err != nil || len(list) != 2 || list[0].Number != 1 || list[1].Number != 2 {
@@ -360,7 +391,7 @@ func versionsCase(t *testing.T, newStore Factory) {
 	}
 	// An unknown publisher is a reference error, not a silent NULL.
 	bad := v2
-	bad.ID, bad.Number, bad.PublishedByPrincipalID = f.ids.New(), 3, f.ids.New()
+	bad.ID, bad.Number, bad.PublishedByPrincipalID = next[flow.FlowVersionID](f.ids), 3, next[identity.PrincipalID](f.ids)
 	wantErr(t, "an unknown publisher", f.s.PublishVersion(f.ctx(), bad), flow.ErrReference)
 }
 
@@ -370,14 +401,14 @@ func publishAtomicCase(t *testing.T, newStore Factory) {
 	rec := f.flow(f.orgA, f.projA, "atomic")
 	v1 := f.firstVersion(rec)
 	dup := v1
-	dup.ID = f.ids.New()
+	dup.ID = next[flow.FlowVersionID](f.ids)
 	wantErr(t, "a repeated version number", f.s.PublishVersion(f.ctx(), dup), flow.ErrConflict)
 	got, _ := f.s.GetFlow(f.ctx(), f.orgA, rec.ID)
 	if got.ActiveVersionID != v1.ID {
 		t.Fatalf("a failed publication moved the active version to %v", got.ActiveVersionID)
 	}
 	// A version of a flow that does not exist leaves no version row behind.
-	ghost := flow.VersionRecord{ID: f.ids.New(), OrgID: f.orgA, FlowID: f.ids.New(), Number: 1, Document: []byte(`{}`), ContentHash: "h", PublishedAt: base, CreatedAt: base}
+	ghost := flow.VersionRecord{ID: next[flow.FlowVersionID](f.ids), OrgID: f.orgA, FlowID: next[flow.FlowID](f.ids), Number: 1, Document: []byte(`{}`), ContentHash: "h", PublishedAt: base, CreatedAt: base}
 	err := f.s.PublishVersion(f.ctx(), ghost)
 	if !errors.Is(err, flow.ErrNotFound) && !errors.Is(err, flow.ErrReference) {
 		t.Fatalf("publishing for an unknown flow: %v", err)
@@ -390,13 +421,13 @@ func snapshotsCase(t *testing.T, newStore Factory) {
 	t.Helper()
 	f := newFixture(t, newStore)
 	rec := f.flow(f.orgA, f.projA, "snap")
-	s1 := flow.SnapshotRecord{ID: f.ids.New(), OrgID: f.orgA, FlowID: rec.ID, ContentHash: "abc", Document: []byte(`{"s":1}`), CreatedAt: base}
+	s1 := flow.SnapshotRecord{ID: next[flow.FlowSnapshotID](f.ids), OrgID: f.orgA, FlowID: rec.ID, ContentHash: "abc", Document: []byte(`{"s":1}`), CreatedAt: base}
 	got, err := f.s.CreateSnapshot(f.ctx(), s1)
 	if err != nil || got.ID != s1.ID {
 		t.Fatalf("first snapshot = %+v, %v", got, err)
 	}
 	again := s1
-	again.ID = f.ids.New()
+	again.ID = next[flow.FlowSnapshotID](f.ids)
 	got, err = f.s.CreateSnapshot(f.ctx(), again)
 	if err != nil || got.ID != s1.ID {
 		t.Fatalf("a snapshot with the same content hash must return the stored one: %+v, %v", got, err)
@@ -405,11 +436,11 @@ func snapshotsCase(t *testing.T, newStore Factory) {
 	if err != nil || string(stored.Document) != `{"s":1}` || stored.FlowID != rec.ID || stored.ContentHash != "abc" {
 		t.Fatalf("snapshot = %+v, %v", stored, err)
 	}
-	_, err = f.s.GetSnapshot(f.ctx(), f.orgA, f.ids.New())
+	_, err = f.s.GetSnapshot(f.ctx(), f.orgA, next[flow.FlowSnapshotID](f.ids))
 	wantErr(t, "an unknown snapshot", err, flow.ErrSnapshotNotFound)
 	// The same hash in another organization is its own snapshot.
 	recB := f.flow(f.orgB, f.projB, "snap")
-	sb := flow.SnapshotRecord{ID: f.ids.New(), OrgID: f.orgB, FlowID: recB.ID, ContentHash: "abc", Document: []byte(`{"s":2}`), CreatedAt: base}
+	sb := flow.SnapshotRecord{ID: next[flow.FlowSnapshotID](f.ids), OrgID: f.orgB, FlowID: recB.ID, ContentHash: "abc", Document: []byte(`{"s":2}`), CreatedAt: base}
 	if got, err = f.s.CreateSnapshot(f.ctx(), sb); err != nil || got.ID != sb.ID {
 		t.Fatalf("snapshot of another organization = %+v, %v", got, err)
 	}
@@ -420,7 +451,7 @@ func isolationCase(t *testing.T, newStore Factory) {
 	f := newFixture(t, newStore)
 	rec := f.flow(f.orgA, f.projA, "secret")
 	v := f.firstVersion(rec)
-	snap := flow.SnapshotRecord{ID: f.ids.New(), OrgID: f.orgA, FlowID: rec.ID, ContentHash: "h", Document: []byte(`{}`), CreatedAt: base}
+	snap := flow.SnapshotRecord{ID: next[flow.FlowSnapshotID](f.ids), OrgID: f.orgA, FlowID: rec.ID, ContentHash: "h", Document: []byte(`{}`), CreatedAt: base}
 	if _, err := f.s.CreateSnapshot(f.ctx(), snap); err != nil {
 		t.Fatal(err)
 	}
@@ -444,22 +475,22 @@ func isolationCase(t *testing.T, newStore Factory) {
 	if _, err := f.s.GetSnapshot(ctx, f.orgB, snap.ID); !errors.Is(err, flow.ErrSnapshotNotFound) {
 		t.Errorf("snapshot of another organization: %v", err)
 	}
-	if got, err := f.s.ListFlows(ctx, f.orgB, f.projA, id.Nil, 10); err != nil || len(got) != 0 {
+	if got, err := f.s.ListFlows(ctx, f.orgB, f.projA, flow.FlowID{}, 10); err != nil || len(got) != 0 {
 		t.Errorf("flows of another organization's project: %d, %v", len(got), err)
 	}
 	if got, err := f.s.ListVersions(ctx, f.orgB, rec.ID, 0, 10); err != nil || len(got) != 0 {
 		t.Errorf("versions of another organization: %d, %v", len(got), err)
 	}
-	if got, err := f.s.ListProjects(ctx, f.orgB, id.Nil, 10); err != nil || len(got) != 1 || got[0].ID != f.projB {
+	if got, err := f.s.ListProjects(ctx, f.orgB, identity.ProjectID{}, 10); err != nil || len(got) != 1 || got[0].ID != f.projB {
 		t.Errorf("projects of organization B: %+v, %v", got, err)
 	}
 	// Writes cannot cross either: a flow of B pointing at A's project is rejected.
-	cross := flow.Record{ID: f.ids.New(), OrgID: f.orgB, ProjectID: f.projA, Name: "cross", Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base}
+	cross := flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgB, ProjectID: f.projA, Name: "cross", Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base}
 	wantErr(t, "a flow in another organization's project", f.s.CreateFlow(ctx, cross), flow.ErrReference)
 	if _, err := f.s.UpdateFlowDraft(ctx, f.orgB, rec.ID, []byte(`{}`), 0, base); !errors.Is(err, flow.ErrNotFound) {
 		t.Errorf("draft update of another organization's flow: %v", err)
 	}
-	vb := flow.VersionRecord{ID: f.ids.New(), OrgID: f.orgB, FlowID: rec.ID, Number: 7, Document: []byte(`{}`), ContentHash: "h", PublishedAt: base, CreatedAt: base}
+	vb := flow.VersionRecord{ID: next[flow.FlowVersionID](f.ids), OrgID: f.orgB, FlowID: rec.ID, Number: 7, Document: []byte(`{}`), ContentHash: "h", PublishedAt: base, CreatedAt: base}
 	if err := f.s.PublishVersion(ctx, vb); err == nil {
 		t.Error("a version of another organization's flow was accepted")
 	}
@@ -479,7 +510,7 @@ func roundTripCase(t *testing.T, newStore Factory) {
 	}
 	zone := time.FixedZone("UTC+5", 5*3600)
 	instant := time.Date(2026, 1, 2, 3, 4, 5, 987654321, zone)
-	rec := flow.Record{ID: f.ids.New(), OrgID: f.orgA, ProjectID: f.projA, Name: "bytes", Draft: draft, CreatedAt: instant, UpdatedAt: instant}
+	rec := flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgA, ProjectID: f.projA, Name: "bytes", Draft: draft, CreatedAt: instant, UpdatedAt: instant}
 	if err := f.s.CreateFlow(f.ctx(), rec); err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +557,7 @@ func concurrencyCase(t *testing.T, newStore Factory) {
 	conflicts.Store(0)
 	for range writers {
 		wg.Go(func() {
-			err := f.s.CreateFlow(f.ctx(), flow.Record{ID: f.ids.New(), OrgID: f.orgA, ProjectID: f.projA, Name: "same", Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base})
+			err := f.s.CreateFlow(f.ctx(), flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgA, ProjectID: f.projA, Name: "same", Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base})
 			switch {
 			case err == nil:
 				wins.Add(1)
@@ -545,7 +576,7 @@ func concurrencyCase(t *testing.T, newStore Factory) {
 	var landed atomic.Int64
 	for i := range 4 * writers {
 		wg.Go(func() {
-			err := f.s.CreateFlow(f.ctx(), flow.Record{ID: f.ids.New(), OrgID: f.orgA, ProjectID: f.projA, Name: fmt.Sprintf("many-%d", i), Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base})
+			err := f.s.CreateFlow(f.ctx(), flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgA, ProjectID: f.projA, Name: fmt.Sprintf("many-%d", i), Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base})
 			if err != nil {
 				t.Errorf("create many-%d: %v", i, err)
 				return
