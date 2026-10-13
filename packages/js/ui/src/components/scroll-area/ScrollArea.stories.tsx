@@ -21,7 +21,7 @@ const content = (
 const meta = {
   title: 'Components/ScrollArea',
   component: ScrollArea,
-  args: { label: 'Recent executions', className: 'h-node-width w-node-width bg-surface rounded-md border border-border', children: content },
+  args: { label: 'Recent executions', className: 'h-panel-width w-panel-width bg-surface rounded-md border border-border', children: content },
 } satisfies Meta<typeof ScrollArea>;
 
 export default meta;
@@ -50,10 +50,10 @@ export const Matrix: Story = {
         {
           label: 'area',
           cells: [
-            <ScrollArea key="d" label="Short list" className="h-node-width w-node-width bg-surface rounded-md border border-border">
+            <ScrollArea key="d" label="Short list" className="h-panel-width w-panel-width bg-surface rounded-md border border-border">
               <p className="p-2">Short content that fits.</p>
             </ScrollArea>,
-            <ScrollArea key="o" label="Long list" className="h-node-width w-node-width bg-surface rounded-md border border-border">
+            <ScrollArea key="o" label="Long list" className="h-panel-width w-panel-width bg-surface rounded-md border border-border">
               {content}
             </ScrollArea>,
           ],

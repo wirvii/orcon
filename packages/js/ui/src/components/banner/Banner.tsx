@@ -50,6 +50,8 @@ export interface BannerProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title
   title: ReactNode;
   /** Extra buttons or links. Decisions never live in toasts; they live in banners and dialogs. */
   action?: ReactNode;
+  /** Replaces the icon of the tone, for a banner about one specific thing (such as pinned data). The tone still sets the colors. */
+  icon?: LucideIcon;
 }
 
 /**
@@ -57,9 +59,9 @@ export interface BannerProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title
  * hidden text prefix as well as by color. Errors are announced immediately
  * (role alert); the other tones politely (role status).
  */
-export function Banner({ tone = 'info', title, action, className, children, ...props }: BannerProps) {
+export function Banner({ tone = 'info', title, action, icon, className, children, ...props }: BannerProps) {
   const intl = useIntl();
-  const Icon = icons[tone];
+  const Icon = icon ?? icons[tone];
   return (
     <div role={tone === 'danger' ? 'alert' : 'status'} className={cn(bannerVariants({ tone }), className)} {...props}>
       <Icon aria-hidden className="size-icon-20 shrink-0" />

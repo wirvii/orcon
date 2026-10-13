@@ -50,7 +50,7 @@ export interface DataTableProps<Row> {
   /** Text for a failed load. */
   errorMessage?: ReactNode;
   onRetry?: () => void;
-  /** Keep the header visible while the body scrolls. Set a height on the table with `className`, such as `max-h-node-width`. */
+  /** Keep the header visible while the body scrolls. Set a height on the table with `className`, such as `max-h-panel-width`. */
   stickyHeader?: boolean;
   /** How many placeholder rows to show while loading. */
   loadingRows?: number;

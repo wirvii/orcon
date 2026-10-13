@@ -17,7 +17,7 @@ const rows = [
 
 function Demo({ selected, sticky, hover }: { selected?: string; sticky?: boolean; hover?: boolean }) {
   return (
-    <div className="bg-surface max-h-node-width max-w-screen-sm overflow-auto rounded-md border border-border" role="region" aria-label="Executions table" tabIndex={0}>
+    <div className="bg-surface max-h-panel-width max-w-screen-sm overflow-auto rounded-md border border-border" role="region" aria-label="Executions table" tabIndex={0}>
       <Table>
         <TableCaption visuallyHidden>Recent executions</TableCaption>
         <TableHeader>

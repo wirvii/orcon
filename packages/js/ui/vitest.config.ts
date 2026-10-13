@@ -69,6 +69,16 @@ export default defineConfig({
         },
       },
       {
+        // The only looping motion is on running elements: with motion allowed, nothing else animates.
+        extends: true,
+        test: {
+          name: 'canvas-motion',
+          setupFiles: quiet,
+          include: ['test/canvas-motion/**/*.test.tsx'],
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'no-preference', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
         // Fine pointer: rows and controls are exactly as tall as the density tokens say.
         extends: true,
         test: {

@@ -28,7 +28,7 @@ export function NodeDetails({ graph, node, onClose, executionHref, side = 'botto
   const intl = useIntl();
   const counts = node ? itemCounts(graph, node.id) : { received: 0, sent: 0 };
   return (
-    <Sheet open={node !== undefined} onOpenChange={(open) => (open ? undefined : onClose())} title={node?.name ?? ''} description={node?.summary} side={side}>
+    <Sheet open={node !== undefined} onOpenChange={(open) => (open ? undefined : onClose())} title={node?.name ?? ''} description={node?.subtitle} side={side}>
       {node ? (
         <div className="flex flex-col gap-3" data-node-details={node.id}>
           <div className="flex flex-wrap items-center gap-2">

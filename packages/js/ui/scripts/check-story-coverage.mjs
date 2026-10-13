@@ -44,7 +44,7 @@ function walk(dir) {
 }
 
 // Base components, canvas primitives and screen templates all follow the same meta + stories contract.
-const files = ['src/components', 'src/canvas', 'src/screens']
+const files = ['src/components', 'src/canvas', 'src/editor', 'src/screens']
   .map((dir) => join(root, dir))
   .filter((dir) => existsSync(dir))
   .flatMap(walk);

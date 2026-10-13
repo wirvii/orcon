@@ -77,7 +77,7 @@ export function AppShell({ navigation, currentId, brand, actions, children, defa
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={intl.formatMessage(messages.main)}
-          className="bg-surface border-border hidden shrink-0 flex-col gap-1 border-r p-2 md:flex md:w-16 lg:w-node-width"
+          className="bg-surface border-border hidden shrink-0 flex-col gap-1 border-r p-2 md:flex md:w-16 lg:w-panel-width"
         >
           {navigation.map((entry) => (
             <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} responsiveLabel />

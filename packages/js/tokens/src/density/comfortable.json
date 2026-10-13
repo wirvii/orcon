@@ -12,6 +12,10 @@
     },
     "connector-icon-safe": {
       "$value": "20px"
+    },
+    "panel-width": {
+      "$value": "240px",
+      "$description": "A reading width for side panels, popovers and narrow stories. Not a canvas measure."
     }
   },
   "space": {

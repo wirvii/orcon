@@ -61,7 +61,7 @@ export const Matrix: Story = {
         {
           label: 'default',
           cells: [
-            <div key="d" className="w-node-width">
+            <div key="d" className="w-panel-width">
               <ErrorFallback error={new Error('A node failed to render')} reset={() => undefined} />
             </div>,
           ],

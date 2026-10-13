@@ -60,7 +60,7 @@ export const Matrix: Story = {
         {
           label: 'text',
           cells: states.map((state) => (
-            <div key={state} className="w-node-width">
+            <div key={state} className="w-panel-width">
               <Input aria-label={`Input, ${state}`} placeholder="Placeholder" defaultValue={state === 'disabled' ? 'Value' : undefined} {...stateProps[state]} />
             </div>
           )),

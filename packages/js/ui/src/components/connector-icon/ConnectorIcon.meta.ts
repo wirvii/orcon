@@ -3,6 +3,6 @@
 
 import { pair } from '../../lib/meta';
 
-export const states = ['default'] as const;
+export const states = ['default', 'tile'] as const;
 
 export const pairs = [pair('border.default', 'surface.sunken')] as const;

@@ -8,6 +8,11 @@ export interface ConnectorIconProps {
   src: string;
   /** Connector name. It is the image text alternative. */
   name: string;
+  /**
+   * `frame` (default) is the Orcon frame with the logo in its safe area. `tile` is the bare image for the
+   * icon box of a canvas node, which draws its own tile around it.
+   */
+  variant?: 'frame' | 'tile';
   className?: string;
 }
 
@@ -17,7 +22,10 @@ export interface ConnectorIconProps {
  * 32 px (comfortable) or 24 px (compact) with the logo fitted to a 20/16 px
  * safe area. Third-party logos only identify the service.
  */
-export function ConnectorIcon({ src, name, className }: ConnectorIconProps) {
+export function ConnectorIcon({ src, name, variant = 'frame', className }: ConnectorIconProps) {
+  if (variant === 'tile') {
+    return <img src={src} alt={name} loading="lazy" decoding="async" data-connector-tile className={cn('size-canvas-icon-box shrink-0 object-contain', className)} />;
+  }
   return (
     <span
       className={cn(

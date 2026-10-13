@@ -3,7 +3,7 @@
 
 import { pair } from '../lib/meta';
 
-export const states = ['default', 'empty', 'view-only', 'outline-open', 'execution'] as const;
+export const states = ['default', 'empty', 'view-only', 'outline-open', 'execution', 'agent', 'compare', 'performance', 'keyboard'] as const;
 
 export const pairs = [
   pair('fg.default', 'surface.raised'),
@@ -11,6 +11,8 @@ export const pairs = [
   pair('fg.default', 'surface.default'),
   pair('fg.muted', 'surface.default'),
   pair('fg.muted', 'bg.app'),
+  pair('fg.default', 'canvas.bg'),
+  pair('fg.muted', 'canvas.bg'),
   pair('canvas.edge', 'canvas.bg'),
   pair('canvas.edge-active', 'canvas.bg'),
   pair('canvas.port', 'canvas.bg'),

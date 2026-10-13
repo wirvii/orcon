@@ -52,7 +52,7 @@ export const Open: Story = {
   args: { defaultOpen: true, defaultValue: 'queued' },
   decorators: [
     (Story) => (
-      <div className="h-node-width">
+      <div className="h-panel-width">
         <Story />
       </div>
     ),
@@ -87,7 +87,7 @@ export const Matrix: Story = {
           cells: states
             .filter((state) => state !== 'open')
             .map((state) => (
-              <div key={state} className="w-node-width">
+              <div key={state} className="w-panel-width">
                 <Select options={options} aria-label={`Run mode, ${state}`} placeholder="Choose" {...stateProps[state]} />
               </div>
             )),

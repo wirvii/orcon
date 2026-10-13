@@ -56,10 +56,10 @@ export const Matrix: Story = {
         {
           label: 'summary',
           cells: [
-            <div key="d" className="w-node-width">
+            <div key="d" className="w-panel-width">
               <ErrorSummary errors={errors} />
             </div>,
-            <div key="s" className="w-node-width">
+            <div key="s" className="w-panel-width">
               <ErrorSummary errors={[errors[0]]} />
             </div>,
           ],

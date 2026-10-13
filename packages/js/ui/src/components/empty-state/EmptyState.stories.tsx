@@ -41,7 +41,7 @@ export const Matrix: Story = {
         {
           label: 'empty state',
           cells: states.map((state) => (
-            <div key={state} className="w-node-width">
+            <div key={state} className="w-panel-width">
               <EmptyState title="No flows yet" description="A flow connects a trigger to the steps that run after it." headingLevel={3} {...props[state]} />
             </div>
           )),

@@ -72,7 +72,7 @@ export const Loading: Story = { args: { status: 'loading' } };
 export const Empty: Story = { args: { rows: [], emptyMessage: 'No executions yet. Run a flow to see it here.' } };
 export const Error: Story = { args: { status: 'error', onRetry: () => undefined } };
 export const StickyHeader: Story = {
-  args: { stickyHeader: true, className: 'max-h-node-width max-w-screen-md', rows: [...executions, ...executions.map((row) => ({ ...row, id: `${row.id}-b` }))] },
+  args: { stickyHeader: true, className: 'max-h-panel-width max-w-screen-md', rows: [...executions, ...executions.map((row) => ({ ...row, id: `${row.id}-b` }))] },
 };
 
 const stateArgs: Record<string, Partial<React.ComponentProps<typeof DataTable<Execution>>>> = {
@@ -81,7 +81,7 @@ const stateArgs: Record<string, Partial<React.ComponentProps<typeof DataTable<Ex
   loading: { status: 'loading' },
   empty: { rows: [], emptyMessage: 'No executions yet.' },
   error: { status: 'error', onRetry: () => undefined },
-  'sticky-header': { stickyHeader: true, className: 'max-h-node-width' },
+  'sticky-header': { stickyHeader: true, className: 'max-h-panel-width' },
 };
 
 export const Matrix: Story = {

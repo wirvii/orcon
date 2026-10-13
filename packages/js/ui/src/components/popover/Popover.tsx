@@ -34,7 +34,7 @@ export function Popover({ trigger, label, children, side = 'bottom', align = 'st
           align={align}
           sideOffset={4}
           collisionPadding={8}
-          className={cn(floatingPanel, 'w-node-width max-h-available overflow-y-auto p-3', className)}
+          className={cn(floatingPanel, 'w-panel-width max-h-available overflow-y-auto p-3', className)}
         >
           {children}
         </PopoverPrimitive.Content>

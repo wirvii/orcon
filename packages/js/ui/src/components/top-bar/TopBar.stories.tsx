@@ -36,9 +36,9 @@ export const Matrix: Story = {
       caption="TopBar variants"
       columns={['bar']}
       rows={[
-        { label: 'default', cells: [<div key="d" className="w-full min-w-node-width"><TopBar brand={<BrandMark />} /></div>] },
-        { label: 'menu', cells: [<div key="m" className="w-full min-w-node-width"><TopBar brand={<BrandMark variant="symbol" />} onOpenNavigation={() => undefined} /></div>] },
-        { label: 'actions', cells: [<div key="a" className="w-full min-w-node-width"><TopBar brand={<BrandMark />} actions={<NotificationBell count={3} />} /></div>] },
+        { label: 'default', cells: [<div key="d" className="w-full min-w-panel-width"><TopBar brand={<BrandMark />} /></div>] },
+        { label: 'menu', cells: [<div key="m" className="w-full min-w-panel-width"><TopBar brand={<BrandMark variant="symbol" />} onOpenNavigation={() => undefined} /></div>] },
+        { label: 'actions', cells: [<div key="a" className="w-full min-w-panel-width"><TopBar brand={<BrandMark />} actions={<NotificationBell count={3} />} /></div>] },
       ]}
     />
   ),

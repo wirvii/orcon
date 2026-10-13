@@ -53,7 +53,7 @@ export const Matrix: Story = {
         {
           label: 'multi-line',
           cells: states.map((state) => (
-            <div key={state} className="w-node-width">
+            <div key={state} className="w-panel-width">
               <Textarea rows={2} aria-label={`Textarea, ${state}`} placeholder="Placeholder" {...stateProps[state]} />
             </div>
           )),

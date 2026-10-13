@@ -123,43 +123,74 @@ export type { TooltipProps } from './components/tooltip/Tooltip';
 export { TopBar } from './components/top-bar/TopBar';
 export type { TopBarProps } from './components/top-bar/TopBar';
 
-// Canvas
-export { OrconEdge, loopBackPath } from './canvas/Edge';
-export type { OrconEdgeData, OrconFlowEdge } from './canvas/Edge';
-export { EdgeCount } from './canvas/EdgeCount';
-export type { EdgeCountProps } from './canvas/EdgeCount';
-export { CanvasOutline } from './canvas/CanvasOutline';
-export type { CanvasOutlineProps } from './canvas/CanvasOutline';
-export { CanvasToolbar } from './canvas/CanvasToolbar';
-export type { CanvasToolbarProps } from './canvas/CanvasToolbar';
-export { ControlNode } from './canvas/ControlNode';
-export type { ControlNodeProps } from './canvas/ControlNode';
-export { NodeCard } from './canvas/NodeCard';
-export type { NodeCardProps } from './canvas/NodeCard';
-export { NodeStatus } from './canvas/NodeStatus';
-export type { NodeStatusProps } from './canvas/NodeStatus';
-export { Port } from './canvas/Port';
-export type { PortProps } from './canvas/Port';
+// Canvas (style A)
+export { CanvasNode, tileRadius } from './canvas/canvas-node/CanvasNode';
+export type { CanvasNodeProps } from './canvas/canvas-node/CanvasNode';
+export { NodeStatusBadge } from './canvas/node-status-badge/NodeStatusBadge';
+export type { NodeStatusBadgeProps } from './canvas/node-status-badge/NodeStatusBadge';
+export { NodeStatusChip } from './canvas/node-status-chip/NodeStatusChip';
+export type { ChipKind, NodeStatusChipProps } from './canvas/node-status-chip/NodeStatusChip';
+export { PinnedBadge } from './canvas/pinned-badge/PinnedBadge';
+export type { PinnedBadgeProps } from './canvas/pinned-badge/PinnedBadge';
+export { NodePort } from './canvas/node-port/NodePort';
+export type { NodePortProps } from './canvas/node-port/NodePort';
+export { PortAddButton } from './canvas/port-add-button/PortAddButton';
+export type { PortAddButtonProps } from './canvas/port-add-button/PortAddButton';
+export { OutputStub } from './canvas/output-stub/OutputStub';
+export type { OutputStubProps } from './canvas/output-stub/OutputStub';
+export { CanvasEdge, edgeGeometry } from './canvas/canvas-edge/CanvasEdge';
+export type { CanvasEdgeData, CanvasFlowEdge, EdgeGeometry } from './canvas/canvas-edge/CanvasEdge';
+export { EdgeLabel, useEdgeLabelText } from './canvas/edge-label/EdgeLabel';
+export type { EdgeLabelProps } from './canvas/edge-label/EdgeLabel';
+export { EdgeActions } from './canvas/edge-actions/EdgeActions';
+export type { EdgeActionsProps } from './canvas/edge-actions/EdgeActions';
+export { NodeToolbar } from './canvas/node-toolbar/NodeToolbar';
+export type { NodeToolbarProps } from './canvas/node-toolbar/NodeToolbar';
+export { StickyNote } from './canvas/sticky-note/StickyNote';
+export type { StickyNoteProps } from './canvas/sticky-note/StickyNote';
+export { CanvasControls } from './canvas/canvas-controls/CanvasControls';
+export type { CanvasControlsProps } from './canvas/canvas-controls/CanvasControls';
+export { CanvasMinimap } from './canvas/canvas-minimap/CanvasMinimap';
+export type { CanvasMinimapProps } from './canvas/canvas-minimap/CanvasMinimap';
+export { AddFirstStep } from './canvas/add-first-step/AddFirstStep';
+export type { AddFirstStepProps } from './canvas/add-first-step/AddFirstStep';
+export { AiBlock } from './canvas/ai-block/AiBlock';
+export type { AiBlockProps } from './canvas/ai-block/AiBlock';
+export { NodePalettePanel } from './canvas/node-palette-panel/NodePalettePanel';
+export type { NodePalettePanelProps } from './canvas/node-palette-panel/NodePalettePanel';
+export { CanvasOutline } from './canvas/canvas-outline/CanvasOutline';
+export type { CanvasOutlineProps } from './canvas/canvas-outline/CanvasOutline';
 export { WorkflowCanvas } from './canvas/WorkflowCanvas';
-export type { WorkflowCanvasProps, NodeExecutionState } from './canvas/WorkflowCanvas';
+export { applyOverlay } from './canvas/WorkflowCanvas';
+export type { EdgeExecutionState, ExecutionOverlay, NodeExecutionState, WorkflowCanvasHandle, WorkflowCanvasProps } from './canvas/WorkflowCanvas';
 export { useAnnouncer, ANNOUNCE_INTERVAL_MS } from './canvas/announcer';
 export type {
+  AiBlockKind,
+  AiBlockSpec,
   CatalogItem,
   ConnectError,
   ConnectRequest,
-  ControlType,
+  DiffMark,
   Direction,
+  EdgeState,
   Graph,
   GraphEdge,
   GraphNode,
+  LogicType,
+  NodeIconName,
   NodeKind,
   PortSpec,
+  StickyColor,
+  StickyNoteData,
 } from './canvas/model';
 export {
+  COLUMN_PITCH,
   GRID,
   addNode,
+  addNodeAfter,
   connect,
   connectError,
+  insertOnEdge,
   itemCounts,
   moveNodes,
   nextFocus,

@@ -49,7 +49,7 @@ export const Matrix: Story = {
         {
           label: 'separator',
           cells: [
-            <div key="h" className="bg-surface w-node-width p-2">
+            <div key="h" className="bg-surface w-panel-width p-2">
               <Separator />
             </div>,
             <div key="v" className="bg-surface flex h-12 items-center p-2">

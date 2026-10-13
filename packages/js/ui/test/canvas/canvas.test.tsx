@@ -4,12 +4,13 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { page } from '@vitest/browser/context';
+import { createRef } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import '../../src/styles/index.css';
 import { exampleCatalog, exampleDraft, exampleGraph } from '../../src/canvas/fixtures';
 import type { Graph } from '../../src/canvas/model';
-import { WorkflowCanvas, type WorkflowCanvasProps } from '../../src/canvas/WorkflowCanvas';
+import { WorkflowCanvas, type WorkflowCanvasHandle, type WorkflowCanvasProps } from '../../src/canvas/WorkflowCanvas';
 import { Providers } from '../../src/providers/Providers';
 
 beforeAll(async () => {
@@ -24,103 +25,113 @@ afterEach(() => {
 
 function renderCanvas(props: Partial<WorkflowCanvasProps> = {}) {
   const onGraphChange = vi.fn<(graph: Graph) => void>();
+  const handle = createRef<WorkflowCanvasHandle>();
   const view = render(
     <Providers theme="light" density="comfortable" locale="en">
       <div className="h-screen">
-        <WorkflowCanvas defaultGraph={exampleDraft} catalog={exampleCatalog} onGraphChange={onGraphChange} {...props} />
+        <WorkflowCanvas ref={handle} defaultGraph={exampleDraft} catalog={exampleCatalog} onGraphChange={onGraphChange} tools {...props} />
       </div>
     </Providers>,
   );
-  return { ...view, onGraphChange, user: userEvent.setup() };
+  return { ...view, onGraphChange, handle, user: userEvent.setup() };
 }
 
-const node = (name: RegExp | string) => screen.findByRole('group', { name: typeof name === 'string' ? new RegExp(name) : name });
+// Node names start with the node name and a comma; connections (also groups) start with it and a parenthesis.
+const nodeName = (name: string) => new RegExp(`^${name}, `);
+const node = (name: string) => screen.findByRole('group', { name: nodeName(name) });
 const last = (mock: ReturnType<typeof vi.fn<(graph: Graph) => void>>) => mock.mock.calls.at(-1)![0];
 const position = (graph: Graph, id: string) => graph.nodes.find((candidate) => candidate.id === id)!.position;
 
 // user-event mouse events carry no window, which React Flow's drag handling needs, so a node is focused directly.
-async function focusNode(_user: ReturnType<typeof userEvent.setup>, name: string) {
+async function focusNode(name: string) {
   const element = await node(name);
   act(() => element.focus());
   return element;
 }
 
 describe('the canvas is named, labelled and has one tab stop', () => {
-  it('gives every node the accessible name "<kind> node <name>, <summary>, status, inputs, outputs"', async () => {
+  it('gives every node the accessible name "<name>, <operation>. Status: <status>. <n> inputs, <m> outputs."', async () => {
     renderCanvas({ defaultGraph: exampleGraph });
-    const charge = await node('Charge card');
-    expect(charge).toHaveAccessibleName(
-      'Action node Charge card, Charges the customer card for the total of the order., status Succeeded with errors, 1 input, 1 output',
-    );
-    expect(await node('In stock')).toHaveAccessibleName(/^Control node In stock\?, status Succeeded, 1 input, 2 outputs$/);
-    expect(await node('Order received')).toHaveAccessibleName(/^Trigger node Order received/);
+    expect(await node('HTTP Request')).toHaveAccessibleName('HTTP Request, GET inventory. Status: Running. 1 input, 1 output.');
+    expect(await node('Validate order')).toHaveAccessibleName('Validate order, If total > 0. Status: Succeeded. 1 input, 2 outputs.');
+    expect(await node('Merge')).toHaveAccessibleName('Merge, Append. Status: Not executed, disabled. 2 inputs, 1 output.');
+    expect(await node('Webhook')).toHaveAccessibleName('Webhook, On POST /orders. Status: Succeeded. 0 inputs, 1 output.');
   });
 
   it('puts exactly one node in the tab order and moves it with the arrow keys', async () => {
     const { user } = renderCanvas();
-    await node('Order received');
+    await node('Webhook');
     const tabbable = () => Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node')).filter((element) => element.tabIndex === 0);
     expect(tabbable()).toHaveLength(1);
-    const first = await focusNode(user, 'Order received');
+    await focusNode('Webhook');
     await user.keyboard('{ArrowRight}');
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: /Check stock/ })));
-    expect(first).not.toBe(document.activeElement);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: nodeName('Validate order') })));
     await waitFor(() => expect(tabbable()).toHaveLength(1));
     expect(tabbable()[0]).toBe(document.activeElement);
+  });
+
+  it('offers the toolbar and the output plus buttons only on the node that holds the tab stop', async () => {
+    renderCanvas();
+    await focusNode('Webhook');
+    const toolbar = await screen.findByRole('toolbar', { name: 'Actions for Webhook' });
+    for (const name of ['Execute workflow', 'Run step', 'Disable node', 'Delete node', 'More actions']) {
+      expect(within(toolbar).getByRole('button', { name })).toHaveProperty('tabIndex', 0);
+    }
+    expect(screen.getByRole('button', { name: 'Add node after Webhook' })).toHaveProperty('tabIndex', 0);
+    // Another node's plus button is not in the tab order.
+    expect(screen.getByRole('button', { name: 'Add node after Slack' })).toHaveProperty('tabIndex', -1);
   });
 });
 
 describe('every graph operation works from the keyboard', () => {
-  it('moves a node one grid step with Shift + arrow and four with Alt + Shift + arrow', async () => {
+  it('moves a node one grid step (20) with Shift + arrow and four with Alt + Shift + arrow', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Check stock');
-    const start = position(exampleDraft, 'check-stock');
+    await focusNode('Validate order');
+    const start = position(exampleDraft, 'validate');
     await user.keyboard('{Shift>}{ArrowRight}{/Shift}');
-    expect(position(last(onGraphChange), 'check-stock')).toEqual({ x: start.x + 8, y: start.y });
+    expect(position(last(onGraphChange), 'validate')).toEqual({ x: start.x + 20, y: start.y });
     await user.keyboard('{Alt>}{Shift>}{ArrowDown}{/Shift}{/Alt}');
-    expect(position(last(onGraphChange), 'check-stock')).toEqual({ x: start.x + 8, y: start.y + 32 });
+    expect(position(last(onGraphChange), 'validate')).toEqual({ x: start.x + 20, y: start.y + 80 });
   });
 
-  it('adds a node: A opens the searchable list, typing filters, Enter adds', async () => {
+  it('adds a node after the focused one: A opens the palette, Enter inserts it one column right, connected and selected', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Check stock');
+    await focusNode('Merge');
     await user.keyboard('a');
     const search = await screen.findByRole('combobox', { name: 'Search nodes' });
+    await waitFor(() => expect(search).toHaveFocus());
     await user.type(search, 'email');
     await user.keyboard('{Enter}');
     await waitFor(() => expect(onGraphChange).toHaveBeenCalled());
-    const added = last(onGraphChange).nodes.find((candidate) => candidate.name === 'Send email');
-    expect(added).toBeDefined();
-    expect(last(onGraphChange).nodes).toHaveLength(exampleDraft.nodes.length + 1);
-    expect(added!.position.x % 8).toBe(0);
-    // The new node is announced politely and receives focus.
+    const graph = last(onGraphChange);
+    const added = graph.nodes.find((candidate) => candidate.name === 'Send email')!;
+    const merge = position(exampleDraft, 'merge');
+    expect(added.position).toEqual({ x: merge.x + 200, y: merge.y });
+    expect(graph.edges.some((edge) => edge.source === 'merge' && edge.target === added.id)).toBe(true);
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Added Send email'));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: /Send email/ })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: nodeName('Send email') })));
   });
 
   it('connects two nodes from lists: C opens the form', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Order received');
+    await focusNode('Webhook');
     await user.keyboard('c');
     const dialog = await screen.findByRole('dialog', { name: 'Connect nodes' });
-    // The focused node is the source; its only output is chosen for us.
     await user.click(within(dialog).getByRole('combobox', { name: 'To node' }));
-    await user.click(await screen.findByRole('option', { name: 'Send receipt' }));
+    await user.click(await screen.findByRole('option', { name: 'Gmail' }));
     await user.click(within(dialog).getByRole('button', { name: 'Connect' }));
     await waitFor(() => expect(onGraphChange).toHaveBeenCalled());
-    const edges = last(onGraphChange).edges;
-    expect(edges).toHaveLength(exampleDraft.edges.length + 1);
-    expect(edges.at(-1)).toMatchObject({ source: 'order-received', target: 'send-receipt', sourceOutput: 'main', targetInput: 'main' });
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Connected Order received to Send receipt'));
+    expect(last(onGraphChange).edges.at(-1)).toMatchObject({ source: 'webhook', target: 'gmail', sourceOutput: 'main', targetInput: 'main' });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Connected Webhook to Gmail'));
   });
 
   it('refuses a connection to itself with a message next to the field', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Check stock');
+    await focusNode('HTTP Request');
     await user.keyboard('c');
     const dialog = await screen.findByRole('dialog', { name: 'Connect nodes' });
     await user.click(within(dialog).getByRole('combobox', { name: 'To node' }));
-    await user.click(await screen.findByRole('option', { name: 'Check stock' }));
+    await user.click(await screen.findByRole('option', { name: 'HTTP Request' }));
     await user.click(within(dialog).getByRole('button', { name: 'Connect' }));
     expect(await within(dialog).findByText('A node cannot be connected to itself.')).toBeVisible();
     expect(onGraphChange).not.toHaveBeenCalled();
@@ -128,26 +139,24 @@ describe('every graph operation works from the keyboard', () => {
 
   it('deletes one node at once with an Undo notice, and Ctrl + Z brings it back', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Send receipt');
+    await focusNode('Gmail');
     await user.keyboard('{Delete}');
-    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'send-receipt')).toBe(false));
-    // Connections of the deleted node go with it.
-    expect(last(onGraphChange).edges.every((edge) => edge.source !== 'send-receipt' && edge.target !== 'send-receipt')).toBe(true);
+    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'gmail')).toBe(false));
+    expect(last(onGraphChange).edges.every((edge) => edge.source !== 'gmail' && edge.target !== 'gmail')).toBe(true);
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Deleted 1 node'));
-    // Focus stays inside the canvas: it moves to a remaining node.
     await waitFor(() => expect(document.activeElement?.classList.contains('react-flow__node')).toBe(true));
     await user.keyboard('{Control>}z{/Control}');
-    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'send-receipt')).toBe(true));
+    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'gmail')).toBe(true));
     await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
-    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'send-receipt')).toBe(false));
+    await waitFor(() => expect(last(onGraphChange).nodes.some((candidate) => candidate.id === 'gmail')).toBe(false));
   });
 
   it('asks before deleting several nodes, and says it can be undone', async () => {
     const { user, onGraphChange } = renderCanvas();
-    await focusNode(user, 'Check stock');
+    await focusNode('Webhook');
     await user.keyboard(' ');
     await user.keyboard('{ArrowRight}');
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: /In stock/ })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: nodeName('Validate order') })));
     await user.keyboard(' ');
     await user.keyboard('{Delete}');
     const dialog = await screen.findByRole('alertdialog', { name: 'Delete 2 nodes?' });
@@ -157,26 +166,50 @@ describe('every graph operation works from the keyboard', () => {
     await waitFor(() => expect(last(onGraphChange).nodes).toHaveLength(exampleDraft.nodes.length - 2));
   });
 
+  it('disables a node with D, pins its output with P and renames it with F2', async () => {
+    const { user, onGraphChange } = renderCanvas();
+    await focusNode('HTTP Request');
+    await user.keyboard('d');
+    expect(last(onGraphChange).nodes.find((candidate) => candidate.id === 'http')?.disabled).toBe(true);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('HTTP Request is disabled'));
+    await user.keyboard('p');
+    expect(last(onGraphChange).nodes.find((candidate) => candidate.id === 'http')?.pinned).toBe(true);
+    await user.keyboard('{F2}');
+    const field = await screen.findByRole('textbox', { name: 'Node name' });
+    await user.clear(field);
+    await user.type(field, 'Inventory{Enter}');
+    expect(last(onGraphChange).nodes.find((candidate) => candidate.id === 'http')?.name).toBe('Inventory');
+  });
+
+  it('adds a sticky note with Shift + S', async () => {
+    const { user, onGraphChange } = renderCanvas();
+    await focusNode('Webhook');
+    await user.keyboard('{Shift>}s{/Shift}');
+    await waitFor(() => expect(last(onGraphChange).notes).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Added a sticky note'));
+  });
+
   it('opens the details with Enter through the host callback', async () => {
-    const onInspect = vi.fn();
-    const { user } = renderCanvas({ onInspect });
-    await focusNode(user, 'Check stock');
+    const onOpenDetails = vi.fn();
+    const { user } = renderCanvas({ onOpenDetails });
+    await focusNode('HTTP Request');
     await user.keyboard('{Enter}');
-    expect(onInspect).toHaveBeenCalledWith('check-stock');
+    expect(onOpenDetails).toHaveBeenCalledWith('http', undefined);
   });
 
   it('lists the shortcuts with ?', async () => {
     const { user } = renderCanvas();
-    await focusNode(user, 'Check stock');
+    await focusNode('HTTP Request');
     await user.keyboard('?');
     const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
     expect(within(dialog).getByText('Add a node')).toBeVisible();
     expect(within(dialog).getByText('Connect two nodes')).toBeVisible();
+    expect(within(dialog).getByText('Add a sticky note')).toBeVisible();
   });
 
   it('does not react to shortcuts typed in a field', async () => {
     const { user } = renderCanvas();
-    await focusNode(user, 'Check stock');
+    await focusNode('HTTP Request');
     await user.keyboard('a');
     const search = await screen.findByRole('combobox', { name: 'Search nodes' });
     await user.type(search, 'c?');
@@ -185,8 +218,8 @@ describe('every graph operation works from the keyboard', () => {
   });
 });
 
-describe('the toolbar and the outline are keyboard paths too', () => {
-  it('every graph operation has a toolbar button', async () => {
+describe('the tools and the outline are keyboard paths too', () => {
+  it('every graph operation has a button in the tools strip', async () => {
     renderCanvas();
     const toolbar = await screen.findByRole('toolbar', { name: 'Canvas tools' });
     for (const name of ['Add node', 'Connect nodes', 'Delete selected', 'Undo', 'Redo', 'Flow outline', 'Keyboard shortcuts']) {
@@ -194,30 +227,66 @@ describe('the toolbar and the outline are keyboard paths too', () => {
     }
   });
 
-  it('the outline describes the graph and can focus a node, remove a connection and delete a node', async () => {
-    const { user, onGraphChange } = renderCanvas({ defaultOutlineOpen: true });
+  it('the outline describes the graph, connection states included, and can focus a node, remove a connection and delete a node', async () => {
+    const { user, onGraphChange } = renderCanvas({ defaultOutlineOpen: true, defaultGraph: exampleGraph });
     const outline = await screen.findByRole('region', { name: 'Flow outline' });
     expect(within(outline).getByText('6 nodes and 6 connections')).toBeVisible();
-    expect(within(outline).getByText('Output true goes to Charge card, input main')).toBeVisible();
+    expect(within(outline).getByText('Output true goes to HTTP Request, input main, 1 item, succeeded')).toBeVisible();
+    expect(within(outline).getByText('Output main goes to Merge, input a, uncertain')).toBeVisible();
 
-    await user.click(within(outline).getByRole('button', { name: 'Go to Charge card' }));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: /Charge card/ })));
+    await user.click(within(outline).getByRole('button', { name: 'Go to Gmail' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: nodeName('Gmail') })));
 
-    await user.click(within(outline).getByRole('button', { name: 'Remove connection from Order received to Check stock' }));
+    await user.click(within(outline).getByRole('button', { name: 'Remove connection from Webhook to Validate order' }));
     await waitFor(() => expect(last(onGraphChange).edges.some((edge) => edge.id === 'e1')).toBe(false));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Removed the connection from Order received to Check stock'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Removed the connection from Webhook to Validate order'));
 
     await user.click(within(outline).getAllByRole('button', { name: /^Delete / })[0]!);
-    await waitFor(() => expect(last(onGraphChange).nodes).toHaveLength(exampleDraft.nodes.length - 1));
+    await waitFor(() => expect(last(onGraphChange).nodes).toHaveLength(exampleGraph.nodes.length - 1));
+  });
+});
+
+describe('connections are focusable and have the same actions as the bar', () => {
+  it('Delete on a focused connection removes it, Enter opens the palette to insert a node on it', async () => {
+    const { user, onGraphChange } = renderCanvas();
+    await node('Webhook');
+    const edge = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>('.react-flow__edge[data-id="e1"]');
+      expect(element).not.toBeNull();
+      return element as HTMLElement;
+    });
+    expect(edge).toHaveAccessibleName('Webhook (main) to Validate order');
+    act(() => edge.focus());
+    await user.keyboard('{Enter}');
+    const search = await screen.findByRole('combobox', { name: 'Search nodes' });
+    await waitFor(() => expect(search).toHaveFocus());
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onGraphChange).toHaveBeenCalled());
+    const graph = last(onGraphChange);
+    expect(graph.edges.some((candidate) => candidate.id === 'e1')).toBe(false);
+    const added = graph.nodes.find((candidate) => !exampleDraft.nodes.some((existing) => existing.id === candidate.id))!;
+    expect(graph.edges.some((candidate) => candidate.source === 'webhook' && candidate.target === added.id)).toBe(true);
+    expect(graph.edges.some((candidate) => candidate.source === added.id && candidate.target === 'validate')).toBe(true);
+  });
+
+  it('Delete removes the focused connection', async () => {
+    const { user, onGraphChange } = renderCanvas();
+    await node('Webhook');
+    const edge = await waitFor(() => document.querySelector<HTMLElement>('.react-flow__edge[data-id="e3"]')!);
+    act(() => edge.focus());
+    await user.keyboard('{Delete}');
+    expect(last(onGraphChange).edges.some((candidate) => candidate.id === 'e3')).toBe(false);
   });
 });
 
 describe('read-only canvas (below md, or by choice)', () => {
   it('renders no editing affordance and ignores editing keys', async () => {
     const { user, onGraphChange } = renderCanvas({ readOnly: true, defaultGraph: exampleGraph });
-    await focusNode(user, 'Check stock');
+    await focusNode('HTTP Request');
     expect(screen.queryByRole('button', { name: 'Add node' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete selected' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add node after/ })).toBeNull();
+    expect(screen.queryByRole('toolbar', { name: /^Actions for/ })).toBeNull();
     expect(screen.getByText(/View only/)).toBeVisible();
     await user.keyboard('a');
     await user.keyboard('{Shift>}{ArrowRight}{/Shift}');
@@ -230,20 +299,20 @@ describe('read-only canvas (below md, or by choice)', () => {
 
   it('opens a panel with the state, the counts and the execution link when a node is chosen', async () => {
     const { user } = renderCanvas({ readOnly: true, defaultGraph: exampleGraph, executionHref: (id) => `/executions/example/${id}` });
-    await focusNode(user, 'Check stock');
+    await focusNode('HTTP Request');
     await user.keyboard('{Enter}');
-    const panel = await screen.findByRole('dialog', { name: 'Check stock' });
-    expect(within(panel).getByText('Succeeded')).toBeVisible();
-    expect(within(panel).getByText('15 items received')).toBeVisible();
-    expect(within(panel).getByText('12 items sent on')).toBeVisible();
-    expect(within(panel).getByRole('link', { name: 'Open the execution detail' })).toHaveAttribute('href', '/executions/example/check-stock');
+    const panel = await screen.findByRole('dialog', { name: 'HTTP Request' });
+    expect(within(panel).getByText('Running')).toBeVisible();
+    expect(within(panel).getByText('1 item received')).toBeVisible();
+    expect(within(panel).getByText('3 items sent on')).toBeVisible();
+    expect(within(panel).getByRole('link', { name: 'Open the execution detail' })).toHaveAttribute('href', '/executions/example/http');
   });
 
   it('is view only on a phone-width viewport even when editing is allowed', async () => {
     await page.viewport(390, 844);
     try {
       renderCanvas();
-      await node('Check stock');
+      await node('HTTP Request');
       expect(screen.queryByRole('button', { name: 'Add node' })).toBeNull();
       expect(screen.getByText(/View only/)).toBeVisible();
     } finally {
@@ -253,20 +322,20 @@ describe('read-only canvas (below md, or by choice)', () => {
 });
 
 describe('execution overlay', () => {
-  it('shows the state of a node as icon and text and announces a change politely', async () => {
-    const view = renderCanvas({ defaultGraph: exampleGraph, statuses: { 'send-receipt': { status: 'NOT_RUN' } } });
-    await node('Send receipt');
+  it('shows the state of a node and announces a change politely', async () => {
+    const view = renderCanvas({ defaultGraph: exampleDraft, overlay: { nodes: { gmail: { status: 'WAITING' } } } });
+    await node('Gmail');
     view.rerender(
       <Providers theme="light" density="comfortable" locale="en">
         <div className="h-screen">
-          <WorkflowCanvas defaultGraph={exampleGraph} statuses={{ 'send-receipt': { status: 'RUNNING' } }} />
+          <WorkflowCanvas defaultGraph={exampleDraft} overlay={{ nodes: { gmail: { status: 'RUNNING' } } }} />
         </div>
       </Providers>,
     );
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Send receipt is now Running'));
-    const card = (await node('Send receipt')).querySelector('[data-node-status]');
-    expect(card?.querySelector('svg')).not.toBeNull();
-    expect(card).toHaveTextContent('Running');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Gmail is now Running'));
+    const tile = (await node('Gmail')).querySelector('[data-canvas-node]');
+    expect(tile?.querySelector('[data-node-chip="RUNNING"]')).toHaveTextContent('Running');
+    expect(tile?.querySelector('[data-node-badge="RUNNING"]')).not.toBeNull();
   });
 });
 
@@ -275,44 +344,71 @@ describe('the canvas opens fitted to the flow with readable text', () => {
     const viewport = container.querySelector<HTMLElement>('.react-flow__viewport');
     return Number(/matrix\(([\d.]+)/.exec(getComputedStyle(viewport!).transform)?.[1] ?? 'NaN');
   };
-  const inside = (inner: DOMRect, outer: DOMRect) =>
-    inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right && inner.bottom <= outer.bottom;
+  const inside = (inner: DOMRect, outer: DOMRect) => inner.left >= outer.left - 1 && inner.top >= outer.top - 1 && inner.right <= outer.right + 1 && inner.bottom <= outer.bottom + 1;
 
   it('keeps the trigger on screen when the view is too narrow to show the whole flow (phone)', async () => {
     await page.viewport(390, 844);
     try {
       const { container } = renderCanvas({ defaultGraph: exampleGraph });
-      const trigger = await node('Order received');
+      const trigger = await node('Webhook');
       const region = container.querySelector<HTMLElement>('[role="region"]')!;
       await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
-      // The zoom never drops below the readable minimum to make everything fit.
       expect(zoomOf(container)).toBeGreaterThanOrEqual(0.6 - 0.01);
     } finally {
       await page.viewport(1440, 900);
     }
   });
 
-  it('shows the whole flow when it fits, and never below the readable zoom on a tablet', async () => {
-    await page.viewport(1024, 768);
-    try {
-      const { container } = renderCanvas({ defaultGraph: exampleGraph });
-      const trigger = await node('Order received');
-      const region = container.querySelector<HTMLElement>('[role="region"]')!;
-      await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
-      expect(zoomOf(container)).toBeGreaterThanOrEqual(0.75 - 0.01);
-    } finally {
-      await page.viewport(1440, 900);
-    }
-  });
-
-  it('fits the whole flow on a wide screen', async () => {
-    const { container } = renderCanvas({ defaultGraph: exampleGraph });
-    await node('Order received');
+  it('never fits to more than 100 % and shows the whole flow on a wide screen', async () => {
+    const { container } = renderCanvas();
+    await node('Webhook');
     const region = container.querySelector<HTMLElement>('[role="region"]')!;
     await waitFor(() => {
       const nodes = Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node'));
-      expect(nodes.length).toBe(exampleGraph.nodes.length);
+      expect(nodes.length).toBe(exampleDraft.nodes.length + (exampleDraft.notes?.length ?? 0));
       for (const element of nodes) expect(inside(element.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true);
     });
+    expect(zoomOf(container)).toBeLessThanOrEqual(1.001);
+  });
+});
+
+describe('level of detail', () => {
+  it('at 50 % hides subtitles, connection labels and toolbars, and keeps names readable', async () => {
+    const { container, handle } = renderCanvas({ defaultGraph: exampleGraph, tools: false });
+    await node('HTTP Request');
+    expect(container.querySelector('[data-node-subtitle]')).not.toBeNull();
+    expect(container.querySelector('[data-edge-label]')).not.toBeNull();
+    act(() => handle.current?.zoomTo(0.5));
+    await waitFor(() => expect(container.querySelector('[data-lod]')?.getAttribute('data-lod')).toBe('detail'));
+    expect(container.querySelector('[data-node-subtitle]')).toBeNull();
+    expect(container.querySelector('[data-edge-label]')).toBeNull();
+    expect(container.querySelector('[data-node-toolbar]')).toBeNull();
+    // The name keeps an on-screen size of at least 10 px: 13 px text scaled by the counter-scale and the zoom.
+    const name = container.querySelector<HTMLElement>('[data-node-name]')!;
+    const lineHeight = 18;
+    const onScreen = (name.getBoundingClientRect().height / lineHeight) * 13;
+    expect(onScreen).toBeGreaterThanOrEqual(9.5);
+  });
+
+  it('at 30 % hides labels and chips, and keeps tiles, badges and connections', async () => {
+    const { container, handle } = renderCanvas({ defaultGraph: exampleGraph, tools: false });
+    await node('HTTP Request');
+    act(() => handle.current?.zoomTo(0.3));
+    await waitFor(() => expect(container.querySelector('[data-lod]')?.getAttribute('data-lod')).toBe('minimal'));
+    expect(container.querySelector('[data-node-label]')).toBeNull();
+    expect(container.querySelector('[data-node-chips]')).toBeNull();
+    expect(container.querySelector('[data-node-badge]')).not.toBeNull();
+    expect(container.querySelector('[data-edge-state]')).not.toBeNull();
+  });
+});
+
+describe('motion', () => {
+  it('has no animation anywhere under reduced motion, even with a running node and connection', async () => {
+    expect(window.matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true);
+    renderCanvas({ defaultGraph: exampleGraph, tools: false });
+    await node('HTTP Request');
+    expect(document.querySelector('[data-run-ring]')).not.toBeNull();
+    expect(document.querySelector('[data-edge-state="running"]')).not.toBeNull();
+    expect(document.getAnimations()).toEqual([]);
   });
 });

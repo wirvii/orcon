@@ -22,7 +22,7 @@ const meta = {
       context.name === 'Matrix' ? (
         <Story />
       ) : (
-        <div className="h-node-width">
+        <div className="h-panel-width">
           <Story />
         </div>
       ),
@@ -58,7 +58,7 @@ export const Matrix: Story = {
                 <p>Content</p>
               </Popover>
             </div>,
-            <div key="o" className="h-node-width">
+            <div key="o" className="h-panel-width">
               <Popover label="Open popover" defaultOpen trigger={<Button variant="secondary">Open</Button>}>
                 <p>Content</p>
               </Popover>

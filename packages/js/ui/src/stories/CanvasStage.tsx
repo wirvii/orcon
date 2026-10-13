@@ -4,53 +4,50 @@
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from '@xyflow/react';
 import type { ReactNode } from 'react';
 
+import { CanvasEdge, type CanvasEdgeData, type CanvasFlowEdge } from '../canvas/canvas-edge/CanvasEdge';
 import { exampleNodes } from '../canvas/fixtures';
-import { OrconEdge, type OrconEdgeData, type OrconFlowEdge } from '../canvas/Edge';
-import { nodeTypes, type OrconFlowNode } from '../canvas/FlowNodes';
+import { nodeTypes, type TileFlowNode } from '../canvas/FlowNodes';
+import type { GraphNode } from '../canvas/model';
 import { cn } from '../lib/cn';
 
-/** The canvas background around something drawn on it, so stories show the real contrast. */
+/** The canvas background around something drawn on it, so stories show the real contrast. Leaves room under it for the label. */
 export function CanvasStage({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('bg-canvas inline-block rounded-lg p-8', className)}>{children}</div>;
+  return <div className={cn('bg-canvas inline-block rounded-lg px-8 pt-12 pb-16', className)}>{children}</div>;
 }
 
-const edgeTypes = { orcon: OrconEdge };
+const edgeTypes = { canvas: CanvasEdge };
 
 /** Two nodes joined by one connection, drawn by React Flow, to show an edge the way the canvas draws it. */
-export function EdgePreview({ data, selected = false, loopBack = false }: { data?: OrconEdgeData; selected?: boolean; loopBack?: boolean }) {
-  const first = { ...exampleNodes.check, position: { x: 0, y: loopBack ? 0 : 0 } };
-  const second = { ...exampleNodes.charge, status: undefined, uncertainCount: undefined, position: { x: loopBack ? 0 : 320, y: loopBack ? 0 : 0 } };
-  const nodes: OrconFlowNode[] = loopBack
-    ? [
-        { id: 'late', type: 'action', position: { x: 320, y: 0 }, data: { node: { ...second, id: 'late', name: 'Create back order', position: { x: 320, y: 0 } }, connectable: false }, draggable: false },
-        { id: 'early', type: 'action', position: { x: 0, y: 0 }, data: { node: { ...first, id: 'early', status: undefined }, connectable: false }, draggable: false },
-      ]
-    : [
-        { id: 'early', type: 'action', position: { x: 0, y: 0 }, data: { node: { ...first, id: 'early', status: undefined }, connectable: false }, draggable: false },
-        { id: 'late', type: 'action', position: { x: 320, y: 0 }, data: { node: { ...second, id: 'late' }, connectable: false }, draggable: false },
-      ];
-  const edges: OrconFlowEdge[] = [
+export function EdgePreview({ data, loopBack = false }: { data?: CanvasEdgeData; loopBack?: boolean }) {
+  const early: GraphNode = { ...exampleNodes.http, id: 'early', name: 'HTTP Request', status: undefined, position: { x: 0, y: 0 } };
+  const late: GraphNode = { ...exampleNodes.slack, id: 'late', name: 'Slack', status: undefined, position: { x: 300, y: 0 } };
+  const left = loopBack ? late : early;
+  const right = loopBack ? early : late;
+  const nodes: TileFlowNode[] = [
+    { id: left.id, type: 'tile', position: { x: 0, y: 40 }, data: { node: { ...left, position: { x: 0, y: 40 } } }, draggable: false },
+    { id: right.id, type: 'tile', position: { x: 300, y: 40 }, data: { node: { ...right, position: { x: 300, y: 40 } } }, draggable: false },
+  ];
+  const edges: CanvasFlowEdge[] = [
     {
       id: 'preview',
-      type: 'orcon',
+      type: 'canvas',
       source: loopBack ? 'late' : 'early',
       target: loopBack ? 'early' : 'late',
       sourceHandle: 'main',
       targetHandle: 'main',
-      selected,
-      data: { ...data, loopBack },
+      data: { ...data, loopBack, sourceName: 'HTTP Request', targetName: 'Slack', editable: true, detail: 'full' },
     },
   ];
   return (
     <ReactFlowProvider>
-      <div className="bg-canvas h-node-width w-screen max-w-screen-sm overflow-hidden rounded-lg">
-        <ReactFlow<OrconFlowNode, OrconFlowEdge>
+      <div className="bg-canvas h-panel-width w-screen max-w-screen-sm overflow-hidden rounded-lg">
+        <ReactFlow<TileFlowNode, CanvasFlowEdge>
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.1 }}
+          fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}
           nodesConnectable={false}
           nodesFocusable={false}
@@ -62,7 +59,7 @@ export function EdgePreview({ data, selected = false, loopBack = false }: { data
           zoomOnDoubleClick={false}
           preventScrolling={false}
         >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} color="var(--orcon-canvas-grid)" />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} color="var(--orcon-canvas-grid)" />
         </ReactFlow>
       </div>
     </ReactFlowProvider>

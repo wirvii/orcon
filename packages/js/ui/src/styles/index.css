@@ -19,6 +19,29 @@
   --default-transition-timing-function: var(--orcon-easing-standard);
   --animate-spin-slow: orcon-spin 1s linear infinite;
   --animate-pulse-soft: orcon-pulse 1.5s ease-in-out infinite;
+  /* Looping motion exists only on running canvas elements; the loop tokens are 0 ms under reduced motion. */
+  --animate-loop-spin: orcon-spin var(--orcon-motion-loop-spin) linear infinite;
+  --animate-edge-flow: orcon-edge-flow var(--orcon-motion-loop-edge) linear infinite;
+  --animate-run-ring: orcon-run-ring var(--orcon-motion-loop-ring) linear infinite;
+}
+
+/* The angle of the sweep of the run ring is animated, so the browser must know its type. */
+@property --orcon-ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes orcon-edge-flow {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
+@keyframes orcon-run-ring {
+  to {
+    --orcon-ring-angle: 360deg;
+  }
 }
 
 /* Stacking layers from the z tokens. */
@@ -86,6 +109,54 @@
  * given a full-size hit area so it meets the contrast and target rules like every other link.
  */
 @layer components {
+  /* The ring around a running node: a conic sweep masked to a 4 px band. */
+  .orcon-run-ring {
+    padding: var(--orcon-space-1);
+    background: conic-gradient(from var(--orcon-ring-angle), transparent 0 50%, var(--orcon-status-active-fg) 100%);
+    mask:
+      linear-gradient(var(--orcon-surface-default) 0 0) content-box exclude,
+      linear-gradient(var(--orcon-surface-default) 0 0);
+    -webkit-mask:
+      linear-gradient(var(--orcon-surface-default) 0 0) content-box,
+      linear-gradient(var(--orcon-surface-default) 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* Under reduced motion the ring does not turn: it is a static segmented ring. */
+  @media (prefers-reduced-motion: reduce) {
+    .orcon-run-ring {
+      background: repeating-conic-gradient(var(--orcon-status-active-fg) 0 9deg, transparent 9deg 18deg);
+    }
+  }
+
+  /* Ports grow and change color when hovered, focused or targeted. */
+  .orcon-handle {
+    transition-property: width, height, background-color, border-color;
+    transition-duration: var(--orcon-duration-base);
+    transition-timing-function: var(--orcon-easing-standard);
+  }
+
+  /* An input port while a connection is dragged: a valid target grows and takes the action color; the others refuse. */
+  .orcon-handle-in.valid {
+    width: var(--orcon-size-icon-16);
+    height: var(--orcon-size-icon-16);
+    border-color: var(--orcon-action-primary-bg);
+  }
+
+  .orcon-handle-in.connectingto:not(.valid) {
+    cursor: not-allowed;
+  }
+
+  /* A focused connection draws its focus ring along the curve instead of boxing it. */
+  .react-flow__edge:focus-visible {
+    outline: none;
+  }
+
+  .react-flow__edge:focus-visible .orcon-edge-focus {
+    opacity: 0.35;
+  }
+
   .react-flow__attribution {
     background-color: var(--orcon-surface-raised);
     color: var(--orcon-fg-muted);

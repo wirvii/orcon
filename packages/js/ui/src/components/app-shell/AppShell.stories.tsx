@@ -64,7 +64,7 @@ export const Matrix: Story = {
     <MatrixTable
       caption="AppShell (the responsive layouts are shown by the viewport toolbar and the visual suite)"
       columns={['shell']}
-      rows={[{ label: 'default', cells: [<div key="d" className="border-border h-node-width w-full overflow-hidden rounded-md border"><AppShell navigation={navigation} currentId="flows" brand={<BrandMark />}>{page}</AppShell></div>] }]}
+      rows={[{ label: 'default', cells: [<div key="d" className="border-border h-panel-width w-full overflow-hidden rounded-md border"><AppShell navigation={navigation} currentId="flows" brand={<BrandMark />}>{page}</AppShell></div>] }]}
     />
   ),
 };

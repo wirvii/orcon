@@ -10,14 +10,14 @@ import { Skeleton } from './Skeleton';
 const meta = {
   title: 'Components/Skeleton',
   component: Skeleton,
-  args: { className: 'h-12 w-node-width' },
+  args: { className: 'h-12 w-panel-width' },
 } satisfies Meta<typeof Skeleton>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-export const Text: Story = { args: { shape: 'text', className: 'w-node-width' } };
+export const Text: Story = { args: { shape: 'text', className: 'w-panel-width' } };
 export const Circle: Story = { args: { shape: 'circle', className: 'size-control' } };
 
 export const Matrix: Story = {

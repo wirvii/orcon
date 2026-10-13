@@ -221,7 +221,7 @@ export function AttentionInboxScreen({
               ]}
             />
           </div>
-          <aside aria-labelledby="notifications-heading" className="bg-surface border-border rounded-lg border p-3 lg:w-node-width lg:shrink-0">
+          <aside aria-labelledby="notifications-heading" className="bg-surface border-border rounded-lg border p-3 lg:w-panel-width lg:shrink-0">
             <h2 id="notifications-heading" className="text-md font-semibold wrap-anywhere">
               {intl.formatMessage(messages.notifications)}
             </h2>

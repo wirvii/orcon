@@ -27,7 +27,7 @@ const meta = {
       context.name === 'Matrix' ? (
         <Story />
       ) : (
-        <div className="h-node-width max-w-screen-sm">
+        <div className="h-panel-width max-w-screen-sm">
           <FormField label="Connector">
             <Story />
           </FormField>
@@ -80,7 +80,7 @@ export const Matrix: Story = {
           cells: states
             .filter((state) => state !== 'open')
             .map((state) => (
-              <div key={state} className="w-node-width">
+              <div key={state} className="w-panel-width">
                 <Combobox options={options} placeholder="Choose" searchLabel="Search" aria-label={`Connector, ${state}`} {...stateProps[state]} />
               </div>
             )),

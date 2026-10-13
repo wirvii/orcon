@@ -155,6 +155,7 @@ export function emitTailwindTheme(model) {
     'space.gap': 'density',
     'size.connector-icon': 'connector-icon',
     'size.connector-icon-safe': 'connector-icon-safe',
+    'size.panel-width': 'panel-width',
   };
   for (const t of densities.comfortable) add(`--spacing-${sizeAlias[t.key]}`, v(t));
   for (const t of scales.filter((x) => x.path[0] === 'size' && x.path[1] === 'icon')) {

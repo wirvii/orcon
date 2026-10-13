@@ -103,7 +103,7 @@ export const Matrix: Story = {
         {
           label: 'field',
           cells: states.map((state) => (
-            <div key={state} className="w-node-width">
+            <div key={state} className="w-panel-width">
               <FormField label="Flow name" {...props[state]}>
                 {props[state].children ?? <Input placeholder="Untitled flow" />}
               </FormField>

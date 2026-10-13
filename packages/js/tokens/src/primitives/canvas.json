@@ -25,10 +25,25 @@
       "$value": "150px",
       "$description": "Maximum width of a node label."
     },
+    "label-gap": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Space between a node tile and its label."
+    },
+    "ring-gap": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Distance of the run ring from the node tile."
+    },
     "badge": {
       "$type": "dimension",
       "$value": "22px",
       "$description": "Status and pinned badges and the trigger mark."
+    },
+    "badge-glyph": {
+      "$type": "dimension",
+      "$value": "14px",
+      "$description": "Status glyph inside a node badge."
     },
     "port-hover": {
       "$type": "dimension",

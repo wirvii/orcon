@@ -3,7 +3,7 @@
 
 import { pair } from '../lib/meta';
 
-export const states = ['default', 'empty', 'view-only', 'execution'] as const;
+export const states = ['default', 'empty', 'view-only', 'execution', 'details'] as const;
 
 export const pairs = [
   pair('fg.default', 'bg.app'),

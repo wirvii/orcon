@@ -45,12 +45,12 @@ export const Matrix: Story = {
       caption="CodeBlock"
       columns={['block']}
       rows={[
-        { label: 'default', cells: [<div key="d" className="w-node-width"><CodeBlock label="Default" code={json} /></div>] },
-        { label: 'copyable', cells: [<div key="c" className="w-node-width"><CodeBlock label="Copyable" code={json} copyable /></div>] },
+        { label: 'default', cells: [<div key="d" className="w-panel-width"><CodeBlock label="Default" code={json} /></div>] },
+        { label: 'copyable', cells: [<div key="c" className="w-panel-width"><CodeBlock label="Copyable" code={json} copyable /></div>] },
         {
           label: 'long',
           cells: [
-            <div key="l" className="w-node-width">
+            <div key="l" className="w-panel-width">
               <CodeBlock label="Long" copyable code="GET /v1/orders?filter0=value0&filter1=value1&filter2=value2&filter3=value3" />
             </div>,
           ],

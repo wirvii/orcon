@@ -58,7 +58,7 @@ export const Matrix: Story = {
       rows={states.map((state) => ({
         label: state,
         cells: [
-          <div key={state} className="w-node-width">
+          <div key={state} className="w-panel-width">
             <Banner tone={tones[state]} title="Title of the banner" action={state === 'action' ? <Button variant="secondary">Review</Button> : undefined}>
               Supporting text.
             </Banner>

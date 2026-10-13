@@ -19,7 +19,7 @@ const meta = {
       context.name === 'Matrix' ? (
         <Story />
       ) : (
-        <nav aria-label="Example" className="bg-surface w-node-width rounded-md p-2">
+        <nav aria-label="Example" className="bg-surface w-panel-width rounded-md p-2">
           <Story />
         </nav>
       ),
@@ -70,7 +70,7 @@ export const Matrix: Story = {
         {
           label: 'item',
           cells: states.map((state) => (
-            <nav key={state} aria-label={`Navigation, ${state}`} className="bg-surface w-node-width rounded-md p-2">
+            <nav key={state} aria-label={`Navigation, ${state}`} className="bg-surface w-panel-width rounded-md p-2">
               <NavItem icon={Workflow} label="Flows" href="#flows" {...stateProps[state]} />
             </nav>
           )),

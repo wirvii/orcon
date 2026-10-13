@@ -162,7 +162,7 @@ export function ExecutionDetailScreen({
           </ol>
         </section>
         {needsDecision && resolution ? (
-          <div className="lg:w-node-width lg:shrink-0 xl:w-node-width">
+          <div className="lg:w-panel-width lg:shrink-0 xl:w-panel-width">
             <UncertainResolutionPanel
               nodeName={resolution.nodeName}
               manualCheck={resolution.manualCheck}

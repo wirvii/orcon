@@ -13,7 +13,7 @@ import { LocaleSwitcher } from './LocaleSwitcher';
 const meta = {
   title: 'Components/LocaleSwitcher',
   component: LocaleSwitcher,
-  decorators: [(Story, context) => (context.name === 'Matrix' ? <Story /> : <div className="w-node-width"><Story /></div>)],
+  decorators: [(Story, context) => (context.name === 'Matrix' ? <Story /> : <div className="w-panel-width"><Story /></div>)],
   render: (args) => {
     const [value, setValue] = useState<ProductLocale>('en');
     return <LocaleSwitcher {...args} value={value} onValueChange={setValue} />;
@@ -44,10 +44,10 @@ export const Matrix: Story = {
         {
           label: 'selected',
           cells: [
-            <div key="e" className="w-node-width">
+            <div key="e" className="w-panel-width">
               <LocaleSwitcher value="en" onValueChange={() => undefined} />
             </div>,
-            <div key="s" className="w-node-width">
+            <div key="s" className="w-panel-width">
               <LocaleSwitcher value="es" onValueChange={() => undefined} />
             </div>,
           ],

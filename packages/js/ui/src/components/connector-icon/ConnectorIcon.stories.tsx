@@ -29,12 +29,23 @@ export const Default: Story = {
   },
 };
 
+export const Tile: Story = {
+  args: { variant: 'tile' },
+  play: async ({ canvasElement }) => {
+    // The tile variant is the bare image: no frame around it.
+    await expect(within(canvasElement).getByRole('img', { name: 'Example connector' }).parentElement?.tagName).not.toBe('SPAN');
+  },
+};
+
 export const Matrix: Story = {
   render: () => (
     <MatrixTable
       caption="ConnectorIcon"
       columns={['default']}
-      rows={[{ label: 'frame', cells: [<ConnectorIcon key="c" src={logo} name="Example connector" />] }]}
+      rows={[
+        { label: 'frame', cells: [<ConnectorIcon key="c" src={logo} name="Example connector" />] },
+        { label: 'tile', cells: [<ConnectorIcon key="t" variant="tile" src={logo} name="Example connector" />] },
+      ]}
     />
   ),
 };

@@ -46,7 +46,7 @@ const meta: Meta<Args> = {
       context.name === 'Matrix' ? (
         <Story />
       ) : (
-        <div className="h-node-width">
+        <div className="h-panel-width">
           <Story />
         </div>
       ),
@@ -84,7 +84,7 @@ export const Matrix: Story = {
             <div key="d" className="h-12">
               <FlowMenu triggerLabel={m.menuClosed} />
             </div>,
-            <div key="o" className="h-node-width w-node-width">
+            <div key="o" className="h-panel-width w-panel-width">
               <FlowMenu defaultOpen triggerLabel={m.menuOpen} />
             </div>,
           ],

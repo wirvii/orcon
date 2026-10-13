@@ -7,9 +7,14 @@ export const canvasMessages = defineMessages({
   nodeLabel: {
     id: 'canvas.node.label',
     defaultMessage:
-      '{kind, select, trigger {Trigger} control {Control} other {Action}} node {name}{hasSummary, select, yes {, {summary}} other {}}{hasStatus, select, yes {, status {status}} other {}}, {inputs, plural, one {# input} other {# inputs}}, {outputs, plural, one {# output} other {# outputs}}',
+      '{name}{hasSubtitle, select, yes {, {subtitle}} other {}}. Status: {status}{pinned, select, yes {, pinned} other {}}{disabled, select, yes {, disabled} other {}}. {inputs, plural, one {# input} other {# inputs}}, {outputs, plural, one {# output} other {# outputs}}.',
     description:
-      'Accessible name of a node on the workflow canvas: its kind, name, one-line summary, execution status and how many inputs and outputs it has.',
+      'Accessible name of a node on the workflow canvas: its name, the operation it performs, its execution status, whether its output is pinned or the node is disabled, and how many inputs and outputs it has.',
+  },
+  statusDesign: {
+    id: 'canvas.node.statusDesign',
+    defaultMessage: 'Not executed',
+    description: 'Status read for a node when no execution is being shown.',
   },
   nodeRoleDescription: {
     id: 'canvas.node.roleDescription',
@@ -26,10 +31,10 @@ export const canvasMessages = defineMessages({
     defaultMessage: 'Starts the flow',
     description: 'Accessible name of the badge on a trigger node. A trigger is what starts a flow.',
   },
-  controlType: {
-    id: 'canvas.control.type',
-    defaultMessage: '{type, select, if {If} switch {Switch} merge {Merge} loop {Loop} wait {Wait} other {Control}}',
-    description: 'Name of a kind of control node: a branch (if), a multi-way branch (switch), a merge, a loop or a wait.',
+  logicType: {
+    id: 'canvas.logic.type',
+    defaultMessage: '{type, select, if {If} switch {Switch} filter {Filter} merge {Merge} loop {Loop} wait {Wait} other {Logic}}',
+    description: 'Name of a kind of logic node: a branch (if), a multi-way branch (switch), a filter, a merge, a loop or a wait.',
   },
   edgeItems: {
     id: 'canvas.edge.items',
@@ -39,9 +44,26 @@ export const canvasMessages = defineMessages({
   edgeLabel: {
     id: 'canvas.edge.label',
     defaultMessage:
-      'Connection from {source} ({output}) to {target} ({input}){hasItems, select, yes {, {items, plural, one {# item} other {# items}}} other {}}{loop, select, yes {, loop back} other {}}',
-    description: 'Accessible name of a connection between two nodes: where it starts, where it ends and how many items went through.',
+      '{source} ({output}) to {target}{hasState, select, yes {: {items}, {state}} other {}}{loop, select, yes {, loop back} other {}}',
+    description:
+      'Accessible name of a connection between two nodes: the node and output it starts at, the node it ends at and, when an execution is shown, how many items went through and how the connection ended.',
   },
+  edgeState: {
+    id: 'canvas.edge.state',
+    defaultMessage: '{state, select, succeeded {succeeded} running {running} failed {failed} uncertain {uncertain} waiting {waiting} other {not run}}',
+    description: 'How a connection ended in the execution being shown, read after the item count in its accessible name.',
+  },
+  edgeUnknown: {
+    id: 'canvas.edge.unknown',
+    defaultMessage: 'unknown',
+    description: 'Label on a connection whose item count is not known because the node before it ended in an uncertain state.',
+  },
+  edgePinned: {
+    id: 'canvas.edge.pinned',
+    defaultMessage: '{label} · pinned',
+    description: 'Label on a connection that carries pinned data. {label} is the item count.',
+  },
+  edgeRepeat: { id: 'canvas.edge.repeat', defaultMessage: 'Repeat', description: 'Chip on a connection that goes back to an earlier node to repeat steps.' },
   outlineTitle: {
     id: 'canvas.outline.title',
     defaultMessage: 'Flow outline',
@@ -65,7 +87,7 @@ export const canvasMessages = defineMessages({
   outlineConnection: {
     id: 'canvas.outline.connection',
     defaultMessage:
-      '{direction, select, out {Output {port} goes to {other}, input {otherPort}} other {Input {port} receives from {other}, output {otherPort}}}{hasItems, select, yes {, {items, plural, one {# item} other {# items}}} other {}}',
+      '{direction, select, out {Output {port} goes to {other}, input {otherPort}} other {Input {port} receives from {other}, output {otherPort}}}{hasItems, select, yes {, {items, plural, one {# item} other {# items}}} other {}}{hasState, select, yes {, {state}} other {}}',
     description:
       'One connection of a node in the flow outline. "out" means the node sends to another node; otherwise it receives from one.',
   },
@@ -187,7 +209,7 @@ export const canvasMessages = defineMessages({
     defaultMessage: 'Move focus between nodes',
     description: 'Shortcut description: arrow keys move focus to the nearest node.',
   },
-  shortcutsOpen: { id: 'canvas.shortcuts.open', defaultMessage: 'Open the node details', description: 'Shortcut description: Enter opens the node inspector.' },
+  shortcutsOpen: { id: 'canvas.shortcuts.open', defaultMessage: 'Open the node details', description: 'Shortcut description: Enter opens the details of the focused node: its input, parameters and output.' },
   shortcutsSelect: {
     id: 'canvas.shortcuts.select',
     defaultMessage: 'Select or unselect the focused node',
@@ -276,4 +298,133 @@ export const canvasMessages = defineMessages({
   },
   ariaControls: { id: 'canvas.aria.controls', defaultMessage: 'Zoom controls', description: 'Accessible name of the group of zoom buttons.' },
   ariaMinimap: { id: 'canvas.aria.minimap', defaultMessage: 'Overview map of the flow', description: 'Accessible name of the small map that shows the whole flow.' },
+
+  // ---- Style A primitives -------------------------------------------------------------------
+  chipPinned: { id: 'canvas.chip.pinned', defaultMessage: 'Pinned', description: 'Chip under a node whose output data is pinned.' },
+  chipDisabled: { id: 'canvas.chip.disabled', defaultMessage: 'Disabled', description: 'Chip under a node that is turned off and passes data through.' },
+  chipNotSupported: {
+    id: 'canvas.chip.notSupported',
+    defaultMessage: 'Not supported',
+    description: 'Chip under a node that was imported but has no equivalent in Orcon.',
+  },
+  chipFailedCode: {
+    id: 'canvas.chip.failedCode',
+    defaultMessage: 'Failed · {code}',
+    description: 'Chip under a node that failed. {code} is a short error code such as an HTTP status.',
+  },
+  chipUncertainItems: {
+    id: 'canvas.chip.uncertainItems',
+    defaultMessage: '{count, plural, one {# uncertain} other {# uncertain}}',
+    description: 'Chip under a node that has items whose external operation may or may not have been applied.',
+  },
+  chipAdded: { id: 'canvas.chip.added', defaultMessage: 'Added', description: 'Chip on a node that exists only in the version being compared.' },
+  chipChanged: { id: 'canvas.chip.changed', defaultMessage: 'Changed', description: 'Chip on a node whose settings differ between two versions.' },
+  chipRemoved: { id: 'canvas.chip.removed', defaultMessage: 'Removed', description: 'Chip on a node that exists only in the version it is compared with.' },
+  pinnedBadge: { id: 'canvas.badge.pinned', defaultMessage: 'Output pinned', description: 'Accessible name of the pin badge on a node whose output is pinned.' },
+  triggerMark: { id: 'canvas.node.triggerMark', defaultMessage: 'Starts the flow', description: 'Accessible name of the lightning mark on a trigger node.' },
+  nodeAddAfter: {
+    id: 'canvas.port.addAfter',
+    defaultMessage: 'Add node after {name}{hasOutput, select, yes {, output {output}} other {}}',
+    description: 'Accessible name of the plus button on an output of a node. It opens the list of nodes to insert after that output.',
+  },
+  portConnectInvalid: {
+    id: 'canvas.port.invalid',
+    defaultMessage: 'These two ports cannot be connected',
+    description: 'Tooltip on an input while a connection is being dragged and the input cannot accept it.',
+  },
+  toolbarFor: { id: 'canvas.nodeToolbar.label', defaultMessage: 'Actions for {name}', description: 'Accessible name of the row of quick actions of a node. {name} is the node name.' },
+  actionExecuteWorkflow: {
+    id: 'canvas.nodeToolbar.executeWorkflow',
+    defaultMessage: 'Execute workflow',
+    description: 'Button in the actions of a trigger node that runs the whole flow from that trigger.',
+  },
+  actionRunStep: { id: 'canvas.nodeToolbar.runStep', defaultMessage: 'Run step', description: 'Button that runs one node with the data it already has.' },
+  actionDisable: { id: 'canvas.nodeToolbar.disable', defaultMessage: 'Disable node', description: 'Button that turns a node off so it passes data through.' },
+  actionEnable: { id: 'canvas.nodeToolbar.enable', defaultMessage: 'Enable node', description: 'Button that turns a disabled node back on.' },
+  actionDelete: { id: 'canvas.nodeToolbar.delete', defaultMessage: 'Delete node', description: 'Button that deletes one node and its connections.' },
+  actionMore: { id: 'canvas.nodeToolbar.more', defaultMessage: 'More actions', description: 'Button that opens a menu with more actions for a node.' },
+  actionRename: { id: 'canvas.nodeToolbar.rename', defaultMessage: 'Rename', description: 'Menu item that renames a node.' },
+  actionDuplicate: { id: 'canvas.nodeToolbar.duplicate', defaultMessage: 'Duplicate', description: 'Menu item that makes a copy of a node.' },
+  actionPin: { id: 'canvas.nodeToolbar.pin', defaultMessage: 'Pin data', description: 'Menu item that pins the output data of a node.' },
+  actionUnpin: { id: 'canvas.nodeToolbar.unpin', defaultMessage: 'Unpin data', description: 'Menu item that removes the pin from the output data of a node.' },
+  actionCopy: { id: 'canvas.nodeToolbar.copy', defaultMessage: 'Copy', description: 'Menu item that copies a node to the clipboard.' },
+  actionOpenDetails: { id: 'canvas.nodeToolbar.openDetails', defaultMessage: 'Open details', description: 'Menu item that opens the details of a node: its input, parameters and output.' },
+  renameLabel: { id: 'canvas.rename.label', defaultMessage: 'Node name', description: 'Accessible name of the field where a node is renamed on the canvas.' },
+  edgeActionsFor: {
+    id: 'canvas.edgeActions.label',
+    defaultMessage: 'Actions for the connection from {source} to {target}',
+    description: 'Accessible name of the two buttons that appear on a connection.',
+  },
+  edgeAddHere: { id: 'canvas.edgeActions.addHere', defaultMessage: 'Add node here', description: 'Button on a connection that inserts a node in the middle of it.' },
+  edgeDelete: { id: 'canvas.edgeActions.delete', defaultMessage: 'Delete connection', description: 'Button on a connection that removes it.' },
+  zoomReset: { id: 'canvas.controls.reset', defaultMessage: 'Reset zoom to 100%', description: 'Button that sets the canvas zoom back to 100 percent.' },
+  zoomLevel: {
+    id: 'canvas.controls.level',
+    defaultMessage: 'Zoom {percent, number, ::percent}',
+    description: 'Accessible name of the current zoom level of the canvas.',
+  },
+  tidyUp: { id: 'canvas.controls.tidyUp', defaultMessage: 'Tidy up', description: 'Button that lines the nodes up on the grid in columns.' },
+  addFirstStep: { id: 'canvas.addFirstStep', defaultMessage: 'Add first step', description: 'Button on an empty canvas that opens the list of triggers to start the flow.' },
+  aiModel: { id: 'canvas.ai.model', defaultMessage: 'Model', description: 'Label of the language model block of an agent node.' },
+  aiMemory: { id: 'canvas.ai.memory', defaultMessage: 'Memory', description: 'Label of the memory block of an agent node.' },
+  aiTools: { id: 'canvas.ai.tools', defaultMessage: 'Tools', description: 'Label of the tools block of an agent node.' },
+  aiParser: { id: 'canvas.ai.parser', defaultMessage: 'Parser', description: 'Label of the output parser block of an agent node.' },
+  aiRetrieval: { id: 'canvas.ai.retrieval', defaultMessage: 'Retrieval', description: 'Label of the document retrieval block of an agent node.' },
+  aiBlockSet: {
+    id: 'canvas.ai.blockSet',
+    defaultMessage: '{block}: {detail}. Opens the agent settings.',
+    description: 'Accessible name of a configured block of an agent node. {block} is the kind of block and {detail} what is configured.',
+  },
+  aiBlockUnset: {
+    id: 'canvas.ai.blockUnset',
+    defaultMessage: '{block}: not set. Opens the agent settings.',
+    description: 'Accessible name of a block of an agent node that is not configured yet.',
+  },
+  stickyLabel: { id: 'canvas.sticky.label', defaultMessage: 'Sticky note', description: 'Name of a sticky note on the canvas, and its default title.' },
+  stickyNamed: {
+    id: 'canvas.sticky.named',
+    defaultMessage: 'Sticky note: {text}',
+    description: 'Accessible name of a sticky note on the canvas. {text} is the start of its text.',
+  },
+  stickyEdit: { id: 'canvas.sticky.edit', defaultMessage: 'Edit note', description: 'Button that lets the text of a sticky note be edited.' },
+  stickyText: { id: 'canvas.sticky.text', defaultMessage: 'Note text', description: 'Accessible name of the text field of a sticky note.' },
+  stickyPlaceholder: { id: 'canvas.sticky.placeholder', defaultMessage: 'Write a note', description: 'Hint in an empty sticky note.' },
+  stickyColor: { id: 'canvas.sticky.color', defaultMessage: 'Note color', description: 'Accessible name of the group of buttons that choose the color of a sticky note.' },
+  stickyColorOption: {
+    id: 'canvas.sticky.colorOption',
+    defaultMessage: 'Color {number}',
+    description: 'Accessible name of one color choice of a sticky note. {number} counts from 1 to 6.',
+  },
+  stickyResize: { id: 'canvas.sticky.resize', defaultMessage: 'Resize note', description: 'Accessible name of the corner handle that resizes a sticky note.' },
+  stickyAdd: { id: 'canvas.sticky.add', defaultMessage: 'Add a sticky note', description: 'Button that adds a sticky note to the canvas.' },
+  announceNoteAdded: { id: 'canvas.announce.noteAdded', defaultMessage: 'Added a sticky note', description: 'Spoken after a sticky note was added.' },
+  announceRenamed: { id: 'canvas.announce.renamed', defaultMessage: 'Renamed to {name}', description: 'Spoken after a node was renamed. {name} is the new name.' },
+  announceDisabled: { id: 'canvas.announce.disabled', defaultMessage: '{name} is disabled', description: 'Spoken after a node was turned off.' },
+  announceEnabled: { id: 'canvas.announce.enabled', defaultMessage: '{name} is enabled', description: 'Spoken after a node was turned back on.' },
+  announcePinned: { id: 'canvas.announce.pinned', defaultMessage: 'Pinned the output of {name}', description: 'Spoken after the output of a node was pinned.' },
+  announceUnpinned: { id: 'canvas.announce.unpinned', defaultMessage: 'Unpinned the output of {name}', description: 'Spoken after the pin of a node output was removed.' },
+  announceInserted: {
+    id: 'canvas.announce.inserted',
+    defaultMessage: 'Added {name} between {source} and {target}',
+    description: 'Spoken after a node was inserted in the middle of a connection.',
+  },
+  announceRunning: { id: 'canvas.announce.running', defaultMessage: 'Running {name}', description: 'Spoken when a node starts running.' },
+  announceDuplicated: { id: 'canvas.announce.duplicated', defaultMessage: 'Duplicated {name}', description: 'Spoken after a node was duplicated.' },
+  announceResized: {
+    id: 'canvas.announce.resized',
+    defaultMessage: 'Note resized to {width} by {height}',
+    description: 'Spoken after a sticky note was resized with the keyboard.',
+  },
+  paletteTriggers: { id: 'canvas.palette.triggers', defaultMessage: 'Choose a trigger', description: 'Title of the node list when it is opened to pick the first step of an empty flow.' },
+  paletteClose: { id: 'canvas.palette.close', defaultMessage: 'Close the node list', description: 'Accessible name of the button that closes the node list.' },
+  paletteResults: { id: 'canvas.palette.results', defaultMessage: 'Nodes', description: 'Accessible name of the list of nodes that can be added.' },
+  mobileSheetTitle: { id: 'canvas.mobile.title', defaultMessage: 'Node status', description: 'Title of the panel that opens when a node is tapped on a phone.' },
+  shortcutsRun: { id: 'canvas.shortcuts.run', defaultMessage: 'Run the focused step', description: 'Shortcut description: R runs the focused node.' },
+  shortcutsDisable: { id: 'canvas.shortcuts.disable', defaultMessage: 'Disable or enable the focused node', description: 'Shortcut description: D turns the focused node off or on.' },
+  shortcutsPin: { id: 'canvas.shortcuts.pin', defaultMessage: 'Pin or unpin the focused node output', description: 'Shortcut description: P pins or unpins the output of the focused node.' },
+  shortcutsRename: { id: 'canvas.shortcuts.rename', defaultMessage: 'Rename the focused node', description: 'Shortcut description: F2 renames the focused node.' },
+  shortcutsSticky: { id: 'canvas.shortcuts.sticky', defaultMessage: 'Add a sticky note', description: 'Shortcut description: Shift and S add a sticky note.' },
+  shortcutsZoom: { id: 'canvas.shortcuts.zoom', defaultMessage: 'Zoom in, zoom out, reset to 100%, fit the flow', description: 'Shortcut description: plus, minus, zero and one change the zoom.' },
+  shortcutsResizeNote: { id: 'canvas.shortcuts.resizeNote', defaultMessage: 'Resize the focused sticky note', description: 'Shortcut description: Control and Shift plus arrow resize a sticky note.' },
+  shortcutsEdge: { id: 'canvas.shortcuts.edge', defaultMessage: 'On a focused connection: insert a node or delete it', description: 'Shortcut description: with a connection focused, Enter opens the node list and Delete removes it.' },
 });

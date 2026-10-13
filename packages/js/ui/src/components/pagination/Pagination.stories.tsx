@@ -50,10 +50,10 @@ export const Matrix: Story = {
       caption="Pagination states"
       columns={['pagination']}
       rows={[
-        { label: 'default', cells: [<div key="d" className="w-node-width"><Pagination page={2} pageCount={10} onPageChange={() => undefined} /></div>] },
-        { label: 'first', cells: [<div key="f" className="w-node-width"><Pagination page={1} pageCount={10} onPageChange={() => undefined} /></div>] },
-        { label: 'last', cells: [<div key="l" className="w-node-width"><Pagination page={10} pageCount={10} onPageChange={() => undefined} /></div>] },
-        { label: 'single', cells: [<div key="s" className="w-node-width"><Pagination page={1} pageCount={1} onPageChange={() => undefined} /></div>] },
+        { label: 'default', cells: [<div key="d" className="w-panel-width"><Pagination page={2} pageCount={10} onPageChange={() => undefined} /></div>] },
+        { label: 'first', cells: [<div key="f" className="w-panel-width"><Pagination page={1} pageCount={10} onPageChange={() => undefined} /></div>] },
+        { label: 'last', cells: [<div key="l" className="w-panel-width"><Pagination page={10} pageCount={10} onPageChange={() => undefined} /></div>] },
+        { label: 'single', cells: [<div key="s" className="w-panel-width"><Pagination page={1} pageCount={1} onPageChange={() => undefined} /></div>] },
       ]}
     />
   ),
