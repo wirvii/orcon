@@ -25,7 +25,7 @@ Required: `format`, `id`, `name`, `settings`, `variables`, `nodes`, `edges`, `ed
 
 The reader is strict so that reading and writing a document gives back the same data, and therefore the same `contentHash`: an empty string, a `0` where a count or limit is meant, and an empty optional array are errors (leave the member out). The required arrays `variables`, `nodes` and `edges` may be empty. An explicit `false` is kept. The published schema states the same rules (`minLength`, `minimum`, `minItems`). Every error carries the JSON Pointer of the offending member.
 
-`ext` keys are namespaced `vendor.key`; `orcon.*` is reserved.
+`ext` keys are namespaced `vendor.key`; `orcon.*` is reserved for keys an Accepted ADR defines: today only `orcon.import` in a node's `ext` (ADR-0034 §8 and its amendment), whose closed shape is checked at level 1.
 
 ## Enumerated values
 
