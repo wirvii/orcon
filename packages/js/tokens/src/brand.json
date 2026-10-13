@@ -1,0 +1,45 @@
+{
+  "brand": {
+    "$type": "color",
+    "green": {
+      "$value": "{color.green.500}",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
+    },
+    "green-dark": {
+      "$value": "{color.green.600}",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
+    },
+    "cyan": {
+      "$value": "{color.cyan.500}",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
+    },
+    "navy": {
+      "$value": "{color.slate.900}",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
+    },
+    "slate": {
+      "$value": "{color.slate.500}",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
+    }
+  }
+}

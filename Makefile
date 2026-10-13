@@ -198,7 +198,7 @@ bench-compare:
 
 # skill-sync copies each canonical skill to its generated copy.
 skill-sync:
-	set -e; for skill in orcon-go orcon-db orcon-api orcon-connector orcon-contributing orcon-web; do \
+	set -e; for skill in orcon-go orcon-db orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do \
 		sh .agents/skills/$$skill/scripts/project.sh; \
 	done
 
@@ -210,7 +210,7 @@ skill-check:
 # ---------------------------------------------------------------------------
 
 web:
-	pnpm --filter @orcon/web build
+	pnpm --filter '@orcon/web...' build
 	mkdir -p internal/adapter/webui/dist
 	cp -R apps/web/dist/. internal/adapter/webui/dist/
 

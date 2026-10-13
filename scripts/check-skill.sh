@@ -48,7 +48,7 @@ check_skill() {
   uvx --from "git+https://github.com/agentskills/agentskills@${skills_ref}#subdirectory=skills-ref" skills-ref validate "$skill"
 }
 
-for name in orcon-go orcon-db orcon-api orcon-connector orcon-contributing orcon-web; do
+for name in orcon-go orcon-db orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do
   check_skill "$name"
 done
 echo "skill-check: ok"

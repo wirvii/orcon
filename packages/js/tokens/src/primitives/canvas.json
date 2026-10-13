@@ -1,0 +1,141 @@
+{
+  "canvas": {
+    "node-size": {
+      "$type": "dimension",
+      "$value": "100px",
+      "$description": "Width and height of a node tile at 100 % zoom."
+    },
+    "node-wide": {
+      "$type": "dimension",
+      "$value": "200px",
+      "$description": "Width of the wide tile of an agent node."
+    },
+    "icon-box": {
+      "$type": "dimension",
+      "$value": "40px",
+      "$description": "Icon box inside a node tile."
+    },
+    "icon": {
+      "$type": "dimension",
+      "$value": "36px",
+      "$description": "Built-in node icon."
+    },
+    "label-width": {
+      "$type": "dimension",
+      "$value": "150px",
+      "$description": "Maximum width of a node label."
+    },
+    "label-gap": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Space between a node tile and its label."
+    },
+    "ring-gap": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Distance of the run ring from the node tile."
+    },
+    "badge": {
+      "$type": "dimension",
+      "$value": "22px",
+      "$description": "Status and pinned badges and the trigger mark."
+    },
+    "badge-glyph": {
+      "$type": "dimension",
+      "$value": "14px",
+      "$description": "Status glyph inside a node badge."
+    },
+    "port-hover": {
+      "$type": "dimension",
+      "$value": "24px",
+      "$description": "Output port grown on hover or focus."
+    },
+    "stub": {
+      "$type": "dimension",
+      "$value": "30px",
+      "$description": "Length of the dashed stub of an unconnected output."
+    },
+    "stub-box": {
+      "$type": "dimension",
+      "$value": "22px",
+      "$description": "Square at the end of the stub of an unconnected output."
+    },
+    "toolbar-button": {
+      "$type": "dimension",
+      "$value": "28px",
+      "$description": "Button of the node toolbar."
+    },
+    "ai-block": {
+      "$type": "dimension",
+      "$value": "48px",
+      "$description": "Circle of an AI configuration block."
+    },
+    "grid-step": {
+      "$type": "dimension",
+      "$value": "20px",
+      "$description": "Spacing of the dot grid and the snap step."
+    },
+    "grid-dot": {
+      "$type": "dimension",
+      "$value": "1.4px",
+      "$description": "Radius of a dot of the canvas grid."
+    },
+    "minimap-w": {
+      "$type": "dimension",
+      "$value": "200px",
+      "$description": "Minimap width."
+    },
+    "minimap-h": {
+      "$type": "dimension",
+      "$value": "120px",
+      "$description": "Minimap height."
+    },
+    "palette-w": {
+      "$type": "dimension",
+      "$value": "360px",
+      "$description": "Width of the node palette panel."
+    },
+    "lod": {
+      "detail": {
+        "$type": "number",
+        "$value": 0.6
+      },
+      "minimal": {
+        "$type": "number",
+        "$value": 0.35
+      }
+    },
+    "zoom": {
+      "min": {
+        "$type": "number",
+        "$value": 0.2
+      },
+      "max": {
+        "$type": "number",
+        "$value": 4
+      }
+    }
+  },
+  "editor": {
+    "params-min": {
+      "$type": "dimension",
+      "$value": "420px",
+      "$description": "Minimum width of the Parameters pane."
+    },
+    "params-max": {
+      "$type": "dimension",
+      "$value": "640px",
+      "$description": "Maximum width of the Parameters pane."
+    },
+    "pane-min": {
+      "$type": "dimension",
+      "$value": "280px",
+      "$description": "Minimum width of the Input and Output panes."
+    },
+    "docked-panel": {
+      "$type": "dimension",
+      "$value": "320px",
+      "$description": "Width of the docked Parameters pane between md and lg."
+    }
+  }
+}

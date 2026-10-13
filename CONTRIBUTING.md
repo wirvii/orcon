@@ -54,6 +54,10 @@ Read [docs/engineering/db.md](docs/engineering/db.md) before changing a table, a
 
 Read [docs/engineering/web.md](docs/engineering/web.md) before changing code in `apps/web` or `packages/js`. The complete web application rulebook lives in `.agents/skills/orcon-web/references/` and is packaged as the `orcon-web` mneme skill.
 
+## Web UI code
+
+Read [docs/design-system/README.md](docs/design-system/README.md) before restyling or adding components, canvas, editor, tokens, screens or translation catalogs under `apps/web` or `packages/js`. The design rules live in `.agents/skills/orcon-ui/references/` and are packaged as the `orcon-ui` mneme skill; run `sh .agents/skills/orcon-ui/scripts/verify.sh` before opening the pull request.
+
 ## How maintainers track work
 
 Maintainers plan and review work with [mneme](https://github.com/juanftp/mneme), which keeps the project's backlog, specifications, acceptance criteria and QA reports. Pull requests for that work include a line such as `Spec: SPEC-013`. You do not need mneme to contribute: use `Spec: n/a`, and a maintainer links your pull request to the backlog if needed.

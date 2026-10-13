@@ -1,0 +1,11 @@
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+a {
+  color: var(--orcon-fg-link);
+  background-color: var(--orcon-surface-default);
+  padding: var(--orcon-space-2) var(--orcon-space-4);
+  margin: 0 auto;
+  border-radius: var(--orcon-radius-md);
+  border: 1px solid var(--orcon-border-control);
+}
