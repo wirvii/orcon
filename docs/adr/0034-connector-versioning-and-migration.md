@@ -48,3 +48,8 @@ Upgrades are deliberate per node, never surprise changes; rollback works at node
 
 ## Alternatives considered
 Global connector upgrade for all flows (rejected by K4); floating "latest compatible" pins (rejected: silent behaviour change); counting every historical flow version as a reference (rejected, SPEC-003 Q4: nothing could ever be retired); mechanical renames in minor releases (rejected by ADR-0079 §6: users see a rename as breaking); counting references with a query inside flow documents (rejected: DA-3 as amended).
+
+## Amendments
+Changes applied by specifications the owner approved; each entry names its source.
+
+- **SPEC-003 (Amendment 9, CN2).** §8: `ext["orcon.import"]` is the closed object `{ n8nType: string, n8nTypeVersion: number, n8nNodeId?: string, reviewStatus?: "NEEDS_REVIEW" | "REVIEWED", reviewReasons?: ["HTTP_WRITE" | "HTTP_METHOD_EXPRESSION" | "UNSAFE_OPERATION"], original?: object }`. `reviewReasons` is present, non-empty and without repeats exactly when `reviewStatus` is present. The importer sets `reviewStatus: "NEEDS_REVIEW"` on every node it imports with an `UNSAFE` contract (ADR-0037 §6): an HTTP Request with a write method (`HTTP_WRITE`) or with a method given by an expression (`HTTP_METHOD_EXPRESSION`), and a connector operation whose safety level is `UNSAFE` (`UNSAFE_OPERATION`). A person who reviews the node sets `REVIEWED` in the draft; the reasons stay. Activation (ADR-0024) fails, naming the nodes, while any node of the version being activated is `NEEDS_REVIEW`; publication does not fail. `original` holds the original n8n node and appears only on `orcon.unsupported@1` nodes (SPEC-014 OQ1). Values are UPPER_SNAKE (ADR-0007 §11).
