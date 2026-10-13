@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: view
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ProjectId
+get:
+  operationId: listNodeTypes
+  summary: List the node types a project can use
+  description: >-
+    Returns the node types available to the flows of a project, built in or provided by installed connectors,
+    with their operations, purity and safety level. Names and descriptions are in the language of the
+    request.
+  tags:
+    - node-types
+  x-orcon-permission: project:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: node-types list
+  x-orcon-mcp:
+    level: read
+    tool: list_node_types
+    description: List the node types a project can use.
+  x-orcon-examples:
+    - name: coreNodeTypes
+      scenario: empty-project
+      request:
+        pathParams:
+          projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        query:
+          group: Core
+          q: HTTP
+      response:
+        status: 200
+        body: coreNodeTypes
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+    - name: q
+      in: query
+      required: false
+      description: Return only node types whose name contains this text (case-insensitive).
+      schema:
+        type: string
+        maxLength: 200
+        examples:
+          - HTTP
+    - name: group
+      in: query
+      required: false
+      description: Return only node types of this palette group.
+      schema:
+        type: string
+        maxLength: 100
+        examples:
+          - Core
+    - name: connectorId
+      in: query
+      required: false
+      description: Return only node types provided by this connector.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a6a
+  responses:
+    '200':
+      description: One page of node types.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/NodeTypeList
+          examples:
+            coreNodeTypes:
+              summary: The HTTP request node type
+              value:
+                items:
+                  - type: orcon.http@1
+                    name: HTTP request
+                    description: Calls an HTTP endpoint and returns the response.
+                    group: Core
+                    seal: OFFICIAL
+                    proofLevel: TESTED
+                    operations:
+                      - name: request.send
+                        label: Send a request
+                        purity: EFFECT
+                        safetyLevel: UNSAFE
+                    n8nTypes:
+                      - n8n-nodes-base.httpRequest
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

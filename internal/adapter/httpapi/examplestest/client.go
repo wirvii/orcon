@@ -24,6 +24,7 @@ type Client struct {
 	base   string
 	prefix string
 	token  string
+	orgID  string
 	http   *http.Client
 }
 
@@ -36,6 +37,18 @@ func NewClient(baseURL, apiPrefix, token string, httpClient *http.Client) *Clien
 	}
 	return &Client{base: strings.TrimRight(baseURL, "/"), prefix: apiPrefix, token: token, http: httpClient}
 }
+
+// WithOrg returns a client that reports orgID as the organization of its
+// credential. Scenarios read it with [Client.OrgID] to seed state in the right
+// organization.
+func (c *Client) WithOrg(orgID string) *Client {
+	clone := *c
+	clone.orgID = orgID
+	return &clone
+}
+
+// OrgID returns the id of the organization the credential belongs to.
+func (c *Client) OrgID() string { return c.orgID }
 
 // Request is one call to the API.
 type Request struct {

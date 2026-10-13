@@ -1,0 +1,126 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+post:
+  operationId: publishFlow
+  summary: Publish a flow draft
+  description: >-
+    Creates a new immutable version of the flow from its current draft and makes it the version that new
+    executions use while the flow is active. Use it after the draft validates without errors; executions
+    already running keep the version they started with.
+  tags:
+    - flows
+  x-orcon-permission: flow:publish
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: flow.published
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - project-managed-by-git
+    - precondition-failed
+    - payload-too-large
+    - idempotency-key-reused
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows publish
+  x-orcon-mcp:
+    level: destructive
+    tool: publish_flow
+    description: Publish the current draft of a flow as a new version.
+  x-orcon-examples:
+    - name: publishWithNote
+      scenario: flow-with-valid-draft
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        headers:
+          If-Match: '"1"'
+          Idempotency-Key: publish-example-1
+        body: publishWithNote
+      response:
+        status: 200
+        body: publishWithNote
+    - name: publishStaleDraft
+      scenario: flow-with-valid-draft
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        headers:
+          If-Match: '"0"'
+        body: publishWithNote
+      response:
+        status: 412
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/PublishFlowRequest
+        examples:
+          publishWithNote:
+            summary: Publish with a release note
+            value:
+              note: Retry the CRM step on rate limits
+  responses:
+    '200':
+      description: The new version.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/FlowVersion
+          examples:
+            publishWithNote:
+              summary: Version 1 with the note
+              value:
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                version: 1
+                contentHash: sha256:4f2a9c0d7e8b1a36c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f00112233445566778
+                publishedAt: '2026-10-12T15:10:00Z'
+                publishedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+                note: Retry the CRM step on rate limits
+                warnings: []
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+FlowVersion:
+  type: object
+  description: An immutable published version of a flow.
+  required:
+    - flowId
+    - version
+    - contentHash
+    - publishedAt
+    - warnings
+  properties:
+    flowId:
+      type: string
+      format: uuid
+      description: Id of the flow.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+    version:
+      type: integer
+      description: Version number, starting at 1.
+      examples:
+        - 3
+      minimum: 1
+    contentHash:
+      type: string
+      description: >-
+        Hash of the document of the version; two versions with the same hash have the same content.
+      examples:
+        - sha256:4f2a9c0d7e8b1a36c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f00112233445566778
+      maxLength: 128
+      x-orcon-volatile: true
+    publishedAt:
+      type: string
+      format: date-time
+      description: When the version was published, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    publishedBy:
+      type: string
+      format: uuid
+      description: Id of the principal that published the version; absent when the principal was deleted.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+    note:
+      type: string
+      description: Release note given at publication.
+      examples:
+        - Retry the CRM step on rate limits
+      maxLength: 500
+    rolledBackFromVersion:
+      type: integer
+      description: When the version came from a rollback, the number of the version whose content it repeats.
+      examples:
+        - 1
+      minimum: 1
+    gitCommit:
+      type: string
+      description: Commit that holds the version when the project is bound to Git.
+      examples:
+        - 9f3c2a1b7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a
+      maxLength: 64
+    warnings:
+      type: array
+      description: The warnings stored with the version; empty when there are none.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/ValidationIssue
+    document:
+      $ref: ../openapi.yaml#/components/schemas/FlowDocument
+      description: The document of the version. It is present only when you read one version.
+FlowVersionList:
+  type: object
+  description: One page of flow versions, without their documents.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/FlowVersion
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+PublishFlowRequest:
+  type: object
+  description: Options for publishing a flow draft.
+  additionalProperties: false
+  properties:
+    note:
+      type: string
+      description: Release note stored with the version.
+      examples:
+        - Retry the CRM step on rate limits
+      maxLength: 500
+RollbackFlowRequest:
+  type: object
+  description: Which earlier version to make current.
+  required:
+    - version
+  additionalProperties: false
+  properties:
+    version:
+      type: integer
+      description: Number of the earlier version whose content is published again as a new version.
+      examples:
+        - 1
+      minimum: 1
+    note:
+      type: string
+      description: Release note stored with the new version.
+      examples:
+        - Back to the version before the pricing change
+      maxLength: 500

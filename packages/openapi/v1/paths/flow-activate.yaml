@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+post:
+  operationId: activateFlow
+  summary: Activate a flow
+  description: >-
+    Switches on the automatic triggers of the flow so that new events start executions of its active version.
+    It creates no version; the flow must have been published first.
+  tags:
+    - flows
+  x-orcon-permission: flow:activate
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: flow.activated
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows activate
+  x-orcon-mcp:
+    level: destructive
+    tool: activate_flow
+    description: Activate a published flow so its triggers start running.
+  x-orcon-examples:
+    - name: activatePublishedFlow
+      scenario: flow-published
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      response:
+        status: 200
+        body: activatePublishedFlow
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  responses:
+    '200':
+      description: The activated flow.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Flow
+          examples:
+            activatePublishedFlow:
+              summary: The flow is active
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                name: Welcome email
+                activationState: ACTIVE
+                activeVersion: 1
+                hasUnpublishedChanges: false
+                draftRevision: 1
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

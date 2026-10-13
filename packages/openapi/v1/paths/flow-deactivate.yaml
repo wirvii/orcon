@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+post:
+  operationId: deactivateFlow
+  summary: Deactivate a flow
+  description: >-
+    Switches off the automatic triggers of the flow: addresses answer as inactive and schedules stop.
+    Executions that are already running continue.
+  tags:
+    - flows
+  x-orcon-permission: flow:activate
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: flow.deactivated
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - idempotency-in-progress
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows deactivate
+  x-orcon-mcp:
+    level: destructive
+    tool: deactivate_flow
+    description: Deactivate a flow so its triggers stop starting executions.
+  x-orcon-examples:
+    - name: deactivateActiveFlow
+      scenario: flow-active
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      response:
+        status: 200
+        body: deactivateActiveFlow
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  responses:
+    '200':
+      description: The deactivated flow.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Flow
+          examples:
+            deactivateActiveFlow:
+              summary: The flow is inactive again
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                name: Welcome email
+                activationState: INACTIVE
+                activeVersion: 1
+                hasUnpublishedChanges: false
+                draftRevision: 1
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

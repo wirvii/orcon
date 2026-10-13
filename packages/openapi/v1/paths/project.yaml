@@ -1,0 +1,248 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: item
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ProjectId
+get:
+  operationId: getProject
+  summary: Get a project
+  description: >-
+    Returns one project with the ETag of its current representation. Use the ETag as If-Match when you
+    change or delete the project.
+  tags:
+    - projects
+  x-orcon-permission: project:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: projects get
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: getExistingProject
+      scenario: empty-project
+      request:
+        pathParams:
+          projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+      response:
+        status: 200
+        body: getExistingProject
+  responses:
+    '200':
+      description: The project.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Project
+          examples:
+            getExistingProject:
+              summary: A production project
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+                name: Customer onboarding
+                slug: onboarding
+                handle: onboarding
+                environment: prod
+                protected: true
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
+patch:
+  operationId: updateProject
+  summary: Update a project
+  description: >-
+    Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you
+    read in If-Match; a stale ETag is refused so concurrent edits are never lost.
+  tags:
+    - projects
+  x-orcon-permission: project:update
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: project.updated
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - precondition-failed
+    - payload-too-large
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: projects update
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: renameProject
+      scenario: empty-project
+      request:
+        pathParams:
+          projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        headers:
+          If-Match: '"1"'
+        body: renameProject
+      response:
+        status: 200
+        body: renameProject
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+  requestBody:
+    required: true
+    content:
+      application/merge-patch+json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/UpdateProjectRequest
+        examples:
+          renameProject:
+            summary: Rename the project
+            value:
+              name: Customer onboarding v2
+  responses:
+    '200':
+      description: The updated project.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Project
+          examples:
+            renameProject:
+              summary: The renamed project
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+                name: Customer onboarding v2
+                slug: onboarding
+                handle: onboarding
+                environment: prod
+                protected: true
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
+delete:
+  operationId: deleteProject
+  summary: Delete a project
+  description: >-
+    Deletes the project and every flow it owns. The project can be restored within 30 days; its automatic
+    triggers are switched off at once and executions that are running continue.
+  tags:
+    - projects
+  x-orcon-permission: project:delete
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: project.deleted
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - precondition-failed
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: projects delete
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: deleteProject
+      scenario: empty-project
+      request:
+        pathParams:
+          projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        headers:
+          If-Match: '"1"'
+      response:
+        status: 204
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+  responses:
+    '204':
+      description: The project was deleted.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

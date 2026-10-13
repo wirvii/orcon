@@ -1,0 +1,141 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+NodeTypeOperation:
+  type: object
+  description: One operation of a node type.
+  required:
+    - name
+    - label
+    - purity
+    - safetyLevel
+  properties:
+    name:
+      type: string
+      description: Name of the operation, resource.verb.
+      examples:
+        - contact.create
+      maxLength: 200
+    label:
+      type: string
+      description: Name shown to people, in the language of the request.
+      examples:
+        - Create a contact
+      maxLength: 200
+    purity:
+      type: string
+      description: >-
+        Purity class of the operation: PURE derives its output from its inputs, READ reads from outside
+        without effects, EFFECT changes the outside world, INTERNAL_EFFECT changes Orcon state, AGENTIC
+        is a stepped node with its own durable state.
+      enum:
+        - PURE
+        - READ
+        - EFFECT
+        - INTERNAL_EFFECT
+        - AGENTIC
+      examples:
+        - EFFECT
+    safetyLevel:
+      type: string
+      description: >-
+        How an EFFECT operation is protected against running twice or with an unknown outcome; NONE for
+        the other purity classes.
+      enum:
+        - NONE
+        - IDEMPOTENCY_KEY
+        - RECONCILE
+        - UNSAFE
+      examples:
+        - IDEMPOTENCY_KEY
+NodeType:
+  type: object
+  description: A node type a flow of the project can use, built in or provided by an installed connector.
+  required:
+    - type
+    - name
+    - description
+    - group
+    - seal
+    - proofLevel
+    - operations
+    - n8nTypes
+  properties:
+    type:
+      type: string
+      description: Identifier of the node type as written in flow documents.
+      examples:
+        - orcon.http@1
+      maxLength: 255
+    name:
+      type: string
+      description: Name shown to people, in the language of the request.
+      examples:
+        - HTTP request
+      maxLength: 200
+    description:
+      type: string
+      description: What the node type does, in the language of the request.
+      examples:
+        - Calls an HTTP endpoint and returns the response.
+      maxLength: 1000
+    group:
+      type: string
+      description: Palette group the node type belongs to.
+      examples:
+        - Core
+      maxLength: 100
+    seal:
+      type: string
+      description: Review seal of the connector that provides the type; built-in types are OFFICIAL.
+      enum:
+        - OFFICIAL
+        - VERIFIED
+        - UNREVIEWED
+      examples:
+        - OFFICIAL
+    proofLevel:
+      type: string
+      description: How far the safety contracts of the operations are proven.
+      enum:
+        - DECLARED
+        - TESTED
+        - VERIFIED
+      examples:
+        - TESTED
+    connectorId:
+      type: string
+      format: uuid
+      description: Id of the installed connector that provides the type; absent for built-in types.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a6a
+    operations:
+      type: array
+      description: The operations of the type with their purity and safety level.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/NodeTypeOperation
+    n8nTypes:
+      type: array
+      description: The n8n node types this type replaces when a flow is imported.
+      items:
+        type: string
+        description: An n8n node type name.
+        examples:
+          - n8n-nodes-base.httpRequest
+        maxLength: 255
+NodeTypeList:
+  type: object
+  description: One page of node types.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/NodeType
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024

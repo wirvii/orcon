@@ -122,6 +122,11 @@ func ParseSpec(raw []byte) (*Spec, error) {
 func (s *Spec) operation(path, method string, item, doc map[string]any) (Operation, error) {
 	op := Operation{Method: strings.ToUpper(method), Path: path}
 	op.ID, _ = doc["operationId"].(string)
+	// The generator embeds operation ids in Go style (GetFlow); the contract writes
+	// them lowerCamel (getFlow). Operation.ID is the contract's spelling.
+	if op.ID != "" {
+		op.ID = strings.ToLower(op.ID[:1]) + op.ID[1:]
+	}
 	where := fmt.Sprintf("%s %s", op.Method, path)
 	if op.ID == "" {
 		return op, fmt.Errorf("%w: %s has no operationId", ErrSpec, where)

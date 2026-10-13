@@ -44,7 +44,8 @@ type Deps struct {
 	// Catalog, when set, makes New fail if the contract names a permission
 	// that is not in it.
 	Catalog *authz.Catalog
-	// Server implements the operations of the contract; nil serves none.
+	// Server implements the operations of the contract; nil answers 503
+	// service-unavailable to all of them (Unavailable).
 	Server apigen.StrictServerInterface
 	// Limits are the rate limits; the zero value means middleware.DefaultLimits.
 	Limits middleware.Limits
@@ -103,7 +104,11 @@ func New(deps *Deps) (*Router, error) {
 		return nil, fmt.Errorf("read the embedded contract: %w", err)
 	}
 	return build(deps, raw, func(mux apigen.ServeMux, baseURL string) {
-		handler := apigen.NewStrictHandlerWithOptions(deps.Server, nil, apigen.StrictHTTPServerOptions{
+		server := deps.Server
+		if server == nil {
+			server = Unavailable{}
+		}
+		handler := apigen.NewStrictHandlerWithOptions(server, nil, apigen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  errorHandler{logger: deps.Logger}.request,
 			ResponseErrorHandlerFunc: errorHandler{logger: deps.Logger}.response,
 		})

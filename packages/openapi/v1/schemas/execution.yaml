@@ -1,0 +1,669 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+ExecutionFailure:
+  type: object
+  description: How an execution or a node execution failed. It is present only when the status is FAILED.
+  required:
+    - code
+    - title
+  properties:
+    code:
+      type: string
+      description: Error code of the engine or of the node, an identifier such as NodeTimeout.
+      examples:
+        - NodeTimeout
+      maxLength: 100
+    title:
+      type: string
+      description: Short summary of the failure.
+      examples:
+        - The node timed out
+      maxLength: 200
+    detail:
+      type: string
+      description: Sanitized explanation of the failure.
+      examples:
+        - The node did not answer within 30 seconds.
+      maxLength: 2000
+    nodeId:
+      type: string
+      description: Id of the node where the failure happened, as written in the flow document.
+      examples:
+        - greeting
+      maxLength: 255
+      x-orcon-external-id: true
+Execution:
+  type: object
+  description: One execution of a flow version.
+  required:
+    - id
+    - flowId
+    - projectId
+    - flowVersion
+    - mode
+    - status
+    - createdAt
+    - dataHidden
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the execution.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+      readOnly: true
+    flowId:
+      type: string
+      format: uuid
+      description: Id of the flow that ran.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+    projectId:
+      type: string
+      format: uuid
+      description: Id of the project that owns the flow.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+    flowVersion:
+      type: integer
+      description: Number of the flow version the execution runs; it never changes.
+      examples:
+        - 3
+      minimum: 1
+    mode:
+      type: string
+      description: How the execution started.
+      enum:
+        - WEBHOOK
+        - TRIGGER
+        - TEST
+        - MANUAL
+        - CHILD
+        - ERROR
+        - RETRY
+        - EVALUATION
+      examples:
+        - MANUAL
+    status:
+      type: string
+      description: Progress of the execution.
+      enum:
+        - QUEUED
+        - RUNNING
+        - WAITING
+        - SUSPENDED
+        - CANCELING
+        - COMPENSATING
+        - SUCCEEDED
+        - FAILED
+        - CANCELED
+      examples:
+        - SUCCEEDED
+    createdAt:
+      type: string
+      format: date-time
+      description: When the execution was accepted, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    startedAt:
+      type: string
+      format: date-time
+      description: When the execution started to run, in UTC; absent while it is queued.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    finishedAt:
+      type: string
+      format: date-time
+      description: When the execution reached a final status, in UTC; absent before that.
+      examples:
+        - '2026-10-12T15:04:09Z'
+    retryOfExecutionId:
+      type: string
+      format: uuid
+      description: Id of the execution this one retries; absent for a first run.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a65
+    failure:
+      $ref: ../openapi.yaml#/components/schemas/ExecutionFailure
+      description: Why the execution failed; absent unless the status is FAILED.
+    dataHidden:
+      type: boolean
+      description: >-
+        True when the output summary is left out because the caller lacks the execution:read-data permission.
+    output:
+      type: object
+      description: >-
+        Summary of the output of the execution: the items of the last node. Present only when the caller
+        has the execution:read-data permission and the execution finished.
+      x-orcon-data: protected
+      additionalProperties: {}
+ExecutionList:
+  type: object
+  description: One page of executions.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/Execution
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+CreateExecutionRequest:
+  type: object
+  description: Options for running a flow by hand.
+  additionalProperties: false
+  properties:
+    input:
+      type: array
+      description: Items the first node receives, each a JSON object. Omit it to start with one empty
+        item.
+      maxItems: 100
+      items:
+        type: object
+        description: One input item.
+        additionalProperties: {}
+NodeExecution:
+  type: object
+  description: One run of one node inside an execution.
+  required:
+    - id
+    - executionId
+    - nodeId
+    - status
+    - attemptCount
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the node execution.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+      readOnly: true
+    executionId:
+      type: string
+      format: uuid
+      description: Id of the execution the node ran in.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+    nodeId:
+      type: string
+      description: Id of the node as written in the flow document.
+      examples:
+        - greeting
+      maxLength: 255
+      x-orcon-external-id: true
+    status:
+      type: string
+      description: Progress of the node execution.
+      enum:
+        - RUNNING
+        - WAITING
+        - SUCCEEDED
+        - SUCCEEDED_WITH_ERRORS
+        - FAILED
+        - SUSPENDED
+        - CANCELED
+      examples:
+        - SUCCEEDED
+    attemptCount:
+      type: integer
+      description: Number of attempts made, retries included.
+      examples:
+        - 1
+      minimum: 0
+      x-orcon-volatile: true
+    startedAt:
+      type: string
+      format: date-time
+      description: When the node started to run, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    finishedAt:
+      type: string
+      format: date-time
+      description: When the node reached a final status, in UTC.
+      examples:
+        - '2026-10-12T15:04:09Z'
+    failure:
+      $ref: ../openapi.yaml#/components/schemas/ExecutionFailure
+      description: Why the node failed; absent unless the status is FAILED.
+NodeExecutionList:
+  type: object
+  description: One page of node executions.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/NodeExecution
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+ExecutionEvent:
+  type: object
+  description: One event of the history of an execution (ADR-0009 section 8).
+  required:
+    - sequenceNumber
+    - type
+    - occurredAt
+  properties:
+    sequenceNumber:
+      type: integer
+      description: Position of the event in the history of the execution; it only grows.
+      examples:
+        - 12
+      minimum: 1
+    type:
+      type: string
+      description: Event type, an identifier such as node.succeeded.
+      examples:
+        - node.succeeded
+      maxLength: 100
+    occurredAt:
+      type: string
+      format: date-time
+      description: When the event happened, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    nodeId:
+      type: string
+      description: Id of the node the event is about, when there is one.
+      examples:
+        - greeting
+      maxLength: 255
+      x-orcon-external-id: true
+    edgeId:
+      type: string
+      description: Id of the edge the event is about, when there is one.
+      examples:
+        - e1
+      maxLength: 255
+      x-orcon-external-id: true
+    detail:
+      type: string
+      description: Short description of the event without execution data.
+      examples:
+        - Attempt 1 finished.
+      maxLength: 1000
+ExecutionEventList:
+  type: object
+  description: One page of execution events.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/ExecutionEvent
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+ExecutionDataEntry:
+  type: object
+  description: The items one node received or produced in an execution, for one port.
+  required:
+    - nodeExecutionId
+    - nodeId
+    - side
+    - port
+    - itemCount
+    - dataItems
+  properties:
+    nodeExecutionId:
+      type: string
+      format: uuid
+      description: Id of the node execution the items belong to.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+    nodeId:
+      type: string
+      description: Id of the node as written in the flow document.
+      examples:
+        - greeting
+      maxLength: 255
+      x-orcon-external-id: true
+    side:
+      type: string
+      description: INPUT for what the node received, OUTPUT for what it produced.
+      enum:
+        - INPUT
+        - OUTPUT
+      examples:
+        - OUTPUT
+    port:
+      type: string
+      description: Name of the port, for example main.
+      examples:
+        - main
+      maxLength: 100
+    itemCount:
+      type: integer
+      description: Number of items on the port.
+      examples:
+        - 1
+      minimum: 0
+    dataItems:
+      type: array
+      description: The items, each a JSON object. Secrets and masked fields are replaced by their mask.
+      x-orcon-data: protected
+      maxItems: 200
+      items:
+        type: object
+        description: One item.
+        additionalProperties: {}
+ExecutionDataList:
+  type: object
+  description: One page of execution data entries.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/ExecutionDataEntry
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+TestSession:
+  type: object
+  description: A short window in which the test addresses of the draft of a flow are live.
+  required:
+    - id
+    - flowId
+    - status
+    - draftRevision
+    - eventCount
+    - maximumEventCount
+    - addresses
+    - createdAt
+    - expiresAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the test session.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+      readOnly: true
+    flowId:
+      type: string
+      format: uuid
+      description: Id of the flow under test.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+    status:
+      type: string
+      description: >-
+        ACTIVE while the addresses are live; COMPLETED when the event limit was reached; EXPIRED when
+        the time ran out; CLOSED when it was closed early.
+      enum:
+        - ACTIVE
+        - COMPLETED
+        - EXPIRED
+        - CLOSED
+      examples:
+        - ACTIVE
+    draftRevision:
+      type: integer
+      description: Revision of the draft the session tests.
+      examples:
+        - 7
+      minimum: 0
+    eventCount:
+      type: integer
+      description: Events received so far.
+      examples:
+        - 0
+      minimum: 0
+    maximumEventCount:
+      type: integer
+      description: Events after which the session completes.
+      examples:
+        - 1
+      minimum: 1
+    addresses:
+      type: array
+      description: The live test addresses, one per trigger that has one.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/TestSessionAddress
+    createdAt:
+      type: string
+      format: date-time
+      description: When the session opened, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    expiresAt:
+      type: string
+      format: date-time
+      description: When the session expires, in UTC.
+      examples:
+        - '2026-10-12T15:06:05Z'
+TestSessionAddress:
+  type: object
+  description: A live test address of a trigger node.
+  required:
+    - nodeId
+    - url
+  properties:
+    nodeId:
+      type: string
+      description: Id of the trigger node as written in the flow document.
+      examples:
+        - start
+      maxLength: 255
+      x-orcon-external-id: true
+    url:
+      type: string
+      format: uri
+      description: The address that starts a test execution of the draft while the session is active.
+      examples:
+        - https://orcon.example.com/webhook-test/welcome
+CreateTestSessionRequest:
+  type: object
+  description: Options for a test session.
+  additionalProperties: false
+  properties:
+    expiresInSeconds:
+      type: integer
+      description: How long the test addresses stay live; at most 10 minutes.
+      examples:
+        - 120
+      minimum: 1
+      maximum: 600
+      default: 120
+    maximumEventCount:
+      type: integer
+      description: How many events the session accepts before it completes.
+      examples:
+        - 1
+      minimum: 1
+      maximum: 100
+      default: 1
+ExternalOperation:
+  type: object
+  description: An external operation of an execution that the journal tracks (ADR-0012).
+  required:
+    - id
+    - executionId
+    - nodeExecutionId
+    - status
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the external operation.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a67
+      readOnly: true
+    executionId:
+      type: string
+      format: uuid
+      description: Id of the execution that made the call.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+    nodeExecutionId:
+      type: string
+      format: uuid
+      description: Id of the node execution that made the call.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+    status:
+      type: string
+      description: >-
+        State in the journal. UNCERTAIN means the outcome is not known and a person must resolve it.
+      enum:
+        - PREPARED
+        - DISPATCHING
+        - VERIFYING
+        - SUCCEEDED
+        - FAILED
+        - UNCERTAIN
+        - NOT_DISPATCHED
+        - RESOLVED_SUCCEEDED
+        - RESOLVED_FAILED
+      examples:
+        - RESOLVED_SUCCEEDED
+    resolvedBy:
+      type: string
+      format: uuid
+      description: Id of the principal that resolved the operation; absent while it is not resolved.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+    resolvedAt:
+      type: string
+      format: date-time
+      description: When the operation was resolved, in UTC.
+      examples:
+        - '2026-10-12T15:04:09Z'
+ResolveExternalOperationRequest:
+  type: object
+  description: How to close an uncertain external operation.
+  required:
+    - resolution
+  additionalProperties: false
+  properties:
+    resolution:
+      type: string
+      description: >-
+        VERIFY_AGAIN asks the connector to check the outcome again; MARK_SUCCEEDED records that the operation
+        happened; MARK_FAILED_AND_REPEAT records that it did not happen and sends it again; CANCEL_EXECUTION
+        stops the execution.
+      enum:
+        - VERIFY_AGAIN
+        - MARK_SUCCEEDED
+        - MARK_FAILED_AND_REPEAT
+        - CANCEL_EXECUTION
+      examples:
+        - MARK_SUCCEEDED
+    evidence:
+      type: string
+      description: >-
+        What you checked, for the audit log; required for MARK_SUCCEEDED and MARK_FAILED_AND_REPEAT.
+      examples:
+        - 'Checked in the CRM: contact 4711 exists and has the welcome tag.'
+      maxLength: 2048
+    acceptRisk:
+      type: boolean
+      description: >-
+        Confirms that you accept the risk of MARK_SUCCEEDED; accepting a risk is never proof that the
+        operation happened.
+    acknowledgeDuplicate:
+      type: boolean
+      description: Confirms that you know MARK_FAILED_AND_REPEAT can duplicate an effect that did happen.
+HumanTask:
+  type: object
+  description: A task that waits for a person (a form or an approval).
+  required:
+    - id
+    - executionId
+    - nodeId
+    - status
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the human task.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a68
+      readOnly: true
+    executionId:
+      type: string
+      format: uuid
+      description: Id of the execution that waits.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+    nodeId:
+      type: string
+      description: Id of the node as written in the flow document.
+      examples:
+        - approve
+      maxLength: 255
+      x-orcon-external-id: true
+    status:
+      type: string
+      description: >-
+        OPEN while it waits; COMPLETED once someone submitted a result; CANCELED when the execution stopped.
+      enum:
+        - OPEN
+        - COMPLETED
+        - CANCELED
+      examples:
+        - COMPLETED
+    completedBy:
+      type: string
+      format: uuid
+      description: Id of the principal that completed the task; absent while it is open.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+    completedAt:
+      type: string
+      format: date-time
+      description: When the task was completed, in UTC.
+      examples:
+        - '2026-10-12T15:04:09Z'
+CompleteHumanTaskRequest:
+  type: object
+  description: The result a person submits for a human task.
+  required:
+    - outcome
+  additionalProperties: false
+  properties:
+    outcome:
+      type: string
+      description: 'The decision: APPROVED or REJECTED for an approval, SUBMITTED for a form.'
+      enum:
+        - APPROVED
+        - REJECTED
+        - SUBMITTED
+      examples:
+        - APPROVED
+    result:
+      type: object
+      description: The form values, as the form schema of the task defines them.
+      x-orcon-data: protected
+      additionalProperties: {}
+    note:
+      type: string
+      description: Optional comment kept with the task.
+      examples:
+        - Looks good.
+      maxLength: 2048

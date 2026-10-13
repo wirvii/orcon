@@ -47,6 +47,9 @@ type Config struct {
 	// Scenarios overrides the registered scenarios; nil uses the ones added with
 	// RegisterScenario.
 	Scenarios map[string]Scenario
+	// OrgID is the id of the organization the credential belongs to; scenarios
+	// read it through Client.OrgID.
+	OrgID string
 	// HTTPClient overrides the HTTP client.
 	HTTPClient *http.Client
 	// PollInterval is the wait between polls of a long-running operation.
@@ -101,7 +104,7 @@ func newRunner(cfg Config) (*runner, error) {
 	return &runner{
 		cfg:       cfg,
 		contract:  c,
-		client:    NewClient(cfg.BaseURL, cfg.APIPrefix, cfg.Token, cfg.HTTPClient),
+		client:    NewClient(cfg.BaseURL, cfg.APIPrefix, cfg.Token, cfg.HTTPClient).WithOrg(cfg.OrgID),
 		scenarios: scenarios,
 	}, nil
 }

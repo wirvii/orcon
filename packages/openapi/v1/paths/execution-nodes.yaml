@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExecutionId
+get:
+  operationId: listExecutionNodes
+  summary: List the node executions of an execution
+  description: >-
+    Returns the run of every node of an execution with its status and attempts, one page at a time. It
+    shows what happened, not the data; read the data with the data listing.
+  tags:
+    - executions
+  x-orcon-permission: execution:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: executions nodes
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: nodesOfFinishedExecution
+      scenario: execution-succeeded
+      request:
+        pathParams:
+          executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+        query:
+          limit: 1
+      response:
+        status: 200
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+  responses:
+    '200':
+      description: One page of node executions.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/NodeExecutionList
+          examples:
+            nodesOfFinishedExecution:
+              summary: The greeting node
+              value:
+                items:
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+                    executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                    nodeId: greeting
+                    status: SUCCEEDED
+                    attemptCount: 1
+                    startedAt: '2026-10-12T15:04:05Z'
+                    finishedAt: '2026-10-12T15:04:09Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

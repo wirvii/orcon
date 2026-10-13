@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExecutionId
+get:
+  operationId: listExecutionEvents
+  summary: List the events of an execution
+  description: >-
+    Returns the history of an execution as events in order, one page at a time. Events describe what the
+    engine did and never carry execution data.
+  tags:
+    - executions
+  x-orcon-permission: execution:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: executions events
+  x-orcon-mcp:
+    level: read
+    tool: get_execution_events
+    description: List the history events of an execution.
+  x-orcon-examples:
+    - name: eventsOfFinishedExecution
+      scenario: execution-succeeded
+      request:
+        pathParams:
+          executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+        query:
+          limit: 1
+      response:
+        status: 200
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+  responses:
+    '200':
+      description: One page of events.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/ExecutionEventList
+          examples:
+            eventsOfFinishedExecution:
+              summary: The first event
+              value:
+                items:
+                  - sequenceNumber: 1
+                    type: execution.started
+                    occurredAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

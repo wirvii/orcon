@@ -1,0 +1,152 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: item
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+  - $ref: ../openapi.yaml#/components/parameters/TestSessionId
+get:
+  operationId: getTestSession
+  summary: Get a test session
+  description: >-
+    Returns the state of a test session: its status, how many events it received and when it expires.
+    Poll it to see when the session completes.
+  tags:
+    - testing
+  x-orcon-permission: flow:execute
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows test-sessions get
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: getActiveSession
+      scenario: flow-with-test-session
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+          testSessionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+      response:
+        status: 200
+        body: getActiveSession
+  responses:
+    '200':
+      description: The session.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/TestSession
+          examples:
+            getActiveSession:
+              summary: An active session
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                status: ACTIVE
+                draftRevision: 1
+                eventCount: 0
+                maximumEventCount: 1
+                addresses: []
+                createdAt: '2026-10-12T15:04:05Z'
+                expiresAt: '2026-10-12T15:06:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
+delete:
+  operationId: deleteTestSession
+  summary: Close a test session
+  description: >-
+    Closes the session before it expires and takes its test addresses down. Closing a session that already
+    ended is not an error.
+  tags:
+    - testing
+  x-orcon-permission: flow:execute
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-audit-reason: >-
+    A test session is a short-lived window; opening it is audited and its events are recorded as executions.
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - precondition-failed
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows test-sessions close
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: closeActiveSession
+      scenario: flow-with-test-session
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+          testSessionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+        headers:
+          If-Match: '"1"'
+      response:
+        status: 204
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+  responses:
+    '204':
+      description: The session was closed.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

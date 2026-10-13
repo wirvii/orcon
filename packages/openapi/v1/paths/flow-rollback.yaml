@@ -1,0 +1,105 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+post:
+  operationId: rollbackFlow
+  summary: Roll a flow back to an earlier version
+  description: >-
+    Publishes the content of an earlier version again as a new version, through the same checks as a publication.
+    Nothing is deleted: the later versions stay in the history.
+  tags:
+    - flows
+  x-orcon-permission: flow:rollback
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: flow.rolled_back
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - project-managed-by-git
+    - payload-too-large
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows rollback
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: rollbackToFirstVersion
+      scenario: flow-with-two-versions
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        body: rollbackToFirstVersion
+      response:
+        status: 200
+        body: rollbackToFirstVersion
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/RollbackFlowRequest
+        examples:
+          rollbackToFirstVersion:
+            summary: Go back to version 1
+            value:
+              version: 1
+              note: Back to the version before the change
+  responses:
+    '200':
+      description: The new version that repeats the earlier content.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/FlowVersion
+          examples:
+            rollbackToFirstVersion:
+              summary: Version 3 repeats version 1
+              value:
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                version: 3
+                contentHash: sha256:4f2a9c0d7e8b1a36c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f00112233445566778
+                publishedAt: '2026-10-12T15:10:00Z'
+                publishedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+                note: Back to the version before the change
+                rolledBackFromVersion: 1
+                warnings: []
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

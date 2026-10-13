@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: item
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+  - $ref: ../openapi.yaml#/components/parameters/Version
+get:
+  operationId: getFlowVersion
+  summary: Get one version of a flow
+  description: >-
+    Returns one published version of a flow with its document. Versions never change, so the answer for
+    a given number is always the same.
+  tags:
+    - flows
+  x-orcon-permission: flow:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows version
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: getFirstVersion
+      scenario: flow-published
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+          version: 1
+      response:
+        status: 200
+        body: getFirstVersion
+  responses:
+    '200':
+      description: The version.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/FlowVersion
+          examples:
+            getFirstVersion:
+              summary: The first version with its document
+              value:
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                version: 1
+                contentHash: sha256:4f2a9c0d7e8b1a36c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f00112233445566778
+                publishedAt: '2026-10-12T15:10:00Z'
+                publishedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+                warnings: []
+                document:
+                  format: orcon/flow@1
+                  id: 01930000-0000-7000-8000-00000000000a
+                  name: Welcome email
+                  settings:
+                    branchMode: PARALLEL
+                  variables: []
+                  nodes:
+                    - id: start
+                      name: Start
+                      element: startEvent
+                      type: orcon.start@1
+                      parameters: {}
+                    - id: greeting
+                      name: Set greeting
+                      element: task
+                      type: orcon.set@1
+                      parameters: {}
+                    - id: end
+                      name: End
+                      element: endEvent
+                      type: orcon.end@1
+                      parameters: {}
+                  edges:
+                    - id: e1
+                      from:
+                        node: start
+                        port: main
+                      to:
+                        node: greeting
+                      kind: SEQUENCE
+                    - id: e2
+                      from:
+                        node: greeting
+                        port: main
+                      to:
+                        node: end
+                      kind: SEQUENCE
+                  editor: {}
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
