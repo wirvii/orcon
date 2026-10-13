@@ -27,6 +27,7 @@ apps/web/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/perf/fixtures/*.json  # the reference flow of the editor performance test; JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+**/testdata/fuzz/**  # Go fuzz corpus entries, a fixed format written by the go tool
 .agents/skills/orcon-connector/assets/templates/**/*.json  # connector template packages and cassettes; JSON has no comment syntax
 
 # Contribution workflow (orcon-contributing, SPEC-013).
@@ -40,3 +41,6 @@ internal/adapter/storetest/dbrules/policy/*.txt  # policy declaration files (SPE
 **/migrations.sum  # migration checksum list read by dbcheck (migrations.md MG-5)
 tools/dbcheck/testdata/**/expect.txt  # planted-case expectation read by the dbcheck tests
 internal/adapter/storetest/dbrules/testdata/**/expect.txt  # planted-case expectation read by the dbrules tests
+
+# API contract toolchain (SPEC-012).
+packages/js/openapi-tools/oasdiff-levels.txt  # read by oasdiff --severity-levels, which rejects comment lines; explained in the package README

@@ -47,6 +47,8 @@ paths:
     $ref: ./paths/operation.yaml
   /orgs/{orgId}/awaiting-human:
     $ref: ./paths/awaiting-human.yaml
+  /orgs/{orgId}/api-keys:
+    $ref: ./paths/org-api-keys.yaml
   /events/stream:
     $ref: ./paths/events-stream.yaml
   /oauth/token:
@@ -347,16 +349,78 @@ components:
           type: string
           description: Progress of the operation.
           enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELED]
-        failureSummary:
-          type: string
-          description: Sanitized reason the operation failed; present only when it failed.
-          examples: [The repository rejected the credentials.]
+        failure:
+          $ref: '#/components/schemas/OperationFailure'
         createdAt:
           type: string
           format: date-time
           description: When the operation was accepted, in UTC.
           x-orcon-volatile: true
           examples: ['2026-10-12T15:04:05Z']
+    OperationFailure:
+      type: object
+      description: How an operation failed; present only when its status is FAILED.
+      required: [code, title]
+      properties:
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        title:
+          type: string
+          description: Short summary of the failure.
+          examples: [Git sync failed]
+        detail:
+          type: string
+          description: Sanitized explanation of the failure.
+          examples: [The repository rejected the credentials.]
+    ApiKey:
+      type: object
+      description: An API key of an organization. The secret is never part of this resource.
+      required: [id, orgId, name, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Id of the API key.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a74]
+        orgId:
+          type: string
+          format: uuid
+          description: Id of the organization that owns the key.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71]
+        name:
+          type: string
+          description: Display name of the key.
+          examples: [CI pipeline]
+        createdAt:
+          type: string
+          format: date-time
+          description: When the key was created, in UTC.
+          examples: ['2026-10-12T15:04:05Z']
+    ApiKeyWithSecret:
+      description: The response of the operation that creates an API key; the only response that carries its secret.
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              format: password
+              readOnly: true
+              description: The secret of the key, shown once; a replay of the request answers secret-already-issued.
+              examples: [example-secret-1]
+    CreateApiKeyRequest:
+      type: object
+      description: Fields of a new API key.
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          description: Display name of the key.
+          examples: [CI pipeline]
     AwaitingHumanItem:
       type: object
       description: An execution step that waits for a person.
@@ -421,6 +485,20 @@ components:
           description: Type of the token.
           enum: [Bearer]
           x-orcon-enum-kind: identifier
+    OAuthError:
+      type: object
+      description: OAuth error response (RFC 6749 section 5.2).
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: OAuth error code.
+          enum: [invalid_request, invalid_client, invalid_grant, unsupported_grant_type]
+          x-orcon-enum-kind: identifier
+        error_description:
+          type: string
+          description: Human-readable explanation.
+          examples: [The client credentials are not valid.]
     CloudEvent:
       type: object
       description: CloudEvents 1.0 attributes in structured JSON form.

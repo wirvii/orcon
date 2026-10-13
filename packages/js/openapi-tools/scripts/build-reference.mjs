@@ -8,7 +8,8 @@
  *   node scripts/build-reference.mjs --input <openapi.yaml> --output <dir> [--base-path /api/reference/]
  *
  * Output: index.html, reference-config.js, openapi.json, scalar.standalone.js (copied from
- * node_modules), LICENSE-scalar.txt. The build fails when
+ * node_modules), LICENSE-scalar.txt, third-party-notices.txt. The build fails when
+ *   - a package bundled in the script has a license outside the allowed list (third-party.mjs),
  *   - index.html, the config or openapi.json load a resource from another origin,
  *   - the vendored script mentions a host that assets/scalar-hosts.yaml does not list
  *     (a Scalar upgrade has to be reviewed), or
@@ -26,6 +27,7 @@ import { bundle } from './bundle.mjs';
 import { decorate } from './decorate.mjs';
 import { must, readDocument, writeJson } from './doc-io.mjs';
 import { isMain, packageDir, parseArgs } from './lib.mjs';
+import { bundledPackages, licenseProblems, renderNotices } from './third-party.mjs';
 
 export const BUDGET_BYTES = 3 * 1024 * 1024;
 
@@ -122,6 +124,7 @@ export function buildReference({ input, output, basePath = '/api/reference/' }) 
   const out = resolve(output);
   mkdirSync(out, { recursive: true });
   const tmp = mkdtempSync(join(tmpdir(), 'orcon-reference-'));
+  let inScript = [];
   try {
     const bundled = join(tmp, 'openapi.bundle.yaml');
     bundle(input, bundled);
@@ -133,6 +136,8 @@ export function buildReference({ input, output, basePath = '/api/reference/' }) 
     writeFileSync(join(out, 'reference-config.js'), renderConfigJs(serverUrl));
     copyFileSync(scalarScript(), join(out, 'scalar.standalone.js'));
     writeFileSync(join(out, 'LICENSE-scalar.txt'), licenseText());
+    inScript = bundledPackages(scalarScript());
+    writeFileSync(join(out, 'third-party-notices.txt'), renderNotices(inScript, licenseText()));
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -142,6 +147,7 @@ export function buildReference({ input, output, basePath = '/api/reference/' }) 
     config: readFileSync(join(out, 'reference-config.js'), 'utf8'),
     openapi: JSON.parse(readFileSync(join(out, 'openapi.json'), 'utf8')),
   });
+  problems.push(...licenseProblems(inScript));
   const allowed = new Set(parse(readFileSync(join(packageDir, 'assets', 'scalar-hosts.yaml'), 'utf8')).hosts);
   const hosts = hostsIn(readFileSync(join(out, 'scalar.standalone.js'), 'utf8'));
   for (const host of hosts) {
