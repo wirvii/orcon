@@ -75,6 +75,7 @@ func checkStatement(text string, baseLine int, dialect, scope string, scoped sco
 		c.fail(-1, "statement %s is not a SELECT, INSERT, UPDATE or DELETE", inner(top).Descriptor().Name())
 		return c.problems
 	}
+	c.checkFunctions(top)
 	if scope == "instance" {
 		c.checkInstance(top)
 	} else {
@@ -125,6 +126,53 @@ func walk(m protoreflect.Message, fn func(protoreflect.Message) bool) {
 			}
 		case fd.Message() != nil && !fd.IsMap():
 			walk(v.Message(), fn)
+		}
+		return true
+	})
+}
+
+// allowedFunctions are the only functions a query of scope org or instance may
+// call, unqualified: aggregates, window functions, time and text helpers that
+// read no table and change no setting. Anything else (set_config,
+// current_setting, a user-defined function that could read or delete rows, an
+// orcon_engine or orcon_context function) is a finding; the engine plane is the
+// place for such calls, through the reviewed allowlist.
+var allowedFunctions = map[string]bool{
+	"count": true, "sum": true, "avg": true, "min": true, "max": true, "bool_and": true, "bool_or": true,
+	"array_agg": true, "string_agg": true, "row_number": true, "rank": true, "dense_rank": true,
+	"lag": true, "lead": true, "first_value": true, "last_value": true,
+	"coalesce": true, "greatest": true, "least": true, "abs": true, "ceil": true, "floor": true, "round": true,
+	"lower": true, "upper": true, "length": true, "substr": true, "substring": true, "trim": true, "concat": true,
+	"now": true, "date_trunc": true, "generate_series": true, "unnest": true,
+	"strftime": true, "datetime": true, "ifnull": true, "iif": true, "instr": true,
+}
+
+// syntaxFunctions are the pg_catalog functions the parser produces for SQL
+// syntax (TRIM, EXTRACT, POSITION, OVERLAY, AT TIME ZONE).
+var syntaxFunctions = map[string]bool{
+	"extract": true, "btrim": true, "ltrim": true, "rtrim": true, "date_part": true, "timezone": true, "overlay": true, "position": true,
+}
+
+// checkFunctions reports every function call of the statement that is not on
+// the allowed list, wherever it stands.
+func (c *checker) checkFunctions(top *pg_query.Node) {
+	walk(top.ProtoReflect(), func(m protoreflect.Message) bool {
+		fc, ok := m.Interface().(*pg_query.FuncCall)
+		if !ok {
+			return true
+		}
+		parts := make([]string, 0, len(fc.Funcname))
+		for _, n := range fc.Funcname {
+			parts = append(parts, n.GetString_().GetSval())
+		}
+		name := strings.Join(parts, ".")
+		ok = len(parts) == 1 && allowedFunctions[parts[0]]
+		if len(parts) == 2 && parts[0] == "pg_catalog" {
+			// The parser spells TRIM, SUBSTRING, EXTRACT, POSITION and OVERLAY this way.
+			ok = allowedFunctions[parts[1]] || syntaxFunctions[parts[1]]
+		}
+		if !ok {
+			c.fail(fc.Location, "function %s is not on the list of functions a query of scope org or instance may call (it could read or change data the check cannot see)", name)
 		}
 		return true
 	})

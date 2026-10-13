@@ -102,6 +102,19 @@ func TestRejectsUnscopedQueries(t *testing.T) {
 		{"data-modifying cte restricted", "-- name: DeleteFlow :one\n-- orcon:scope org\nWITH d AS (DELETE FROM flow WHERE org_id = $1 AND id = $2 RETURNING id) SELECT id FROM d;", ""},
 		{"same-table alias used for the pin", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT run.id FROM flow run WHERE run.org_id = $1;", ""},
 
+		{"allowed functions", "-- name: Stats :many\n-- orcon:scope org\nSELECT lower(name), count(*), max(id) FROM flow WHERE org_id = $1 GROUP BY lower(name);", ""},
+		{"syntax functions", "-- name: Stats :many\n-- orcon:scope org\nSELECT trim(name), substring(name from 1 for 2), extract(year from now()), position('a' in name) FROM flow WHERE org_id = $1;", ""},
+		{"table-less select with an allowed function", "-- name: Clock :one\n-- orcon:scope instance\nSELECT now();", ""},
+
+		// Function calls: only the small allowed list may appear.
+		{"user function in a table-less select", "-- name: Wipe :one\n-- orcon:scope org\nSELECT delete_all_flows();", "function delete_all_flows is not on the list"},
+		{"set_config", "-- name: Ctx :one\n-- orcon:scope org\nSELECT set_config('orcon.org_id', $1, true);", "function set_config is not on the list"},
+		{"current_setting", "-- name: Ctx :one\n-- orcon:scope org\nSELECT current_setting('orcon_context.org_id');", "function current_setting is not on the list"},
+		{"orcon_context function", "-- name: Ctx :one\n-- orcon:scope org\nSELECT orcon_context.current_org();", "function orcon_context.current_org is not on the list"},
+		{"pg_catalog function written out", "-- name: Ctx :one\n-- orcon:scope org\nSELECT pg_catalog.set_config('a', 'b', true);", "function pg_catalog.set_config is not on the list"},
+		{"function in a where clause", "-- name: Get :one\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = $1 AND pg_sleep(1) IS NOT NULL;", "function pg_sleep is not on the list"},
+		{"function in an instance statement", "-- name: Wipe :one\n-- orcon:scope instance\nSELECT delete_all_flows() FROM principal;", "function delete_all_flows is not on the list"},
+
 		// Fail-closed probes from review: each must be a finding.
 		{"table in parentheses", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM (flow);", "cannot read the statement"},
 		{"table in parentheses inside exists", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT p.id FROM principal p WHERE EXISTS (SELECT 1 FROM (flow) WHERE true);", "cannot read the statement"},

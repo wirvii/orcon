@@ -55,12 +55,7 @@ import (
 )
 
 // Analyzer is the orgscope analyzer.
-var Analyzer = &analysis.Analyzer{
-	Name:     "orgscope",
-	Doc:      "reports SQL driver use outside the data-access layer and SQL text that is not a constant",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
-}
+var Analyzer = newAnalyzer()
 
 // driverPrefixes are the import path prefixes of SQL drivers and wrappers.
 var driverPrefixes = []string{
@@ -133,6 +128,9 @@ func run(pass *analysis.Pass) (any, error) {
 		call := n.(*ast.CallExpr) //nolint:errcheck,forcetypeassert // filtered by the node types above
 		checkSink(pass, call, allowed)
 	})
+	if inLayer {
+		reportSinkValues(pass, insp)
+	}
 	return nil, nil //nolint:nilnil // analyzers without a result return nil
 }
 
@@ -200,19 +198,12 @@ func holdsDriver(t types.Type, depth int) bool {
 // checkSink applies rule 2 to a call.
 func checkSink(pass *analysis.Pass, call *ast.CallExpr, allowed map[lineKey]string) {
 	fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-	if !ok || fn.Pkg() == nil || !sinkNames[fn.Name()] {
-		return
-	}
-	sig, ok := fn.Type().(*types.Signature)
 	if !ok {
 		return
 	}
-	if !isDriver(fn.Pkg().Path()) {
-		// Outside the drivers only the handle interface of the layer (sqlc's
-		// DBTX) is a sink; a store method named Get or Select is not.
-		if !containsAny(fn.Pkg().Path(), dataAccessPackages) || sig.Recv() == nil || !types.IsInterface(sig.Recv().Type()) || !handleMethods[fn.Name()] {
-			return
-		}
+	sig, ok := sinkSignature(fn)
+	if !ok {
+		return
 	}
 	params := sig.Params()
 	for i := range params.Len() {
@@ -235,6 +226,51 @@ func checkSink(pass *analysis.Pass, call *ast.CallExpr, allowed map[lineKey]stri
 	}
 }
 
+// sinkSignature reports whether fn takes SQL text and returns its signature.
+// Outside the drivers only the handle interface of the layer (sqlc's DBTX) is a
+// sink; a store method named Get or Select is not.
+func sinkSignature(fn *types.Func) (*types.Signature, bool) {
+	if fn.Pkg() == nil || !sinkNames[fn.Name()] {
+		return nil, false
+	}
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok {
+		return nil, false
+	}
+	if isDriver(fn.Pkg().Path()) {
+		return sig, true
+	}
+	if !containsAny(fn.Pkg().Path(), dataAccessPackages) || sig.Recv() == nil || !types.IsInterface(sig.Recv().Type()) || !handleMethods[fn.Name()] {
+		return nil, false
+	}
+	return sig, true
+}
+
+// reportSinkValues reports a sink method that is not called where it is named:
+// a method value or expression (f := db.QueryContext) would let the statement
+// reach the driver through a call the analyzer cannot follow.
+func reportSinkValues(pass *analysis.Pass, insp *inspector.Inspector) {
+	called := map[*ast.Ident]bool{}
+	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
+		switch fun := ast.Unparen(n.(*ast.CallExpr).Fun).(type) { //nolint:errcheck,forcetypeassert // filtered by the node types above
+		case *ast.Ident:
+			called[fun] = true
+		case *ast.SelectorExpr:
+			called[fun.Sel] = true
+		}
+	})
+	insp.Preorder([]ast.Node{(*ast.Ident)(nil)}, func(n ast.Node) {
+		id := n.(*ast.Ident) //nolint:errcheck,forcetypeassert // filtered by the node types above
+		fn, ok := pass.TypesInfo.Uses[id].(*types.Func)
+		if !ok || called[id] {
+			return
+		}
+		if _, sink := sinkSignature(fn); sink {
+			pass.Reportf(id.Pos(), "SQL method %s used as a value; call it directly with a constant statement so the text can be checked", fn.Name())
+		}
+	})
+}
+
 type lineKey struct {
 	file string
 	line int
@@ -251,29 +287,75 @@ const allowlistPath = "internal/adapter/storetest/dbrules/policy/dynamic_sql_all
 
 var allowlistLine = regexp.MustCompile(`^(\S+) {2,}(\S.*?) {2,}(\d{4}-\d{2}-\d{2}) {2,}approved-by:(\S+)$`)
 
-// allowedFiles returns the files, as absolute slash paths, that may carry the
-// directive: it looks for the allowlist in the directory of a source file and
-// each directory above it.
-func allowedFiles(dir string) map[string]bool {
-	for d := dir; ; d = filepath.Dir(d) {
-		data, err := os.ReadFile(filepath.Join(d, filepath.FromSlash(allowlistPath)))
-		if err == nil {
-			out := map[string]bool{}
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimRight(line, " \t\r")
-				if line == "" || strings.HasPrefix(line, "#") {
-					continue
-				}
-				if m := allowlistLine.FindStringSubmatch(line); m != nil {
-					out[filepath.ToSlash(filepath.Join(d, filepath.FromSlash(m[1])))] = true
-				}
+// allowlistFlag, when set (-orgscope.allowlist=<file>), names the allowlist
+// explicitly; its entries are then relative to the repository root that the
+// file path implies (the file path without allowlistPath). The tests use it;
+// the vet run leaves it empty and the root is found from the source file.
+var allowlistFlag string
+
+func newAnalyzer() *analysis.Analyzer {
+	a := &analysis.Analyzer{
+		Name:     "orgscope",
+		Doc:      "reports SQL driver use outside the data-access layer and SQL text that is not a constant",
+		Requires: []*analysis.Analyzer{inspect.Analyzer},
+		Run:      run,
+	}
+	a.Flags.StringVar(&allowlistFlag, "allowlist", "", "path of dynamic_sql_allowlist.txt (default: the one at the repository root)")
+	return a
+}
+
+// repoRoot finds the root of the repository that holds dir: the outermost
+// ancestor that has a .git entry, else the outermost one with a go.work. It is
+// the outermost, never the nearest, so a copy of the allowlist planted in a
+// subdirectory cannot become the authority. It returns "" when neither exists.
+func repoRoot(dir string) string {
+	for _, marker := range []string{".git", "go.work"} {
+		root := ""
+		for d := dir; ; d = filepath.Dir(d) {
+			if _, err := os.Stat(filepath.Join(d, marker)); err == nil {
+				root = d
 			}
-			return out
+			if filepath.Dir(d) == d {
+				break
+			}
 		}
-		if parent := filepath.Dir(d); parent == d {
-			return map[string]bool{}
+		if root != "" {
+			return root
 		}
 	}
+	return ""
+}
+
+// allowedFiles returns the files, as absolute slash paths, that may carry the
+// directive, read from the allowlist at the repository root of dir (or from the
+// explicit flag). When there is none, no file may.
+func allowedFiles(dir string) map[string]bool {
+	var root, file string
+	if allowlistFlag != "" {
+		file = allowlistFlag
+		root = strings.TrimSuffix(filepath.ToSlash(file), "/"+allowlistPath)
+		root = filepath.FromSlash(root)
+	} else if root = repoRoot(dir); root != "" {
+		file = filepath.Join(root, filepath.FromSlash(allowlistPath))
+	}
+	out := map[string]bool{}
+	if file == "" {
+		return out
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return out
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimRight(line, " \t\r")
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if m := allowlistLine.FindStringSubmatch(line); m != nil {
+			out[filepath.ToSlash(filepath.Join(root, filepath.FromSlash(m[1])))] = true
+		}
+	}
+	return out
 }
 
 // directiveLines maps the lines holding the dynamic-sql directive to its reason.

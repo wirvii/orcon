@@ -65,8 +65,10 @@ func notConstants(ctx context.Context, db *sql.DB, table, query string, q querie
 	var sb strings.Builder
 	_, _ = db.QueryContext(ctx, sb.String()) // want `SQL text must be a constant`
 
-	method := db.QueryContext
-	_, _ = method(ctx, built)
+	method := db.QueryContext // want `SQL method QueryContext used as a value`
+	_, _ = method(ctx, "SELECT "+table)
+	expr := (*sql.DB).ExecContext // want `SQL method ExecContext used as a value`
+	_, _ = expr(db, ctx, built)
 }
 
 func getText(table string) string { return "SELECT id FROM " + table }
