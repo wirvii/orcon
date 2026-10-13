@@ -69,6 +69,7 @@ export function createConfig({ tailwindEntryPoint, cwd } = {}) {
       ignores: [
         '**/node_modules/**',
         '**/dist/**',
+        '**/dist-perf/**',
         '**/storybook-static/**',
         '**/coverage/**',
         '**/test/fixtures/**',

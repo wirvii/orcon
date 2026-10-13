@@ -18,7 +18,10 @@
     "test:unit": "vitest run --project unit",
     "test:coverage": "vitest run --coverage",
     "test:screens": "vitest run --project screens",
-    "size": "vite build && size-limit && node scripts/check-initial-chunks.mjs"
+    "size": "vite build && size-limit && node scripts/check-initial-chunks.mjs",
+    "build:perf": "vite build --config vite.perf.config.ts",
+    "test:perf": "playwright test -c playwright.perf.config.ts",
+    "perf:reference": "node perf/generate-reference-flow.mjs --check"
   },
   "dependencies": {
     "@hookform/resolvers": "^5",
