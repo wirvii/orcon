@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Architecture
 
 Orcon ships a single multi-role Go executable with a statically embedded React editor.

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon — Product Vision
 
 Status: **Accepted** | Owner: Wirvii | Version: 0.1
@@ -42,3 +44,5 @@ The product owner and architecture collaborators produce product specifications,
 ## Open questions
 
 Target n8n compatibility baseline; exact node and expression priorities; workflow definition schema; failure semantics; multi-tenant isolation model; resource limits; plugin sandbox; initial release milestones. None are implicitly approved by this document.
+
+Note (owner, on accepting SPEC-004 on 2026-10-12): the multi-tenant isolation model is answered by ADR-0046 and ADR-0047.

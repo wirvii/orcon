@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
 name: Visual baselines
 # Generates the visual regression baselines in the pinned Playwright container on an amd64 runner.
 # It never commits or pushes: download the artifact and commit the folder yourself.

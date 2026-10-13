@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Files exempt from the SPDX header check (tools/spdxcheck). One glob per line,
+# each with a reason: "glob  # reason". Binary files are skipped automatically.
+
+# Tool-managed configuration directories and instruction files are exempt
+# built in (tools/provenance/configpaths); they are not repeated here.
+
+# Formats without comment syntax, or whose bytes are significant.
+LICENSE  # canonical license text, must stay byte-identical
+**/go.sum  # generated checksum list; comments are not allowed
+**/package.json  # JSON has no comment syntax
+turbo.json  # JSON has no comment syntax
+pnpm-lock.yaml  # generated lock file
+internal/adapter/webui/dist/**  # build output of the web app, replaced by make web
+tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it carries the SPDX lines as comments)
+
+**/tsconfig*.json  # JSON has no comment syntax
+packages/js/tokens/src/**/*.json  # design token sources in the W3C format; JSON has no comment syntax
+packages/js/tokens/src/*.json  # design token sources in the W3C format; JSON has no comment syntax
+packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has no comment syntax
+packages/js/ui/src/i18n/*.json  # translation catalogs; JSON has no comment syntax

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Visual regression
 
 The visual suite compares a screenshot of every Matrix story and every screen template with a committed

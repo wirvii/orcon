@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Component checklist
 
 Status: Proposed — pending owner approval | Version: 1.0 | Source: SPEC-007

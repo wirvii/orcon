@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Performance regression gate (SPEC-008 CFG-7, performance.md PERF-2). The base
+# and the head benchmarks run interleaved, ten times each, on GitHub runners.
+# benchgate fails when sec/op, B/op or allocs/op got worse by more than 10 % with
+# p < 0.05, unless the pull request has the performance-regression-accepted
+# label and a non-empty "### Performance regression justification" section.
+name: Benchmarks
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+permissions:
+  contents: read
+jobs:
+  benchgate:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - name: Build benchgate
+        run: cd tools && GOWORK=off go build -o ../.bin/benchgate ./benchgate
+      - name: Compare the base and the head with benchgate
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          BENCH_ACCEPTED: ${{ contains(github.event.pull_request.labels.*.name, 'performance-regression-accepted') && '1' || '0' }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          PR_BODY_FILE="$RUNNER_TEMP/pr-body.md" make bench-compare

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Owner-approved license exceptions for linked dependencies (SPEC-008 CFG-4,
+# dependencies.md DEP-2b). The file is empty on purpose: every dependency that
+# is not Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause or ISC fails `make
+# licenses` unless its exact module and version has a line here.
+#
+# One exception per line, fields separated by two or more spaces:
+#
+#   <module path>@<version>  <SPDX id>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+#
+# The line covers that exact version only; upgrading the module requires a
+# renewed line. Add lines only in a pull request the owner approves. A malformed
+# line, or one without approved-by:, makes `make licenses` fail. No exception can
+# admit GPL, AGPL, LGPL, SSPL, BUSL, Elastic, Commons Clause or other
+# source-available licenses.

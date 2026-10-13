@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon — Research and Design Reference Appendix
 
 **Status:** research notes and proposed requirements, not accepted implementation contracts. **Research snapshot:** October 2026. Verify current upstream versions before implementing.

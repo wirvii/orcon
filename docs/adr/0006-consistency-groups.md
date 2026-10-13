@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0006 — Consistency groups and optional coordination protocols
 
 Status: **Proposed / optional feature set** | Date: 2026-10-10

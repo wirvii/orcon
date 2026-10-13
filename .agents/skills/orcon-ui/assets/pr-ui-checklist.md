@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 ## UI checklist
 
 <!-- Paste this block into the description of every pull request that changes apps/web or packages/js/{tokens,ui,lint-config}. -->

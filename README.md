@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon
 
 **Open-source workflow orchestration engine**, implemented in Go with a React Flow editor.

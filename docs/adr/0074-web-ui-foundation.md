@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0074: Web UI foundation
 
 Status: Proposed
@@ -15,7 +17,7 @@ The embedded React editor (ADR 0002) needs a component foundation, styling syste
 5. Icons: Lucide (ISC). Final brand assets (symbol, wordmark, favicon, mascot exports) are delivered separately; until then the UI uses neutral placeholders behind stable `BrandMark` and `Mascot` components.
 6. i18n: react-intl / FormatJS (BSD-3-Clause), ICU messages, English and Spanish in V1.
 7. Quality gates: ESLint 9 and Stylelint token rules, Storybook 9 with Vitest browser tests and axe (axe-core MPL-2.0, development only, not distributed), Playwright visual regression in a pinned container, a token contrast test, story coverage.
-8. The design rules live in the repository skill `orcon-ui` (`.agents/skills/orcon-ui/`, Agent Skills standard + mneme template). A byte-identical copy is generated at `.claude/skills/orcon-ui/` for clients that read that directory. `docs/design-system/README.md` summarizes and links to it.
+8. The design rules live in the repository skill `orcon-ui` (`.agents/skills/orcon-ui/`, Agent Skills standard + mneme template). A byte-identical projection is generated into the tool configuration directories for clients that read skills from there (`make skill-sync`). `docs/design-system/README.md` summarizes and links to it.
 
 ## Consequences
 New runtime dependencies are permissive and bundled by Vite into the binary; their notices are added to the third-party notices. CI gains UI jobs and a committed lockfile. Product screens may rely on the design system only after its rules are Accepted.

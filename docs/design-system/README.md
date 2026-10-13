@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon design system
 
 The Orcon design system is the shared set of design tokens, themed components, canvas visual language, content and i18n rules, and accessibility requirements that every Orcon web UI surface follows. It covers the embedded editor in `apps/web` and the shared packages under `packages/js` (`@orcon/tokens`, `@orcon/ui`, `@orcon/lint-config`).
@@ -18,7 +20,7 @@ The complete, normative rules live in the repository skill `orcon-ui`, which is 
 - Screen checklist: [`references/screen-checklist.md`](../../.agents/skills/orcon-ui/references/screen-checklist.md)
 - Screenshot review and owner gate: [`references/review-protocol.md`](../../.agents/skills/orcon-ui/references/review-protocol.md)
 
-The skill folder `.agents/skills/orcon-ui/` is the only copy that is edited. It is copied byte for byte to `.claude/skills/orcon-ui/` for clients that read that directory, by running `sh .agents/skills/orcon-ui/scripts/project.sh`. The skill follows the open Agent Skills format and the mneme skill template.
+The skill folder `.agents/skills/orcon-ui/` is the only copy that is edited. It is copied byte for byte into the tool configuration directories for clients that read skills from there, by running `make skill-sync`. The skill follows the open Agent Skills format and the mneme skill template.
 
 ## Related documents
 

@@ -1,7 +1,5 @@
-/*
- * SPDX-FileCopyrightText: The Orcon Authors
- * SPDX-License-Identifier: Apache-2.0
- */
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
 
 /* React Flow's structural rules sit in their own layer, below the utilities, so Orcon classes always win. */
 @layer theme, base, xyflow, components, utilities;

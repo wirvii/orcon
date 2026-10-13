@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Owner review record template
 
 Add one row per base component or primary screen template to the "Owner review status" table in `docs/design-system/README.md`. New rows, and rows whose approved visual baseline changed, start as `Pending`. Only the owner sets `Approved`.

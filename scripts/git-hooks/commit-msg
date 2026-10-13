@@ -1,0 +1,28 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# commit-msg hook: rejects AI authorship marks and assistant names in commit
+# messages (tools/provenance, SPEC-008 4.11). Enable with `make hooks`.
+# Usage: commit-msg <message-file>
+set -eu
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: commit-msg <message-file>" >&2
+  exit 2
+fi
+
+root=$(cd "$(dirname "$0")/../.." && pwd)
+
+case "$1" in
+  /*) msg=$1 ;;
+  *) msg=$PWD/$1 ;;
+esac
+
+if [ -x "$root/.bin/provenance" ]; then
+  exec "$root/.bin/provenance" msg "$msg"
+fi
+
+# The binary is not built yet (`make tools` builds it): compile on the fly.
+cd "$root/tools"
+GOWORK=off exec go run ./provenance msg "$msg"

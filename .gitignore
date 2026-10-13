@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
 node_modules/
 **/dist/
-!apps/orcon/ui/dist/
+!internal/adapter/webui/dist/
 .DS_Store
 .env
 .env.*
@@ -15,3 +18,5 @@ packages/js/ui/test/**/__screenshots__/
 test-results/
 playwright-report/
 packages/js/ui/visual/report/
+.bin/
+bin/

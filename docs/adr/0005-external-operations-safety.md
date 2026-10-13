@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0005 — External Operations Safety Contract (EOSC)
 
 Status: **Accepted (safety policy); contract schema Proposed** | Date: 2026-10-10
@@ -27,3 +29,12 @@ No universal exactly-once remote side effects or cross-API atomicity is claimed.
 
 ## Open
 Machine-readable schema, proof levels, exception workflow, trust model, cancellation behavior, credential handling and fault-injection acceptance tests.
+
+Resolved on 2026-10-12 (SPEC-003): machine-readable schema and proof levels → ADR-0029 §5; trust model → ADR-0033. SPEC-003 lists as still open: the exception workflow beyond the supervised resolution of ADR-0012, and credential handling (BL-004).
+
+Resolved on 2026-10-12 (SPEC-004): credential handling → ADR-0043 and ADR-0045.
+
+## Notes
+The safety policy of this ADR is unchanged.
+- Runtime journal, lifecycle details (VERIFYING, NOT_DISPATCHED, RESOLVED_*), group commit and recovery specified by ADR-0012 (Accepted); the contract schema is specified by ADR-0012 and the connector ADRs (ADR-0029 to ADR-0037, Accepted). (SPEC-001, accepted 2026-10-12.)
+- Machine-readable contract schema, proof levels and contract trust level specified by ADR-0029 §5; connector-level fault tests by ADR-0031 §5; `UNSAFE` operations are dispatchable at most once, never retried after dispatch, and suspend with a human-attention notification (ADR-0073) on ambiguity (ADR-0029 §5). (SPEC-003, accepted 2026-10-12.)
