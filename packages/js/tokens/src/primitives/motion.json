@@ -1,0 +1,58 @@
+{
+  "duration": {
+    "$type": "duration",
+    "fast": {
+      "$value": "120ms"
+    },
+    "base": {
+      "$value": "160ms"
+    },
+    "slow": {
+      "$value": "200ms"
+    }
+  },
+  "easing": {
+    "$type": "cubicBezier",
+    "standard": {
+      "$value": [
+        0.2,
+        0,
+        0,
+        1
+      ]
+    },
+    "enter": {
+      "$value": [
+        0,
+        0,
+        0.2,
+        1
+      ]
+    },
+    "exit": {
+      "$value": [
+        0.4,
+        0,
+        1,
+        1
+      ]
+    }
+  },
+  "motion": {
+    "loop": {
+      "$type": "duration",
+      "ring": {
+        "$value": "1300ms",
+        "$description": "One sweep of the run ring of a running node."
+      },
+      "spin": {
+        "$value": "1000ms",
+        "$description": "One turn of the running spinner."
+      },
+      "edge": {
+        "$value": "800ms",
+        "$description": "One cycle of the flow animation of a running edge."
+      }
+    }
+  }
+}

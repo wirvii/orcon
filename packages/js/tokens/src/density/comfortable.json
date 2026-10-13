@@ -1,0 +1,30 @@
+{
+  "size": {
+    "$type": "dimension",
+    "row": {
+      "$value": "40px"
+    },
+    "control": {
+      "$value": "36px"
+    },
+    "connector-icon": {
+      "$value": "32px"
+    },
+    "connector-icon-safe": {
+      "$value": "20px"
+    },
+    "panel-width": {
+      "$value": "240px",
+      "$description": "A reading width for side panels, popovers and narrow stories. Not a canvas measure."
+    }
+  },
+  "space": {
+    "$type": "dimension",
+    "control-x": {
+      "$value": "12px"
+    },
+    "gap": {
+      "$value": "12px"
+    }
+  }
+}
