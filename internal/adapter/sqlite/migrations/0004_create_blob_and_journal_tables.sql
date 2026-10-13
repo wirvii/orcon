@@ -143,8 +143,8 @@ CREATE TABLE external_operation (
   CONSTRAINT fk_external_operation_resolved_by_principal FOREIGN KEY (resolved_by_principal_id) REFERENCES principal (id) ON DELETE SET NULL
 ) STRICT;
 
--- Supports ListExternalOperations (the journal of a node execution) and the node execution foreign key.
-CREATE INDEX ix_external_operation_org_id_node_execution_id_item_index ON external_operation (org_id, node_execution_id, item_index);
+-- Supports ListExternalOperations (the journal of a node execution, keyset by item) and the node execution foreign key.
+CREATE INDEX ix_external_operation_org_id_node_execution_id_item_index_id ON external_operation (org_id, node_execution_id, item_index, id);
 
 -- Supports the recovery of operations left in DISPATCHING (ADR-0012 section 6).
 CREATE INDEX ix_external_operation_dispatch_deadline_at ON external_operation (dispatch_deadline_at) WHERE state = 'DISPATCHING';
