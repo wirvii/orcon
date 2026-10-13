@@ -449,6 +449,33 @@ for (const file of templateFiles) {
   const isPaths = Object.keys(t).every((k) => k.startsWith('/'));
   doc = merge(doc, isPaths ? { paths: t } : t);
 }
+// The problem-code template adds a reusable response for its example code. Point the
+// 409 of the publish operation at it so the response is exercised like a real one.
+const publish = doc.paths?.['/flows/{flowId}/publish']?.post;
+if (publish?.responses?.['409'] && doc.components?.responses?.ProjectManagedByGit) {
+  publish.responses['409'] = { $ref: '#/components/responses/ProjectManagedByGit' };
+}
+
+// Drop components nothing reachable references (the shared base carries more than any one
+// template needs), so the built-in no-unused-components rule only reports real mistakes.
+const sections = ['schemas', 'responses', 'parameters', 'headers'];
+const refPattern = /"#\/components\/(schemas|responses|parameters|headers)\/([^"]+)"/g;
+const used = new Set();
+const queue = [JSON.stringify({ ...doc, components: undefined })];
+while (queue.length > 0) {
+  for (const [, section, name] of queue.pop().matchAll(refPattern)) {
+    const key = `${section}/${name}`;
+    if (used.has(key) || !doc.components[section]?.[name]) continue;
+    used.add(key);
+    queue.push(JSON.stringify(doc.components[section][name]));
+  }
+}
+for (const section of sections) {
+  for (const name of Object.keys(doc.components[section] ?? {})) {
+    if (!used.has(`${section}/${name}`)) delete doc.components[section][name];
+  }
+}
+
 writeFileSync(outFile, YAML.stringify(doc));
 EOF
 
