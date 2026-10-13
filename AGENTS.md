@@ -20,6 +20,10 @@ Before creating, changing or reviewing a connector under `internal/adapter/conne
 
 Before adding, changing or reviewing an endpoint, event, webhook payload, CLI command or MCP tool in the OpenAPI contract (`packages/openapi/`), load the `orcon-api` skill (`.agents/skills/orcon-api/`). Its `references/` folder is the complete API design rulebook; [docs/engineering/api.md](docs/engineering/api.md) is the short human overview. Code generation and handlers stay in `orcon-go`. Edit the skill only under `.agents/skills/orcon-api/` and re-run `sh .agents/skills/orcon-api/scripts/project.sh`.
 
+## Web application code
+
+Before writing, reviewing or refactoring TypeScript or React code in `apps/web` or `packages/js`, load the `orcon-web` skill (`.agents/skills/orcon-web/`), and the `orcon-ui` skill when the change touches anything visual. Its `references/` folder is the complete web application rulebook; [docs/engineering/web.md](docs/engineering/web.md) is the short human overview. Edit the skill only under `.agents/skills/orcon-web/` and re-run `sh .agents/skills/orcon-web/scripts/project.sh`.
+
 ## Contributing
 
 Branches, commits, pull requests and releases follow the `orcon-contributing` skill (`.agents/skills/orcon-contributing/`).
