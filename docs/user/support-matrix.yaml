@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Support matrix of Orcon (ADR 0083 §10). One data file for two readers: the
+# page support/matrix of the documentation site is generated from it, and the
+# install test matrix reads it. A test compares both.
+#
+# Tiers: 1 = install test and the full test battery on every release;
+# 2 = published binary, plus the install test when a CI runner is available,
+# without the full battery; evaluation = published but not recommended for
+# production.
+version: 1
+
+platforms:
+  - id: linux-amd64
+    os: linux
+    arch: amd64
+    artifacts: [binary, image]
+    tier: 1
+    installTestRunner: ubuntu-24.04
+  - id: linux-arm64
+    os: linux
+    arch: arm64
+    artifacts: [binary, image]
+    tier: 1
+    installTestRunner: ubuntu-24.04-arm
+  - id: darwin-arm64
+    os: darwin
+    arch: arm64
+    artifacts: [binary]
+    tier: 1
+    installTestRunner: macos-15
+  - id: darwin-amd64
+    os: darwin
+    arch: amd64
+    artifacts: [binary]
+    tier: 2
+    installTestRunner: "an Intel runner if one exists; otherwise published only"
+  - id: windows-amd64
+    os: windows
+    arch: amd64
+    artifacts: [binary]
+    tier: evaluation
+    installTestRunner: windows-2025
+  - id: windows-arm64
+    os: windows
+    arch: arm64
+    artifacts: [binary]
+    tier: evaluation
+    installTestRunner: "windows-11-arm if it exists; otherwise published only"
+
+# Minimum system requirements are those of the Go toolchain that builds each
+# release; the page cites them per version.
+
+postgresql:
+  # PostgreSQL 14 to 17 are supported in version 1. 14 and 17 run on every pull
+  # request and every night; 15 and 16 run in the release battery.
+  - version: 14
+    status: supported
+    endOfLife: 2026-11-12
+    removedAfter: 2027-05-12
+    note: "community end of life 2026-11-12; leaves the matrix with the first minor release published after 2027-05-12"
+  - version: 15
+    status: supported
+  - version: 16
+    status: supported
+  - version: 17
+    status: supported
+  # PostgreSQL 18 runs in the nightly battery and enters the matrix only after a
+  # release has tested it in the release battery.
+
+sqlite:
+  driver: embedded
+  library: modernc.org/sqlite
+
+kubernetes:
+  versions: "the three minor versions supported by the community on the release date"
+  helm: ["3.14+", "4.x"]
+
+containers:
+  docker: "24+"
+  compose: "v2"
+
+objectStorage:
+  s3:
+    tested: "AWS S3, through its API"
+    ci: "an Apache-2.0 compatible server (SeaweedFS)"
+    others: "should work; not tested"
+
+browsers:
+  source: "the web application standards"
