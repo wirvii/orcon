@@ -404,49 +404,95 @@ func checkExpandContract(w *world) []Finding {
 }
 
 // breakingStatements reports the statements MG-7 rejects outside kind
-// contract. A rebuild migration in SQLite follows the twelve-step procedure
-// (MG-8), which creates a new table, drops the old one and renames the new
-// one, so DROP TABLE and RENAME are accepted there and nowhere else.
+// contract. The one exception is the SQLite file of a rebuild migration, which
+// follows the twelve-step procedure of MG-8: it creates a new table, drops the
+// old one and renames the new one to the old name. There every DROP TABLE <t>
+// must be followed, in the same file, by ALTER TABLE <other> RENAME TO <t>, and
+// every RENAME TO must give a dropped table's name back; DROP COLUMN, RENAME
+// COLUMN and ALTER COLUMN ... TYPE stay rejected, and the PostgreSQL file of the
+// pair follows MG-7 in full.
 func breakingStatements(m *migration) []Finding {
 	if m.header.kind == "contract" {
 		return nil
 	}
 	rebuildSQLite := m.header.kind == "rebuild" && m.dialect == dialectSQLite
 	var out []Finding
-	report := func(line int, what string) {
-		out = append(out, Finding{File: m.path, Line: line, Rule: "MG-7", Msg: fmt.Sprintf("%s is only allowed in a contract migration (kind is %q)", what, orNone(m.header.kind)), Fix: "split the change into an expand migration and a later contract migration"})
+	report := func(line int, what, fix string) {
+		out = append(out, Finding{File: m.path, Line: line, Rule: "MG-7", Msg: fmt.Sprintf("%s is only allowed in a contract migration (kind is %q)", what, orNone(m.header.kind)), Fix: fix})
 	}
+	const split = "split the change into an expand migration and a later contract migration"
+	dropped, renamedTo := map[string]int{}, map[string]bool{}
 	for _, s := range m.stmts {
 		words := s.words()
 		if len(words) == 0 {
 			continue
 		}
-		if !rebuildSQLite {
-			if hasWordSeq(words, "drop", "table") {
-				report(s.line, "DROP TABLE")
+		switch {
+		case hasWordSeq(words, "drop", "table"):
+			if rebuildSQLite {
+				dropped[tableAfter(words, "drop", "table")] = s.line
+			} else {
+				report(s.line, "DROP TABLE", split)
 			}
-			if len(words) > 1 && words[0] == "alter" && words[1] == "table" && containsWord(words, "rename") {
-				report(s.line, "RENAME")
+		case len(words) > 1 && words[0] == "alter" && words[1] == "table" && containsWord(words, "rename"):
+			if target, ok := renameTableTarget(words); ok && rebuildSQLite {
+				renamedTo[target] = true
+				if _, was := dropped[target]; !was {
+					report(s.line, "RENAME TO "+target+" without a DROP TABLE of "+target+" in the same file", "rename a new table back to the name of the table dropped before it (MG-8)")
+				}
+			} else {
+				report(s.line, "RENAME", split)
 			}
 		}
 		if words[0] == "alter" {
 			if hasWordSeq(words, "drop", "column") {
-				report(s.line, "DROP COLUMN")
+				report(s.line, "DROP COLUMN", split)
 			}
 			for i := indexWordSeq(words, 0, "alter", "column"); i >= 0; i = indexWordSeq(words, i+1, "alter", "column") {
 				// ALTER COLUMN <name> [SET DATA] TYPE <type>
 				rest := words[min(i+3, len(words)):]
 				if len(rest) > 0 && rest[0] == "type" || len(rest) > 2 && rest[0] == "set" && rest[1] == "data" && rest[2] == "type" {
-					report(s.line, "ALTER COLUMN ... TYPE")
+					report(s.line, "ALTER COLUMN ... TYPE", split)
 				}
 			}
 			if hasWordSeq(words, "set", "not", "null") {
-				report(s.line, "SET NOT NULL")
+				report(s.line, "SET NOT NULL", split)
 			}
 			out = append(out, addColumnNotNull(m, s)...)
 		}
 	}
+	for t, line := range dropped {
+		if !renamedTo[t] {
+			report(line, "DROP TABLE "+t+" that is not renamed back to "+t+" in the same file", "create a new table, copy, drop the old one and rename the new one to "+t+" (MG-8)")
+		}
+	}
 	return out
+}
+
+// tableAfter returns the word that follows the sequence a, b in words,
+// skipping IF EXISTS.
+func tableAfter(words []string, a, b string) string {
+	i := indexWordSeq(words, 0, a, b)
+	if i < 0 {
+		return ""
+	}
+	i += 2
+	if i+1 < len(words) && words[i] == "if" && words[i+1] == "exists" {
+		i += 2
+	}
+	if i < len(words) {
+		return words[i]
+	}
+	return ""
+}
+
+// renameTableTarget returns <t> of "ALTER TABLE <x> RENAME TO <t>" (not RENAME COLUMN).
+func renameTableTarget(words []string) (string, bool) {
+	i := indexWordSeq(words, 0, "rename", "to")
+	if i < 0 || i+2 >= len(words) {
+		return "", false
+	}
+	return words[i+2], true
 }
 
 func orNone(s string) string {

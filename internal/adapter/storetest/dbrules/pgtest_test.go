@@ -44,6 +44,7 @@ func TestMain(m *testing.M) {
 	stop := func() {}
 	if dsn := os.Getenv("ORCON_TEST_POSTGRES_DSN"); dsn != "" {
 		pgServer.adminDSN = dsn
+		announceExistingServer(dsn)
 	} else {
 		dsn, terminate, err := startPostgresContainer(os.Getenv("ORCON_TEST_POSTGRES_IMAGE"))
 		pgServer.adminDSN, pgServer.err = dsn, err
@@ -183,4 +184,21 @@ func execPostgres(t *testing.T, conn *pgx.Conn, statements string) {
 	if _, err := conn.Exec(t.Context(), statements, pgx.QueryExecModeSimpleProtocol); err != nil {
 		t.Fatalf("exec: %v", err)
 	}
+}
+
+// announceExistingServer prints one line saying that an existing server is in
+// use, with its address and version and never its password. Results from such a
+// run are not evidence for I8 or T5, which run against containers.
+func announceExistingServer(dsn string) {
+	cfg, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "dbrules: ORCON_TEST_POSTGRES_DSN is set but cannot be parsed")
+		return
+	}
+	version := "unknown version"
+	if conn, err := pgx.ConnectConfig(context.Background(), cfg); err == nil {
+		_ = conn.QueryRow(context.Background(), "SHOW server_version").Scan(&version)
+		_ = conn.Close(context.Background())
+	}
+	fmt.Fprintf(os.Stderr, "dbrules: using the existing PostgreSQL server %s:%d (%s) from ORCON_TEST_POSTGRES_DSN; this is a local convenience and not container evidence\n", cfg.Host, cfg.Port, version)
 }

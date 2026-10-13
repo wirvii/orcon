@@ -284,3 +284,13 @@ func TestWithRealGit(t *testing.T) {
 		t.Fatalf("unknown base: %v", findings)
 	}
 }
+
+func TestBaseNoneComparesOnlyWithTheSums(t *testing.T) {
+	cfg := tree(t, withSums(pair(1, "a", additive, "")), nil)
+	cfg.Git = &fakeGit{}
+	cfg.Base = "none"
+	findings, notes, code := runCheck(t, "migration-immutable", cfg)
+	if code != 0 || len(findings) != 0 || !contains(notes, "no base revision available") {
+		t.Fatalf("exit %d findings %v notes %v", code, findings, notes)
+	}
+}

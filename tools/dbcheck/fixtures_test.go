@@ -13,7 +13,7 @@ import (
 )
 
 // wantBadCases is the number of planted violations of SPEC-009 4.4.6.
-const wantBadCases = 26
+const wantBadCases = 29
 
 func fixtureConfig(dir string) config {
 	return config{

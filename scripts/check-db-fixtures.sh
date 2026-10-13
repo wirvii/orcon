@@ -7,8 +7,8 @@
 # fixtures and exits 0 only if every bad case is detected and every good one
 # passes:
 #
-#   26 static cases   tools/dbcheck/testdata/{bad,good}, run through .bin/dbcheck
-#   22 schema cases   dbrules/testdata/{bad,good}, SQLite and PostgreSQL
+#   29 static cases   tools/dbcheck/testdata/{bad,good}, run through .bin/dbcheck
+#   23 schema cases   dbrules/testdata/{bad,good}, SQLite and PostgreSQL
 #    2 plan cases     a full scan is detected in both engines; indexed queries pass
 #    1 pragma case    an opener without foreign_keys is detected
 #    2 upgrade cases  a migration that breaks seeded data is detected; a correct pair passes
@@ -53,7 +53,7 @@ for dir in "$cases"/bad/*/; do
   name=$(basename "$dir")
   bad=$((bad + 1))
   want=$(sort <"$dir/expect.txt" | tr '\n' ' ')
-  if "$dbcheck" -sqlite "$dir/sqlite" -postgres "$dir/postgres" -policy "$policy" -base HEAD all >"$work/out.txt" 2>"$work/err.txt"; then
+  if "$dbcheck" -sqlite "$dir/sqlite" -postgres "$dir/postgres" -policy "$policy" -base none all >"$work/out.txt" 2>"$work/err.txt"; then
     echo "db-fixtures: static case $name was NOT detected (dbcheck passed)" >&2
     status=1
     continue
@@ -64,13 +64,13 @@ for dir in "$cases"/bad/*/; do
     status=1
   fi
 done
-if [ "$bad" -ne 26 ]; then
-  echo "db-fixtures: found $bad static cases, SPEC-009 4.4.6 requires 26" >&2
+if [ "$bad" -ne 29 ]; then
+  echo "db-fixtures: found $bad static cases, SPEC-009 4.4.6 requires 29" >&2
   status=1
 fi
 for dir in "$cases"/good/*/; do
   name=$(basename "$dir")
-  if ! "$dbcheck" -sqlite "$dir/sqlite" -postgres "$dir/postgres" -policy "$policy" -base HEAD all >"$work/out.txt" 2>&1; then
+  if ! "$dbcheck" -sqlite "$dir/sqlite" -postgres "$dir/postgres" -policy "$policy" -base none all >"$work/out.txt" 2>&1; then
     echo "db-fixtures: good static case $name does not pass:" >&2
     cat "$work/out.txt" >&2
     status=1
@@ -92,7 +92,7 @@ require_pass() {
   done
 }
 
-sqlite_tests="TestSchemaLintGoodSQLite TestSchemaLintPlantedSQLite TestForeignKeysOnEveryConnection TestOpenerWithoutForeignKeysIsDetected TestPlansIndexedQueryPassesSQLite TestUpgradeDetectsAMigrationThatBreaksSeededData TestUpgradeGoodPairHasNoFindings"
+sqlite_tests="TestSchemaLintGoodSQLite TestSchemaLintPlantedSQLite TestForeignKeysOnEveryConnection TestOpenerWithoutForeignKeysIsDetected TestPlansIndexedQueryPassesSQLite TestUpgradeDetectsAMigrationThatBreaksSeededData TestUpgradeGoodPairHasNoFindings TestEnumValueRule"
 pattern=$(echo "$sqlite_tests" | tr ' ' '|')
 # shellcheck disable=SC2086 # the pattern has no spaces
 if ! go test -count=1 -v -run "^($pattern)\$" ./internal/adapter/storetest/dbrules/ >"$work/sqlite.log" 2>&1; then
@@ -107,7 +107,7 @@ echo "db-fixtures: SQLite schema, pragma, plan and upgrade cases run"
 if [ "$sqlite_only" -eq 1 ]; then
   echo "db-fixtures: PostgreSQL cases NOT run (--sqlite-only); run 'make test-postgres' and 'make db-fixtures' for them" >&2
 else
-  pg_tests="TestSchemaLintGoodPostgres TestSchemaLintPlantedPostgres TestPostgresSession TestPlansDetectFullScan TestPlansDetectSort TestEngineFunctionPlansPostgres TestUpgradeFromSeededPreviousVersion TestUpgradeDetectsAMigrationThatBreaksSeededData TestUpgradeGoodPairHasNoFindings TestUpgradeRequiresTwoOrganizationsInSeeds"
+  pg_tests="TestSchemaLintGoodPostgres TestSchemaLintPlantedPostgres TestPostgresSession TestPlansDetectFullScan TestPlansDetectSort TestEngineFunctionPlansPostgres TestUpgradeFromSeededPreviousVersion TestUpgradeDetectsAMigrationThatBreaksSeededData TestUpgradeGoodPairHasNoFindings TestUpgradeRequiresTwoOrganizationsInSeeds TestRowsAreVisibleThroughTheOrganizationContext"
   pattern=$(echo "$pg_tests" | tr ' ' '|')
   if ! ORCON_TEST_POSTGRES=1 go test -count=1 -v -run "^($pattern)\$" ./internal/adapter/storetest/dbrules/ >"$work/postgres.log" 2>&1; then
     cat "$work/postgres.log" >&2

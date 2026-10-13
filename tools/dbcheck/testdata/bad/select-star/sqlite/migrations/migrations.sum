@@ -3,4 +3,4 @@
 #
 # Checksums of the migrations in this directory.
 0001_create_org.sql  3fb70df8f938e51ad2cf86aebc20c67f0c00ea4719f0e3fcb502b6ce05c64654
-0002_create_api_key.sql  ce983e3fc44c51fe0cce5cb4892d61d359585b95a78967e965136951f50bcd33
+0002_create_api_key.sql  519472372fe8e72208e67ff9e979801c2fa85411a05fa364433bb5d51b38518a

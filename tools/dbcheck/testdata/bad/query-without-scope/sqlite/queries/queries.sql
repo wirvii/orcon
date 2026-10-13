@@ -18,8 +18,8 @@ SELECT count(*) FROM api_key WHERE org_id = ?;
 
 -- name: CreateApiKey :one
 -- orcon:scope org
-INSERT INTO api_key (id, org_id, created_at, updated_at, token_hash, is_active, http_status)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO api_key (id, org_id, created_at, updated_at, token_hash, is_active, http_status, status, authentication_kind, body_document, body_document_format)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id, created_at;
 
 -- name: DeleteApiKey :exec

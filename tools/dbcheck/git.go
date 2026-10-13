@@ -36,10 +36,14 @@ var errNoBase = errors.New("no base revision")
 // explicit value (flag or DBCHECK_BASE), else the merge base of HEAD and
 // origin/main. A base that was asked for but cannot be resolved is an error;
 // only the absence of any reference is "no base" (and is declared by the
-// caller, never silent).
+// caller, never silent). The explicit value "none" asks for no comparison with
+// a base: the planted-case fixtures use it, since they live in the repository.
 func resolveBase(g gitRunner, dir, explicit string) (string, error) {
 	if g == nil {
 		return "", fmt.Errorf("%w: git is not available", errNoBase)
+	}
+	if explicit == "none" {
+		return "", fmt.Errorf("%w: -base none was given", errNoBase)
 	}
 	if explicit != "" {
 		out, err := g.Run(dir, "rev-parse", "--verify", "--quiet", explicit+"^{commit}")

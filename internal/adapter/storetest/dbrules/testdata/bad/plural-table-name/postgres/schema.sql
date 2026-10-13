@@ -3,8 +3,9 @@
 
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 CREATE SCHEMA orcon_context;
+GRANT USAGE ON SCHEMA orcon_context TO orcon_application;
 CREATE FUNCTION orcon_context.current_org() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('orcon.org_id', true), '')::uuid $$;
-CREATE FUNCTION orcon_context.current_org_ids() RETURNS SETOF uuid LANGUAGE sql STABLE AS $$ SELECT unnest(string_to_array(nullif(current_setting('orcon.org_ids', true), ''), ',')::uuid[]) $$;
+CREATE FUNCTION orcon_context.current_org_ids() RETURNS SETOF uuid LANGUAGE sql STABLE AS $$ SELECT CAST(organization_id_text AS uuid) FROM string_to_table(NULLIF(current_setting('orcon.org_ids', true), ''), ',') AS organization_id_text $$;
 
 CREATE TABLE org (
   id uuid NOT NULL,
@@ -122,11 +123,13 @@ CREATE TABLE api_key (
   sha256 bytea NOT NULL,
   is_active boolean NOT NULL,
   http_status bigint NOT NULL,
+  authentication_kind text NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   CONSTRAINT pk_api_key PRIMARY KEY (id),
   CONSTRAINT uq_api_key_org_id_id UNIQUE (org_id, id),
   CONSTRAINT ck_api_key_http_status CHECK (http_status BETWEEN 100 AND 599),
+  CONSTRAINT ck_api_key_authentication_kind CHECK (authentication_kind IN ('SECRET', 'OAUTH2')),
   CONSTRAINT fk_api_key_org FOREIGN KEY (org_id) REFERENCES org (id) ON DELETE CASCADE
 );
 ALTER TABLE api_key ENABLE ROW LEVEL SECURITY;

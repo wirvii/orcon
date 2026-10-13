@@ -397,11 +397,13 @@ func lintModel(m *model, p *Policy) []Finding {
 		lintColumns(c, m, t, p)
 		lintTenancy(c, t, byName, p)
 		lintIntegrity(c, t, p)
+		lintEnumValues(c, m.dialect, t, p)
 		lintActors(c, t, p)
 		lintSoftDelete(c, t, p)
 		lintDocuments(c, m, t, p)
 		lintRedundantIndexes(c, t)
 	}
+	lintExternalIDWildcards(c, m, p)
 	for _, o := range m.otherNames {
 		checkIdentifier(c, o[0]+" "+o[1], o[1], "", p)
 	}
@@ -873,4 +875,28 @@ func forbiddenType(dialect, typ string) string {
 		return "citext"
 	}
 	return ""
+}
+
+// lintExternalIDWildcards rejects an external_ids.txt entry "*.<x>_id" when a
+// table <x> exists: a wildcard is for identifiers that do not identify a row of
+// Orcon (nodes and edges inside a stored document, identifiers of providers).
+func lintExternalIDWildcards(c *collector, m *model, p *Policy) {
+	tables := map[string]bool{}
+	for _, t := range m.tables {
+		tables[t.name] = true
+	}
+	keys := make([]string, 0, len(p.externalIDs))
+	for k := range p.externalIDs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		column, ok := strings.CutPrefix(k, "*.")
+		if !ok {
+			continue
+		}
+		if table, isID := strings.CutSuffix(column, "_id"); isID && tables[table] {
+			c.addf("IN-1", "policy "+fileExternalIDs, "entry %s applies to every table, but table %s exists and its identifier is a foreign key", k, table)
+		}
+	}
 }

@@ -221,11 +221,32 @@ func TestExpandContract(t *testing.T) {
 		{name: "add constraint is not a column", files: pair(1, "a", additive, "ALTER TABLE a ADD CONSTRAINT uq_a_b UNIQUE (b);\n")},
 		{name: "if not exists is not NOT NULL", files: pair(1, "a", additive, "ALTER TABLE a ADD COLUMN IF NOT EXISTS b TEXT;\n")},
 		{name: "words in strings and comments are ignored", files: pair(1, "a", additive, "-- DROP TABLE a;\nSELECT 'DROP TABLE a';\n")},
-		{name: "rebuild in sqlite may drop and rename", files: map[string]string{
+		{name: "rebuild in sqlite may drop and rename back", files: map[string]string{
 			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "CREATE TABLE a_new (id BLOB NOT NULL) STRICT;\nDROP TABLE a;\nALTER TABLE a_new RENAME TO a;\n",
 		}},
+		{name: "rebuild in sqlite: drop without renaming back", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "CREATE TABLE a_new (id BLOB NOT NULL) STRICT;\nDROP TABLE a;\n",
+		}, rules: []string{"MG-7"}, contains: "renamed back"},
+		{name: "rebuild in sqlite: rename to another name", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "CREATE TABLE a_new (id BLOB NOT NULL) STRICT;\nDROP TABLE a;\nALTER TABLE a_new RENAME TO b;\n",
+		}, rules: []string{"MG-7"}},
+		{name: "rebuild in sqlite: rename without a drop", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "ALTER TABLE a RENAME TO b;\n",
+		}, rules: []string{"MG-7"}},
+		{name: "rebuild in sqlite: rename column", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "CREATE TABLE a_new (id BLOB NOT NULL) STRICT;\nDROP TABLE a;\nALTER TABLE a_new RENAME TO a;\nALTER TABLE a RENAME COLUMN x TO y;\n",
+		}, rules: []string{"MG-7"}, contains: "RENAME"},
+		{name: "rebuild in sqlite: drop column", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "ALTER TABLE a DROP COLUMN x;\n",
+		}, rules: []string{"MG-7"}},
+		{name: "rebuild in sqlite: alter column type", files: map[string]string{
+			"sqlite/migrations/0001_a.sql": sqlHeader + k("rebuild") + "ALTER TABLE a ALTER COLUMN x TYPE bigint;\n",
+		}, rules: []string{"MG-7"}},
 		{name: "rebuild in postgres may not drop", files: map[string]string{
 			"postgres/migrations/0001_a.sql": sqlHeader + k("rebuild") + "DROP TABLE a;\n",
+		}, rules: []string{"MG-7"}},
+		{name: "rebuild in postgres may not rename back", files: map[string]string{
+			"postgres/migrations/0001_a.sql": sqlHeader + k("rebuild") + "CREATE TABLE a_new (id uuid NOT NULL);\nDROP TABLE a;\nALTER TABLE a_new RENAME TO a;\n",
 		}, rules: []string{"MG-7"}},
 		{name: "contract may drop", files: merge(
 			pair(1, "a", k("expand"), "ALTER TABLE a ADD COLUMN b TEXT;\n"),
@@ -517,4 +538,52 @@ func TestUnknownCheckAndUsage(t *testing.T) {
 	if !strings.Contains(errOut.String(), "migration-immutable") {
 		t.Fatalf("usage does not list the checks: %q", errOut.String())
 	}
+}
+
+func TestCheckEnumValues(t *testing.T) {
+	check := func(expr string) map[string]string {
+		return map[string]string{"sqlite/migrations/0001_a.sql": sqlHeader + additive + "CREATE TABLE a (\n  id BLOB NOT NULL,\n  status TEXT NOT NULL,\n  CONSTRAINT ck_a_status CHECK (" + expr + ")\n) STRICT;\n"}
+	}
+	pgCheck := func(expr string) map[string]string {
+		return map[string]string{"postgres/migrations/0001_a.sql": sqlHeader + additive + "CREATE TABLE a (\n  id uuid NOT NULL,\n  status text NOT NULL,\n  CONSTRAINT ck_a_status CHECK (" + expr + ")\n);\n"}
+	}
+	runCases(t, "ddl-enum-values", []checkCase{
+		{name: "IN with a lowercase value", files: check("status IN ('ACTIVE', 'revoked')"), rules: []string{"NM-16"}, contains: `value "revoked" in CHECK ck_a_status`},
+		{name: "IN all UPPER_SNAKE", files: check("status IN ('ACTIVE', 'NOT_FOUND', 'OAUTH2')")},
+		{name: "NOT IN with a lowercase value", files: check("status NOT IN ('a')"), rules: []string{"NM-16"}},
+		{name: "ANY ARRAY with a cast", files: pgCheck("status = ANY (ARRAY['x'::text])"), rules: []string{"NM-16"}},
+		{name: "ANY ARRAY with several casts, correct", files: pgCheck("status = ANY (ARRAY['A'::text, 'B'::text])")},
+		{name: "ANY ARRAY cast to text array", files: pgCheck("((status)::text = ANY ((ARRAY['A'::character varying, 'b'::character varying])::text[]))"), rules: []string{"NM-16"}},
+		{name: "ALL ARRAY with <>", files: pgCheck("status <> ALL (ARRAY['x'])"), rules: []string{"NM-16"}},
+		{name: "mixed case comparison", files: check("status = 'Active'"), rules: []string{"NM-16"}},
+		{name: "comparison with the literal first", files: check("'Active' = status"), rules: []string{"NM-16"}},
+		{name: "not equal comparison", files: check("status != 'draft'"), rules: []string{"NM-16"}},
+		{name: "comparison on a column that is not enumerated", files: check("name <> ''")},
+		{name: "empty value in IN", files: check("status IN ('')"), rules: []string{"NM-16"}},
+		{name: "format column is exempt", files: check("body_document_format IN ('orcon/flow@1')")},
+		{name: "enumerated column with digits", files: check("kind IN ('OAUTH2')")},
+		{name: "escaped quote keeps the whole value", files: check("status IN ('it''s')"), rules: []string{"NM-16"}, contains: `value "it's"`},
+		{name: "check inside a comment", files: check("status IN ('ACTIVE') -- status IN ('x')\n")},
+		{name: "numeric list", files: check("is_active IN (0, 1)")},
+		{name: "regular expression is not a value", files: pgCheck("status ~ '^[a-z]+$'")},
+		{name: "approved exception", files: check("status IN ('client_secret_basic')"), policy: map[string]*string{fileExceptions: str("NM-16  sqlite:a.ck_a_status  fixed by an external standard  2027-01-01  approved-by:owner\n")}},
+		{name: "exception for another dialect does not apply", files: check("status IN ('x')"), policy: map[string]*string{fileExceptions: str("NM-16  postgres:a.ck_a_status  other dialect  2027-01-01  approved-by:owner\n")}, rules: []string{"NM-16"}},
+		{name: "list on a column of any name", files: check("name IN ('x')"), rules: []string{"NM-16"}},
+		{name: "enumeration words missing", files: check("status IN ('ACTIVE')"), policy: map[string]*string{fileEnumWords: nil}, rules: []string{"CK-24"}, contains: "enumeration words are missing"},
+	})
+}
+
+func TestEnumFixSuggestion(t *testing.T) {
+	tests := map[string]string{"notification-link": "NOTIFICATION_LINK", "revoked": "REVOKED", "Revoked": "REVOKED", "it's": "IT_S", "a  b": "A_B", "": ""}
+	for in, want := range tests {
+		if got := upperSnakeFix(in); got != want {
+			t.Errorf("upperSnakeFix(%q) = %q, want %q", in, got, want)
+		}
+	}
+	runCases(t, "ddl-enum-values", []checkCase{{
+		name:     "fix text",
+		files:    map[string]string{"sqlite/migrations/0001_a.sql": sqlHeader + additive + "CREATE TABLE a (id BLOB NOT NULL, status TEXT NOT NULL, CONSTRAINT ck_a_status CHECK (status IN ('notification-link'))) STRICT;\n"},
+		rules:    []string{"NM-16"},
+		contains: "(fix: 'NOTIFICATION_LINK')",
+	}})
 }

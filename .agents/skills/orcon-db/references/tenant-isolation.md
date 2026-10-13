@@ -23,7 +23,7 @@ Encodes SPEC-004 S3 (R-ISO-01..11, ADR-0046, ADR-0047) and ADR-0077 §6.
     WITH CHECK (org_id = (SELECT orcon_context.current_org()) OR current_user = 'orcon_engine'
            OR org_id = ANY ((SELECT orcon_context.current_org_ids())));
   ```
-  The `org` table uses the same expression on `id` (`org_self_isolation`).
+  The `org` table uses the same expression on `id` (`org_self_isolation`). `orcon_context.current_org()` returns `uuid`; `orcon_context.current_org_ids()` returns `SETOF uuid`, `STABLE`, one row per organization of the transaction-local setting `orcon.org_ids` and no rows when it is unset (ADR-0046, ADR-0047 §4). An array return type fails with the subquery form above (`uuid = uuid[]`).
 - **TI-5** Roles: `orcon_owner` owns the schema and runs migrations; `orcon_application` is the runtime role, `NOSUPERUSER NOBYPASSRLS`, owner of nothing, granted `SELECT, INSERT, UPDATE, DELETE` (append-only tables: `SELECT, INSERT`); `orcon_engine` is `NOLOGIN NOBYPASSRLS` and owns the `orcon_engine` functions. With ≥ 2 organizations Orcon refuses to start, and refuses to create the second organization, if these hold false (R-ISO-06).
 - **TI-6** Organization context is transaction-local only: `SELECT set_config('orcon.org_id', $1, true)`. Never a session-level `SET`. A pool hook asserts the context is empty when a transaction starts. No context means zero rows.
 - **TI-7** Foreign keys between organization-scoped tables are composite: `FOREIGN KEY (org_id, <parent>_id) REFERENCES <parent> (org_id, id)`. A foreign key from an organization-scoped table to an instance table (`worker`, `principal`, `org`) is single-column.

@@ -47,3 +47,5 @@ Schema changes start from a specification tracked in mneme, the project's tool f
 ## Proposing a rule change
 
 Open a pull request that edits the relevant file in `.agents/skills/orcon-db/references/` and runs `make skill-sync`, so the generated copies stay identical. Rule changes are reviewed like code; a change that contradicts an accepted ADR needs a new ADR first.
+
+`ORCON_TEST_POSTGRES_DSN` points the PostgreSQL tests at an existing server instead of starting a container. It is a local convenience only: use a throwaway server where the user is a superuser, CI never sets it, and the PostgreSQL 14 and 17 matrix still runs in CI.

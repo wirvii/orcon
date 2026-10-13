@@ -107,6 +107,7 @@ CREATE TABLE api_key (
   sha256 BLOB NOT NULL,
   is_active INTEGER NOT NULL,
   http_status INTEGER NOT NULL,
+  authentication_kind TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CONSTRAINT pk_api_key PRIMARY KEY (id),
@@ -115,6 +116,7 @@ CREATE TABLE api_key (
   CONSTRAINT uq_api_key_org_id_id UNIQUE (org_id, id),
   CONSTRAINT ck_api_key_is_active CHECK (is_active IN (0, 1)),
   CONSTRAINT ck_api_key_http_status CHECK (http_status BETWEEN 100 AND 599),
+  CONSTRAINT ck_api_key_authentication_kind CHECK (authentication_kind IN ('SECRET', 'OAUTH2')),
   CONSTRAINT fk_api_key_org FOREIGN KEY (org_id) REFERENCES org (id) ON DELETE CASCADE
 ) STRICT;
 

@@ -177,7 +177,7 @@ ORDER BY con.conrelid, con.conname`, oids)
 		case "f":
 			t.fks = append(t.fks, &foreignKey{name: name, cols: cols, refTable: refTable, refCols: refCols, onDelete: pgDeleteAction(delType)})
 		case "c":
-			toks, err := tokenize(def)
+			toks, err := tokenizePostgres(def)
 			if err != nil {
 				return fmt.Errorf("constraint %s: %w", name, err)
 			}

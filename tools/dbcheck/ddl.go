@@ -411,3 +411,96 @@ func (a *ddlAnalysis) alter() {
 		i = end - 1
 	}
 }
+
+// checkEnumValues is "ddl-enum-values" (NM-16, IN-3, CK-24): every string
+// literal of an enumeration CHECK in a migration is UPPER_SNAKE.
+func checkEnumValues(w *world) []Finding {
+	if len(w.policy.enumWords) == 0 {
+		return []Finding{{File: w.policy.dir + "/" + fileEnumWords, Line: 1, Rule: "CK-24", Msg: "enumeration words are missing or empty, so enumeration values cannot be checked", Fix: "restore policy/enumeration_words.txt"}}
+	}
+	words := make([]string, 0, len(w.policy.enumWords))
+	for k := range w.policy.enumWords {
+		words = append(words, k)
+	}
+	var out []Finding
+	for _, d := range w.dialects {
+		for _, m := range d.migrations {
+			if m.toks == nil {
+				continue
+			}
+			for _, s := range m.stmts {
+				out = append(out, enumStatementFindings(w, m, s, words)...)
+			}
+		}
+	}
+	return out
+}
+
+// enumStatementFindings judges every CHECK (...) of one statement.
+func enumStatementFindings(w *world, m *migration, s stmt, words []string) []Finding {
+	table := statementTable(s)
+	var out []Finding
+	for k, t := range s.toks {
+		if !t.isWord("check") || k+1 >= len(s.toks) || !s.toks[k+1].isPunct("(") {
+			continue
+		}
+		inside, _, ok := tokenGroup(s.toks, k+1)
+		if !ok {
+			continue
+		}
+		name := ""
+		if k >= 2 && s.toks[k-2].isWord("constraint") {
+			name, _ = s.toks[k-1].name()
+		}
+		if name != "" && w.exc.has("NM-16", m.dialect, table+"."+name) {
+			continue
+		}
+		et := toEnumToks(inside)
+		for _, lit := range badEnumLiterals(et, words) {
+			line := t.line
+			object := name
+			if object == "" {
+				object = "(unnamed)"
+			}
+			out = append(out, Finding{File: m.path, Line: line, Rule: "NM-16",
+				Msg: fmt.Sprintf("enumeration value %q in CHECK %s is not UPPER_SNAKE", lit.value, object),
+				Fix: "'" + upperSnakeFix(lit.value) + "'"})
+		}
+	}
+	return out
+}
+
+// statementTable returns the table a CREATE TABLE or ALTER TABLE statement is about.
+func statementTable(s stmt) string {
+	toks := s.toks
+	if len(toks) == 0 {
+		return ""
+	}
+	switch {
+	case toks[0].isWord("create"):
+		kind, _, i := createInfo(toks)
+		if kind != "table" {
+			return ""
+		}
+		_, name, _ := objectName(toks, skipOptions(toks, i))
+		return name
+	case toks[0].isWord("alter") && len(toks) > 2 && toks[1].isWord("table"):
+		i := skipOptions(toks, 2)
+		if i < len(toks) && toks[i].isWord("only") {
+			i++
+		}
+		_, name, _ := objectName(toks, i)
+		return name
+	}
+	return ""
+}
+
+// tokenGroup returns the tokens inside the parentheses that open at toks[i].
+func tokenGroup(toks []token, i int) ([]token, int, bool) {
+	for j := i + 1; j < len(toks); j++ {
+		if toks[j].isPunct(")") && toks[j].depth == toks[i].depth {
+			return toks[i+1 : j], j, true
+		}
+	}
+	return nil, 0, false
+}

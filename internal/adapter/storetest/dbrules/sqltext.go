@@ -40,7 +40,17 @@ var errUnterminated = errors.New("unterminated quoted text or comment")
 // single-quoted strings, double-quoted, backtick and bracketed identifiers and
 // PostgreSQL dollar-quoted strings.
 func tokenize(src string) ([]sqlToken, error) {
-	s := &scanner{src: src, line: 1}
+	return tokenizeText(src, true)
+}
+
+// tokenizePostgres is tokenize for PostgreSQL text, where "[" and "]" delimit
+// array subscripts and ARRAY[...] and never quote an identifier.
+func tokenizePostgres(src string) ([]sqlToken, error) {
+	return tokenizeText(src, false)
+}
+
+func tokenizeText(src string, brackets bool) ([]sqlToken, error) {
+	s := &scanner{src: src, line: 1, brackets: brackets}
 	for s.pos < len(s.src) {
 		if err := s.next(); err != nil {
 			return nil, fmt.Errorf("line %d: %w", s.line, err)
@@ -58,6 +68,8 @@ type scanner struct {
 	line  int
 	depth int
 	toks  []sqlToken
+	// brackets makes [name] an identifier (SQLite).
+	brackets bool
 }
 
 func (s *scanner) add(kind byte, start, end int, lower string) {
@@ -88,7 +100,7 @@ func (s *scanner) next() error {
 		s.pos += 2 + end + 2
 	case c == '\'' || c == '"' || c == '`':
 		return s.quoted(c)
-	case c == '[':
+	case c == '[' && s.brackets:
 		return s.bracketed()
 	case c == '$':
 		s.dollar()

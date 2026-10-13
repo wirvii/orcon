@@ -10,7 +10,7 @@
 //	dbcheck [flags] all | <check> | sum
 //
 // Checks: migration-names, migration-pairs, migration-headers,
-// migration-immutable, migration-expand-contract, ddl-forbidden,
+// migration-immutable, migration-expand-contract, ddl-forbidden, ddl-enum-values,
 // query-select-star, query-json-path, query-limit, query-offset,
 // query-keyset, query-annotations, query-soft-delete, query-hot-tag,
 // query-parity, query-names, policy. "all" runs every check; "sum" appends the
@@ -51,6 +51,7 @@ var checks = []check{
 	{"migration-immutable", checkMigrationImmutable},
 	{"migration-expand-contract", checkExpandContract},
 	{"ddl-forbidden", checkForbiddenDDL},
+	{"ddl-enum-values", checkEnumValues},
 	{"query-select-star", checkSelectStar},
 	{"query-json-path", checkJSONPath},
 	{"query-limit", checkLimit},
@@ -71,7 +72,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	sqliteDir := flags.String("sqlite", "", "SQLite adapter directory (default <root>/internal/adapter/sqlite)")
 	postgresDir := flags.String("postgres", "", "PostgreSQL adapter directory (default <root>/internal/adapter/postgres)")
 	policyDir := flags.String("policy", "", "policy directory (default <root>/internal/adapter/storetest/dbrules/policy)")
-	base := flags.String("base", os.Getenv("DBCHECK_BASE"), "base revision for migration-immutable (default $DBCHECK_BASE, else the merge base with origin/main)")
+	base := flags.String("base", os.Getenv("DBCHECK_BASE"), "base revision for migration-immutable (default $DBCHECK_BASE, else the merge base with origin/main; none = compare only with migrations.sum)")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "usage: dbcheck [flags] all | sum | <check>")
 		fmt.Fprintln(stderr, "checks:", strings.Join(checkNames(), ", "))
