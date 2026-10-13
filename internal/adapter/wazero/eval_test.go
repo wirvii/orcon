@@ -40,9 +40,11 @@ func newEnv(tb testing.TB, json string) *expr.Env {
 
 func asEvalError(err error, target **expr.EvalError) bool { return errors.As(err, target) }
 
+// evaluator builds an evaluator with the production stop; tests that compare
+// modes use evaluatorIn.
 func evaluator(tb testing.TB, opts expr.Options) *expr.Evaluator {
 	tb.Helper()
-	return evaluatorIn(tb, wazero.ModeHardLimit, opts)
+	return evaluatorIn(tb, wazero.ModeCooperativeAbandon, opts)
 }
 
 var (

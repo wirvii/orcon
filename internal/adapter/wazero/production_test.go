@@ -185,8 +185,8 @@ func TestAbandonSaturation(t *testing.T) {
 	}
 	select {
 	case <-sb.Degraded():
+		t.Error("a refusal that drains by itself must not restart the process")
 	default:
-		t.Error("a refused call must mark the sandbox degraded")
 	}
 	if r := sb.HealthReport(); r.Saturated != 1 || m.saturated.Load() != 1 || m.abandoned.Load() != 2 || m.running.Load() != 2 {
 		t.Errorf("report = %+v, metrics = abandoned %d saturated %d running %d", r, m.abandoned.Load(), m.saturated.Load(), m.running.Load())
@@ -211,6 +211,11 @@ func TestAbandonSaturation(t *testing.T) {
 	close(g.release)
 	if _, err := rt2.Call(t.Context(), []byte(holdRequest), g); err != nil {
 		t.Errorf("a call after the room came back: %v", err)
+	}
+	select {
+	case <-sb.Degraded():
+		t.Error("saturation that recovered must not have degraded the process")
+	default:
 	}
 }
 
@@ -247,7 +252,7 @@ func TestAbandonStuck(t *testing.T) {
 // a restart: it is closed once, carries the counts, and a healthy sandbox
 // never closes it.
 func TestAbandonRestartSignal(t *testing.T) {
-	sb, open := openProduction(t, wazero.WithMaxAbandoned(1))
+	sb, open := openProduction(t, wazero.WithMaxAbandoned(1), wazero.WithStuckAfter(100*time.Millisecond))
 	select {
 	case <-sb.Degraded():
 		t.Fatal("a sandbox that abandoned nothing is degraded")
@@ -265,8 +270,8 @@ func TestAbandonRestartSignal(t *testing.T) {
 	}
 	select {
 	case <-sb.Degraded():
-	default:
-		t.Fatal("the restart signal was not raised")
+	case <-time.After(10 * time.Second):
+		t.Fatal("the restart signal was not raised although the sandbox stayed at its limit")
 	}
 	if r := sb.HealthReport(); r.Saturated != 2 || r.MaxAbandoned != 1 {
 		t.Errorf("report = %+v", r)
@@ -315,4 +320,131 @@ func (l *lockedBuffer) String() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.b.String()
+}
+
+// TestAbandonCapHoldsUnderConcurrency checks that the limit of abandoned calls
+// is never exceeded, however many calls reach their deadline at once: past the
+// limit the caller keeps waiting for its call instead of leaving it behind.
+func TestAbandonCapHoldsUnderConcurrency(t *testing.T) {
+	const limit, calls = 2, 12
+	m := &metricsLog{}
+	sb, open := openProduction(t, wazero.WithMaxAbandoned(limit), wazero.WithMetrics(m))
+	var peak atomic.Int64
+	stop := make(chan struct{})
+	sampled := make(chan struct{})
+	go func() {
+		defer close(sampled)
+		for {
+			if n := int64(sb.HealthReport().AbandonedRunning); n > peak.Load() {
+				peak.Store(n)
+			}
+			select {
+			case <-stop:
+				return
+			default:
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}()
+	guests := make([]*holdingGuest, calls)
+	rts := make([]expr.Runtime, calls)
+	for i := range calls {
+		guests[i], rts[i] = newHoldingGuest(), open()
+	}
+	var wg sync.WaitGroup
+	errs := make([]error, calls)
+	for i := range calls {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = abandonHeld(t, rts[i], guests[i])
+		}()
+	}
+	time.Sleep(300 * time.Millisecond) // every deadline has passed; nothing can end the held calls
+	if n := sb.HealthReport().AbandonedRunning; n > limit {
+		t.Errorf("%d abandoned calls running with a limit of %d", n, limit)
+	}
+	for _, g := range guests {
+		close(g.release)
+	}
+	wg.Wait()
+	eventually(t, "the abandoned calls to end", func() bool { return sb.HealthReport().AbandonedRunning == 0 })
+	close(stop)
+	<-sampled
+	if peak.Load() > limit {
+		t.Errorf("the abandoned calls peaked at %d with a limit of %d", peak.Load(), limit)
+	}
+	if got := m.abandoned.Load(); got > limit {
+		t.Errorf("%d abandons counted, more than the limit %d allows at once", got, limit)
+	}
+	for i, err := range errs {
+		if !errors.Is(err, expr.ErrTimeout) {
+			t.Errorf("call %d: got %v, want ErrTimeout", i, err)
+		}
+	}
+}
+
+// TestCancellationIsNotATimeout checks BL-031: a canceled context surfaces as
+// the cancellation, not as the time limit, is not logged or counted as an
+// abandon at the deadline, and a storm of cancellations neither saturates the
+// sandbox for good nor restarts the process.
+func TestCancellationIsNotATimeout(t *testing.T) {
+	var buf lockedBuffer
+	m := &metricsLog{}
+	sb, open := openProduction(t, wazero.WithMetrics(m), wazero.WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
+	const storm = 24
+	guests := make([]*holdingGuest, storm)
+	var wg sync.WaitGroup
+	errs := make([]error, storm)
+	rts := make([]expr.Runtime, storm)
+	for i := range storm {
+		guests[i], rts[i] = newHoldingGuest(), open()
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	for i := range storm {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = rts[i].Call(ctx, []byte(holdRequest), guests[i])
+		}()
+	}
+	eventually(t, "every call to reach the host", func() bool {
+		for _, g := range guests {
+			if g.began.Load() == 0 {
+				return false
+			}
+		}
+		return true
+	})
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+	if n := sb.HealthReport().AbandonedRunning; n > 8 {
+		t.Errorf("%d runs held after cancellation, over the default limit of 8", n)
+	}
+	for _, g := range guests {
+		close(g.release)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if !errors.Is(err, context.Canceled) || errors.Is(err, expr.ErrTimeout) {
+			t.Errorf("call %d: got %v, want the cancellation and not ErrTimeout", i, err)
+		}
+	}
+	eventually(t, "the canceled runs to end", func() bool { return sb.HealthReport().AbandonedRunning == 0 })
+	if r := sb.HealthReport(); r.Abandoned != 0 || m.abandoned.Load() != 0 {
+		t.Errorf("cancellations counted as abandons at the deadline: report %+v, metric %d", r, m.abandoned.Load())
+	}
+	if strings.Contains(buf.String(), "abandoned at its deadline") {
+		t.Errorf("a cancellation was logged as an abandon at the deadline: %s", buf.String())
+	}
+	select {
+	case <-sb.Degraded():
+		t.Error("a storm of cancellations restarted the process")
+	default:
+	}
+	g := newHoldingGuest()
+	close(g.release)
+	if _, err := open().Call(t.Context(), []byte(holdRequest), g); err != nil {
+		t.Errorf("a call after the storm: %v", err)
+	}
 }

@@ -370,11 +370,25 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 			r := <-done
 			return r.out, r.err
 		}
-		in.abandoned.Store(true)
+		in.abandoned.Store(true) // from now on the guest is refused, whatever happens next
 		in.abandonedAt = time.Now()
-		gave = in.track.abandon(ctx, in.abandonedAt.Sub(started))
+		a, ok := in.track.abandon(ctx, in.abandonedAt.Sub(started), expired(ctx))
+		if !ok {
+			// At the limit of abandoned calls the caller keeps waiting, so the
+			// memory held by calls nobody waits for stays bounded.
+			in.stateMu.Unlock()
+			<-done
+			// The call has ended; the runtime was marked abandoned, so it is
+			// not reused. Close it here, as an abandoned call would have.
+			in.mu.Lock()
+			in.broken = true
+			in.mu.Unlock()
+			_ = in.mod.Close(context.WithoutCancel(ctx))
+			return nil, stopError(ctx)
+		}
+		gave = a
 		in.stateMu.Unlock()
-		return nil, fmt.Errorf("%w: %w", expr.ErrTimeout, context.Cause(ctx))
+		return nil, stopError(ctx)
 	}
 }
 
@@ -424,7 +438,7 @@ func (in *instance) callLocked(ctx context.Context, request []byte) ([]byte, err
 		return []byte(text), nil
 	default:
 		if cause := context.Cause(ctx); cause != nil && strings.Contains(text, "interrupted") {
-			return nil, fmt.Errorf("%w: %w", expr.ErrTimeout, cause)
+			return nil, stopError(ctx)
 		}
 		return nil, classifyScript(text)
 	}
@@ -457,6 +471,21 @@ func (in *instance) Close(ctx context.Context) error {
 	defer in.mu.Unlock()
 	in.broken = true
 	return in.mod.Close(ctx)
+}
+
+// Whether the context ended because its deadline passed (expired), as opposed
+// to being canceled.
+func expired(ctx context.Context) bool { return errors.Is(ctx.Err(), context.DeadlineExceeded) }
+
+// stopError is the error of a call stopped because its context is done: the
+// time limit ([expr.ErrTimeout]) when the deadline passed, and the
+// cancellation itself when the caller canceled, which is not an error of the
+// expression and must not look like one.
+func stopError(ctx context.Context) error {
+	if expired(ctx) {
+		return fmt.Errorf("%w: %w", expr.ErrTimeout, context.Cause(ctx))
+	}
+	return fmt.Errorf("expr: evaluation canceled: %w", context.Cause(ctx))
 }
 
 // classify maps a failure of the WebAssembly runtime to the sandbox errors.

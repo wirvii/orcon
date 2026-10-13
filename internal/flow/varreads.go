@@ -62,8 +62,8 @@ func (v *validator) valueVariableReads(path string, val jsonvalue.Value, declare
 // expressionVariableReads checks one field that may hold an expression: a
 // template string, or for an edge condition the bare code.
 func (v *validator) expressionVariableReads(path, s string, declared []string) {
-	if !strings.Contains(s, "variables") {
-		return // cheap exit: no expression reads a variable
+	if !strings.Contains(s, "$execution") {
+		return // cheap exit: no expression names $execution
 	}
 	a := analyzeCondition(s)
 	for _, f := range a.Findings {

@@ -66,6 +66,10 @@ type tracker struct {
 	abandoned uint64
 	saturated uint64
 
+	// satTimer fires when the sandbox has been at its limit for the stuck
+	// period; guarded by mu.
+	satTimer *time.Timer
+
 	degraded     chan struct{}
 	degradedOnce sync.Once
 }
@@ -89,23 +93,43 @@ func newTracker(maxAbandoned int, stuckAfter time.Duration, log *slog.Logger, m 
 }
 
 // admit decides whether a new sandbox call may start. With the limit of
-// abandoned calls reached it refuses, counts the refusal and marks the
-// process degraded: it can no longer serve expressions and must restart.
+// abandoned calls reached it refuses and counts the refusal. The process is
+// marked degraded only if the condition persists (see [tracker.watchSaturation]):
+// a burst that drains by itself, such as the cancellation of a batch of
+// executions, does not restart it.
 func (t *tracker) admit(ctx context.Context) error {
 	t.mu.Lock()
 	full := t.running >= t.max
 	if full {
 		t.saturated++
+		t.watchSaturationLocked()
 	}
 	t.mu.Unlock()
 	if !full {
 		return nil
 	}
 	t.metrics.Saturated()
-	t.markDegraded()
-	t.log.ErrorContext(ctx, "expression sandbox saturated: new calls are refused until the process restarts",
+	t.log.ErrorContext(ctx, "expression sandbox saturated: new calls are refused until abandoned calls finish",
 		"abandoned_running", t.max, "max_abandoned", t.max)
 	return expr.ErrSandboxSaturated
+}
+
+// watchSaturationLocked starts the timer that marks the process degraded if
+// the sandbox is still at its limit after the stuck period. It is idempotent
+// and is stopped when room comes back.
+func (t *tracker) watchSaturationLocked() {
+	if t.satTimer != nil {
+		return
+	}
+	t.satTimer = time.AfterFunc(t.stuckAfter, func() {
+		t.mu.Lock()
+		t.satTimer = nil
+		full := t.running >= t.max
+		t.mu.Unlock()
+		if full {
+			t.markDegraded()
+		}
+	})
 }
 
 func (t *tracker) markDegraded() { t.degradedOnce.Do(func() { close(t.degraded) }) }
@@ -116,28 +140,47 @@ type abandonment struct {
 	at      time.Time
 	timer   *time.Timer
 	isStuck bool
+	// counted is set for a call abandoned at its deadline.
+	counted bool
 	mu      sync.Mutex
 	done    bool
 }
 
-// abandon registers a call abandoned at its deadline. The log line names the
-// organization, execution and node and the deadline; never the expression or
-// its data.
-func (t *tracker) abandon(ctx context.Context, deadline time.Duration) *abandonment {
+// abandon registers a call the caller gave up on. It enforces the limit
+// strictly: when abandoned calls still running already equal the limit it
+// registers nothing and reports false, and the caller must keep waiting for
+// its call instead of leaving it behind, so the memory the abandoned calls can
+// hold is bounded by the limit whatever the concurrency. A call abandoned
+// because of its deadline is counted, logged (organization, execution and node
+// ids and the deadline, never the expression or its data) and measured;
+// one abandoned because its context was canceled holds a slot but is not an
+// abandon at the deadline.
+func (t *tracker) abandon(ctx context.Context, deadline time.Duration, atDeadline bool) (*abandonment, bool) {
 	id := expr.CallIdentityFrom(ctx)
 	t.mu.Lock()
+	if t.running >= t.max {
+		t.watchSaturationLocked()
+		t.mu.Unlock()
+		t.log.ErrorContext(context.WithoutCancel(ctx), "expression sandbox at its abandon limit: the caller waits for its call to finish",
+			"organization_id", id.OrganizationID, "execution_id", id.ExecutionID, "node_id", id.NodeID, "max_abandoned", t.max)
+		return nil, false
+	}
 	t.running++
-	t.abandoned++
+	if atDeadline {
+		t.abandoned++
+	}
 	running := t.running
 	t.mu.Unlock()
-	t.metrics.Abandoned()
 	t.metrics.AbandonedRunning(1)
-	t.log.WarnContext(context.WithoutCancel(ctx), "expression evaluation abandoned at its deadline",
-		"organization_id", id.OrganizationID, "execution_id", id.ExecutionID, "node_id", id.NodeID,
-		"deadline", deadline, "abandoned_running", running)
-	a := &abandonment{t: t, at: time.Now()}
+	if atDeadline {
+		t.metrics.Abandoned()
+		t.log.WarnContext(context.WithoutCancel(ctx), "expression evaluation abandoned at its deadline",
+			"organization_id", id.OrganizationID, "execution_id", id.ExecutionID, "node_id", id.NodeID,
+			"deadline", deadline, "abandoned_running", running)
+	}
+	a := &abandonment{t: t, at: time.Now(), counted: atDeadline}
 	a.timer = time.AfterFunc(t.stuckAfter, a.markStuck)
-	return a
+	return a, true
 }
 
 func (a *abandonment) markStuck() {
@@ -166,14 +209,20 @@ func (a *abandonment) ended() {
 	if wasStuck {
 		a.t.stuck--
 	}
+	if a.t.running < a.t.max && a.t.satTimer != nil {
+		a.t.satTimer.Stop()
+		a.t.satTimer = nil
+	}
 	a.t.mu.Unlock()
 	a.t.metrics.AbandonedRunning(-1)
-	a.t.metrics.AbandonOverrun(time.Since(a.at))
+	if a.counted {
+		a.t.metrics.AbandonOverrun(time.Since(a.at))
+	}
 }
 
 // Degraded implements [expr.Health]: the channel is closed when the sandbox
-// refused a call because of the limit of abandoned calls, or holds a stuck
-// one. The process must then shut down gracefully and restart.
+// has stayed at its limit of abandoned calls for the stuck period, or holds a
+// stuck abandoned call. The process must then shut down gracefully and restart.
 func (s *Sandbox) Degraded() <-chan struct{} { return s.track.degraded }
 
 // HealthReport implements [expr.Health].

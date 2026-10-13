@@ -25,6 +25,13 @@ func TestValidateVariableReads(t *testing.T) {
 		{"enumeration", "={{ Object.keys($execution.variables) }}"},
 		{"destructuring", "={{ (() => { const { total } = $execution.variables; return total; })() }}"},
 		{"the in operator", "={{ 'total' in $execution.variables }}"},
+		{"an alias of $execution", "={{ (() => { const e = $execution; return e.variables.total; })() }}"},
+		{"destructuring $execution", "={{ (() => { const { variables } = $execution; return variables.total; })() }}"},
+		{"a built key into $execution", "={{ $execution['vari' + 'ables'].total }}"},
+		{"spreading $execution", "={{ ({ ...$execution }).variables.total }}"},
+		{"keys of $execution", "={{ Object.keys($execution) }}"},
+		{"passing $execution to a function", "={{ JSON.stringify($execution) }}"},
+		{"an unknown member of $execution", "={{ $execution.customData }}"},
 	}
 	for _, tc := range bad {
 		t.Run(tc.name, func(t *testing.T) {
@@ -50,7 +57,7 @@ func TestValidateVariableReads(t *testing.T) {
 		{"a declared name", "={{ $execution.variables.total > 3 }}"},
 		{"a declared name in brackets", `={{ $execution.variables["pages"].length > 0 }}`},
 		{"the same name twice", "={{ $execution.variables.total + $execution.variables.total }}"},
-		{"other members of $execution", "={{ $execution.id }}"},
+		{"other members of $execution", "={{ $execution.id + $execution.mode + $execution.resumeUrl + $execution.resumeFormUrl }}"},
 	}
 	for _, tc := range good {
 		t.Run(tc.name, func(t *testing.T) {

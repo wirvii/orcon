@@ -521,7 +521,48 @@ func (w *walker) contextMember(e ast.Expression) bool {
 		w.wholeVariables(e)
 		return true
 	}
+	if w.executionMember(e) {
+		return true
+	}
 	return w.jsonMember(e)
+}
+
+// executionFields are the members of $execution an expression may read besides
+// its variables.
+var executionFields = []string{"id", "mode", "resumeUrl", "resumeFormUrl"}
+
+// executionMember handles a member access whose base is $execution itself
+// (not its variables): the four plain fields are allowed, anything else is a
+// finding because it could reach the variables around the check.
+func (w *walker) executionMember(e ast.Expression) bool {
+	var left, member ast.Expression
+	var name string
+	lit := true
+	switch n := e.(type) {
+	case *ast.DotExpression:
+		left, name = n.Left, n.Identifier.Name.String()
+	case *ast.BracketExpression:
+		left, member = n.Left, n.Member
+		name, lit = stringLiteral(n.Member)
+	default:
+		return false
+	}
+	if !w.isExecution(left) {
+		return false
+	}
+	w.use("$execution", e.Idx0())
+	w.size++
+	if lit && slices.Contains(executionFields, name) {
+		return true
+	}
+	w.findings = append(w.findings, Finding{
+		Kind: FindingExecutionVariables, Name: "$execution", Offset: w.offset(e.Idx0()),
+		Message: "$execution is read other than by .id, .mode, .resumeUrl, .resumeFormUrl or a literal .variables.name; use one of those",
+	})
+	if !lit {
+		w.expr(member)
+	}
+	return true
 }
 
 // wholeVariables records a use of $execution.variables as an object.
@@ -540,6 +581,15 @@ func (w *walker) expr(e ast.Expression) {
 	switch n := e.(type) {
 	case nil:
 	case *ast.Identifier:
+		if string(n.Name) == "$execution" && !w.bound("$execution") {
+			// $execution used as a value (aliased, spread, destructured,
+			// enumerated or passed on) could reach the variables around the
+			// literal-name check.
+			w.findings = append(w.findings, Finding{
+				Kind: FindingExecutionVariables, Name: "$execution", Offset: w.offset(n.Idx),
+				Message: "$execution is used as a whole; read .id, .mode, .resumeUrl, .resumeFormUrl or a literal .variables.name",
+			})
+		}
 		w.use(string(n.Name), n.Idx)
 	case *ast.CallExpression:
 		w.call(n)
