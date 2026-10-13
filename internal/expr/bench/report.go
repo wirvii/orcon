@@ -220,8 +220,10 @@ func dur(d time.Duration) string {
 		return fmt.Sprintf("%d ns", d.Nanoseconds())
 	case d < time.Millisecond:
 		return fmt.Sprintf("%.1f µs", float64(d.Nanoseconds())/1e3)
-	default:
+	case d < time.Second:
 		return fmt.Sprintf("%.2f ms", float64(d.Nanoseconds())/1e6)
+	default:
+		return fmt.Sprintf("%.2f s", d.Seconds())
 	}
 }
 
