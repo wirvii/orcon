@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Short forms the naming rule NM-3 allows (naming.md). Single source of the
+# decision: tools/dbcheck and dbrules both read this file; neither holds a list.
+#
+# Format, one entry per line, in alphabetical order:
+#   <token>  # <expansion>; <standard or product>
+# The token matches ^[a-z][a-z0-9]*$ and must not appear in
+# abbreviation_denylist.txt. Adding an entry loosens the rule: only a pull
+# request approved by the maintainers may do it.
+ai  # artificial intelligence; product feature name
+api  # application programming interface; common technical term
+dns  # Domain Name System; RFC 1035
+fts5  # SQLite FTS5 full-text search module; SQLite module name
+hmac  # keyed-hash message authentication code; RFC 2104
+http  # Hypertext Transfer Protocol; RFC 9110
+id  # identifier; permitted abbreviation (Q1)
+ip  # Internet Protocol; RFC 791
+kms  # key management service; common technical term
+ldap  # Lightweight Directory Access Protocol; RFC 4511
+mac  # message authentication code; common technical term
+mcp  # Model Context Protocol; product protocol name
+n8n  # the n8n product; compatibility only
+oauth  # OAuth authorization framework; RFC 6749
+oidc  # OpenID Connect; OpenID specification
+org  # organization; permitted abbreviation (Q1)
+saml  # Security Assertion Markup Language; OASIS standard
+scim  # System for Cross-domain Identity Management; RFC 7643
+sha256  # SHA-256 hash; FIPS 180-4
+siem  # security information and event management; common technical term
+smtp  # Simple Mail Transfer Protocol; RFC 5321
+tls  # Transport Layer Security; RFC 8446
+uri  # Uniform Resource Identifier; RFC 3986
+url  # Uniform Resource Locator; RFC 3986
+uuid  # universally unique identifier; RFC 9562

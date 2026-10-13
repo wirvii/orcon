@@ -19,3 +19,7 @@ internal/adapter/sqlite/sqlcgen/**               pr-size-exclude linguist-genera
 internal/adapter/postgres/sqlcgen/**             pr-size-exclude linguist-generated
 internal/adapter/httpapi/apigen/**               pr-size-exclude linguist-generated
 docs/reference/api/**                            pr-size-exclude linguist-generated
+
+# SQL files are LF on every platform so the checksums in migrations.sum stay
+# stable (migrations.md MG-5).
+*.sql text eol=lf

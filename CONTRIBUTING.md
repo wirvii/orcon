@@ -46,6 +46,10 @@ Read [docs/engineering/connectors.md](docs/engineering/connectors.md) before wri
 
 Read [docs/engineering/api.md](docs/engineering/api.md) before changing the OpenAPI contract in `packages/openapi/`. The complete API design rulebook lives in `.agents/skills/orcon-api/references/` and is packaged as the `orcon-api` mneme skill; start from its templates in `.agents/skills/orcon-api/assets/templates/` and paste `.agents/skills/orcon-api/assets/pr-api-checklist.md` into the pull request.
 
+## Database schema and SQL
+
+Read [docs/engineering/db.md](docs/engineering/db.md) before changing a table, a migration or a SQL query. The complete database rulebook lives in `.agents/skills/orcon-db/references/` and is packaged as the `orcon-db` mneme skill. Run `make db-check` while iterating, and `make check` plus `make test-postgres` (needs a container runtime) before opening a pull request; paste `.agents/skills/orcon-db/assets/pr-db-checklist.md` into its description.
+
 ## Web application code
 
 Read [docs/engineering/web.md](docs/engineering/web.md) before changing code in `apps/web` or `packages/js`. The complete web application rulebook lives in `.agents/skills/orcon-web/references/` and is packaged as the `orcon-web` mneme skill.

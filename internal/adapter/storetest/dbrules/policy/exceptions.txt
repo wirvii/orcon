@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Owner-approved exceptions to the database rules (checks.md CK-20, CK-21):
+# JSON-path queries, jsonb columns, OFFSET, WITHOUT ROWID, triggers. Only a
+# pull request approved by the owner may add a line. A line without
+# approved-by:, or past its date, fails the policy check. Format, fields
+# separated by two or more spaces:
+#   <rule-id>  <dialect>:<object>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+# Empty at birth.
