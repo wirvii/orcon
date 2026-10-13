@@ -1,0 +1,17 @@
+{
+  "format": "orcon/cassette@1",
+  "operation": "contact.delete",
+  "case": "ok",
+  "example": true,
+  "parameters": { "contactId": "c_1" },
+  "items": [ {} ],
+  "credential": { "type": "apiKey", "fixture": "default" },
+  "interactions": [
+    {
+      "request": { "method": "DELETE", "url": "https://api.acme.example/v1/contacts/c_1", "headers": { "Authorization": "[REDACTED:credential.apiKey]" }, "body": null },
+      "response": { "status": 204, "headers": {}, "body": null }
+    }
+  ],
+  "expect": { "items": [ { "id": "c_1", "deleted": true } ] },
+  "recorded": { "at": "2026-10-13T00:00:00Z", "orconVersion": "0.0.0", "scrubber": { "version": 1, "rulesDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000" } }
+}

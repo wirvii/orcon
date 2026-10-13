@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Template: an executable example block (x-orcon-examples) and the OpenAPI examples it names.
+# Paste the x-orcon-examples list into an operation and the named examples into its requestBody
+# and responses; the reference site shows exactly what the examples runner executes.
+# Rules: references/documentation.md (DOC-7 to DOC-10), references/extensions.md.
+#
+# The scenario named by each example is a Go function registered in
+# internal/adapter/httpapi/examplestest/scenarios/. It seeds state only through the public API,
+# never through storage, never reaches the internet, and must pass on SQLite and PostgreSQL.
+# It returns bindings from the fixed values used in the examples to the real ones:
+#
+#   func init() {
+#       examplestest.RegisterScenario("flow-with-valid-draft", func(ctx context.Context, api *examplestest.Client) (examplestest.Bindings, error) {
+#           // Create a project and a flow with a valid draft through the public API only.
+#           // Bind the fixed ids and ETags of the examples to the created ones:
+#           // return examplestest.Bindings{"0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60": flowID, `"7"`: etag}, nil
+#       })
+#   }
+
+x-orcon-examples:
+  # name: lowerCamel; the same name is used for the OpenAPI examples it refers to.
+  - name: publishValidDraft
+    # scenario: kebab-case name of a registered scenario (seeds the state the example needs).
+    scenario: flow-with-valid-draft
+    request:
+      # pathParams: values for the path parameters; fixed UUIDs are bound by the scenario.
+      pathParams:
+        flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      # query: query parameters (optional).
+      query: {}
+      # headers: request headers (optional); fixed ETags are bound by the scenario.
+      headers:
+        If-Match: '"7"'
+        Idempotency-Key: publish-example-1
+      # body: the name of an example under requestBody.content.<media type>.examples (optional).
+      body: publishValidDraft
+    response:
+      # status: the expected status code.
+      status: 200
+      # body: the name of an example under responses.<status>.content.<media type>.examples.
+      # The runner validates the real body against the schema and compares every leaf;
+      # unbound uuid and date-time fields and x-orcon-volatile fields are compared by format.
+      body: publishValidDraft
+  # Streams: the runner opens the stream, runs the trigger example and expects these event types.
+  - name: followExecutionEvents
+    scenario: running-execution
+    request:
+      pathParams:
+        executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+    response:
+      status: 200
+    stream:
+      # trigger: the name of another example (any operation) that causes the events.
+      trigger: cancelRunningExecution
+      # expectTypes: event types that must arrive, in order.
+      expectTypes: [execution.canceled]
+      # within: maximum wait, at most 10 seconds.
+      within: 10s
+  # Long-running operations: the runner polls Location until the Operation reaches this status.
+  - name: importFlowsFromGit
+    scenario: project-with-git-binding
+    request:
+      pathParams:
+        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+      headers:
+        Idempotency-Key: git-sync-example-1
+    response:
+      status: 202
+      body: importFlowsFromGit
+    operation:
+      # terminalStatus: the Operation status the runner waits for (at most 60 seconds).
+      terminalStatus: SUCCEEDED
+
+# The OpenAPI examples named above, placed in the operation:
+requestBody:
+  content:
+    application/json:
+      examples:
+        publishValidDraft:
+          summary: Publish with a release note
+          value:
+            note: Retry the CRM step on rate limits
+responses:
+  '200':
+    content:
+      application/json:
+        examples:
+          publishValidDraft:
+            summary: Version 8 published
+            value:
+              flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+              version: 8
+              note: Retry the CRM step on rate limits
+              publishedAt: '2026-10-12T15:04:05Z'
+              publishedByPrincipalId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61

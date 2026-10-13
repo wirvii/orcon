@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Feature request
+description: Propose a new capability or a change in behavior
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How you would like Orcon to behave.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or workarounds you tried or considered.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - engine
+        - trigger
+        - connector
+        - api
+        - cli
+        - mcp
+        - web
+        - ui
+        - db
+        - ai
+        - security
+        - notify
+        - docs
+  - type: checkboxes
+    id: design
+    attributes:
+      label: Design process
+      options:
+        - label: I understand that new behavior needs an accepted design before implementation
+          required: true

@@ -22,3 +22,12 @@ packages/js/tokens/src/**/*.json  # design token sources in the W3C format; JSON
 packages/js/tokens/src/*.json  # design token sources in the W3C format; JSON has no comment syntax
 packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has no comment syntax
 packages/js/ui/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
+internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
+internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+.agents/skills/orcon-connector/assets/templates/**/*.json  # connector template packages and cassettes; JSON has no comment syntax
+
+# Contribution workflow (orcon-contributing, SPEC-013).
+CODE_OF_CONDUCT.md                       # third-party text, Contributor Covenant 2.1, CC-BY-4.0, attribution inside
+.github/pull_request_template.md         # copied into every pull request description
+.agents/skills/orcon-contributing/assets/github-settings.expected.json   # JSON has no comment syntax
+.agents/skills/orcon-contributing/assets/templates/commit-message.txt   # plain-text commit template (it carries the SPDX lines as comments)

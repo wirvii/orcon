@@ -168,6 +168,10 @@ bench-compare:
 skill-sync:
 	sh .agents/skills/orcon-go/scripts/project.sh
 	sh .agents/skills/orcon-ui/scripts/project.sh
+	sh .agents/skills/orcon-api/scripts/project.sh
+	sh .agents/skills/orcon-connector/scripts/project.sh
+	sh .agents/skills/orcon-contributing/scripts/project.sh
+	sh .agents/skills/orcon-web/scripts/project.sh
 
 skill-check:
 	sh scripts/check-skill.sh

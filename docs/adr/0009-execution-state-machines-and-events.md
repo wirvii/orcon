@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0009 — Execution lifecycle state machines and event catalog
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -88,4 +88,5 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-002.** Execution modes are `WEBHOOK`, `TRIGGER`, `TEST`, `MANUAL`, `CHILD`, `ERROR`, `RETRY` and `EVALUATION` (ADR-0080 §3); `execution.created` carries `trigger.kind` and `eventId`.
 - **SPEC-005.** Internal events map to CloudEvents and public event types as defined by ADR-0055 §2; live-only events are delivered through the per-execution SSE stream (ADR-0055 §3).
-- **SPEC-006.** A NodeExecution may move between `RUNNING` and `WAITING` several times (`AGENTIC` nodes). The catalog gains the `ai.*` execution events (`schemaVersion` 2): `ai.run.started|finished|limit_exceeded`, `ai.model_call.finished`, `ai.tool_call.requested|finished|denied`, `ai.approval.requested|resolved|expired`, `ai.redaction.applied`, `ai.injection.tainted`, `ai.delta` (live-only) and `knowledge.ingested`. The tool-approval human task is `tool_approval` in the database and `TOOL_APPROVAL` in the API.
+- **SPEC-006.** A NodeExecution may move between `RUNNING` and `WAITING` several times (`AGENTIC` nodes). The catalog gains the `ai.*` execution events (`schemaVersion` 2): `ai.run.started|finished|limit_exceeded`, `ai.model_call.finished`, `ai.tool_call.requested|finished|denied`, `ai.approval.requested|resolved|expired`, `ai.redaction.applied`, `ai.injection.tainted`, `ai.delta` (live-only) and `knowledge.ingested`. The tool-approval human task kind is `TOOL_APPROVAL` in the database and in the API.
+- **SPEC-009 K19 (2026-10-13, owner decision).** SPEC-006 entry (`human_task.kind` `TOOL_APPROVAL`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.

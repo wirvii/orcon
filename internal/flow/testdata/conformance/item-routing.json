@@ -1,0 +1,38 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000008",
+  "name": "Item routing with an inclusive switch",
+  "settings": { "branchMode": "PARALLEL" },
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "route",
+      "name": "Route items",
+      "element": "inclusiveGateway",
+      "type": "orcon.switch@1",
+      "parameters": { "rules": [{ "port": "case:vip", "when": "={{ $json.vip }}" }] },
+      "routing": "INCLUSIVE"
+    },
+    { "id": "vip", "name": "VIP handling", "element": "task", "type": "orcon.set@1", "parameters": {} },
+    { "id": "all", "name": "Everyone", "element": "task", "type": "orcon.set@1", "parameters": {} },
+    {
+      "id": "combine",
+      "name": "Combine",
+      "element": "task",
+      "type": "orcon.merge@1",
+      "parameters": {},
+      "join": { "mode": "FIRST", "data": "MATCH_FIELD", "matchField": "id" }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "route" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "route", "port": "case:vip" }, "to": { "node": "vip" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "route", "port": "main" }, "to": { "node": "all" }, "default": true, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "vip", "port": "main" }, "to": { "node": "combine" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "all", "port": "main" }, "to": { "node": "combine" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "combine", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

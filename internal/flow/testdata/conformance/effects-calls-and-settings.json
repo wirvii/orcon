@@ -1,0 +1,98 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000007",
+  "name": "Effects, compensation, sub-flow call and every setting",
+  "description": "Uses each document setting and the safety contract of an external write.",
+  "settings": {
+    "branchMode": "SEQUENTIAL",
+    "priority": "HIGH",
+    "concurrency": 16,
+    "timeouts": { "executionActive": "PT2H" },
+    "retention": "ALWAYS",
+    "memoryLimit": 268435456,
+    "errorFlow": "01930000-0000-7000-8000-000000000101",
+    "callDepthLimit": 5,
+    "importedFrom": { "sourceVersion": "1.80.0", "reportId": "import-0001" }
+  },
+  "variables": [
+    { "name": "orderId", "scope": "EXECUTION" },
+    { "name": "attempts", "scope": "EXECUTION", "accumulator": "MAX" }
+  ],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "charge",
+      "name": "Charge card",
+      "element": "serviceTask",
+      "type": "orcon.payments.charge@2",
+      "parameters": { "amount": "={{ $json.amount }}" },
+      "retry": {
+        "maxAttempts": 4,
+        "initialInterval": "PT1S",
+        "factor": 2,
+        "maxInterval": "PT5M",
+        "respectRetryAfter": true
+      },
+      "timeouts": { "attempt": "PT20S", "node": "PT5M" },
+      "onError": "ERROR_OUTPUT",
+      "concurrency": 4,
+      "compensation": { "handler": "refund", "precondition": "={{ $('Charge card').item.json.charged === true }}" },
+      "attention": { "notify": "ON" },
+      "ext": { "acme.billing": { "ledger": "main" } }
+    },
+    {
+      "id": "refund",
+      "name": "Refund card",
+      "element": "serviceTask",
+      "type": "orcon.payments.refund@2",
+      "parameters": {}
+    },
+    {
+      "id": "lookup",
+      "name": "Look up customer",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "https://example.test/customers" },
+      "disabled": false
+    },
+    {
+      "id": "child",
+      "name": "Ship order",
+      "element": "callActivity",
+      "type": "orcon.callFlow@1",
+      "parameters": { "input": "={{ $('Charge card').item.json }}" },
+      "call": {
+        "target": "01930000-0000-7000-8000-000000000102",
+        "version": 3,
+        "mode": "WAIT",
+        "perItem": false
+      }
+    },
+    {
+      "id": "dynamic",
+      "name": "Notify partner",
+      "element": "callActivity",
+      "type": "orcon.callFlow@1",
+      "parameters": {},
+      "call": {
+        "target": "={{ $json.partnerFlow }}",
+        "allowedTargets": ["01930000-0000-7000-8000-000000000103", "01930000-0000-7000-8000-000000000104"],
+        "version": "CURRENT",
+        "mode": "FIRE_AND_FORGET",
+        "perItem": true
+      }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} },
+    { "id": "failed", "name": "Failed", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "lookup" }, "kind": "SEQUENCE", "order": 1 },
+    { "id": "e2", "from": { "node": "lookup", "port": "main" }, "to": { "node": "charge" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "charge", "port": "main" }, "to": { "node": "child" }, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "charge", "port": "error" }, "to": { "node": "failed" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "child", "port": "main" }, "to": { "node": "dynamic" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "dynamic", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": { "viewport": { "zoom": 1 } },
+  "ext": { "acme.team": "payments" }
+}
