@@ -12,6 +12,10 @@ Do not modify foundational architecture without an accepted ADR. Include tests a
 
 Before writing, reviewing or refactoring Go code, `go.mod`, SQL, generated API handlers or Go CI configuration, load the `orcon-go` skill (`.agents/skills/orcon-go/`). Its `references/` folder is the complete Go rulebook; [docs/engineering/go.md](docs/engineering/go.md) is the short human overview. Edit the skill only under `.agents/skills/orcon-go/` and re-run `make skill-sync`. `make check` is the single gate, locally and in CI.
 
+## Connectors
+
+Before creating, changing or reviewing a connector under `internal/adapter/connectors/` or a catalog submission, load the `orcon-connector` skill (`.agents/skills/orcon-connector/`). Its `references/` folder is the complete connector rulebook; [docs/engineering/connectors.md](docs/engineering/connectors.md) is the short human overview. Native connector code also follows `orcon-go`. Edit the skill only under `.agents/skills/orcon-connector/` and re-run `sh .agents/skills/orcon-connector/scripts/project.sh`.
+
 ## Contributing
 
 Branches, commits, pull requests and releases follow the `orcon-contributing` skill (`.agents/skills/orcon-contributing/`).

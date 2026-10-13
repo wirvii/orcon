@@ -1,0 +1,29 @@
+{
+  "format": "orcon/cassette@1",
+  "operation": "contact.getMany",
+  "case": "two-pages",
+  "example": false,
+  "parameters": { "returnAll": true },
+  "items": [ {} ],
+  "credential": { "type": "apiKey", "fixture": "default" },
+  "interactions": [
+    {
+      "request": { "method": "GET", "url": "https://api.acme.example/v1/contacts?limit=200", "headers": { "Authorization": "[REDACTED:credential.apiKey]" }, "body": null },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "data": [ { "id": "c_1", "name": "Person 1", "email": "person1@example.com" } ], "next": "p2" }
+      }
+    },
+    {
+      "request": { "method": "GET", "url": "https://api.acme.example/v1/contacts?cursor=p2&limit=200", "headers": { "Authorization": "[REDACTED:credential.apiKey]" }, "body": null },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "data": [ { "id": "c_2", "name": "Person 2", "email": "person2@example.com" } ], "next": null }
+      }
+    }
+  ],
+  "expect": { "items": [ { "id": "c_1", "name": "Person 1", "email": "person1@example.com" }, { "id": "c_2", "name": "Person 2", "email": "person2@example.com" } ] },
+  "recorded": { "at": "2026-10-13T00:00:00Z", "orconVersion": "0.0.0", "scrubber": { "version": 1, "rulesDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000" } }
+}

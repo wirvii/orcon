@@ -38,6 +38,10 @@ Commit messages, pull requests and documentation describe the change itself. The
 - Keep pull requests under about 400 changed lines, not counting generated code, translation catalogs, screenshots and lockfiles. If a change cannot be split, explain why in the `Size justification` section; a check warns otherwise.
 - All required checks must pass and every review conversation must be resolved before a maintainer merges. While Orcon has a single maintainer, no approving review is required; once a second maintainer with write access joins, every pull request needs one approval from a code owner.
 
+## Connectors
+
+Read [docs/engineering/connectors.md](docs/engineering/connectors.md) before writing or changing a connector. The complete connector rulebook lives in `.agents/skills/orcon-connector/references/` and is packaged as the `orcon-connector` mneme skill; templates for new connectors are in `.agents/skills/orcon-connector/assets/templates/`.
+
 ## How maintainers track work
 
 Maintainers plan and review work with [mneme](https://github.com/juanftp/mneme), which keeps the project's backlog, specifications, acceptance criteria and QA reports. Pull requests for that work include a line such as `Spec: SPEC-013`. You do not need mneme to contribute: use `Spec: n/a`, and a maintainer links your pull request to the backlog if needed.

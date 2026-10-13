@@ -19,6 +19,7 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 **/tsconfig*.json  # JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+.agents/skills/orcon-connector/assets/templates/**/*.json  # connector template packages and cassettes; JSON has no comment syntax
 
 # Contribution workflow (orcon-contributing, SPEC-013).
 CODE_OF_CONDUCT.md                       # third-party text, Contributor Covenant 2.1, CC-BY-4.0, attribution inside

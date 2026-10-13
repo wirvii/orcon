@@ -1,0 +1,14 @@
+{
+  "connector.displayName": "Acme Queue",
+  "connector.description": "Envía y lee mensajes en Acme Queue.",
+  "node.acmeQueue.displayName": "Acme Queue",
+  "parameter.acmeQueue.queue.description": "Nombre de la cola.",
+  "parameter.acmeQueue.body.description": "Cuerpo del mensaje.",
+  "parameter.acmeQueue.returnAll.description": "Si se devuelven todos los mensajes en espera en lugar de los primeros hasta el límite.",
+  "parameter.acmeQueue.limit.description": "Número máximo de mensajes que se devuelven.",
+  "operation.message.getMany.displayName": "Obtener varios mensajes",
+  "operation.message.send.displayName": "Enviar un mensaje",
+  "operation.message.send.manualCheck": "Abre la cola {{ $parameter.queue }} en la consola de Acme Queue y busca un mensaje enviado hacia {{ $intent.sentAt }}.",
+  "credential.password.displayName": "Usuario de Acme Queue",
+  "changelog.1.0.0.first": "Primera versión: mensajes (enviar, obtener varios)."
+}
