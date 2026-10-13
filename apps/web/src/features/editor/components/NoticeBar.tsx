@@ -11,7 +11,10 @@ import { useNoticeChannel } from './notice-channel';
 /** How long a confirmation stays; a refusal stays until the next one or until it is dismissed. */
 const INFO_MS = 5_000;
 
-/** Shows the latest notice of the editor as a banner. It is announced politely like every banner that is not an error. */
+/**
+ * Shows the latest notice of the editor as a banner over the top of the canvas, so the canvas does
+ * not move when a notice comes and goes. It is announced politely like every banner that is not an error.
+ */
 export function NoticeBar() {
   const intl = useIntl();
   const channel = useNoticeChannel();
@@ -27,15 +30,18 @@ export function NoticeBar() {
 
   if (!notice) return null;
   return (
-    <Banner
-      key={notice.id}
-      tone={notice.tone === 'warning' ? 'warning' : 'info'}
-      title={notice.message}
-      action={
-        <Button variant="ghost" onClick={channel.dismiss}>
-          {intl.formatMessage(editorMessages.dismiss)}
-        </Button>
-      }
-    />
+    <div className="pointer-events-none absolute inset-x-0 top-3 z-sticky flex justify-center px-4">
+      <Banner
+        key={notice.id}
+        className="pointer-events-auto w-full max-w-screen-sm shadow-md"
+        tone={notice.tone === 'warning' ? 'warning' : 'info'}
+        title={notice.message}
+        action={
+          <Button variant="ghost" onClick={channel.dismiss}>
+            {intl.formatMessage(editorMessages.dismiss)}
+          </Button>
+        }
+      />
+    </div>
   );
 }

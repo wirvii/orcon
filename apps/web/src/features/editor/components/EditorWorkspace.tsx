@@ -256,10 +256,10 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
             {intl.formatMessage(editorMessages.conflictText)}
           </Banner>
         ) : null}
-        <NoticeBar />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div className="relative flex min-h-0 flex-1 flex-col lg:flex-row">
         <EditorCanvas ref={canvas} />
+        <NoticeBar />
         {outlineOpen ? (
           <aside aria-label={intl.formatMessage(editorMessages.outlineTitle)} className="border-border bg-surface min-h-0 overflow-y-auto border-t p-3 lg:w-canvas-palette-w lg:shrink-0 lg:border-s lg:border-t-0">
             <EditorOutline
