@@ -25,7 +25,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 ## Secrets and protected data
 
-- **FIELD-7** Secrets and secret-bearing fields are `writeOnly: true` (and `format: password` for strings), never returned; examples use `example-secret-<n>`. [`secret-fields`]
+- **FIELD-7** Secrets and secret-bearing request fields are `writeOnly: true` (and `format: password` for strings) and are never returned; secrets of the credential store are never returned in any form (ADR-0043 §2). The only exception is a secret Orcon generates (API key, OAuth client secret, webhook signing secret): it is returned exactly once, in the response of the operation that creates or rotates it, as the `readOnly` property `secret` (`format: password`) of a response schema named `<Resource>WithSecret` that extends the resource. That operation declares `x-orcon-idempotency: required` and `secret-already-issued`; the stored idempotent response omits the secret and a replay answers `409 secret-already-issued` with the resource id ([IDEM-3](idempotency-and-concurrency.md)). No other schema has a returned secret; protocol-tagged operations follow their standard. Examples use `example-secret-<n>`. [`secret-fields`]
 - **FIELD-8** Execution data fields carry `x-orcon-data: protected` and are present only with `execution:read-data` (otherwise `dataHidden: true` on the resource). [`events`, review]
 
 ## Schemas and bounds

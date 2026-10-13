@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0011 — Errors, retries, timeouts, cancellation and compensation
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -57,3 +57,4 @@ Whole-node retries (rejected: re-runs succeeded items); retrying uncertain write
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-006.** §1: engine errors `AgentLimitExceeded` and `AiBudgetExceeded` (final). §6: cancellation includes agent runs (ADR-0060 §7).
+- **SPEC-014 (ADR-0082, 2026-10-13, owner decision).** §1: engine errors `TestInputMissing` (a test run needs data from a node outside its scope that has neither pinned data nor an output in an earlier test run; the API rejects the request before creating an execution) and `EffectConfirmationExpired` (final; an effect preview expired without a decision). §3: executions of mode `TEST` never start an error flow. §6: the expiry of an effect preview cancels the test execution under the rules of this section; its prepared items become `NOT_DISPATCHED`.

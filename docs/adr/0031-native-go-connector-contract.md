@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0031 — Native Go connector contract and conformance kit
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-003.
 
@@ -46,3 +46,8 @@ Official complex connectors run at full speed with uniform safety and permission
 
 ## Alternatives considered
 Go plugins (`plugin` package; rejected: platform limits, no isolation, version skew); out-of-process gRPC plugins for official connectors (rejected: unnecessary for trusted code, extra latency); declarative connectors in a top-level `connectors/` folder (rejected by ADR-0079: outside the Go layout of ADR-0075 and still needs embedding).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-014 (ADR-0082, 2026-10-13, owner decision).** §1: an `Effector` may also implement the optional interface `Describer` with the method `Describe(ctx context.Context, c Call, in Intent) (Description, error)`, where `Description` has one field, `Summary string` (plain text, at most 8 KiB). The engine calls it only in executions of mode `TEST`, after `Prepare` and before the transaction that writes the effect preview (ADR-0082 §4), with a 1-second deadline. During the call `Credentials` and `Egress` of the `Call` are unavailable and any use fails it, so a description never reaches the network or a secret; the engine applies the masking set to the summary. An error, a timeout or a connector without `Describe` yields a preview that says no description is available, and the gate still requires a decision. §5: the conformance kit checks that `Describe` makes no egress and returns within its deadline.
