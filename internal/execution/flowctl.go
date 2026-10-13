@@ -256,10 +256,15 @@ func correspondingSplit(lineage []ForkRef, split flow.NodeID) (NodeExecutionID, 
 // token is exactly what the cancellation covers). It is checked before the
 // rule of the join mode, on the fork lineage of the continuation.
 func (r *run) regionCanceled(n *planNode, js *joinState) bool {
+	return r.lineageCanceled(continuationLineage(js.combined(), r.splitNode(n)))
+}
+
+// lineageCanceled reports whether a fork lineage contains a split instance a
+// discriminator canceled.
+func (r *run) lineageCanceled(lineage []ForkRef) bool {
 	if len(r.canceledSplits) == 0 {
 		return false
 	}
-	lineage := continuationLineage(js.combined(), r.splitNode(n))
 	return slices.ContainsFunc(lineage, func(f ForkRef) bool { return r.canceledSplits[f.SplitNodeExecution] })
 }
 
@@ -614,6 +619,12 @@ func (r *run) advanceRounds(ctx context.Context, key nodeKey, n *planNode, js *j
 // recorded without a continuation.
 func (r *run) fireRound(ctx context.Context, key nodeKey, n *planNode, rd *joinRound) error {
 	first := rd.arrivals[0]
+	if lineage := continuationLineage([]joinArrival{first}, r.splitNode(n)); r.lineageCanceled(lineage) {
+		// An outer discriminator canceled the region this round belongs to: the
+		// round neither fires nor blocks the rounds after it.
+		rd.fired, rd.reset = true, true
+		return nil
+	}
 	batch, err := r.load(ctx, first.Payload)
 	if err != nil {
 		return err
@@ -663,7 +674,7 @@ func (r *run) collectReturn(t *token, n *planNode) error {
 // whatever number of tokens returned.
 func (r *run) startNextIteration(ctx context.Context, iteration ScopePath) error {
 	rec := r.returns[iteration]
-	if rec == nil || rec.started || r.scopeLive[iteration] > 0 || r.failure != nil {
+	if rec == nil || rec.started || r.scopeHeld[iteration] > 0 || r.failure != nil {
 		return nil
 	}
 	rec.started = true

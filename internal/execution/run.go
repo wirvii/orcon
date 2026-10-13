@@ -164,9 +164,11 @@ type run struct {
 	dirtyJoins []nodeKey
 	// iterations holds the loop iteration scopes already started.
 	iterations map[ScopePath]bool
-	// scopeLive counts the active tokens in each scope path, nested scopes
-	// included: an iteration is over when no token is left in its scope.
-	scopeLive map[ScopePath]int
+	// scopeHeld counts the tokens that hold each scope path, nested scopes
+	// included, until they reach a terminal state: an iteration is over when no
+	// token holds its scope. Unlike the SEQUENTIAL counters, a WAITING token
+	// still holds it.
+	scopeHeld map[ScopePath]int
 	// returns collects, per loop iteration scope, the tokens that came back by
 	// the back edges of a loop that merges its returns.
 	returns    map[ScopePath]*loopReturns
@@ -206,7 +208,7 @@ func newRun(in *Interpreter, plan *Plan, req Request) *run {
 		splitLive:      make(map[NodeExecutionID]int),
 		roundJoins:     make(map[NodeExecutionID][]nodeKey),
 		iterations:     make(map[ScopePath]bool),
-		scopeLive:      make(map[ScopePath]int),
+		scopeHeld:      make(map[ScopePath]int),
 		returns:        make(map[ScopePath]*loopReturns),
 		nodeExecs:      make(map[NodeExecutionID]*nodeExec),
 	}

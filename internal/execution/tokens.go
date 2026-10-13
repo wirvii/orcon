@@ -34,6 +34,7 @@ func (r *run) spawn(id TokenID, state TokenState, node, inEdge int, scope ScopeP
 // (amendment 9, B-2): it holds until the token reaches a terminal state.
 func (r *run) holdRounds(t *token) {
 	t.roundHeld = true
+	r.countScopes(t.scope, 1)
 	for _, f := range t.lineage {
 		r.splitLive[f.SplitNodeExecution]++
 	}
@@ -46,6 +47,7 @@ func (r *run) releaseRounds(t *token) {
 		return
 	}
 	t.roundHeld = false
+	r.countScopes(t.scope, -1)
 	for _, f := range t.lineage {
 		r.splitLive[f.SplitNodeExecution]--
 		r.dirtyJoins = append(r.dirtyJoins, r.roundJoins[f.SplitNodeExecution]...)
@@ -93,13 +95,15 @@ func (r *run) instances(scope ScopePath) []nodeKey {
 	return keys
 }
 
-// countScopes adds delta to the live count of every scope path the given one
-// contains, itself included. When an iteration scope that has collected returns
-// empties, the next iteration is due.
+// countScopes adds delta to the held count of every scope path the given one
+// contains, itself included. A token holds its scope until it reaches a terminal
+// state, WAITING and SUSPENDED included: a loop iteration is over only when no
+// token holds its scope, so a waiting token in the body keeps it open. When an
+// iteration scope that has collected returns empties, the next iteration is due.
 func (r *run) countScopes(scope ScopePath, delta int) {
 	for scope != "" {
-		r.scopeLive[scope] += delta
-		if delta < 0 && r.scopeLive[scope] == 0 {
+		r.scopeHeld[scope] += delta
+		if delta < 0 && r.scopeHeld[scope] == 0 {
 			if rec := r.returns[scope]; rec != nil && !rec.started {
 				r.dirtyIters = append(r.dirtyIters, scope)
 			}
@@ -117,7 +121,6 @@ func (r *run) track(t *token) {
 		return
 	}
 	t.tracked = true
-	r.countScopes(t.scope, 1)
 	for _, k := range r.instances(t.scope) {
 		r.loopOf(k).live++
 	}
@@ -131,7 +134,6 @@ func (r *run) untrack(t *token) {
 		return
 	}
 	t.tracked = false
-	r.countScopes(t.scope, -1)
 	for _, k := range r.instances(t.scope) {
 		r.loopOf(k).live--
 		r.dirtyLoops = append(r.dirtyLoops, k)
@@ -151,6 +153,10 @@ func (r *run) moveScope(t *token, scope ScopePath) {
 	if t.scope == scope {
 		return
 	}
+	if t.roundHeld {
+		r.countScopes(scope, 1)
+		r.countScopes(t.scope, -1)
+	}
 	if !t.tracked {
 		t.scope = scope
 		return
@@ -159,10 +165,7 @@ func (r *run) moveScope(t *token, scope ScopePath) {
 		r.loopOf(k).live--
 		r.dirtyLoops = append(r.dirtyLoops, k)
 	}
-	old := t.scope
 	t.scope = scope
-	r.countScopes(scope, 1)
-	r.countScopes(old, -1)
 	for _, k := range r.instances(scope) {
 		r.loopOf(k).live++
 	}
