@@ -196,11 +196,10 @@ bench-compare:
 # Skill
 # ---------------------------------------------------------------------------
 
-# skill-sync copies each canonical skill to its generated copy. orcon-db joins
-# when its scripts exist (SPEC-009 D5).
+# skill-sync copies each canonical skill to its generated copy.
 skill-sync:
 	sh .agents/skills/orcon-go/scripts/project.sh
-	if [ -f .agents/skills/orcon-db/scripts/project.sh ]; then sh .agents/skills/orcon-db/scripts/project.sh; fi
+	sh .agents/skills/orcon-db/scripts/project.sh
 
 skill-check:
 	sh scripts/check-skill.sh

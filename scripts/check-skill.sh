@@ -6,10 +6,8 @@
 # the Agent Skills standard and its generated copies (the projections written by
 # the skill's project.sh into the tool directories) are identical.
 #
-# The orcon-go skill is completed by SPEC-008 slice G6. The orcon-db skill is
-# completed by SPEC-009 cut D5; until its SKILL.md exists the check says so on
-# standard output and skips it, never silently. A skill whose SKILL.md exists is
-# checked in full and a missing piece fails.
+# Every listed skill is required: a missing SKILL.md, validation script or
+# frontmatter check fails.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -18,16 +16,10 @@ cd "$root"
 # Same commit as the UI skill check of SPEC-007.
 skills_ref=69ef37e9424c0a7ea9dd2293b559e43ec8176379
 
-# check_skill <name> <complete-required>: 1 = a missing SKILL.md fails, 0 = declared skip.
+# check_skill <name>
 check_skill() {
   name=$1
-  required=$2
   skill=.agents/skills/$name
-
-  if [ "$required" = 0 ] && [ ! -f "$skill/SKILL.md" ]; then
-    echo "skill-check: $skill/SKILL.md does not exist yet (SPEC-009 cut D5 writes it); $name skipped"
-    return 0
-  fi
 
   for needed in "$skill/SKILL.md" "$skill/validation/run.sh" "$skill/scripts/check-frontmatter.sh"; do
     if [ ! -f "$needed" ]; then
@@ -56,6 +48,6 @@ check_skill() {
   uvx --from "git+https://github.com/agentskills/agentskills@${skills_ref}#subdirectory=skills-ref" skills-ref validate "$skill"
 }
 
-check_skill orcon-go 1
-check_skill orcon-db 0
+check_skill orcon-go
+check_skill orcon-db
 echo "skill-check: ok"

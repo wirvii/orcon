@@ -11,3 +11,7 @@ Do not modify foundational architecture without an accepted ADR. Include tests a
 ## Go code
 
 Before writing, reviewing or refactoring Go code, `go.mod`, SQL, generated API handlers or Go CI configuration, load the `orcon-go` skill (`.agents/skills/orcon-go/`). Its `references/` folder is the complete Go rulebook; [docs/engineering/go.md](docs/engineering/go.md) is the short human overview. Edit the skill only under `.agents/skills/orcon-go/` and re-run `make skill-sync`. `make check` is the single gate, locally and in CI.
+
+## Database schema and SQL
+
+Before creating or changing a table, column, index, constraint, migration, SQL query or storage adapter, load the `orcon-db` skill (`.agents/skills/orcon-db/`). Its `references/` folder is the complete database rulebook; [docs/engineering/db.md](docs/engineering/db.md) is the short human overview. Go code that reaches the database also follows `orcon-go`. Edit the skill only under `.agents/skills/orcon-db/` and re-run `make skill-sync`.
