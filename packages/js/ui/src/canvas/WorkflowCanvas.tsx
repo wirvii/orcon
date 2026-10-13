@@ -334,10 +334,14 @@ function Canvas({
    * wide for that, it keeps the readable zoom and starts at the first node (the
    * trigger), so the start of the flow is always on screen; pan to see the rest.
    */
+  const fittedSize = useRef('');
   const fitFlow = useCallback(() => {
     const rect = containerRef.current?.getBoundingClientRect();
     const all = flow.getNodes();
     if (!rect || rect.width === 0 || all.length === 0) return;
+    fittedSize.current = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    // Screenshots wait until this equals the canvas size: a fit made for an older size is stale.
+    containerRef.current?.setAttribute('data-fit-size', fittedSize.current);
     // With a coarse pointer controls must stay at least 44 px, so the flow is never fitted below 100 %: it starts at the trigger and is panned.
     const readable = coarse ? 1 : wide ? READABLE_ZOOM_WIDE : READABLE_ZOOM_NARROW;
     const bounds = getNodesBounds(all);
@@ -363,6 +367,33 @@ function Canvas({
     // Tests and screenshots wait for this mark: the first fit has been applied.
     requestAnimationFrame(() => containerRef.current?.setAttribute('data-fitted', 'true'));
   }, [nodesReady, fitFlow]);
+
+  // The first fit follows the size of the canvas until a person moves the view. Other content sizes the
+  // canvas too (a notice above it wraps differently once the web fonts are drawn), so the size at the
+  // moment of the first fit is not always the final one; fitting once would leave the flow off-center.
+  const userMoved = useRef(false);
+  const fitRef = useRef(fitFlow);
+  fitRef.current = fitFlow;
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      const box = element.getBoundingClientRect();
+      const size = `${Math.round(box.width)}x${Math.round(box.height)}`;
+      // Only a size different from the one the last fit used asks for a new fit.
+      if (!fittedOnOpen.current || size === fittedSize.current || userMoved.current) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!userMoved.current) fitRef.current();
+      });
+    });
+    observer.observe(element);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
 
   // Where focus was inside the canvas, so a dialog opened from the keyboard hands it back when it closes.
   const dialogOpen = shortcutsOpen || connectOpen || pendingDelete !== undefined;
@@ -668,6 +699,7 @@ function Canvas({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    userMoved.current = true;
     const target = event.target as HTMLElement;
     // Dialogs and the palette handle their own keys; nothing typed in a field reaches the canvas.
     if (!containerRef.current?.contains(target)) return;
@@ -854,7 +886,10 @@ function Canvas({
     movingTimer.current = setTimeout(() => setMoving(false), MINIMAP_LINGER_MS);
   };
   const onMoveStart = (event: unknown) => {
-    if (event) pulseMinimap();
+    if (event) {
+      userMoved.current = true;
+      pulseMinimap();
+    }
   };
   const onMove = (event: unknown) => {
     if (event) pulseMinimap();
@@ -973,6 +1008,12 @@ function Canvas({
           tabIndex={0}
           className="bg-canvas relative min-h-canvas-node min-w-0 flex-1 overflow-hidden"
           onKeyDown={onKeyDown}
+          onPointerDownCapture={() => {
+            userMoved.current = true;
+          }}
+          onWheelCapture={() => {
+            userMoved.current = true;
+          }}
           onFocus={(event) => {
             const target = event.target as HTMLElement;
             lastFocus.current = target;
