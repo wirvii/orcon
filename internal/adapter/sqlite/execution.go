@@ -569,6 +569,7 @@ func (t *sqliteTx) InsertAttentionRequest(ctx context.Context, a *store.Attentio
 	return t.q.InsertAttentionRequest(ctx, sqlcgen.InsertAttentionRequestParams{
 		ID: uuidBytes(a.ID), OrgID: uuidBytes(a.OrgID), ExecutionID: uuidBytes(a.ExecutionID), ProjectID: uuidBytes(a.ProjectID),
 		FlowID: uuidBytes(a.FlowID), NodeID: a.NodeID, TokenID: nullUUIDBytes(a.TokenID), Cause: a.Cause, CauseReference: a.CauseReference,
+		NotifyClass: defaultText(a.NotifyClass, "NOTIFY"), Status: defaultText(a.Status, "OPEN"), Level: a.Level,
 		GroupKey: a.GroupKey, ItemCount: a.ItemCount, Summary: a.Summary, CreatedAt: micros(a.CreatedAt), UpdatedAt: micros(a.CreatedAt),
 	})
 }
@@ -766,4 +767,12 @@ func (s *Store) releaseAllLeases(ctx context.Context) (int64, error) {
 		return err
 	})
 	return n, err
+}
+
+// defaultText returns v, or fallback when v is empty.
+func defaultText(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
 }

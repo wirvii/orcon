@@ -310,7 +310,8 @@ type OutboxRow struct {
 	CreatedAt time.Time
 }
 
-// AttentionRequest is a row of attention_request.
+// AttentionRequest is a row of attention_request. NotifyClass and Status default
+// to NOTIFY and OPEN when empty.
 type AttentionRequest struct {
 	ID             AttentionRequestID
 	OrgID          identity.OrgID

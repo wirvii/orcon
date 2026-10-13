@@ -54,7 +54,7 @@ const lockExecution = `-- name: LockExecution :one
 SELECT id
 FROM execution
 WHERE org_id = $1 AND id = $2
-FOR UPDATE
+FOR NO KEY UPDATE
 `
 
 // SPDX-FileCopyrightText: The Orcon Authors
@@ -66,7 +66,9 @@ FOR UPDATE
 // plans of their bodies are checked through auto_explain in the adapter tests.
 // The SQLite file of the same name holds the equivalent queries.
 // The caller holds the execution row until commit, so concurrent checkpoints of one execution append their events in
-// commit order (ADR-0009 section 7).
+// commit order (ADR-0009 section 7). The lock is FOR NO KEY UPDATE: FOR UPDATE would conflict with the FOR KEY SHARE
+// lock that inserting a child row (token, node execution, join arrival) takes on the execution, and two steps that
+// each insert a child and then append an event would deadlock.
 // orcon:scope org
 func (q *Queries) LockExecution(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, lockExecution, orgID, iD)
@@ -80,7 +82,7 @@ SELECT id
 FROM join_instance
 WHERE org_id = $1 AND execution_id = $2 AND node_id = $3
   AND scope_path = $4 AND round_number = $5
-FOR UPDATE
+FOR NO KEY UPDATE
 `
 
 type LockJoinInstanceParams struct {

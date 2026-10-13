@@ -103,6 +103,8 @@ func executionCases() []struct {
 		{"AttentionInbox", attentionCase},
 		{"ExecutionIsolation", executionIsolationCase},
 		{"EventsAreOrderedUnderConcurrency", eventsCase},
+		{"ConcurrentStepsOnOneExecution", stepsCase},
+		{"OneJoinInstancePerSplitInstance", splitJoinCase},
 	}
 }
 
@@ -971,6 +973,17 @@ func attentionCase(t *testing.T, newStore Factory) {
 		t.Fatalf("organization B sees %d requests, %v", len(got), err)
 	}
 	// One request per cause reference, per organization.
+	// The class, the status and the level are stored as given, not forced.
+	silent := store.AttentionRequest{ID: next[store.AttentionRequestID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, ProjectID: e.projA, FlowID: e.flow.ID, NodeID: "n",
+		Cause: "END_USER_WAIT", CauseReference: "wait-1", NotifyClass: "SILENT", Status: "RESOLVED", Level: 2, GroupKey: "g", Summary: "done", CreatedAt: base}
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertAttentionRequest(ctx, &silent) }), "insert a silent request")
+	resolved, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "RESOLVED", store.Cursor{}, 10)
+	if err != nil || len(resolved) != 1 || resolved[0].ID != silent.ID || resolved[0].NotifyClass != "SILENT" || resolved[0].Level != 2 || resolved[0].Status != "RESOLVED" {
+		t.Fatalf("resolved requests = %+v, %v", resolved, err)
+	}
+	if open, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "OPEN", store.Cursor{}, 100); err != nil || len(open) != n {
+		t.Fatalf("a resolved request appeared in the open inbox: %d, %v", len(open), err)
+	}
 	dup := store.AttentionRequest{ID: next[store.AttentionRequestID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, ProjectID: e.projA, FlowID: e.flow.ID, NodeID: "n",
 		Cause: "HUMAN_TASK", CauseReference: "task-0", GroupKey: "g", Summary: "again", CreatedAt: base}
 	wantErr(t, "a repeated cause reference", e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertAttentionRequest(ctx, &dup) }), flow.ErrConflict)
@@ -1049,4 +1062,82 @@ func eventsCase(t *testing.T, newStore Factory) {
 		}
 		perWriter[w]++
 	}
+}
+
+// stepsCase runs many engine steps on one execution at once. Each step inserts a
+// child row (which takes a shared lock on the execution) and then appends an
+// event (which holds the execution until commit): the two locks must not
+// deadlock, nothing may fail, and the sequence numbers stay contiguous.
+func stepsCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	ex := e.execution()
+	const workers, steps = 10, 8
+	var failed atomic.Int64
+	var wg sync.WaitGroup
+	for w := range workers {
+		wg.Go(func() {
+			for i := range steps {
+				err := e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
+					tok := store.Token{ID: next[store.TokenID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, Status: "RUNNABLE", NodeID: fmt.Sprintf("w%d-%d", w, i),
+						ForkLineage: []byte(`[]`), FairnessKey: "k", AvailableAt: base, CreatedAt: base, UpdatedAt: base}
+					if err := tx.InsertToken(ctx, &tok); err != nil {
+						return err
+					}
+					ne := store.NodeExecution{ID: next[store.NodeExecutionID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, TokenID: tok.ID, NodeID: tok.NodeID,
+						Status: "RUNNING", StartedAt: base, CreatedAt: base, UpdatedAt: base}
+					if err := tx.InsertNodeExecution(ctx, ne); err != nil {
+						return err
+					}
+					_, err := tx.AppendEvent(ctx, store.Event{ID: next[store.EventID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, OccurredAt: base,
+						Type: "node.started", SchemaVersion: 1, Reference: []byte(`{}`), CreatedAt: base})
+					return err
+				})
+				if err != nil {
+					failed.Add(1)
+					t.Errorf("step %d of worker %d: %v", i, w, err)
+				}
+			}
+		})
+	}
+	wg.Wait()
+	if failed.Load() != 0 {
+		t.Fatalf("%d of %d steps failed", failed.Load(), workers*steps)
+	}
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 1000)
+	if err != nil || len(events) != workers*steps {
+		t.Fatalf("%d events, %v; want %d", len(events), err, workers*steps)
+	}
+	for i := range events {
+		if events[i].SequenceNumber != int64(i+1) {
+			t.Fatalf("event %d has sequence number %d: numbers must be contiguous from 1", i, events[i].SequenceNumber)
+		}
+	}
+}
+
+// splitJoinCase: a split instance has one join instance per join node and scope,
+// whatever the round (ADR-0015 section 3 as amended by SPEC-001 Amendment 9).
+func splitJoinCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	ex := e.execution()
+	tok := e.token(ex, "split", 0, realNow().Add(time.Hour))
+	split := store.NodeExecution{ID: next[store.NodeExecutionID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, TokenID: tok.ID, NodeID: "split",
+		Status: "SUCCEEDED", StartedAt: base, CreatedAt: base, UpdatedAt: base}
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertNodeExecution(ctx, split) }), "insert the split")
+	arrive := func(round int64, splitID store.NodeExecutionID) error {
+		return e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
+			_, err := tx.RecordJoinArrival(ctx, store.JoinArrival{
+				Key:        store.JoinKey{OrgID: e.orgA, ExecutionID: ex.ID, NodeID: "join", ScopePath: "", RoundNumber: round},
+				InstanceID: next[store.JoinInstanceID](e.ids), ArrivalID: next[store.JoinArrivalID](e.ids), EdgeIndex: 0, TokenID: tok.ID,
+				IsLive: true, SplitNodeExecutionID: splitID, ArrivedAt: base,
+			}, base)
+			return err
+		})
+	}
+	mustTx(t, arrive(1, split.ID), "round 1 of the split instance")
+	wantErr(t, "a second join instance for the same split instance", arrive(2, split.ID), flow.ErrConflict)
+	// Rounds without a split instance (ALL, ACTIVATED, FIRST with CANCEL) are not limited by it.
+	mustTx(t, arrive(3, store.NodeExecutionID{}), "round 3 without a split instance")
+	mustTx(t, arrive(4, store.NodeExecutionID{}), "round 4 without a split instance")
 }

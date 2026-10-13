@@ -524,8 +524,17 @@ func (t *pgTx) InsertAttentionRequest(ctx context.Context, a *store.AttentionReq
 	return t.q.InsertAttentionRequest(ctx, sqlcgen.InsertAttentionRequestParams{
 		ID: pgUUID(a.ID), OrgID: pgUUID(a.OrgID), ExecutionID: pgUUID(a.ExecutionID), ProjectID: pgUUID(a.ProjectID),
 		FlowID: pgUUID(a.FlowID), NodeID: a.NodeID, TokenID: nullPGUUID(a.TokenID), Cause: a.Cause, CauseReference: a.CauseReference,
+		NotifyClass: defaultText(a.NotifyClass, "NOTIFY"), Status: defaultText(a.Status, "OPEN"), Level: a.Level,
 		GroupKey: a.GroupKey, ItemCount: a.ItemCount, Summary: a.Summary, CreatedAt: timestamp(a.CreatedAt), UpdatedAt: timestamp(a.CreatedAt),
 	})
 }
 
 var _ store.Tx = (*pgTx)(nil)
+
+// defaultText returns v, or fallback when v is empty.
+func defaultText(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
+}

@@ -9,13 +9,15 @@
 -- The SQLite file of the same name holds the equivalent queries.
 
 -- The caller holds the execution row until commit, so concurrent checkpoints of one execution append their events in
--- commit order (ADR-0009 section 7).
+-- commit order (ADR-0009 section 7). The lock is FOR NO KEY UPDATE: FOR UPDATE would conflict with the FOR KEY SHARE
+-- lock that inserting a child row (token, node execution, join arrival) takes on the execution, and two steps that
+-- each insert a child and then append an event would deadlock.
 -- name: LockExecution :one
 -- orcon:scope org
 SELECT id
 FROM execution
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id)
-FOR UPDATE;
+FOR NO KEY UPDATE;
 
 -- name: CountJoinArrivals :one
 -- orcon:scope org
@@ -32,4 +34,4 @@ SELECT id
 FROM join_instance
 WHERE org_id = sqlc.arg(org_id) AND execution_id = sqlc.arg(execution_id) AND node_id = sqlc.arg(node_id)
   AND scope_path = sqlc.arg(scope_path) AND round_number = sqlc.arg(round_number)
-FOR UPDATE;
+FOR NO KEY UPDATE;

@@ -311,8 +311,8 @@ const insertAttentionRequest = `-- name: InsertAttentionRequest :exec
 INSERT INTO attention_request (id, org_id, execution_id, project_id, flow_id, node_id, token_id, cause, cause_reference, notify_class,
                                status, level, group_key, item_count, summary, created_at, updated_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6,
-        ?7, ?8, ?9, 'NOTIFY', 'OPEN', 0, ?10,
-        ?11, ?12, ?13, ?14)
+        ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+        ?14, ?15, ?16, ?17)
 `
 
 type InsertAttentionRequestParams struct {
@@ -325,6 +325,9 @@ type InsertAttentionRequestParams struct {
 	TokenID        []byte
 	Cause          string
 	CauseReference string
+	NotifyClass    string
+	Status         string
+	Level          int64
 	GroupKey       string
 	ItemCount      int64
 	Summary        string
@@ -344,6 +347,9 @@ func (q *Queries) InsertAttentionRequest(ctx context.Context, arg InsertAttentio
 		arg.TokenID,
 		arg.Cause,
 		arg.CauseReference,
+		arg.NotifyClass,
+		arg.Status,
+		arg.Level,
 		arg.GroupKey,
 		arg.ItemCount,
 		arg.Summary,

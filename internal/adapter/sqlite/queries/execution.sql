@@ -230,7 +230,7 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_owner = sqlc.arg
 INSERT INTO attention_request (id, org_id, execution_id, project_id, flow_id, node_id, token_id, cause, cause_reference, notify_class,
                                status, level, group_key, item_count, summary, created_at, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(project_id), sqlc.arg(flow_id), sqlc.arg(node_id),
-        sqlc.arg(token_id), sqlc.arg(cause), sqlc.arg(cause_reference), 'NOTIFY', 'OPEN', 0, sqlc.arg(group_key),
+        sqlc.arg(token_id), sqlc.arg(cause), sqlc.arg(cause_reference), sqlc.arg(notify_class), sqlc.arg(status), sqlc.arg(level), sqlc.arg(group_key),
         sqlc.arg(item_count), sqlc.arg(summary), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- The inbox: requests in one status, oldest first, keyset by (created_at, id).

@@ -32,8 +32,11 @@ CREATE TABLE join_instance (
   CONSTRAINT fk_join_instance_continuation_token FOREIGN KEY (org_id, continuation_token_id) REFERENCES token (org_id, id) ON DELETE CASCADE
 );
 
--- One round per split instance and join node: (org_id, split_node_execution_id, node_id, round_number); the name is a purpose because the columns exceed 63 bytes.
-CREATE UNIQUE INDEX uq_join_instance_split_round ON join_instance (org_id, split_node_execution_id, node_id, round_number) WHERE split_node_execution_id IS NOT NULL;
+-- One join instance per split instance (ADR-0015 section 3 as amended by SPEC-001 Amendment 9): (org_id, execution_id, node_id, scope_path, split_node_execution_id); the name is a purpose because the columns exceed 63 bytes.
+CREATE UNIQUE INDEX uq_join_instance_split_instance ON join_instance (org_id, execution_id, node_id, scope_path, split_node_execution_id) WHERE split_node_execution_id IS NOT NULL;
+
+-- Supports fk_join_instance_split_node_execution and the delete of its parent row.
+CREATE INDEX ix_join_instance_org_id_split_node_execution_id ON join_instance (org_id, split_node_execution_id) WHERE split_node_execution_id IS NOT NULL;
 
 -- Supports fk_join_instance_continuation_token and the delete of its parent row.
 CREATE INDEX ix_join_instance_org_id_continuation_token_id ON join_instance (org_id, continuation_token_id) WHERE continuation_token_id IS NOT NULL;
