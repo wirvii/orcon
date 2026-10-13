@@ -29,12 +29,14 @@
     "test:density": "vitest run --project density",
     "test:expansion": "vitest run --project expansion",
     "test:visual": "pnpm build-storybook && playwright test -c visual/playwright.config.ts",
-    "test:visual:docker": "pnpm build-storybook && sh visual/run-docker.sh"
+    "test:visual:docker": "pnpm build-storybook && sh visual/run-docker.sh",
+    "test:virtual": "vitest run --project virtual"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.0",
     "@fontsource-variable/jetbrains-mono": "^5.2.0",
     "@orcon/tokens": "workspace:*",
+    "@tanstack/react-virtual": "^3",
     "@xyflow/react": "^12.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
