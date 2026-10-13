@@ -140,5 +140,5 @@ These wait for an owner decision or a later cut; the implementation takes the re
 
 - **The per-node override of a safety contract** (ADR-0007 §3 "per-node overrides allowed by that contract") is defined by the SPEC-003 cut that implements the node-type registry, as an additive amendment within `@1`.
 - **Additive blocks of later specs** (`trigger`, `connector`, `credentials`, `ai`) are not in the schema yet; each arrives with its own cut, which extends the schema.
-- **The in-memory cache of upgraded documents (ADR-0007 §7) belongs to cut C4, the first cut that loads pinned revisions on the hot path.
+- **The in-memory cache of upgraded documents** (ADR-0007 §7) belongs to cut C4, the first cut that loads pinned revisions on the hot path.
 - **Tests of the schema** use a small in-repository checker with a closed list of supported keywords and a differential check against the Go reader; a full validator library is a separate owner decision.
