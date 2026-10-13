@@ -74,6 +74,6 @@ Notes:
 - `axe-core` and `@axe-core/playwright` are MPL-2.0 and run only in tests and CI; they are never bundled. `lightningcss` (MPL-2.0, a Tailwind build tool) is not bundled either.
 - Transitive development packages under other licenses (`argparse` Python-2.0, `caniuse-lite` CC-BY-4.0, `mdn-data` CC0-1.0, `jsonify` Public Domain, `jackspeak`, `minimatch`, `minipass`, `path-scurry` and `package-json-from-dist` BlueOak-1.0.0, `tslib` 0BSD) are build and test tooling only. `pnpm licenses list` reports no entry whose license is unknown or the literal word "License".
 
-## Enmienda 1 (editor style A)
+## Amendment 1 (editor style A)
 
-Enmienda 1 added no dependency. Between the commit before it (`25a61b9^`) and the head, the only change in any `package.json` is two scripts of `packages/js/ui/package.json` (`test:canvas`, `test:parity`), and `pnpm-lock.yaml` is unchanged. The canvas uses `@xyflow/react`, `cmdk`, `lucide-react` and Radix, all already present.
+Amendment 1 added no dependency. Between the commit before it (`25a61b9^`) and the head, the only change in any `package.json` is two scripts of `packages/js/ui/package.json` (`test:canvas`, `test:parity`), and `pnpm-lock.yaml` is unchanged. The canvas uses `@xyflow/react`, `cmdk`, `lucide-react` and Radix, all already present.
