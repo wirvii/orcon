@@ -83,6 +83,6 @@ Workflow editor must visually distinguish: invalid safety contract, verified saf
 - docs/product/principles.md
 - docs/product/n8n-compatibility.md
 - docs/architecture/overview.md
-- docs/design-system/foundations.md
+- docs/design-system/README.md
 - docs/engineering/implementation-contract.md
 - docs/adr/0001-monorepo.md

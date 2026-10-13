@@ -6,9 +6,12 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "i18n:check": "turbo i18n:check"
   },
   "devDependencies": {
-    "turbo": "^2.4.0"
+    "turbo": "^2.4.0",
+    "vitest": "^3.2.0"
   }
 }

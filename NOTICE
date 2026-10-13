@@ -1,0 +1,82 @@
+Orcon
+Copyright The Orcon Authors
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes third-party software and fonts. Their notices follow. The
+full list of dependencies with versions and licenses is in
+docs/design-system/third-party-licenses.md.
+
+--------------------------------------------------------------------------------
+shadcn/ui (MIT)
+
+Parts of the component source in packages/js/ui are adapted from shadcn/ui
+(https://ui.shadcn.com), restyled with the Orcon design tokens.
+
+MIT License
+
+Copyright (c) 2023 shadcn
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+@xyflow/react (MIT)
+
+The flow canvas is built on @xyflow/react (https://xyflow.com). Its visible
+attribution link is kept on the canvas.
+
+MIT License
+
+Copyright (c) 2019-2025 webkid GmbH
+
+(The permission notice and warranty disclaimer are the same as the MIT License
+text above and apply to this component.)
+
+--------------------------------------------------------------------------------
+Other MIT, ISC, BSD and Apache-2.0 components bundled into the web application
+
+Radix Primitives (radix-ui), Copyright (c) 2022 WorkOS; cmdk, Copyright (c) 2022
+Paco Coursey; sonner, Copyright (c) 2023 Emil Kowalski; tailwind-merge,
+Copyright (c) 2021 Dany Castillo; clsx, Copyright (c) Luke Edwards; React and
+React DOM, Copyright (c) Meta Platforms, Inc. and affiliates (all MIT);
+lucide-react (ISC), Copyright (c) Cole Bemis 2013-2026 (Feather, MIT) and Lucide
+Contributors 2026; react-intl and intl-messageformat (BSD-3-Clause), Copyright
+2019 Oath Inc.; class-variance-authority (Apache-2.0); the d3 modules used by
+@xyflow/react (ISC and BSD-3-Clause). Each package carries its own license text
+in its distribution.
+
+--------------------------------------------------------------------------------
+Fonts (SIL Open Font License, Version 1.1)
+
+Inter variable, Copyright 2016 The Inter Project Authors
+(https://github.com/rsms/inter), distributed through
+@fontsource-variable/inter.
+
+JetBrains Mono variable, Copyright 2020 The JetBrains Mono Project Authors
+(https://github.com/JetBrains/JetBrainsMono), distributed through
+@fontsource-variable/jetbrains-mono.
+
+These Font Software files are licensed under the SIL Open Font License,
+Version 1.1, available at https://openfontlicense.org. They are bundled
+unmodified as .woff2 files and are not sold on their own.
+
+--------------------------------------------------------------------------------
+Development-only tools (not part of the binary)
+
+axe-core and @axe-core/playwright (MPL-2.0) run accessibility checks in tests
+and CI only. lightningcss (MPL-2.0) is a build tool used by Tailwind CSS. Neither
+is distributed with, or linked into, the binary.

@@ -1,0 +1,181 @@
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* React Flow's structural rules sit in their own layer, below the utilities, so Orcon classes always win. */
+@layer theme, base, xyflow, components, utilities;
+
+@import 'tailwindcss';
+@import '@orcon/tokens/tokens.css';
+@import '@orcon/tokens/tailwind-theme.css';
+@import '@xyflow/react/dist/base.css' layer(xyflow);
+@import './fonts.css';
+
+/* Scan the component sources wherever this stylesheet is imported from. */
+@source '../';
+
+/* Transitions follow the motion tokens, so reduced motion (0 ms) turns them off. */
+@theme inline {
+  --default-transition-duration: var(--orcon-duration-base);
+  --default-transition-timing-function: var(--orcon-easing-standard);
+  --animate-spin-slow: orcon-spin 1s linear infinite;
+  --animate-pulse-soft: orcon-pulse 1.5s ease-in-out infinite;
+  /* Looping motion exists only on running canvas elements; the loop tokens are 0 ms under reduced motion. */
+  --animate-loop-spin: orcon-spin var(--orcon-motion-loop-spin) linear infinite;
+  --animate-edge-flow: orcon-edge-flow var(--orcon-motion-loop-edge) linear infinite;
+  --animate-run-ring: orcon-run-ring var(--orcon-motion-loop-ring) linear infinite;
+}
+
+/* The angle of the sweep of the run ring is animated, so the browser must know its type. */
+@property --orcon-ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes orcon-edge-flow {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
+@keyframes orcon-run-ring {
+  to {
+    --orcon-ring-angle: 360deg;
+  }
+}
+
+/* Stacking layers from the z tokens. */
+@utility z-sticky {
+  z-index: var(--orcon-z-sticky);
+}
+@utility z-dropdown {
+  z-index: var(--orcon-z-dropdown);
+}
+@utility z-overlay {
+  z-index: var(--orcon-z-overlay);
+}
+@utility z-modal {
+  z-index: var(--orcon-z-modal);
+}
+@utility z-toast {
+  z-index: var(--orcon-z-toast);
+}
+@utility z-tooltip {
+  z-index: var(--orcon-z-tooltip);
+}
+
+/* A control grows with wrapped text, but is never shorter than its density height or the minimum target. */
+@utility min-h-control-target {
+  min-height: max(var(--orcon-size-control), var(--orcon-size-target-min));
+}
+
+/* Floating content sizes from the trigger and the space the browser leaves it. */
+@utility min-w-trigger {
+  min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, var(--radix-dropdown-menu-trigger-width, 0px)));
+}
+@utility max-h-available {
+  max-height: var(--radix-select-content-available-height, var(--radix-popover-content-available-height, var(--radix-dropdown-menu-content-available-height, none)));
+}
+
+@keyframes orcon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orcon-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-app text-fg font-sans text-base antialiased;
+  }
+
+  /* One visible focus ring for every interactive element: 2 px ring, 2 px offset. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
+}
+
+/*
+ * The React Flow credit stays visible, as the library asks. It is restyled with the Orcon tokens and
+ * given a full-size hit area so it meets the contrast and target rules like every other link.
+ */
+@layer components {
+  /* The ring around a running node: a conic sweep masked to a 4 px band. */
+  .orcon-run-ring {
+    padding: var(--orcon-space-1);
+    background: conic-gradient(from var(--orcon-ring-angle), transparent 0 50%, var(--orcon-status-active-fg) 100%);
+    mask:
+      linear-gradient(var(--orcon-surface-default) 0 0) content-box exclude,
+      linear-gradient(var(--orcon-surface-default) 0 0);
+    -webkit-mask:
+      linear-gradient(var(--orcon-surface-default) 0 0) content-box,
+      linear-gradient(var(--orcon-surface-default) 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* Under reduced motion the ring does not turn: it is a static segmented ring. */
+  @media (prefers-reduced-motion: reduce) {
+    .orcon-run-ring {
+      background: repeating-conic-gradient(var(--orcon-status-active-fg) 0 9deg, transparent 9deg 18deg);
+    }
+  }
+
+  /* Ports grow and change color when hovered, focused or targeted. */
+  .orcon-handle {
+    transition-property: width, height, background-color, border-color;
+    transition-duration: var(--orcon-duration-base);
+    transition-timing-function: var(--orcon-easing-standard);
+  }
+
+  /* An input port while a connection is dragged: a valid target grows and takes the action color; the others refuse. */
+  .orcon-handle-in.valid {
+    width: var(--orcon-size-icon-16);
+    height: var(--orcon-size-icon-16);
+    border-color: var(--orcon-action-primary-bg);
+  }
+
+  .orcon-handle-in.connectingto:not(.valid) {
+    cursor: not-allowed;
+  }
+
+  /* A focused connection draws its focus ring along the curve instead of boxing it. */
+  .react-flow__edge:focus-visible {
+    outline: none;
+  }
+
+  .react-flow__edge:focus-visible .orcon-edge-focus {
+    opacity: 0.35;
+  }
+
+  .react-flow__attribution {
+    background-color: transparent;
+    color: var(--orcon-fg-muted);
+    font-size: var(--orcon-font-size-xs);
+    margin: 0;
+    padding: 0;
+  }
+
+  .react-flow__attribution a {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: var(--orcon-space-2);
+    color: inherit;
+  }
+
+  @media (pointer: coarse) {
+    .react-flow__attribution a {
+      min-height: var(--orcon-size-target-min);
+      min-width: var(--orcon-size-target-min);
+    }
+  }
+}

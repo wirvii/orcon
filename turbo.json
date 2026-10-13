@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "agentGuidance": false,
   "tasks": {
     "build": {
       "dependsOn": [
@@ -13,7 +14,24 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {},
-    "typecheck": {}
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "i18n:check": {}
   }
 }

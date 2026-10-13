@@ -1,0 +1,18 @@
+{
+  "component": {
+    "node-tile": {
+      "bg": {
+        "$type": "color",
+        "$value": "{canvas.node.bg}"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "{canvas.node.border}"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": "{elevation.sm}"
+      }
+    }
+  }
+}

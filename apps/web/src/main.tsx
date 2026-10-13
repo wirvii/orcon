@@ -1,14 +1,21 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react';
+import '@orcon/ui/styles.css';
+
+import { ErrorBoundary, Providers, WelcomeScreen } from '@orcon/ui';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ReactFlow, Background, Controls } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import './style.css';
 
-const nodes = [{ id: 'start', position: { x: 80, y: 80 }, data: { label: 'Welcome to Orcon' } }];
+const root = document.getElementById('root');
+if (!root) throw new Error('The page has no #root element to mount the app in.');
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><main><header><strong>Orcon</strong><span>Open-source orchestration engine</span></header><section><ReactFlow nodes={nodes} edges={[]} fitView><Background /><Controls /></ReactFlow></section></main></React.StrictMode>
+createRoot(root).render(
+  <StrictMode>
+    <Providers>
+      <ErrorBoundary>
+        <WelcomeScreen />
+      </ErrorBoundary>
+    </Providers>
+  </StrictMode>,
 );
