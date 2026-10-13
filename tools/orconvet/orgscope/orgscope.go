@@ -28,8 +28,10 @@
 //	//orcon:dynamic-sql <reason>
 //
 // for the few places that must run text they did not write (a migration runner
-// executing an embedded file). It needs a reason and is reviewed like any other
-// line.
+// executing an embedded file). It needs a reason, and it is honoured only in the
+// files listed in internal/adapter/storetest/dbrules/policy/dynamic_sql_allowlist.txt
+// (path, reason, date, approved-by, added with owner approval); in any other file
+// the annotation is itself a finding.
 //
 // What this does not do: it does not read the statement (tools/sqlcheck does,
 // on the query files), and it does not check that a store method receives an
@@ -41,6 +43,9 @@ package orgscope
 import (
 	"go/ast"
 	"go/types"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -235,10 +240,49 @@ type lineKey struct {
 	line int
 }
 
+// allowlistPath is where the files allowed to carry the directive are listed,
+// relative to the repository root. Format of a line, fields separated by two or
+// more spaces (like exceptions.txt):
+//
+//	<path of the Go file from the repository root>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+//
+// A malformed line grants nothing.
+const allowlistPath = "internal/adapter/storetest/dbrules/policy/dynamic_sql_allowlist.txt"
+
+var allowlistLine = regexp.MustCompile(`^(\S+) {2,}(\S.*?) {2,}(\d{4}-\d{2}-\d{2}) {2,}approved-by:(\S+)$`)
+
+// allowedFiles returns the files, as absolute slash paths, that may carry the
+// directive: it looks for the allowlist in the directory of a source file and
+// each directory above it.
+func allowedFiles(dir string) map[string]bool {
+	for d := dir; ; d = filepath.Dir(d) {
+		data, err := os.ReadFile(filepath.Join(d, filepath.FromSlash(allowlistPath)))
+		if err == nil {
+			out := map[string]bool{}
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimRight(line, " \t\r")
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				if m := allowlistLine.FindStringSubmatch(line); m != nil {
+					out[filepath.ToSlash(filepath.Join(d, filepath.FromSlash(m[1])))] = true
+				}
+			}
+			return out
+		}
+		if parent := filepath.Dir(d); parent == d {
+			return map[string]bool{}
+		}
+	}
+}
+
 // directiveLines maps the lines holding the dynamic-sql directive to its reason.
+// The directive counts only in a file of the allowlist; anywhere else the
+// annotation is itself reported.
 func directiveLines(pass *analysis.Pass) map[lineKey]string {
 	out := map[lineKey]string{}
 	for _, f := range pass.Files {
+		var allowedHere map[string]bool
 		for _, group := range f.Comments {
 			for _, c := range group.List {
 				rest, ok := strings.CutPrefix(c.Text, directive)
@@ -246,6 +290,17 @@ func directiveLines(pass *analysis.Pass) map[lineKey]string {
 					continue
 				}
 				pos := pass.Fset.Position(c.Slash)
+				abs, err := filepath.Abs(pos.Filename)
+				if err != nil {
+					abs = pos.Filename
+				}
+				if allowedHere == nil {
+					allowedHere = allowedFiles(filepath.Dir(abs))
+				}
+				if !allowedHere[filepath.ToSlash(abs)] {
+					pass.Reportf(c.Slash, "%s is honoured only in the files of %s; this file is not listed (owner approval is needed to add it)", directive, allowlistPath)
+					continue
+				}
 				out[lineKey{pos.Filename, pos.Line}] = strings.TrimSpace(rest)
 			}
 		}

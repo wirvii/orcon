@@ -73,12 +73,10 @@ func getText(table string) string { return "SELECT id FROM " + table }
 
 func generic[T ~string](s T) T { return s }
 
-// The directive is the reviewed way to run text the code did not write.
-func reviewed(ctx context.Context, db *sql.DB, embedded string) {
-	//orcon:dynamic-sql runs one migration file embedded in the binary
-	_, _ = db.ExecContext(ctx, embedded)
-	_, _ = db.ExecContext(ctx, embedded) //orcon:dynamic-sql same, on the call line
-	//orcon:dynamic-sql
-	_, _ = db.ExecContext(ctx, embedded) // want `needs a reason`
+// This file is not in the allowlist: the directive is a finding of its own and
+// does not silence the call.
+func unlisted(ctx context.Context, db *sql.DB, embedded string) {
+	//orcon:dynamic-sql runs one migration file // want `honoured only in the files of`
 	_, _ = db.ExecContext(ctx, embedded) // want `SQL text must be a constant`
+	_, _ = db.ExecContext(ctx, embedded) //orcon:dynamic-sql on the call line // want `honoured only in the files of` `SQL text must be a constant`
 }

@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fixture allowlist, same format as the real one.
+internal/adapter/sqlite/reviewed/reviewed.go  runs one embedded migration file  2026-10-13  approved-by:owner
+malformed line grants nothing

@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Go files allowed to carry the //orcon:dynamic-sql <reason> annotation, which
+# lets a driver call in the data-access layer run SQL text that is not a
+# constant (tools/orconvet orgscope, rule 2). In any other file the annotation
+# is itself a finding. Only a pull request approved by the owner may add a line.
+# Format, fields separated by two or more spaces:
+#   <path from the repository root>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+# Empty at birth: the migration runners (SPEC-001 C2a) add theirs if they need it.
