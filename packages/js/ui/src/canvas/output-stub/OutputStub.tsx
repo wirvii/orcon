@@ -10,10 +10,10 @@ export interface OutputStubProps {
   /** Accessible name: "Add node after <name>, output <output>". */
   label: string;
   /** Vertical position on the right edge of the tile, in px from its top. */
-  top?: number;
-  tabbable?: boolean;
-  onAdd?: () => void;
-  className?: string;
+  top?: number | undefined;
+  tabbable?: boolean | undefined;
+  onAdd?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

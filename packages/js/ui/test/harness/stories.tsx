@@ -37,7 +37,7 @@ export function composeAll(globals: Partial<Globals>): ComposedEntry[] {
   for (const [path, module] of Object.entries(modules)) {
     const meta = (module as { default?: { title?: string } }).default;
     const title = meta?.title ?? path;
-    const composed = composeStories(module, annotations) as unknown as Record<string, ComposedEntry['Story']>;
+    const composed = composeStories(module, annotations) as Record<string, ComposedEntry['Story']>;
     for (const [name, Story] of Object.entries(composed)) {
       entries.push({ label: `${title} › ${name}`, title, name, Story });
     }

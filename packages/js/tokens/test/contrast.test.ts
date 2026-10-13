@@ -33,7 +33,7 @@ describe('declared pairs', () => {
 });
 
 describe('ratios match the values certified in the specification', () => {
-  const expected: Array<[string, string, string, 'light' | 'dark', number]> = [
+  const expected: [string, string, string, 'light' | 'dark', number][] = [
     ['fg.default', 'bg.app', 'text', 'light', 17.06],
     ['fg.subtle', 'surface.default', 'text', 'light', 4.76],
     ['action.primary.fg', 'action.primary.bg', 'text', 'light', 5.02],

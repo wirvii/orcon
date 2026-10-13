@@ -16,8 +16,8 @@ export interface FlowRow {
   name: string;
   description: string;
   enabled: boolean;
-  lastRunAt?: string;
-  lastStatus?: StatusKey;
+  lastRunAt?: string | undefined;
+  lastStatus?: StatusKey | undefined;
 }
 
 export const flows: FlowRow[] = [
@@ -33,7 +33,7 @@ export interface ExecutionRow {
   flowName: string;
   status: StatusKey;
   startedAt: string;
-  durationMs?: number;
+  durationMs?: number | undefined;
   items: number;
 }
 
@@ -56,9 +56,9 @@ export interface AttentionRow {
   cause: 'approval' | 'reviewUncertain' | 'failedStep';
   group: 'mine' | 'groups' | 'other';
   createdAt: string;
-  escalationLevel?: number;
-  acknowledgedBy?: string;
-  overdue?: boolean;
+  escalationLevel?: number | undefined;
+  acknowledgedBy?: string | undefined;
+  overdue?: boolean | undefined;
 }
 
 export const attentionRows: AttentionRow[] = [
@@ -95,7 +95,7 @@ export interface TimelineNode {
   status: StatusKey;
   items: number;
   attempts: AttemptRow[];
-  output?: string;
+  output?: string | undefined;
 }
 
 export const executionTimeline: TimelineNode[] = [
@@ -135,9 +135,9 @@ export interface ResolutionAction {
   label: string;
   kind: 'repeat' | 'mark-applied' | 'mark-not-applied' | 'other';
   /** The action can have a lasting effect; a person must tick the acknowledgment first. */
-  requiresRiskAck?: boolean;
+  requiresRiskAck?: boolean | undefined;
   /** The risk the acknowledgment states. */
-  riskText?: string;
+  riskText?: string | undefined;
 }
 
 export interface UncertainResolution {

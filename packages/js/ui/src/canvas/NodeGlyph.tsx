@@ -10,10 +10,10 @@ import type { GraphNode } from './model';
 export interface NodeGlyphProps {
   node: Pick<GraphNode, 'kind' | 'logicType' | 'icon' | 'connector'>;
   /** Size class of the Lucide icon (not used for connector logos, which fill their box). */
-  iconClassName?: string;
+  iconClassName?: string | undefined;
   /** A quiet look for disabled and not-run nodes: the icon uses the subtle foreground. */
-  muted?: boolean;
-  className?: string;
+  muted?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /** The icon of a node: a connector logo (an <img>) or a built-in Lucide icon. Decorative: the name is next to it. */

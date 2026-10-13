@@ -1,0 +1,181 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A small OpenAPI 3.1 document that exercises what the generator pipeline must handle:
+# a resource with a oneOf and a type-nullable member, a cursor-paginated list, and
+# problem+json error responses with per-field errors. It is a test input, not the Orcon API.
+openapi: 3.1.0
+info:
+  title: Orcon API test document
+  version: 1.0.0
+paths:
+  /api/v1/flows:
+    get:
+      operationId: listFlows
+      summary: List flows
+      parameters:
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: One page of flows.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlowPage'
+        '403':
+          description: The caller may not list flows.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      operationId: createFlow
+      summary: Create a flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFlowRequest'
+      responses:
+        '201':
+          description: The created flow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '422':
+          description: The request is not valid; field errors name the pointers.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/flows/{flowId}:
+    get:
+      operationId: getFlow
+      summary: Get a flow
+      parameters:
+        - name: flowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The flow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '404':
+          description: There is no flow with that id.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  schemas:
+    Flow:
+      type: object
+      required: [id, name, status, trigger, description]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+        description:
+          type: [string, 'null']
+        trigger:
+          oneOf:
+            - $ref: '#/components/schemas/ScheduleTrigger'
+            - $ref: '#/components/schemas/WebhookTrigger'
+        draftRevision:
+          type: integer
+          minimum: 0
+    ScheduleTrigger:
+      type: object
+      required: [kind, cron]
+      properties:
+        kind:
+          type: string
+          const: schedule
+        cron:
+          type: string
+    WebhookTrigger:
+      type: object
+      required: [kind, path]
+      properties:
+        kind:
+          type: string
+          const: webhook
+        path:
+          type: string
+    FlowPage:
+      type: object
+      required: [items, nextPageToken]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flow'
+        nextPageToken:
+          type: [string, 'null']
+    CreateFlowRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: [string, 'null']
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        requestId:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      required: [pointer, code, message]
+      properties:
+        pointer:
+          type: string
+        code:
+          type: string
+        message:
+          type: string

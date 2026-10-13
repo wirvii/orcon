@@ -14,20 +14,20 @@ export type ChipKind = 'pinned' | 'disabled' | 'not-supported' | 'added' | 'chan
 
 export interface NodeStatusChipProps {
   /** An execution state. The chip shows its icon and label. */
-  status?: StatusKey;
+  status?: StatusKey | undefined;
   /** A short error code shown with Failed ("Failed · 401"). */
-  code?: string;
+  code?: string | undefined;
   /** A chip that is not an execution state: pinned data, disabled, an unsupported node, a compare mark. */
-  kind?: ChipKind;
+  kind?: ChipKind | undefined;
   /** Items that are UNCERTAIN, for kind "uncertain-items". */
-  count?: number;
-  className?: string;
+  count?: number | undefined;
+  className?: string | undefined;
 }
 
 interface ChipLook {
   family: StatusFamily;
   icon: LucideIcon;
-  dashed?: boolean;
+  dashed?: boolean | undefined;
 }
 
 const kindLooks: Record<ChipKind, ChipLook> = {

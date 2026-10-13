@@ -19,9 +19,9 @@ export function languageName(locale: ProductLocale): string {
 
 export interface LocaleSwitcherProps {
   /** Controlled value. Without it the switcher reads and sets the I18nProvider locale. */
-  value?: ProductLocale;
-  onValueChange?: (value: ProductLocale) => void;
-  className?: string;
+  value?: ProductLocale | undefined;
+  onValueChange?: ((value: ProductLocale) => void) | undefined;
+  className?: string | undefined;
 }
 
 /** Chooses the interface language. Each language is listed by its own name, so it is findable whatever the current language. */

@@ -10,6 +10,7 @@ import { Pagination } from '../../src/components/pagination/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../src/components/table/Table';
 
 import { renderWithProviders } from './helpers';
+import { must } from '../../src/lib/must';
 
 interface Row {
   id: string;
@@ -85,7 +86,7 @@ describe('DataTable', () => {
   it('starts ascending when another column is chosen', async () => {
     const onSortChange = vi.fn();
     renderWithProviders(
-      <DataTable {...base} columns={[{ ...columns[0]!, sortable: true }, { ...columns[1]!, sortable: true }]} sort={{ columnId: 'id', direction: 'descending' }} onSortChange={onSortChange} />,
+      <DataTable {...base} columns={[{ ...must(columns[0]), sortable: true }, { ...must(columns[1]), sortable: true }]} sort={{ columnId: 'id', direction: 'descending' }} onSortChange={onSortChange} />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Name' }));
     expect(onSortChange).toHaveBeenCalledWith({ columnId: 'name', direction: 'ascending' });

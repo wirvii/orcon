@@ -56,7 +56,7 @@ export type NodeIconName =
 export interface PortSpec {
   id: string;
   /** Visible label of an output ("true", "false", a case name). Optional for single ports. */
-  label?: string;
+  label?: string | undefined;
 }
 
 export interface ConnectorRef {
@@ -72,7 +72,7 @@ export interface AiBlockSpec {
   /** The block is configured. An unset block is drawn as a dashed circle with a plus. */
   set: boolean;
   /** Name of what is configured (shown in the tooltip and the accessible name). */
-  detail?: string;
+  detail?: string | undefined;
 }
 
 export type DiffMark = 'added' | 'changed' | 'removed';
@@ -82,25 +82,25 @@ export interface GraphNode {
   kind: NodeKind;
   name: string;
   /** The operation the node performs ("Send message", "If total > 0"). One line under the name. */
-  subtitle?: string;
+  subtitle?: string | undefined;
   /** Only for kind "logic". */
-  logicType?: LogicType;
+  logicType?: LogicType | undefined;
   /** Built-in icon. Ignored when a connector logo is given. */
-  icon?: NodeIconName;
-  connector?: ConnectorRef;
+  icon?: NodeIconName | undefined;
+  connector?: ConnectorRef | undefined;
   /** Execution overlay: the state of the node in the execution being shown. */
-  status?: StatusKey;
+  status?: StatusKey | undefined;
   /** Execution overlay: a short error code shown in the Failed chip ("401"). */
-  statusCode?: string;
+  statusCode?: string | undefined;
   /** Execution overlay: how many items of the node are UNCERTAIN. */
-  uncertainCount?: number;
-  disabled?: boolean;
+  uncertainCount?: number | undefined;
+  disabled?: boolean | undefined;
   /** The node's output is pinned: later runs reuse it. */
-  pinned?: boolean;
+  pinned?: boolean | undefined;
   /** Compare mode: how this node differs from the other version. */
-  diff?: DiffMark;
+  diff?: DiffMark | undefined;
   /** Configuration blocks of an agent node. */
-  ai?: AiBlockSpec[];
+  ai?: AiBlockSpec[] | undefined;
   inputs: PortSpec[];
   outputs: PortSpec[];
   position: { x: number; y: number };
@@ -115,11 +115,11 @@ export interface GraphEdge {
   target: string;
   targetInput: string;
   /** Execution overlay: how many items travelled this connection. */
-  items?: number;
+  items?: number | undefined;
   /** Execution overlay: how the connection looks in the execution being shown. Absent at design time. */
-  state?: EdgeState;
+  state?: EdgeState | undefined;
   /** The connection goes back to an earlier node (a loop). */
-  loopBack?: boolean;
+  loopBack?: boolean | undefined;
 }
 
 export type StickyColor = 1 | 2 | 3 | 4 | 5 | 6;
@@ -129,27 +129,27 @@ export interface StickyNoteData {
   position: { x: number; y: number };
   size: { w: number; h: number };
   color: StickyColor;
-  title?: string;
+  title?: string | undefined;
   body: string;
 }
 
 export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  notes?: StickyNoteData[];
+  notes?: StickyNoteData[] | undefined;
 }
 
 /** An entry of the add-node palette. */
 export interface CatalogItem {
   id: string;
   kind: NodeKind;
-  logicType?: LogicType;
+  logicType?: LogicType | undefined;
   name: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
   group: string;
-  icon?: NodeIconName;
-  connector?: ConnectorRef;
-  keywords?: readonly string[];
+  icon?: NodeIconName | undefined;
+  connector?: ConnectorRef | undefined;
+  keywords?: readonly string[] | undefined;
   inputs: PortSpec[];
   outputs: PortSpec[];
 }

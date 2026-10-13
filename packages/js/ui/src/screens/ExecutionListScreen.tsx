@@ -52,10 +52,10 @@ const messages = defineMessages({
 });
 
 export interface ExecutionListScreenProps {
-  executions?: readonly ExecutionRow[];
-  status?: 'ready' | 'loading' | 'error';
-  now?: string;
-  onRetry?: () => void;
+  executions?: readonly ExecutionRow[] | undefined;
+  status?: 'ready' | 'loading' | 'error' | undefined;
+  now?: string | undefined;
+  onRetry?: (() => void) | undefined;
 }
 
 /**

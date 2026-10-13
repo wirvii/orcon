@@ -98,12 +98,12 @@ const noteMeta: Record<NotificationRow['tone'], { icon: LucideIcon; text: typeof
 };
 
 export interface AttentionInboxScreenProps {
-  items?: readonly AttentionRow[];
-  notifications?: readonly NotificationRow[];
-  now?: string;
-  status?: 'ready' | 'error';
-  onAcknowledge?: (ids: readonly string[]) => void;
-  onRetry?: () => void;
+  items?: readonly AttentionRow[] | undefined;
+  notifications?: readonly NotificationRow[] | undefined;
+  now?: string | undefined;
+  status?: 'ready' | 'error' | undefined;
+  onAcknowledge?: ((ids: readonly string[]) => void) | undefined;
+  onRetry?: (() => void) | undefined;
 }
 
 /**
@@ -130,7 +130,7 @@ export function AttentionInboxScreen({
 
   const visible = useMemo(() => items.filter((item) => filter === 'all' || item.group === filter), [items, filter]);
   const chosen = items.filter((item) => selected.has(item.id));
-  const sameCauseAndFlow = chosen.length > 0 && chosen.every((item) => item.cause === chosen[0]?.cause && item.flowName === chosen[0]?.flowName);
+  const sameCauseAndFlow = chosen.length > 0 && chosen.every((item) => item.cause === chosen[0]?.cause && item.flowName === chosen[0].flowName);
 
   const first = useRef(true);
   useEffect(() => {

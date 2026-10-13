@@ -12,13 +12,13 @@ import { canvasMessages } from '../messages';
 export interface CanvasControlsProps {
   /** Current zoom, 1 is 100 %. Reset to 100 % shows only when it differs. */
   zoom: number;
-  onFit?: () => void;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
-  onReset?: () => void;
+  onFit?: (() => void) | undefined;
+  onZoomIn?: (() => void) | undefined;
+  onZoomOut?: (() => void) | undefined;
+  onReset?: (() => void) | undefined;
   /** Lines the nodes up on the grid. Omit it to hide the button. */
-  onTidyUp?: () => void;
-  className?: string;
+  onTidyUp?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 const control = 'bg-surface-raised border-border shadow-sm';

@@ -8,8 +8,8 @@ export interface FieldContextValue {
   controlId: string;
   /** Id of the label (or legend, for groups). */
   labelId: string;
-  descriptionId?: string;
-  errorId?: string;
+  descriptionId?: string | undefined;
+  errorId?: string | undefined;
   invalid: boolean;
   required: boolean;
 }
@@ -17,10 +17,10 @@ export interface FieldContextValue {
 export const FieldContext = createContext<FieldContextValue | null>(null);
 
 export interface ControlOwnProps {
-  id?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: AriaAttributes['aria-invalid'];
-  'aria-required'?: AriaAttributes['aria-required'];
+  id?: string | undefined;
+  'aria-describedby'?: string | undefined;
+  'aria-invalid'?: AriaAttributes['aria-invalid'] | undefined;
+  'aria-required'?: AriaAttributes['aria-required'] | undefined;
 }
 
 /**

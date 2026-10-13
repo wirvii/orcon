@@ -27,15 +27,15 @@ const labels = {
 export interface AiBlockProps {
   kind: AiBlockKind;
   /** The block is configured. An unset block is a dashed circle with a plus. */
-  set?: boolean;
+  set?: boolean | undefined;
   /** What is configured ("Chat model", "Window memory"), for the accessible name. */
-  detail?: string;
-  tabbable?: boolean;
+  detail?: string | undefined;
+  tabbable?: boolean | undefined;
   /** A view-only canvas shows the block without a button, so nothing small is left to tap. Default true. */
-  interactive?: boolean;
+  interactive?: boolean | undefined;
   /** Opens the Agent tab of the node details view. */
-  onActivate?: () => void;
-  className?: string;
+  onActivate?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

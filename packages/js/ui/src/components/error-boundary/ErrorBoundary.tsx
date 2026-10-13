@@ -54,9 +54,9 @@ export function ErrorFallback({ error, reset }: ErrorFallbackProps) {
 export interface ErrorBoundaryProps {
   children: ReactNode;
   /** Custom fallback. Defaults to ErrorFallback. */
-  fallback?: ComponentType<ErrorFallbackProps>;
+  fallback?: ComponentType<ErrorFallbackProps> | undefined;
   /** Called with the error, for logging. */
-  onError?: (error: Error, info: ErrorInfo) => void;
+  onError?: ((error: Error, info: ErrorInfo) => void) | undefined;
 }
 
 interface ErrorBoundaryState {
@@ -65,19 +65,19 @@ interface ErrorBoundaryState {
 
 /** Catches render errors below it and shows a recoverable fallback instead of a blank screen. */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null };
+  override state: ErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     this.props.onError?.(error, info);
   }
 
   reset = () => this.setState({ error: null });
 
-  render() {
+  override render() {
     const { error } = this.state;
     if (!error) return this.props.children;
     const Fallback = this.props.fallback ?? ErrorFallback;

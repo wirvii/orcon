@@ -176,7 +176,7 @@ describe('RedactedValue', () => {
     expect(screen.getByText(/Oculto: necesitas permiso/)).toBeInTheDocument();
   });
 
-  it('keeps a hidden value out of the page and the clipboard', async () => {
+  it('keeps a hidden value out of the page and the clipboard', () => {
     const writeText = vi.fn();
     stubClipboard(writeText);
     const { container } = renderWithProviders(<ProtectedValue value="sk-live-secret" hidden />);
@@ -228,7 +228,7 @@ describe('ErrorBoundary', () => {
     throw new Error('boom');
   }
 
-  it('replaces a crashing child with a recoverable fallback and reports the error', async () => {
+  it('replaces a crashing child with a recoverable fallback and reports the error', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onError = vi.fn();
     renderWithProviders(

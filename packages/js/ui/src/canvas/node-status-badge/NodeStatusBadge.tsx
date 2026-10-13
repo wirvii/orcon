@@ -23,9 +23,9 @@ const glyphs: Partial<Record<StatusKey, LucideIcon>> = {
 export interface NodeStatusBadgeProps {
   status: StatusKey;
   /** Place the badge on the top-right corner of its parent (offset -8, -8). Off for a standalone badge. */
-  corner?: boolean;
+  corner?: boolean | undefined;
   /** Scale the badge for low zoom levels. */
-  className?: string;
+  className?: string | undefined;
 }
 
 /**
