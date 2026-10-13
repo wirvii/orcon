@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Queries that exist in one dialect only (types-and-time and queries rule QY-1).
+# Format: <dialect>:<QueryName>  # reason, with dialect sqlite or postgres.
+# Empty at birth.
