@@ -395,11 +395,8 @@ components:
             - SUCCEEDED
             - FAILED
             - CANCELED
-        failureSummary:
-          type: string
-          description: Sanitized reason the operation failed; present only when it failed.
-          examples:
-            - The repository rejected the credentials.
+        failure:
+          $ref: "#/components/schemas/OperationFailure"
         createdAt:
           type: string
           format: date-time
@@ -407,6 +404,25 @@ components:
           x-orcon-volatile: true
           examples:
             - 2026-10-12T15:04:05Z
+    OperationFailure:
+      type: object
+      description: How an operation failed; present only when its status is FAILED.
+      required:
+        - code
+        - title
+      properties:
+        code:
+          $ref: "#/components/schemas/ProblemCode"
+        title:
+          type: string
+          description: Short summary of the failure.
+          examples:
+            - Git sync failed
+        detail:
+          type: string
+          description: Sanitized explanation of the failure.
+          examples:
+            - The repository rejected the credentials.
   responses:
     ValidationFailed:
       description: A parameter or the body is invalid.

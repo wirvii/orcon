@@ -6,14 +6,15 @@ The contract toolchain of the public API (ADR 0080, rulebook in `.agents/skills/
 
 | What | Where |
 |---|---|
-| Lint configuration (Redocly built-in rules + the `orcon` plugin, all errors, none disabled) | `redocly.yaml` |
+| Lint configuration (Redocly built-in rules + the `orcon` plugin, all errors; only the built-in `operation-4xx-problem-details-rfc7807` is off, ADR-0054 §1) | `redocly.yaml` |
 | The 31 `orcon/*` rules and the 31 action verbs | `plugin/orcon.js`, `plugin/rules/`, `plugin/verbs.js` |
 | Bundle (YAML for the Go generator, JSON for Go tests) | `scripts/bundle.mjs` |
 | Lint the real contract | `scripts/lint.mjs` (does nothing while the contract does not exist) |
 | Reference site (Scalar, same origin, no CDN, at most 3 MiB compressed) | `scripts/decorate.mjs`, `scripts/build-reference.mjs` |
 | Generated pages | `scripts/problem-codes.mjs`, `scripts/operation-index.mjs` (both take `--check`) |
-| Compatibility and changelog (oasdiff) | `scripts/stability-filter.mjs`, `scripts/compat-selftest.mjs`, `scripts/changelog.mjs`, `scripts/changelog-deprecations.mjs`, `scripts/changelog-selftest.mjs` |
-| Fixtures | `testdata/good/` (zero problems), `testdata/bad/` (one planted case per rule), `testdata/compat/`, `testdata/changelog/`, `testdata/permissions.yaml` |
+| Compatibility (oasdiff + project comparator) | `scripts/stability-filter.mjs` (drops experimental), `scripts/events-as-responses.mjs` (events compared as responses), `oasdiff-levels.txt` (severity file: one check id and `err`/`info` per line, no comments because oasdiff rejects them), `scripts/compat-extra.mjs` (VER-2 changes in `x-orcon-*` extensions), `scripts/compat-selftest.mjs` (also `--check --base --head` for `make api-compat`) |
+| Changelog | `scripts/changelog.mjs`, `scripts/changelog-deprecations.mjs`, `scripts/changelog-selftest.mjs` |
+| Fixtures | `testdata/good/` (zero problems), `testdata/bad/` (one planted case per rule), `testdata/compat/`, `testdata/changelog/`, `testdata/permissions.yaml` (strict format of `internal/authz/permissions.yaml`: `version: 1`, scopes `organization`, `project`, `instance`, each a list of `name` items) |
 
 ## Commands
 
@@ -34,4 +35,4 @@ The oasdiff tests need an `oasdiff` binary (`ORCON_OASDIFF`, `oasdiff` on the pa
 
 ## Reference site and the content security policy
 
-`build-reference.mjs` writes `index.html`, `reference-config.js`, `openapi.json`, `scalar.standalone.js` (copied unchanged from `node_modules`) and `LICENSE-scalar.txt`. The configuration is a file of its own because inline scripts are not allowed. Measured with the policy `default-src 'self'; connect-src 'self'`: the page loads but renders unstyled, because Scalar injects its styles at run time (inline styles are blocked). With `default-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'` the site renders and sends only same-origin requests, and "try it" sends no cookies. The one remaining violation report is a blocked `eval` that the script tolerates (the page works). `scripts/serve-reference.mjs` serves a built site with the headers of the binary for a manual check.
+`build-reference.mjs` writes `index.html`, `reference-config.js`, `openapi.json`, `scalar.standalone.js` (copied unchanged from `node_modules`) and `LICENSE-scalar.txt`. The configuration is a file of its own because inline scripts are not allowed. Measured with the policy `default-src 'self'; connect-src 'self'`: the page loads but renders unstyled, because Scalar injects its styles at run time (inline styles are blocked). With `default-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'` the site renders and sends only same-origin requests, and "try it" sends no cookies. The one remaining violation report is a blocked `eval` that the script tolerates (the page works). `scripts/serve-reference.mjs` serves a built site with the headers of the binary for a manual check. The binary serves the site with the policy of ADR-0080 §10 (the one above plus `img-src 'self' data:; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`) and redirects `/api/reference` to `/api/reference/`. `build-reference.mjs` also writes `third-party-notices.txt` and fails when a bundled package has a license outside the allowed list.

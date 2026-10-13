@@ -1,76 +1,77 @@
 # SPDX-FileCopyrightText: The Orcon Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Permission catalog used by the plugin self-tests (version 1 of the catalog in the
-# access-control design). The plugin reads every `resource:action` name in the file, so
-# the real internal/authz/permissions.yaml may use any structure that lists names.
+# Permission catalog used by the plugin self-tests, in the strict format of
+# internal/authz/permissions.yaml (SPEC-012 Amendment 2): version 1 and the scopes
+# organization, project and instance, each a list of items with a name.
 version: 1
 permissions:
   organization:
-    - org:read
-    - org:update
-    - org:delete
-    - member:read
-    - member:invite
-    - member:remove
-    - member:update-role
-    - group:manage
-    - role:read
-    - role:manage
-    - project:create
-    - project:read-all
-    - project:delete
-    - auth-source:manage
-    - scim:manage
-    - domain:manage
-    - security-policy:manage
-    - service-account:manage
-    - audit:read
-    - audit:export
-    - siem:manage
-    - secret-store:manage
-    - secret-store:reference
-    - connector:approve
-    - key:rotate-org
-    - limits:read
-    - notification:manage
-    - apikey:manage-org
+    - name: org:read
+    - name: org:update
+    - name: org:delete
+    - name: member:read
+    - name: member:invite
+    - name: member:remove
+    - name: member:update-role
+    - name: group:manage
+    - name: role:read
+    - name: role:manage
+    - name: project:create
+    - name: project:read-all
+    - name: project:delete
+    - name: auth-source:manage
+    - name: scim:manage
+    - name: domain:manage
+    - name: security-policy:manage
+    - name: service-account:manage
+    - name: audit:read
+    - name: audit:export
+    - name: siem:manage
+    - name: secret-store:manage
+    - name: secret-store:reference
+    - name: connector:approve
+    - name: key:rotate-org
+    - name: limits:read
+    - name: notification:manage
+    - name: apikey:manage-org
   project:
-    - project:read
-    - project:update
-    - project:manage-members
-    - flow:read
-    - flow:create
-    - flow:update
-    - flow:delete
-    - flow:move
-    - flow:publish
-    - flow:activate
-    - flow:rollback
-    - flow:execute
-    - flow:export
-    - flow:import
-    - flow:submit-form
-    - execution:read
-    - execution:read-data
-    - execution:retry
-    - execution:cancel
-    - execution:resolve
-    - execution:delete
-    - human-task:resolve
-    - credential:read
-    - credential:create
-    - credential:update
-    - credential:delete
-    - credential:use
-    - credential:share
-    - variable:read
-    - variable:manage
+    - name: project:read
+    - name: project:update
+    - name: project:manage-members
+    - name: flow:read
+    - name: flow:create
+    - name: flow:update
+    - name: flow:delete
+    - name: flow:move
+    - name: flow:publish
+    - name: flow:activate
+    - name: flow:rollback
+    - name: flow:execute
+    - name: flow:export
+    - name: flow:import
+    - name: flow:submit-form
+    - name: execution:read
+    - name: execution:read-data
+    - name: execution:retry
+    - name: execution:cancel
+    - name: execution:resolve
+    - name: execution:delete
+    - name: human-task:resolve
+    - name: credential:read
+    - name: credential:create
+    - name: credential:update
+    - name: credential:delete
+    - name: credential:use
+    - name: credential:share
+    - name: variable:read
+    - name: variable:manage
   instance:
-    - instance:orgs
-    - instance:keys
-    - instance:connectors
-    - instance:policy
-    - instance:limits
-    - instance:siem
-    - instance:users
+    - name: instance:orgs
+    - name: instance:keys
+    - name: instance:connectors
+    - name: instance:policy
+    - name: instance:limits
+    - name: instance:siem
+    - name: instance:users
+roles: {}   # role definitions; not read by the contract lint

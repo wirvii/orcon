@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # A protocol-tagged operation: it follows RFC 6749, so it is outside the path grammar, the
-# problem+json rules and the executable examples. Open point: the built-in
-# operation-4xx-problem-details-rfc7807 rule (required by the toolchain) demands problem+json
-# on every 4xx, including this one, whereas RFC 6749 section 5.2 prescribes its own JSON error
-# body. The fixture follows the toolchain; the real contract needs a decision (ADR 0080).
+# problem+json rules and the executable examples. Its 400 is the OAuth error response of
+# RFC 6749 section 5.2 (application/json with error and error_description); the built-in
+# rule operation-4xx-problem-details-rfc7807 is off for this reason (ADR-0054 section 1).
 post:
   operationId: issueToken
   summary: Issue an OAuth access token
@@ -38,4 +37,8 @@ post:
           schema:
             $ref: '../openapi.yaml#/components/schemas/TokenResponse'
     '400':
-      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+      description: The request is invalid; the body is the OAuth error response of RFC 6749 section 5.2.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/OAuthError'

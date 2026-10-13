@@ -27,7 +27,14 @@ export async function settle(page: Page): Promise<void> {
     let last = '';
     let steady = 0;
     while (performance.now() - steadyStart < 10_000 && steady < 3) {
-      const fitted = marks().every((region) => region.hasAttribute('data-fitted'));
+      // The fit was made for the size the canvas has now: other content (text that wraps once the
+      // fonts are drawn) can resize it after the first fit, and the canvas fits again when it does.
+      const fitted = marks().every((region) => {
+        const box = region.getBoundingClientRect();
+        const size = region.getAttribute('data-fit-size');
+        // A canvas without nodes has nothing to fit and carries no size.
+        return region.hasAttribute('data-fitted') && (size === null || size === `${Math.round(box.width)}x${Math.round(box.height)}`);
+      });
       const now = viewportOf();
       steady = fitted && now === last ? steady + 1 : 0;
       last = now;
