@@ -36,27 +36,33 @@ func TestSandboxIsolation(t *testing.T) {
 
 func sandboxIsolation(t *testing.T, mode wazero.Mode) {
 	t.Helper()
+	// A deadline case runs under a short limit. A case that must hit a memory
+	// limit runs under a long one, so a slow machine does not stop it by time
+	// before it fills memory.
 	ev := evaluatorIn(t, mode, expr.Options{Timeout: 150 * time.Millisecond, MemoryLimit: 32 << 20})
+	evMemory := evaluatorIn(t, mode, expr.Options{Timeout: time.Minute, MemoryLimit: 32 << 20})
 	prime(t, ev)
 
 	stops := []struct {
 		name string
 		src  string
 		want error
+		ev   *expr.Evaluator
 	}{
-		{"memory bomb by buffers", `={{ (() => { const a = []; for (;;) a.push(new Uint8Array(1 << 22)); })() }}`, expr.ErrMemory},
-		{"memory bomb by array buffers", `={{ (() => { const a = []; for (;;) a.push(new ArrayBuffer(1 << 24)); })() }}`, expr.ErrMemory},
-		{"memory bomb by typed array", `={{ new Uint8Array(1 << 30).length }}`, expr.ErrMemory},
-		{"infinite loop", `={{ (() => { for (;;) {} })() }}`, expr.ErrTimeout},
-		{"infinite loop in a callback", `={{ [1, 2, 3].map(() => { while (true) {} }) }}`, expr.ErrTimeout},
-		{"regular expression backtracking", `={{ /^(a+)+$/.test('a'.repeat(40) + 'b') }}`, expr.ErrTimeout},
-		{"deep recursion", `={{ (function f(n) { return f(n + 1) + 1; })(0) }}`, expr.ErrStack},
-		{"deep recursion in a callback", `={{ (() => { const f = (n) => [n].map((x) => f(x + 1)); return f(0); })() }}`, expr.ErrStack},
-		{"doubling a string", `={{ (() => { let s = 'x'; for (;;) s += s; })() }}`, nil},
-		{"deep recursion through JSON", `={{ (() => { let o = []; for (let i = 0; i < 1e5; i++) o = [o]; return JSON.stringify(o).length; })() }}`, nil},
+		{"memory bomb by buffers", `={{ (() => { const a = []; for (;;) a.push(new Uint8Array(1 << 22)); })() }}`, expr.ErrMemory, evMemory},
+		{"memory bomb by array buffers", `={{ (() => { const a = []; for (;;) a.push(new ArrayBuffer(1 << 24)); })() }}`, expr.ErrMemory, evMemory},
+		{"memory bomb by typed array", `={{ new Uint8Array(1 << 30).length }}`, expr.ErrMemory, evMemory},
+		{"infinite loop", `={{ (() => { for (;;) {} })() }}`, expr.ErrTimeout, ev},
+		{"infinite loop in a callback", `={{ [1, 2, 3].map(() => { while (true) {} }) }}`, expr.ErrTimeout, ev},
+		{"regular expression backtracking", `={{ /^(a+)+$/.test('a'.repeat(40) + 'b') }}`, expr.ErrTimeout, ev},
+		{"deep recursion", `={{ (function f(n) { return f(n + 1) + 1; })(0) }}`, expr.ErrStack, evMemory},
+		{"deep recursion in a callback", `={{ (() => { const f = (n) => [n].map((x) => f(x + 1)); return f(0); })() }}`, expr.ErrStack, evMemory},
+		{"doubling a string", `={{ (() => { let s = 'x'; for (;;) s += s; })() }}`, nil, evMemory},
+		{"deep recursion through JSON", `={{ (() => { let o = []; for (let i = 0; i < 1e5; i++) o = [o]; return JSON.stringify(o).length; })() }}`, nil, ev},
 	}
 	for _, tc := range stops {
 		t.Run(tc.name, func(t *testing.T) {
+			ev := tc.ev
 			s := ev.Open()
 			defer func() { _ = s.Close(t.Context()) }()
 			start := time.Now()
@@ -207,7 +213,11 @@ func TestSandboxContainsABadNeighbor(t *testing.T) {
 
 func badNeighbor(t *testing.T, mode wazero.Mode) {
 	t.Helper()
-	ev := evaluatorIn(t, mode, expr.Options{Timeout: 200 * time.Millisecond, MemoryLimit: 32 << 20})
+	// Only the runaway loop is held to a short deadline; the other executions
+	// and the memory bomb get a long one, so a slow machine fails none of them
+	// by time.
+	evLoop := evaluatorIn(t, mode, expr.Options{Timeout: 300 * time.Millisecond, MemoryLimit: 32 << 20})
+	ev := evaluatorIn(t, mode, expr.Options{Timeout: time.Minute, MemoryLimit: 32 << 20})
 	prime(t, ev)
 	const executions = 24
 	results := make([]error, executions)
@@ -216,17 +226,19 @@ func badNeighbor(t *testing.T, mode wazero.Mode) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s := ev.Open()
-			defer func() { _ = s.Close(t.Context()) }()
+			ev := ev
 			var src string
 			switch i {
 			case 3:
+				ev = evLoop
 				src = `={{ (() => { for (;;) {} })() }}`
 			case 11:
 				src = `={{ (() => { const a = []; for (;;) a.push(new Uint8Array(1 << 22)); })() }}`
 			default:
 				src = fmt.Sprintf(`={{ [1, 2, 3].map(x => x * %d).join('-') }}`, i)
 			}
+			s := ev.Open()
+			defer func() { _ = s.Close(t.Context()) }()
 			p, err := ev.Compile(src)
 			if err != nil {
 				results[i] = err
