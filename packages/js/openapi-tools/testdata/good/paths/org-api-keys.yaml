@@ -1,0 +1,101 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: '../openapi.yaml#/components/parameters/OrgId'
+post:
+  operationId: createApiKey
+  summary: Create an API key
+  description: >-
+    Creates an API key for the organization and returns it together with its secret. The secret
+    is shown only in this response; keep it, because a replay of the request answers
+    secret-already-issued and never shows it again.
+  tags: [flows]
+  x-orcon-permission: apikey:manage-org
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: required
+  x-orcon-audit: api_key.created
+  x-orcon-problems:
+    - unauthenticated
+    - forbidden
+    - not-found
+    - validation-failed
+    - payload-too-large
+    - idempotency-key-reused
+    - idempotency-in-progress
+    - secret-already-issued
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: api-keys create
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: createCiKey
+      scenario: org-without-keys
+      request:
+        pathParams:
+          orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+        headers:
+          Idempotency-Key: create-key-example-1
+        body: createCiKey
+      response:
+        status: 201
+        body: createCiKey
+  parameters:
+    - $ref: '../openapi.yaml#/components/parameters/IdempotencyKeyRequired'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/CreateApiKeyRequest'
+        examples:
+          createCiKey:
+            summary: A key for a pipeline
+            value:
+              name: CI pipeline
+  responses:
+    '201':
+      description: The created key with its secret, shown once.
+      headers:
+        Location:
+          $ref: '../openapi.yaml#/components/headers/Location'
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+        RateLimit:
+          $ref: '../openapi.yaml#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '../openapi.yaml#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/ApiKeyWithSecret'
+          examples:
+            createCiKey:
+              summary: The new key and its secret
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a74
+                orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+                name: CI pipeline
+                createdAt: '2026-10-12T15:04:05Z'
+                secret: example-secret-1
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '403':
+      $ref: '../openapi.yaml#/components/responses/Forbidden'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/NotFound'
+    '409':
+      $ref: '../openapi.yaml#/components/responses/Conflict'
+    '413':
+      $ref: '../openapi.yaml#/components/responses/PayloadTooLarge'
+    '422':
+      $ref: '../openapi.yaml#/components/responses/IdempotencyKeyReused'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

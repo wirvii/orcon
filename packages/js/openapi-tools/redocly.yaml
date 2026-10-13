@@ -3,8 +3,8 @@
 #
 # Lint configuration of the public API contract (packages/openapi/v1/openapi.yaml).
 # The rulebook is .agents/skills/orcon-api/references/; the plugin implements its 31
-# `orcon/*` rules. No rule is disabled for the real contract (H-API1-1): an exception
-# is an amendment of ADR 0080, never a line here.
+# `orcon/*` rules. The only rule turned off is the built-in operation-4xx-problem-details-rfc7807
+# (ADR-0054 section 1, SPEC-012 Amendment 2); any other exception amends ADR 0080 first.
 #
 # Run from the repository root:
 #   pnpm --filter @orcon/openapi-tools exec redocly lint --config redocly.yaml <contract>
@@ -27,7 +27,7 @@ rules:
   no-unused-components: error
   security-defined: error
   no-server-trailing-slash: error
-  operation-4xx-problem-details-rfc7807: error
+  operation-4xx-problem-details-rfc7807: off   # protocol operations follow their standard; orcon/problem-responses covers the rest
 
   # Orcon rules, one per rulebook area. Severity error for all of them.
   # path-shape must stay the first orcon rule: its protocolPaths option sets the allowlist
