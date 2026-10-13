@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -318,13 +319,34 @@ func TestConfigSchema(t *testing.T) {
 	}
 }
 
+// watch runs a reload watcher over dir until the test ends. The handler gets the keys to answer with.
+func watch(t *testing.T, dir string, answer cli.ReloadResult) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult { return answer }, slog.New(slog.DiscardHandler))
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+}
+
+// registerSilentServer leaves the registration of a server that never answers.
+func registerSilentServer(t *testing.T, dir string) {
+	t.Helper()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cli.RunDir(dir), "server.silent"), []byte("silent\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReloadNoServerTimesOut(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	if err := os.MkdirAll(cli.RunDir(dir), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	registerSilentServer(t, dir)
 	env := cli.Env{
 		Environ:    []string{"HOME=/h", "ORCON_DATA_DIR=" + dir},
 		ReloadWait: 300 * time.Millisecond,
@@ -343,14 +365,14 @@ func TestReloadNoServerTimesOut(t *testing.T) {
 		t.Errorf("stderr = %q, want %q", r.err.String(), want)
 	}
 	entries, err := os.ReadDir(cli.RunDir(dir))
-	if err != nil || len(entries) != 0 {
+	if err != nil || len(entries) != 1 || entries[0].Name() != "server.silent" {
 		t.Errorf("the command left files behind: %v %v", entries, err)
 	}
-	// Without a run directory there is no server at all and the command does not wait.
+	// Without a live server there is nothing to wait for and the command does not wait.
 	empty := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + t.TempDir()}, ReloadWait: 10 * time.Second}
 	started = time.Now()
 	if r := exec(t, empty, "config", "reload"); r.code != cli.ExitError || time.Since(started) > 2*time.Second {
-		t.Errorf("no run directory: exit %d after %v", r.code, time.Since(started))
+		t.Errorf("no server: exit %d after %v", r.code, time.Since(started))
 	}
 }
 
@@ -365,22 +387,91 @@ func TestReloadChannelRoundTrip(t *testing.T) {
 	if err != nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("run directory = %v, %v; want mode 0700", info, err)
 	}
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
-			return cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"role"}}
-		}, slog.New(slog.DiscardHandler))
-	}()
-	res, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond)
-	cancel()
-	<-done
+	watch(t, dir, cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"role"}})
+	waitRegistered(t, dir, 1)
+	rep, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.RequestID == "" || len(res.AppliedKeys) != 1 || len(res.RestartRequiredKeys) != 1 {
-		t.Fatalf("result = %+v", res)
+	if rep.RequestID == "" || len(rep.Servers) != 1 || len(rep.Unanswered) != 0 {
+		t.Fatalf("report = %+v", rep)
+	}
+	got := rep.Servers[0]
+	if got.ServerID == "" || got.RequestID != rep.RequestID || len(got.AppliedKeys) != 1 || len(got.RestartRequiredKeys) != 1 {
+		t.Fatalf("result = %+v", got)
+	}
+	entries, err := os.ReadDir(cli.RunDir(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "reload-") {
+			t.Errorf("%s was left in the run directory", e.Name())
+		}
+	}
+}
+
+func waitRegistered(t *testing.T, dir string, n int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		matches, _ := filepath.Glob(filepath.Join(cli.RunDir(dir), "server.*"))
+		if len(matches) >= n {
+			return
+		}
+		time.Sleep(5 * time.Millisecond) // polling real files for the watchers to register
+	}
+	t.Fatalf("%d servers did not register", n)
+}
+
+func TestReloadTwoServersAnswerOnceEach(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	for range 2 {
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
+				calls.Add(1)
+				return cli.ReloadResult{AppliedKeys: []string{"log.level"}}
+			}, slog.New(slog.DiscardHandler))
+		}()
+		t.Cleanup(func() { cancel(); <-done })
+	}
+	waitRegistered(t, dir, 2)
+	rep, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Servers) != 2 || rep.Servers[0].ServerID == rep.Servers[1].ServerID {
+		t.Fatalf("servers = %+v, want two different servers", rep.Servers)
+	}
+	time.Sleep(100 * time.Millisecond) // give a server that wrongly handles an id twice time to do it
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("handlers ran %d times, want once per server", got)
+	}
+}
+
+func TestReloadReportsAServerThatDoesNotAnswer(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	registerSilentServer(t, dir)
+	watch(t, dir, cli.ReloadResult{AppliedKeys: []string{"log.level"}})
+	waitRegistered(t, dir, 2)
+	env := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + dir}, ReloadWait: 300 * time.Millisecond, ReloadPoll: 10 * time.Millisecond}
+	r := exec(t, env, "config", "reload", "-o", "table")
+	if r.code != cli.ExitError {
+		t.Fatalf("exit = %d, want %d when a running server did not answer", r.code, cli.ExitError)
+	}
+	if !strings.Contains(r.out.String(), "reloaded. Applied: log.level") || !strings.Contains(r.out.String(), "No answer in time from: silent") {
+		t.Errorf("output:\n%s", r.out.String())
 	}
 }
 
@@ -404,18 +495,10 @@ func TestReloadChannelIgnoresMalformedRequests(t *testing.T) {
 			return cli.ReloadResult{}
 		}, slog.New(slog.DiscardHandler))
 	}()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(request); os.IsNotExist(err) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond) // polling a real file for the watcher to consume it
-	}
+	waitRegistered(t, dir, 1)
+	time.Sleep(100 * time.Millisecond) // several polls pass over the malformed file
 	cancel()
 	<-done
-	if _, err := os.Stat(request); !os.IsNotExist(err) {
-		t.Fatalf("the malformed request was not consumed: %v", err)
-	}
 }
 
 func TestConfigReloadFormats(t *testing.T) {
@@ -425,18 +508,11 @@ func TestConfigReloadFormats(t *testing.T) {
 	if err := cli.EnsureRunDir(dir); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
-			return cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"http.address"}}
-		}, slog.New(slog.DiscardHandler))
-	}()
-	defer func() { cancel(); <-done }()
+	watch(t, dir, cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"http.address"}})
+	waitRegistered(t, dir, 1)
 	env := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + dir}, MarshalYAML: json.Marshal, ReloadWait: 5 * time.Second, ReloadPoll: 10 * time.Millisecond}
 	for format, want := range map[string]string{
-		"table": "Applied: log.level",
+		"table": "reloaded. Applied: log.level",
 		"json":  `"appliedKeys"`,
 		"yaml":  `"restartRequiredKeys"`,
 	} {
@@ -450,5 +526,25 @@ func TestConfigReloadFormats(t *testing.T) {
 	}
 	if r := exec(t, env, "config", "reload", "-o", "xml"); r.code != cli.ExitUsage {
 		t.Errorf("bad format: exit %d", r.code)
+	}
+}
+
+func TestConfigReloadExitsFiveWhenAnyServerRefuses(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	watch(t, dir, cli.ReloadResult{AppliedKeys: []string{"log.level"}})
+	watch(t, dir, cli.ReloadResult{Errors: []string{"log.level: invalid"}})
+	waitRegistered(t, dir, 2)
+	env := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + dir}, ReloadWait: 5 * time.Second, ReloadPoll: 10 * time.Millisecond}
+	r := exec(t, env, "config", "reload", "-o", "table")
+	if r.code != cli.ExitValidation {
+		t.Fatalf("exit = %d, want %d; out %s", r.code, cli.ExitValidation, r.out.String())
+	}
+	if !strings.Contains(r.out.String(), "refused") || !strings.Contains(r.out.String(), "reloaded. Applied") {
+		t.Errorf("both results must be shown:\n%s", r.out.String())
 	}
 }

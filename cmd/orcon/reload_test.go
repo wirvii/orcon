@@ -25,6 +25,13 @@ type reloadServer struct {
 	stderr  *syncBuffer
 	done    chan int
 	cancel  context.CancelFunc
+	// registered counts the servers registered once this one is up.
+	registered int
+}
+
+func registrations(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(cli.RunDir(dir), "server.*"))
+	return matches
 }
 
 // startReloadServer starts orcon serve on a loopback port with a configuration file and a fast poll.
@@ -37,15 +44,23 @@ func startReloadServer(t *testing.T, body string) *reloadServer {
 	}
 	t.Setenv("ORCON_DATA_DIR", dir)
 	t.Setenv("ORCON_CONFIG", file)
+	return startServerIn(t, dir, file)
+}
+
+// startServerIn starts one more server over the data directory and file of the test.
+// Extra environment entries apply to this server only.
+func startServerIn(t *testing.T, dir, file string, extraEnv ...string) *reloadServer {
+	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
-	s := &reloadServer{file: file, dataDir: dir, stderr: &syncBuffer{}, done: make(chan int, 1), cancel: cancel}
+	s := &reloadServer{registered: len(registrations(dir)), file: file, dataDir: dir, stderr: &syncBuffer{}, done: make(chan int, 1), cancel: cancel}
 	var stdout syncBuffer
-	deps := serveDeps{newSandbox: productionSandbox, environ: os.Environ(), reloadPoll: 10 * time.Millisecond}
+	deps := serveDeps{newSandbox: productionSandbox, environ: append(os.Environ(), extraEnv...), reloadPoll: 10 * time.Millisecond}
 	go func() {
 		s.done <- runServe(ctx, []string{"--http-address=127.0.0.1:0"}, &stdout, s.stderr, deps)
 	}()
 	waitForListenAddr(t, s.stderr, s.done)
-	waitFor(t, "the run directory", func() bool { _, err := os.Stat(cli.RunDir(dir)); return err == nil })
+	waitFor(t, "the server to register", func() bool { return len(registrations(dir)) > s.registered })
+	s.registered = len(registrations(dir))
 	t.Cleanup(func() { s.stop(t) })
 	return s
 }
@@ -85,14 +100,24 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 // reload runs orcon config reload -o json against the data directory of s.
 func reload(t *testing.T) (code int, res cli.ReloadResult, stderr string) {
 	t.Helper()
+	code, rep, stderr := reloadAll(t)
+	if len(rep.Servers) > 0 {
+		res = rep.Servers[0]
+	}
+	return code, res, stderr
+}
+
+// reloadAll runs orcon config reload -o json and returns the whole report.
+func reloadAll(t *testing.T) (code int, rep cli.ReloadReport, stderr string) {
+	t.Helper()
 	var stdout, errOut bytes.Buffer
 	code = run(t.Context(), []string{"config", "reload", "-o", "json"}, &stdout, &errOut)
 	if stdout.Len() > 0 {
-		if err := json.Unmarshal(stdout.Bytes(), &res); err != nil {
+		if err := json.Unmarshal(stdout.Bytes(), &rep); err != nil {
 			t.Fatalf("reload output is not JSON: %v\n%s", err, stdout.String())
 		}
 	}
-	return code, res, errOut.String()
+	return code, rep, errOut.String()
 }
 
 func TestReloadRequestAppliedAndReported(t *testing.T) {
@@ -223,5 +248,56 @@ func TestLoggerLevelFollowsReload(t *testing.T) {
 	newLogger(&text, "text", level).Info("x")
 	if strings.HasPrefix(text.String(), "{") {
 		t.Errorf("text format wrote JSON: %q", text.String())
+	}
+}
+
+// TestReloadTwoServers starts two servers over one data directory: one reload request reaches both,
+// each answers once, and a server whose own secret file broke refuses without stopping the other.
+func TestReloadTwoServers(t *testing.T) {
+	first := startReloadServer(t, "log:\n  level: info\n")
+	secret := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(secret, []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := startServerIn(t, first.dataDir, first.file, "ORCON_BACKUP_S3_SECRET_ACCESS_KEY_FILE="+secret)
+
+	first.write(t, "log:\n  level: debug\n")
+	code, rep, stderr := reloadAll(t)
+	if code != exitOK || len(rep.Servers) != 2 || len(rep.Unanswered) != 0 {
+		t.Fatalf("exit %d report %+v stderr %s; want both servers applied", code, rep, stderr)
+	}
+	for _, s := range rep.Servers {
+		if !slices.Equal(s.AppliedKeys, []string{"log.level"}) || len(s.Errors) > 0 {
+			t.Errorf("server %s result = %+v", s.ServerID, s)
+		}
+	}
+	if rep.Servers[0].ServerID == rep.Servers[1].ServerID {
+		t.Error("both results come from the same server")
+	}
+	for _, s := range []*reloadServer{first, second} {
+		if got := strings.Count(s.stderr.String(), "configuration reloaded"); got != 1 {
+			t.Errorf("a server reloaded %d times, want once", got)
+		}
+	}
+
+	if err := os.Remove(secret); err != nil {
+		t.Fatal(err)
+	}
+	first.write(t, "log:\n  level: warn\n")
+	code, rep, stderr = reloadAll(t)
+	if code != exitValidation || len(rep.Servers) != 2 {
+		t.Fatalf("exit %d report %+v stderr %s; want 5 with both results", code, rep, stderr)
+	}
+	refused, applied := 0, 0
+	for _, s := range rep.Servers {
+		switch {
+		case len(s.Errors) > 0:
+			refused++
+		case slices.Equal(s.AppliedKeys, []string{"log.level"}):
+			applied++
+		}
+	}
+	if refused != 1 || applied != 1 {
+		t.Fatalf("refused %d applied %d, want one of each: %+v", refused, applied, rep.Servers)
 	}
 }

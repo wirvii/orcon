@@ -412,19 +412,23 @@ func configReload(ctx context.Context, args []string, env Env) int {
 	if poll <= 0 {
 		poll = clientPollInterval
 	}
-	result, err := RequestReload(ctx, res.Config.Value("dataDir").Text(), wait, poll)
+	report, err := RequestReload(ctx, res.Config.Value("dataDir").Text(), wait, poll)
 	if err != nil {
 		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
 		return ExitError
 	}
-	if err := writeReload(env, format, result); err != nil {
+	if err := writeReload(env, format, report); err != nil {
 		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
 		return ExitError
 	}
-	if len(result.Errors) > 0 {
+	switch {
+	case slices.ContainsFunc(report.Servers, func(r ReloadResult) bool { return len(r.Errors) > 0 }):
 		return ExitValidation
+	case len(report.Unanswered) > 0:
+		return ExitError
+	default:
+		return ExitOK
 	}
-	return ExitOK
 }
 
 // outputFormat resolves -o: table on a terminal, json otherwise (ADR 0058 section 4).
@@ -441,8 +445,12 @@ func outputFormat(flagValue string, env Env) (string, bool) {
 	}
 }
 
-func writeReload(env Env, format string, r *ReloadResult) error {
-	r.AppliedKeys, r.RestartRequiredKeys, r.Errors = nonNil(r.AppliedKeys), nonNil(r.RestartRequiredKeys), nonNil(r.Errors)
+func writeReload(env Env, format string, r *ReloadReport) error {
+	for i := range r.Servers {
+		s := &r.Servers[i]
+		s.AppliedKeys, s.RestartRequiredKeys, s.Errors = nonNil(s.AppliedKeys), nonNil(s.RestartRequiredKeys), nonNil(s.Errors)
+	}
+	r.Unanswered = nonNil(r.Unanswered)
 	switch format {
 	case "json":
 		var buf bytes.Buffer
@@ -464,21 +472,31 @@ func writeReload(env Env, format string, r *ReloadResult) error {
 		_, err = env.Stdout.Write(out)
 		return wrapWrite(err)
 	default:
-		var b strings.Builder
-		if len(r.Errors) > 0 {
-			b.WriteString("The new configuration was refused; the running configuration is unchanged.\n")
-			for _, e := range r.Errors {
-				b.WriteString("ERROR  " + e + "\n")
-			}
-		} else {
-			fmt.Fprintf(&b, "Reloaded. Applied: %s\n", listOrNone(r.AppliedKeys))
-		}
-		if len(r.RestartRequiredKeys) > 0 {
-			fmt.Fprintf(&b, "These keys changed but need a restart, so they keep their running value: %s\n", strings.Join(r.RestartRequiredKeys, ", "))
-		}
-		_, err := io.WriteString(env.Stdout, b.String())
+		_, err := io.WriteString(env.Stdout, reloadTable(r))
 		return wrapWrite(err)
 	}
+}
+
+func reloadTable(r *ReloadReport) string {
+	var b strings.Builder
+	for _, s := range r.Servers {
+		fmt.Fprintf(&b, "Server %s: ", s.ServerID)
+		if len(s.Errors) > 0 {
+			b.WriteString("the new configuration was refused; the running configuration is unchanged.\n")
+			for _, e := range s.Errors {
+				b.WriteString("  ERROR  " + e + "\n")
+			}
+		} else {
+			fmt.Fprintf(&b, "reloaded. Applied: %s\n", listOrNone(s.AppliedKeys))
+		}
+		if len(s.RestartRequiredKeys) > 0 {
+			fmt.Fprintf(&b, "  These keys changed but need a restart, so they keep their running value: %s\n", strings.Join(s.RestartRequiredKeys, ", "))
+		}
+	}
+	if len(r.Unanswered) > 0 {
+		fmt.Fprintf(&b, "No answer in time from: %s\n", strings.Join(r.Unanswered, ", "))
+	}
+	return b.String()
 }
 
 func nonNil(s []string) []string {
