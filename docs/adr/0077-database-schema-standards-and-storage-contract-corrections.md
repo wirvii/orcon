@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0077: Database schema standards and storage contract corrections
 
-Status: Accepted
+Status: Accepted | Amended: 2026-10-13 (required timestamp columns clarified)
 
 ## Context
 ADR-0015 defines the storage contract (type mapping, logical schema, migrations) and ADR-0046/0047 define multi-organization isolation. ADR-0075 and ADR-0076 (accepted) fix the module layout and the SQL toolchain (sqlc with separate SQLite and PostgreSQL query sets), and the accepted Go rulebook (`.agents/skills/orcon-go/references/data-access.md`, rules DA-1 to DA-8) governs how Go code reaches the database. The maintainers fixed binding database standards: singular snake_case names without abbreviations, `id` primary keys holding application-generated UUIDv7 values, `<table>_id` foreign keys, `org_id` on every organization-scoped row, actor columns that reference a principal, forward-only paired migrations, constraints enforced by the database, JSON only for whole documents, soft delete only for flows, bounded indexed queries. Checked against these standards, the ADR-0015 logical schema lacks `org_id` on 28 organization-scoped tables, lacks `id` on many, and uses plural, abbreviated and reserved names. Some mappings cannot be enforced as written (SQLite `BLOB(16)` in STRICT tables, `INTEGER PRIMARY KEY` sequences), PostgreSQL 14 views bypass row-level security, and lookups that happen before the organization is known are missing from the engine-plane function list.
@@ -56,3 +56,8 @@ Every row carries its organization, so row-level security and the static scope c
 
 ## Alternatives considered
 Keeping natural primary keys on high-volume tables (rejected: contradicts the `id` rule and complicates composite foreign keys). Nullable `org_id` for instance-level rows (rejected: breaks NOT NULL scoping and row-level security). Actor columns without foreign keys (rejected: loses integrity; the audit log already keeps the identity). Soft delete on projects as well (rejected: project deletion is deliberate and strongly confirmed). Allowing common short forms such as `max`, `min`, `seq`, `ref`, `ms` (rejected by the maintainers). Querying inside JSON with SQLite JSON1 functions and native PostgreSQL `jsonb` (rejected: data filtered inside JSON escapes foreign keys, CHECK constraints and ordinary indexes, and the two dialects diverge). A generic SQL linter (rejected: no tool covers both dialects, row-level security and these policy lists; the in-repo checkers are small and dependency-free). PostgreSQL ENUM types (rejected: no SQLite equivalent, hard to evolve). Ordering execution events by `occurred_at` alone (rejected: equal timestamps have no defined order).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 D4 (2026-10-13, owner decision).** §3: the per-table column lists name each table's own columns. `created_at`, and `updated_at` unless the table is append-only, apply to every table, including `worker`, `principal` and `schema_migration`; `schema_migration` is append-only and exempt only from the `id` rule, and the migration runner writes its `created_at` with the same instant as `applied_at`.

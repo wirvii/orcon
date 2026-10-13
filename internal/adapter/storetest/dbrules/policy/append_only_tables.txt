@@ -10,3 +10,4 @@ call_edge  # derived call graph of a published version
 variable_change  # history of variable writes
 nondeterminism_record  # recorded results used for replay
 execution_event  # ordered event stream of an execution
+schema_migration  # one row per applied migration, written once by the migration runner (orcon_owner); never updated or deleted (ADR-0015 §4, MG-4)

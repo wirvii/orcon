@@ -4,7 +4,7 @@ description: Applies the Orcon database schema standards - naming without abbrev
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with Go (two latest stable releases), GNU make, git and uv, plus Docker for the PostgreSQL checks.
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   pinned: true
   owner: wirvii
 ---
