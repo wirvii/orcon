@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Contributing to Orcon
 
 Thank you for helping build Orcon. Issues, design discussions and pull requests are welcome. Every contribution is licensed under the [Apache License 2.0](LICENSE), and everyone who takes part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
