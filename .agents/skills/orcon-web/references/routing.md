@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Routing
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines how the web application declares routes, keeps view state in the URL, prefetches data and splits code, and what it expects from the Go server that serves it. Routing uses TanStack Router with virtual file routes (ADR 0078). Rule IDs (`RT-…`) are stable.
 

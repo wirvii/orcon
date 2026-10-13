@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Architecture
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines how the web application in `apps/web` and the shared packages in `packages/js` are organized: the composition folder, feature folders, the allowed subfolders, the direction of imports and how shared code is promoted. The foundational libraries are recorded in ADR 0078 (`docs/adr/0078-web-application-foundational-libraries.md`). Rule IDs (`AR-…`) are stable.
 

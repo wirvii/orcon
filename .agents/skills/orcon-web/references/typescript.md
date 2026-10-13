@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # TypeScript
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines the TypeScript compiler settings, the forbidden constructs and how external input becomes typed data in `apps/web` and `packages/js`. Rule IDs (`TS-…`) are stable.
 

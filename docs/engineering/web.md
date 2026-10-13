@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Web application engineering standards
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 The editor in `apps/web` is a client of the public API through the generated SDK, organized in feature folders, with server data cached by TanStack Query, typed routes, a store only for the flow editor, forms validated against the API contract, and automated budgets for size and speed. The foundational libraries are recorded in [ADR 0078](../adr/0078-web-application-foundational-libraries.md).
 

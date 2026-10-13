@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Forms
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines how forms are built: React Hook Form with schemas generated from the API contract, field names that are JSON pointers so server errors land on the right field, messages from catalogs, and node configuration forms generated from connector manifests (ADR 0078). How a field, an error or a summary looks is defined by `orcon-ui` ([forms and errors](../../orcon-ui/references/components.md#forms-and-errors)). Rule IDs (`FM-…`) are stable.
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Errors
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines how the web application turns failures into what the user sees: one adapter for problem+json responses, a fixed treatment per HTTP status, error boundaries, contract errors and what is never logged. Where and how an error is displayed is defined by `orcon-ui` ([forms and errors](../../orcon-ui/references/components.md#forms-and-errors), [notifications](../../orcon-ui/references/components.md#notifications)). Rule IDs (`ER-…`) are stable.
 

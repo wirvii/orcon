@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Performance
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines the performance budgets of the web application and how each one is measured: initial JavaScript size, first useful screen, the 500-node editor and long lists. The phone and frame-rate budgets are measured in CI with Chromium CPU and network emulation; this is a reproducible approximation, not a measurement on a physical phone or display (ADR 0078, maintainer decision of 2026-10-12). The visual side of the canvas is defined by `orcon-ui` ([canvas](../../orcon-ui/references/canvas.md#performance)). Rule IDs (`PF-…`) are stable.
 

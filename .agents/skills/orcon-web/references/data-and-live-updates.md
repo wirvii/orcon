@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Data and live updates
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines how the web application reads, caches and changes server data, and how live updates over server-sent events reach the cache. Server state is held by TanStack Query on top of the generated SDK `@orcon/sdk` (ADR 0078, ADR 0054). Rule IDs (`DT-…`) are stable.
 

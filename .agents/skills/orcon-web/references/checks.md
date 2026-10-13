@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Checks
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document lists every automated check that enforces the web rulebook: the tool, its license, the command, where it runs, what it verifies and how to fix a failure. `make check` (the Go gate) does not change; the web checks run in the `ui-quality`, `web-e2e` and `web-perf` CI jobs and are reproduced locally by `make web-check`, `make web-e2e` and `make web-perf`.
 

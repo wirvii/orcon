@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Testing
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines the test levels of the web application, the coverage threshold, how the API is simulated in screen tests and which end-to-end journeys exist or are owed. Component stories and their accessibility and visual tests belong to `orcon-ui` ([accessibility](../../orcon-ui/references/accessibility.md#target)). Rule IDs (`TE-…`) are stable.
 

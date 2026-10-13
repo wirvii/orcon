@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0078: Web application foundational libraries
 
-Status: Proposed
+Status: Accepted (2026-10-13)
 
 ## Context
 ADR-0074 fixed the visual foundation of the embedded editor (components, tokens, styling, i18n, UI quality gates). The application code around it has no foundation yet: how it reads and caches server data, routes, keeps editor state, builds forms, validates external input, and how it is tested and kept fast. The public API design (SPEC-005, ADR-0054) makes the editor a client of the public API through the generated TypeScript SDK `@orcon/sdk` (openapi-typescript and openapi-fetch) and delivers live updates over server-sent events. The maintainers fixed binding direction for the application code: server state cached by a query library on top of the SDK, typed routes with state in the URL, a store only for the flow editor, schema-validated forms generated from the API contract, feature folders with enforced boundaries, four test levels, performance budgets and the same license policy as the Go code.

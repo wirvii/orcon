@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # State
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines where each kind of state lives and how the flow editor store works: one store per open editor, changed only by named actions, with undo and redo built from Immer patches (ADR 0078). Rule IDs (`ST-…`) are stable.
 

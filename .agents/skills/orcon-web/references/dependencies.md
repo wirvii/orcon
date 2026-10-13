@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Dependencies
 
-Status: Proposed — pending owner approval
+Status: Accepted (2026-10-13)
 
 This document defines when a JavaScript dependency may be added, which licenses shipped code may carry, how exceptions are recorded, and the SPDX and provenance rules for web code. The policy is the same as the Go rulebook ([dependencies](../../orcon-go/references/dependencies.md)); the foundational libraries and their major versions are recorded in ADR 0078. Rule IDs (`DP-…`) are stable.
 
