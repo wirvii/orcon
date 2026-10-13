@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+Problem:
+  type: object
+  description: A problem document (RFC 9457).
+  required: [type, title, status, code, requestId]
+  properties:
+    type:
+      type: string
+      format: uri
+      description: urn:orcon:problem:<code>.
+      examples: ['urn:orcon:problem:not-found']
+    title:
+      type: string
+      description: Short summary of the problem type.
+      examples: [Not found]
+    status:
+      type: integer
+      minimum: 400
+      maximum: 599
+      description: HTTP status code.
+      examples: [404]
+    detail:
+      type: string
+      description: Explanation of this occurrence.
+      examples: [The flow does not exist.]
+    instance:
+      type: string
+      description: Path of the request that failed.
+      examples: [/api/v1/flows/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+    code:
+      $ref: '#/ProblemCode'
+    requestId:
+      type: string
+      format: uuid
+      description: Id of the request.
+      examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a62]
+    errors:
+      type: array
+      description: Field errors.
+      items:
+        $ref: '#/ProblemFieldError'
+ProblemFieldError:
+  type: object
+  description: One error of one request field.
+  required: [pointer, code, message]
+  properties:
+    pointer:
+      type: string
+      description: JSON Pointer into the request.
+      examples: [/note]
+    code:
+      type: string
+      description: Stable code of the field error.
+      examples: [too-long]
+    message:
+      type: string
+      description: Explanation for a person.
+      examples: [The note is longer than 500 characters.]
+ProblemCode:
+  type: string
+  description: Stable code of a problem; the type URI is urn:orcon:problem:<code>.
+  x-orcon-enum-kind: identifier
+  enum:
+    - validation-failed
+    - invalid-page-token
+    - experimental-not-enabled
+    - unauthenticated
+    - forbidden
+    - step-up-required
+    - personal-keys-disabled
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - secret-already-issued
+    - attention-already-resolved
+    - project-managed-by-git
+    - deprecated-removed
+    - precondition-failed
+    - payload-too-large
+    - idempotency-key-reused
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-problem-catalog:
+    validation-failed: {status: 400, title: Validation failed, when: A parameter or the body is invalid., retryable: false}
+    invalid-page-token: {status: 400, title: Invalid page token, when: The page token is unknown or was issued for other parameters., retryable: false}
+    experimental-not-enabled: {status: 400, title: Experimental feature not enabled, when: The operation is experimental and Orcon-Experimental does not name it., retryable: false}
+    unauthenticated: {status: 401, title: Unauthenticated, when: No valid credential was sent., retryable: false}
+    forbidden: {status: 403, title: Forbidden, when: The caller lacks the required permission., retryable: false}
+    step-up-required: {status: 403, title: Step-up required, when: The operation needs a recent second factor., retryable: false}
+    personal-keys-disabled: {status: 403, title: Personal keys disabled, when: The organization does not allow personal API keys., retryable: false}
+    not-found: {status: 404, title: Not found, when: The resource does not exist or is not visible to the caller., retryable: false}
+    conflict: {status: 409, title: Conflict, when: The resource state does not allow the operation., retryable: false}
+    idempotency-in-progress: {status: 409, title: Idempotent request in progress, when: A request with the same key is still running., retryable: true}
+    secret-already-issued: {status: 409, title: Secret already issued, when: A replay asked again for a secret that is shown only once., retryable: false}
+    attention-already-resolved: {status: 409, title: Attention already resolved, when: The human-attention item was already handled., retryable: false}
+    project-managed-by-git: {status: 409, title: Project managed by Git, when: The project is bound to a Git repository so its flows change only through a Git sync., retryable: false}
+    deprecated-removed: {status: 410, title: Removed, when: The operation was removed after its sunset date., retryable: false}
+    precondition-failed: {status: 412, title: Precondition failed, when: If-Match does not match the current ETag., retryable: false}
+    payload-too-large: {status: 413, title: Payload too large, when: The body exceeds the size limit., retryable: false}
+    idempotency-key-reused: {status: 422, title: Idempotency key reused, when: The key was used with a different request., retryable: false}
+    precondition-required: {status: 428, title: Precondition required, when: If-Match is missing., retryable: false}
+    rate-limited: {status: 429, title: Rate limited, when: The rate class quota is exhausted., retryable: true}
+    internal-error: {status: 500, title: Internal error, when: An unexpected server error happened., retryable: true}
+    service-unavailable: {status: 503, title: Service unavailable, when: The server is starting, stopping or overloaded., retryable: true}
