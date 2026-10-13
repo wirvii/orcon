@@ -106,7 +106,10 @@ type Config struct {
 }
 
 // defaultDenyHosts are cloud metadata host names refused for every client.
-var defaultDenyHosts = []string{"metadata.google.internal", "metadata.goog"}
+var defaultDenyHosts = []string{
+	"metadata", "metadata.google.internal", "metadata.goog",
+	"instance-data", "instance-data.ec2.internal", "metadata.tencentyun.com",
+}
 
 // Client is the egress HTTP client. Build one with [New] and share it; it is
 // safe for concurrent use.
@@ -471,6 +474,16 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	ev.Host = host
+	if req.Host != "" {
+		// The Host header must name the host that was checked: a different
+		// one would let a granted domain front for another virtual host.
+		if hh, _, err := normalizeHost(hostnameOf(req.Host)); err != nil || hh != host {
+			derr := denied(ReasonBadURL, ev.Scheme, host, "the Host header differs from the URL host")
+			closeBody()
+			c.denyEvent(req.Context(), ev, start, derr)
+			return nil, derr
+		}
+	}
 
 	if req.ContentLength > c.maxRequest {
 		closeBody()
@@ -549,6 +562,14 @@ func (c *Client) denyEvent(ctx context.Context, ev Event, start time.Time, err e
 		}
 	}
 	c.emit(ctx, ev)
+}
+
+// hostnameOf strips an optional port (and IPv6 brackets) from a Host header.
+func hostnameOf(h string) string {
+	if u, err := url.Parse("//" + h); err == nil && u.Hostname() != "" {
+		return u.Hostname()
+	}
+	return h
 }
 
 func hostLiteral(host string) (netip.Addr, bool) {

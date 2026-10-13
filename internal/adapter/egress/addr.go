@@ -39,6 +39,12 @@ var blockedRanges = []namedPrefix{
 	np("168.63.129.16/32", "cloud metadata", kindNever),
 	np("100.100.100.200/32", "cloud metadata", kindNever),
 	np("192.0.0.192/32", "cloud metadata", kindNever),
+	// AWS: ECS task credentials, DNS and time-sync link-local services, and
+	// the whole IPv6 instance-metadata network (fd00:ec2::254, fd00:ec2::23).
+	np("169.254.170.2/32", "cloud metadata", kindNever),
+	np("169.254.169.253/32", "cloud metadata", kindNever),
+	np("169.254.169.123/32", "cloud metadata", kindNever),
+	np("fd00:ec2::/64", "cloud metadata", kindNever),
 
 	// IPv4.
 	np("0.0.0.0/8", "unspecified", kindNever),
@@ -61,7 +67,9 @@ var blockedRanges = []namedPrefix{
 	np("::1/128", "loopback", kindPrivate),
 	np("::/96", "unspecified or IPv4-compatible", kindNever),
 	np("100::/64", "discard-only", kindNever),
+	np("::ffff:0:0:0/96", "SIIT translated", kindNever),
 	np("2001::/32", "Teredo", kindNever),
+	np("2001:2::/48", "benchmarking", kindNever),
 	np("2001:10::/28", "ORCHID", kindNever),
 	np("2001:20::/28", "ORCHIDv2", kindNever),
 	np("2001:db8::/32", "documentation", kindNever),
@@ -75,9 +83,38 @@ var blockedRanges = []namedPrefix{
 }
 
 var (
-	nat64Prefix = netip.MustParsePrefix("64:ff9b::/96")
-	sixToFour   = netip.MustParsePrefix("2002::/16")
+	nat64Prefix      = netip.MustParsePrefix("64:ff9b::/96")
+	localNAT64Prefix = netip.MustParsePrefix("64:ff9b:1::/48")
+	sixToFour        = netip.MustParsePrefix("2002::/16")
 )
+
+// embeddedV4 returns the IPv4 address an IPv6 address carries inside a
+// translation or tunnel form: IPv4-mapped (::ffff:a.b.c.d), NAT64
+// (64:ff9b::/96 and the local-use 64:ff9b:1::/48, RFC 6052 and RFC 8215) and
+// 6to4 (2002::/16). Denylists are matched against it as well as against the
+// address itself, so a denied IPv4 network cannot be reached through its
+// IPv6 spelling.
+func embeddedV4(addr netip.Addr) (netip.Addr, bool) {
+	addr = addr.WithZone("")
+	switch {
+	case addr.Is4In6():
+		return addr.Unmap(), true
+	case !addr.Is6():
+		return netip.Addr{}, false
+	}
+	raw := addr.As16()
+	switch {
+	case nat64Prefix.Contains(addr):
+		return netip.AddrFrom4([4]byte{raw[12], raw[13], raw[14], raw[15]}), true
+	case localNAT64Prefix.Contains(addr):
+		// RFC 6052 section 2.2: for a /48 prefix the IPv4 address occupies
+		// bytes 6, 7, 9 and 10 (byte 8 is reserved).
+		return netip.AddrFrom4([4]byte{raw[6], raw[7], raw[9], raw[10]}), true
+	case sixToFour.Contains(addr):
+		return netip.AddrFrom4([4]byte{raw[2], raw[3], raw[4], raw[5]}), true
+	}
+	return netip.Addr{}, false
+}
 
 // BlockedRange reports whether addr belongs to a range Orcon refuses to
 // connect to by default, and names the range. IPv4-mapped IPv6 addresses

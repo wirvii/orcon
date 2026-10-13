@@ -266,12 +266,15 @@ func granted(p *Policy, scheme, host string) error {
 // literal address.
 func (g *guard) checkAddr(allowPrivate bool, addr netip.Addr, scheme, host string) error {
 	plain := addr.WithZone("")
-	if plain.Is4In6() {
-		plain = plain.Unmap()
+	candidates := []netip.Addr{plain}
+	if inner, ok := embeddedV4(plain); ok {
+		candidates = append(candidates, inner)
 	}
 	for _, n := range g.denyNetworks {
-		if n.Contains(plain) {
-			return denied(ReasonDenylisted, scheme, host, "address in a denied network")
+		for _, a := range candidates {
+			if n.Contains(a) {
+				return denied(ReasonDenylisted, scheme, host, "address in a denied network")
+			}
 		}
 	}
 	name, kind, blocked := classify(addr)
