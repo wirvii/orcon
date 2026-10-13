@@ -72,7 +72,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: The committed API changelog of this version matches the contract
-        run: make api-changelog-check VERSION=${{ github.ref_name }}
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: make api-changelog-check VERSION="$VERSION"
       - name: Build the reference site
         run: make api-reference
       - name: Keep the reference site with the release

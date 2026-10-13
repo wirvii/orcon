@@ -11,6 +11,7 @@ tool (
 	github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod
 	github.com/google/go-licenses/v2
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+	// Pinned at v1.31.0: v1.32 and later need go.yaml.in/yaml/v4 rc.6, which breaks actionlint 1.7.12 (SPEC-012 A4).
 	github.com/oasdiff/oasdiff
 	github.com/rhysd/actionlint/cmd/actionlint
 	golang.org/x/perf/cmd/benchstat
