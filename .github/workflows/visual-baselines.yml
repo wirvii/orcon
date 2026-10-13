@@ -3,7 +3,9 @@
 
 name: Visual baselines
 # Generates the visual regression baselines in the pinned Playwright container on an amd64 runner.
-# It never commits or pushes: download the artifact and commit the folder yourself.
+# The artifact is always uploaded. For same-repository branches (label or workflow_dispatch on a
+# non-default branch) a second job commits the regenerated baselines back to the branch.
+# Fork pull requests never get write access: the label event runs with a read-only token there.
 on:
   workflow_dispatch:
   pull_request:
@@ -35,6 +37,44 @@ jobs:
       - name: Upload baselines
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: visual-baselines
+          name: visual-baselines-${{ github.sha }}
           path: packages/js/ui/visual/__screenshots__
           if-no-files-found: error
+  commit:
+    needs: baselines
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch) ||
+      (github.event_name == 'pull_request' &&
+       github.event.label.name == 'update-visual-baselines' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.BRANCH }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: visual-baselines-${{ github.sha }}
+          path: packages/js/ui/visual/__screenshots__
+      - name: Commit the baselines to the branch
+        shell: bash
+        run: |
+          git add -A packages/js/ui/visual/__screenshots__
+          if git diff --cached --quiet; then
+            echo "Baselines are already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(ui): update visual baselines"
+          git push origin "HEAD:${BRANCH}"
+      - name: Remove the label
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit "${{ github.event.pull_request.number }}" --remove-label update-visual-baselines

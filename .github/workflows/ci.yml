@@ -167,6 +167,12 @@ jobs:
         run: pnpm --filter @orcon/ui test:a11y
       - name: Touch targets and density
         run: pnpm --filter @orcon/ui test:targets
+      - name: Canvas
+        run: pnpm --filter @orcon/ui test:canvas
+      - name: Parity and parity coverage
+        run: pnpm --filter @orcon/ui test:parity
+      - name: Expansion
+        run: pnpm --filter @orcon/ui test:expansion
       - name: Build web app
         run: pnpm --filter @orcon/web build
       - name: Fonts are bundled and none is requested externally
