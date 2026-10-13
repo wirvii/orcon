@@ -4,7 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IntlProvider } from 'react-intl';
 
-import { catalogs, isLocale, matchProductLocale, type Locale } from '../i18n/locales';
+import { catalogs, isLocale, matchProductLocale, type Locale, type ProductLocale } from '../i18n/locales';
 
 import { readPreference, writePreference } from './storage';
 
@@ -30,9 +30,14 @@ export interface I18nProviderProps {
   /** Controlled locale (Storybook globals, tests). Disables persistence. */
   locale?: Locale | undefined;
   onLocaleChange?: ((locale: Locale) => void) | undefined;
+  /**
+   * Messages of the application on top of the design system's own, per product
+   * locale. The pseudo-locale uses the English ones.
+   */
+  messages?: Readonly<Record<ProductLocale, Readonly<Record<string, string>>>> | undefined;
 }
 
-export function I18nProvider({ children, defaultLocale, locale: controlled, onLocaleChange }: I18nProviderProps) {
+export function I18nProvider({ children, defaultLocale, locale: controlled, onLocaleChange, messages: appMessages }: I18nProviderProps) {
   const [stored, setStored] = useState<Locale>(() => defaultLocale ?? initialLocale());
   const locale = controlled ?? stored;
 
@@ -52,10 +57,14 @@ export function I18nProvider({ children, defaultLocale, locale: controlled, onLo
   );
 
   const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);
+  const messages = useMemo(
+    () => (appMessages ? { ...catalogs[locale], ...appMessages[locale === 'xx-LS' ? 'en' : locale] } : catalogs[locale]),
+    [appMessages, locale],
+  );
 
   return (
     <LocaleContext.Provider value={value}>
-      <IntlProvider locale={locale} defaultLocale="en" messages={catalogs[locale]}>
+      <IntlProvider locale={locale} defaultLocale="en" messages={messages}>
         {children}
       </IntlProvider>
     </LocaleContext.Provider>

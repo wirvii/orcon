@@ -224,6 +224,8 @@ export function createWebAppConfig({ appRoot, tsconfigRootDir = appRoot, network
   const importPatterns = (...extra) => ['error', { patterns: [...extra, deepImport] }];
 
   const config = [
+    // Generated files (the route tree, the contract code) are type-checked but not linted (orcon-web TS-8).
+    { ignores: ['**/*.gen.ts', '**/gen/**'] },
     // Every file the TypeScript parser reads (including .mjs configs) needs the root, or it guesses.
     ...(tsconfigRootDir === undefined ? [] : [{ languageOptions: { parserOptions: { tsconfigRootDir } } }]),
     ...typeChecked,

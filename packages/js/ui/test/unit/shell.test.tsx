@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Inbox, Settings, Workflow } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
@@ -157,6 +157,46 @@ describe('TopBar and AppShell', () => {
     expect(within(drawer).getAllByRole('link')).toHaveLength(3);
     await userEvent.click(within(drawer).getByRole('link', { name: 'Settings' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('AppShell hands a plain click on a section to onNavigate instead of following the link', () => {
+    const onNavigate = vi.fn();
+    renderWithProviders(
+      <AppShell navigation={navigation} currentId="flows" onNavigate={onNavigate}>
+        <p>Page</p>
+      </AppShell>,
+    );
+    const link = must(screen.getAllByRole('link', { name: 'Settings', hidden: true })[0]);
+    const notPrevented = fireEvent.click(link);
+    expect(notPrevented).toBe(false);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith(expect.objectContaining({ id: 'settings' }));
+  });
+
+  it('AppShell leaves clicks with a modifier key, and middle clicks, to the browser', () => {
+    const onNavigate = vi.fn();
+    renderWithProviders(
+      <AppShell navigation={navigation} currentId="flows" onNavigate={onNavigate}>
+        <p>Page</p>
+      </AppShell>,
+    );
+    const link = must(screen.getAllByRole('link', { name: 'Settings', hidden: true })[0]);
+    expect(fireEvent.click(link, { ctrlKey: true })).toBe(true);
+    expect(fireEvent.click(link, { metaKey: true })).toBe(true);
+    expect(fireEvent.click(link, { shiftKey: true })).toBe(true);
+    expect(fireEvent.click(link, { altKey: true })).toBe(true);
+    expect(fireEvent.click(link, { button: 1 })).toBe(true);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('AppShell follows the links as before without onNavigate', () => {
+    renderWithProviders(
+      <AppShell navigation={navigation} currentId="flows">
+        <p>Page</p>
+      </AppShell>,
+    );
+    const link = must(screen.getAllByRole('link', { name: 'Settings', hidden: true })[0]);
+    expect(fireEvent.click(link)).toBe(true);
   });
 
   it('AppShell offers at most five sections in the bottom bar', () => {

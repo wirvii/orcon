@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { LucideIcon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import { cn } from '../../lib/cn';
@@ -54,6 +54,12 @@ export interface AppShellProps {
    * height, such as the flow editor.
    */
   fill?: boolean | undefined;
+  /**
+   * Called instead of following the link when a person activates an entry with a
+   * plain click, so a router can navigate without reloading the page. Clicks with a
+   * modifier key and middle clicks still use the link.
+   */
+  onNavigate?: ((entry: NavEntry) => void) | undefined;
 }
 
 /**
@@ -61,9 +67,15 @@ export interface AppShellProps {
  * lg it is a rail of icons; below md the sections are a bottom bar plus a drawer
  * opened from the top bar. A skip link jumps to the content.
  */
-export function AppShell({ navigation, currentId, brand, actions, children, defaultDrawerOpen = false, fill = false }: AppShellProps) {
+export function AppShell({ navigation, currentId, brand, actions, children, defaultDrawerOpen = false, fill = false, onNavigate }: AppShellProps) {
   const intl = useIntl();
   const [drawerOpen, setDrawerOpen] = useState(defaultDrawerOpen);
+  const follow = (entry: NavEntry, afterwards?: () => void) => (event: MouseEvent<HTMLAnchorElement>) => {
+    afterwards?.();
+    if (!onNavigate || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onNavigate(entry);
+  };
 
   return (
     <div className={cn('bg-app flex flex-col', fill ? 'h-screen' : 'min-h-screen')}>
@@ -80,7 +92,7 @@ export function AppShell({ navigation, currentId, brand, actions, children, defa
           className="bg-surface border-border hidden shrink-0 flex-col gap-1 border-r p-2 md:flex md:w-16 lg:w-panel-width"
         >
           {navigation.map((entry) => (
-            <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} responsiveLabel />
+            <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} responsiveLabel onClick={follow(entry)} />
           ))}
         </nav>
         <main
@@ -96,13 +108,13 @@ export function AppShell({ navigation, currentId, brand, actions, children, defa
         className="bg-surface border-border z-sticky fixed inset-x-0 bottom-0 flex justify-around border-t md:hidden"
       >
         {navigation.slice(0, 5).map((entry) => (
-          <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} collapsed className="rounded-none" />
+          <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} collapsed className="rounded-none" onClick={follow(entry)} />
         ))}
       </nav>
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen} title={intl.formatMessage(messages.drawerTitle)} side="bottom">
         <nav aria-label={intl.formatMessage(messages.main)} className="flex flex-col gap-1">
           {navigation.map((entry) => (
-            <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} onClick={() => setDrawerOpen(false)} />
+            <NavItem key={entry.id} href={entry.href} icon={entry.icon} label={entry.label} current={entry.id === currentId} badge={entry.badge} onClick={follow(entry, () => setDrawerOpen(false))} />
           ))}
         </nav>
       </Sheet>
