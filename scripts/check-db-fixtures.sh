@@ -46,6 +46,13 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT INT TERM
 status=0
 
+# The planted cases have queries of their own: the entries of the real
+# dialect_only_queries.txt name queries of the real adapters and would be
+# reported as stale, so the cases run against a copy of the policy without them.
+cp -R "$policy" "$work/policy"
+grep '^#' "$policy/dialect_only_queries.txt" > "$work/policy/dialect_only_queries.txt"
+policy=$work/policy
+
 # --- static cases -----------------------------------------------------------
 cases=tools/dbcheck/testdata
 bad=0

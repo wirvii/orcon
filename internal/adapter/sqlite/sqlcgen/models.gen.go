@@ -11,6 +11,166 @@ import (
 	"database/sql"
 )
 
+type AttentionRequest struct {
+	ID                        []byte
+	OrgID                     []byte
+	ExecutionID               []byte
+	ProjectID                 []byte
+	FlowID                    []byte
+	FlowVersionID             []byte
+	NodeID                    string
+	TokenID                   []byte
+	Cause                     string
+	CauseReference            string
+	NotifyClass               string
+	Status                    string
+	Level                     int64
+	GroupKey                  string
+	ItemCount                 int64
+	Summary                   string
+	AcknowledgedByPrincipalID []byte
+	AcknowledgedAt            sql.NullInt64
+	NextReminderAt            sql.NullInt64
+	NextEscalationAt          sql.NullInt64
+	ResolvedAt                sql.NullInt64
+	ResolvedByPrincipalID     []byte
+	Resolution                sql.NullString
+	ResolutionAction          sql.NullString
+	CreatedAt                 int64
+	UpdatedAt                 int64
+}
+
+type AttentionRouting struct {
+	ID                         []byte
+	OrgID                      []byte
+	ScopeKind                  string
+	ProjectID                  []byte
+	FlowID                     []byte
+	Cause                      string
+	RecipientDocument          []byte
+	RecipientDocumentFormat    string
+	EscalationDocument         []byte
+	EscalationDocumentFormat   sql.NullString
+	ReminderDocument           []byte
+	ReminderDocumentFormat     sql.NullString
+	CoalesceWindowMilliseconds int64
+	OverdueAfterMilliseconds   sql.NullInt64
+	Revision                   int64
+	CreatedAt                  int64
+	UpdatedAt                  int64
+}
+
+type Blob struct {
+	ID          []byte
+	OrgID       []byte
+	ExecutionID []byte
+	FlowID      []byte
+	SizeBytes   int64
+	Sha256      []byte
+	MediaType   string
+	Backend     string
+	Location    sql.NullString
+	CommittedAt sql.NullInt64
+	CreatedAt   int64
+	UpdatedAt   int64
+}
+
+type BlobChunk struct {
+	ID         []byte
+	OrgID      []byte
+	BlobID     []byte
+	ChunkIndex int64
+	Data       []byte
+	CreatedAt  int64
+	UpdatedAt  int64
+}
+
+type CallEdge struct {
+	ID            []byte
+	OrgID         []byte
+	FlowVersionID []byte
+	TargetFlowID  []byte
+	Kind          string
+	IsIntentional int64
+	MaximumDepth  sql.NullInt64
+	CreatedAt     int64
+}
+
+type Execution struct {
+	ID                      []byte
+	OrgID                   []byte
+	ProjectID               []byte
+	FlowID                  []byte
+	FlowVersionID           []byte
+	FlowSnapshotID          []byte
+	Status                  string
+	Mode                    string
+	Priority                int64
+	ParentExecutionID       []byte
+	ParentTokenID           []byte
+	RootExecutionID         []byte
+	CallDepth               int64
+	CallChainDocument       []byte
+	CallChainDocumentFormat sql.NullString
+	RetriedExecutionID      []byte
+	RunGeneration           int64
+	CancelRequestedAt       sql.NullInt64
+	UndoRequestedAt         sql.NullInt64
+	RunnableCount           int64
+	LeasedCount             int64
+	WaitingCount            int64
+	SuspendedCount          int64
+	ActiveMilliseconds      int64
+	ThrottleKind            sql.NullString
+	ErrorDocument           []byte
+	ErrorDocumentFormat     sql.NullString
+	SummaryDocument         []byte
+	SummaryDocumentFormat   sql.NullString
+	DataKeyWrapped          []byte
+	StartedAt               sql.NullInt64
+	FinishedAt              sql.NullInt64
+	CreatedAt               int64
+	UpdatedAt               int64
+}
+
+type ExecutionEvent struct {
+	ID                      []byte
+	OrgID                   []byte
+	ExecutionID             []byte
+	RootExecutionID         []byte
+	SequenceNumber          int64
+	OccurredAt              int64
+	Type                    string
+	SchemaVersion           int64
+	ReferenceDocument       []byte
+	ReferenceDocumentFormat string
+	DataDocument            []byte
+	DataDocumentFormat      sql.NullString
+	CreatedAt               int64
+}
+
+type ExternalOperation struct {
+	ID                    []byte
+	OrgID                 []byte
+	ExecutionID           []byte
+	NodeExecutionID       []byte
+	ItemIndex             int64
+	CorrelationKey        string
+	ContractReference     string
+	State                 string
+	BatchKey              sql.NullString
+	RequestReference      sql.NullString
+	ResponseReference     sql.NullString
+	DispatchDeadlineAt    sql.NullInt64
+	FirstDispatchedAt     sql.NullInt64
+	RetryEpoch            int64
+	CompensationState     string
+	ResolvedByPrincipalID []byte
+	EvidenceReference     sql.NullString
+	CreatedAt             int64
+	UpdatedAt             int64
+}
+
 type Flow struct {
 	ID                   []byte
 	OrgID                []byte
@@ -24,6 +184,29 @@ type Flow struct {
 	DeletedByPrincipalID []byte
 	CreatedAt            int64
 	UpdatedAt            int64
+}
+
+type FlowDataOperation struct {
+	ID                   []byte
+	OrgID                []byte
+	OperationKey         string
+	ResultDocument       []byte
+	ResultDocumentFormat string
+	AppliedAt            int64
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
+type FlowDatum struct {
+	ID                  []byte
+	OrgID               []byte
+	FlowID              []byte
+	DataKey             string
+	ValueDocument       []byte
+	ValueDocumentFormat string
+	Version             int64
+	CreatedAt           int64
+	UpdatedAt           int64
 }
 
 type FlowSnapshot struct {
@@ -51,6 +234,214 @@ type FlowVersion struct {
 	CreatedAt              int64
 }
 
+type HumanTask struct {
+	ID                     []byte
+	OrgID                  []byte
+	ExecutionID            []byte
+	WaitID                 []byte
+	NodeExecutionID        []byte
+	Kind                   string
+	Title                  string
+	AssigneeDocument       []byte
+	AssigneeDocumentFormat string
+	FormDocument           []byte
+	FormDocumentFormat     sql.NullString
+	Status                 string
+	ResponseDocument       []byte
+	ResponseDocumentFormat sql.NullString
+	ResolvedByPrincipalID  []byte
+	ResolvedAt             sql.NullInt64
+	ExpiresAt              sql.NullInt64
+	CreatedAt              int64
+	UpdatedAt              int64
+}
+
+type InstanceAlert struct {
+	ID                              []byte
+	Kind                            string
+	SubjectReference                string
+	Status                          string
+	Level                           int64
+	Summary                         string
+	AffectedReferenceDocument       []byte
+	AffectedReferenceDocumentFormat sql.NullString
+	AcknowledgedByPrincipalID       []byte
+	AcknowledgedAt                  sql.NullInt64
+	NextEscalationAt                sql.NullInt64
+	ClosedAt                        sql.NullInt64
+	ClosedReason                    sql.NullString
+	CreatedAt                       int64
+	UpdatedAt                       int64
+}
+
+type JoinArrival struct {
+	ID               []byte
+	OrgID            []byte
+	ExecutionID      []byte
+	NodeID           string
+	ScopePath        string
+	RoundNumber      int64
+	EdgeIndex        int64
+	TokenID          []byte
+	PayloadReference sql.NullString
+	IsLive           int64
+	ArrivedAt        int64
+	CreatedAt        int64
+	UpdatedAt        int64
+}
+
+type JoinInstance struct {
+	ID                      []byte
+	OrgID                   []byte
+	ExecutionID             []byte
+	NodeID                  string
+	ScopePath               string
+	RoundNumber             int64
+	SplitNodeExecutionID    []byte
+	EdgeStateDocument       []byte
+	EdgeStateDocumentFormat string
+	Status                  string
+	ContinuationTokenID     []byte
+	CreatedAt               int64
+	UpdatedAt               int64
+}
+
+type LimitBucket struct {
+	ID              []byte
+	OrgID           []byte
+	BucketKey       string
+	Capacity        int64
+	RefillPerSecond int64
+	Tokens          int64
+	RefilledAt      int64
+	BlockedUntilAt  sql.NullInt64
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
+type MergeTracker struct {
+	ID                      []byte
+	OrgID                   []byte
+	ExecutionID             []byte
+	NodeID                  string
+	ScopePath               string
+	EdgeStateDocument       []byte
+	EdgeStateDocumentFormat string
+	Status                  string
+	ContinuationTokenID     []byte
+	CreatedAt               int64
+	UpdatedAt               int64
+}
+
+type MultiInstance struct {
+	ID             []byte
+	OrgID          []byte
+	ExecutionID    []byte
+	NodeID         string
+	ScopePath      string
+	TotalCount     int64
+	StartedCount   int64
+	CompletedCount int64
+	InFlightCount  int64
+	Status         string
+	CreatedAt      int64
+	UpdatedAt      int64
+}
+
+type NodeExecution struct {
+	ID                            []byte
+	OrgID                         []byte
+	ExecutionID                   []byte
+	TokenID                       []byte
+	NodeID                        string
+	ScopePath                     string
+	Status                        string
+	AttemptCount                  int64
+	ItemStateDocument             []byte
+	ItemStateDocumentFormat       sql.NullString
+	ItemRouteDocument             []byte
+	ItemRouteDocumentFormat       sql.NullString
+	OutputReferenceDocument       []byte
+	OutputReferenceDocumentFormat sql.NullString
+	ErrorDocument                 []byte
+	ErrorDocumentFormat           sql.NullString
+	StartedAt                     sql.NullInt64
+	FinishedAt                    sql.NullInt64
+	CreatedAt                     int64
+	UpdatedAt                     int64
+}
+
+type NodeOutput struct {
+	ID                   []byte
+	OrgID                []byte
+	ExecutionID          []byte
+	NodeExecutionID      []byte
+	Port                 string
+	ItemCount            int64
+	Encoding             string
+	InlineDocument       []byte
+	InlineDocumentFormat sql.NullString
+	BlobID               []byte
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
+type NondeterminismRecord struct {
+	ID                  []byte
+	OrgID               []byte
+	ExecutionID         []byte
+	NodeExecutionID     []byte
+	SequenceNumber      int64
+	ValueDocument       []byte
+	ValueDocumentFormat string
+	CreatedAt           int64
+}
+
+type NotificationDelivery struct {
+	ID               []byte
+	OrgID            []byte
+	DeduplicationKey string
+	Channel          string
+	Recipient        string
+	Status           string
+	AttemptCount     int64
+	NextAttemptAt    sql.NullInt64
+	LastError        sql.NullString
+	FinishedAt       sql.NullInt64
+	CreatedAt        int64
+	UpdatedAt        int64
+}
+
+type NotificationGroup struct {
+	ID           []byte
+	OrgID        []byte
+	GroupKey     string
+	Channel      string
+	WindowEndsAt int64
+	PendingCount int64
+	CreatedAt    int64
+	UpdatedAt    int64
+}
+
+type OperationalAlert struct {
+	ID                              []byte
+	OrgID                           []byte
+	Kind                            string
+	SubjectReference                string
+	Status                          string
+	Level                           int64
+	Summary                         string
+	AffectedReferenceDocument       []byte
+	AffectedReferenceDocumentFormat sql.NullString
+	AcknowledgedByPrincipalID       []byte
+	AcknowledgedAt                  sql.NullInt64
+	NextEscalationAt                sql.NullInt64
+	ClosedAt                        sql.NullInt64
+	ClosedReason                    sql.NullString
+	CreatedAt                       int64
+	UpdatedAt                       int64
+}
+
 type Org struct {
 	ID                  []byte
 	Name                string
@@ -59,6 +450,20 @@ type Org struct {
 	DeletionScheduledAt sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64
+}
+
+type Outbox struct {
+	ID                    []byte
+	OrgID                 []byte
+	Topic                 string
+	PayloadDocument       []byte
+	PayloadDocumentFormat string
+	LeaseOwner            []byte
+	LeaseExpiresAt        sql.NullInt64
+	DeliveredAt           sql.NullInt64
+	AttemptCount          int64
+	CreatedAt             int64
+	UpdatedAt             int64
 }
 
 type Principal struct {
@@ -86,6 +491,117 @@ type SchemaMigration struct {
 	BinaryVersion      string
 	CompatibilityFloor string
 	CreatedAt          int64
+}
+
+type TaskAttempt struct {
+	ID                  []byte
+	OrgID               []byte
+	ExecutionID         []byte
+	NodeExecutionID     []byte
+	AttemptNumber       int64
+	LeaseEpoch          int64
+	WorkerID            []byte
+	Status              string
+	ItemDocument        []byte
+	ItemDocumentFormat  sql.NullString
+	ErrorDocument       []byte
+	ErrorDocumentFormat sql.NullString
+	StartedAt           int64
+	FinishedAt          sql.NullInt64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
+type Timer struct {
+	ID                    []byte
+	OrgID                 []byte
+	ExecutionID           []byte
+	TokenID               []byte
+	Kind                  string
+	DueAt                 int64
+	Status                string
+	PayloadDocument       []byte
+	PayloadDocumentFormat sql.NullString
+	CreatedAt             int64
+	UpdatedAt             int64
+}
+
+type Token struct {
+	ID                        []byte
+	OrgID                     []byte
+	ExecutionID               []byte
+	Status                    string
+	NodeID                    string
+	EdgeID                    sql.NullString
+	ScopePath                 string
+	ForkLineageDocument       []byte
+	ForkLineageDocumentFormat string
+	PayloadReference          sql.NullString
+	FairnessKey               string
+	EffectivePriority         int64
+	AvailableAt               int64
+	LeaseOwner                []byte
+	LeaseEpoch                int64
+	LeaseExpiresAt            sql.NullInt64
+	ClaimCount                int64
+	AbandonedCount            int64
+	DeferredUntilAt           sql.NullInt64
+	SuspendReason             sql.NullString
+	CreatedAt                 int64
+	UpdatedAt                 int64
+}
+
+type TriggerRate struct {
+	ID              []byte
+	OrgID           []byte
+	FlowID          []byte
+	WindowStartedAt int64
+	FireCount       int64
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
+type Variable struct {
+	ID                  []byte
+	OrgID               []byte
+	ExecutionID         []byte
+	ScopePath           string
+	Name                string
+	ValueDocument       []byte
+	ValueDocumentFormat string
+	Version             int64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
+type VariableChange struct {
+	ID                []byte
+	OrgID             []byte
+	SequenceNumber    int64
+	ExecutionID       []byte
+	ScopePath         string
+	Name              string
+	NodeExecutionID   []byte
+	ChangedAt         int64
+	OldValueReference sql.NullString
+	NewValueReference sql.NullString
+	CreatedAt         int64
+}
+
+type Wait struct {
+	ID                     []byte
+	OrgID                  []byte
+	ExecutionID            []byte
+	TokenID                []byte
+	NodeExecutionID        []byte
+	Kind                   string
+	WaitGroupKey           sql.NullString
+	SecretHash             []byte
+	ExpiresAt              sql.NullInt64
+	Status                 string
+	ResumePayloadReference sql.NullString
+	CreatedAt              int64
+	UpdatedAt              int64
 }
 
 type Worker struct {
