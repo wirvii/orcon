@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0010 — Control-flow semantics: gateways, joins, loops, multi-instance, sub-flows, waits and events
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12, 2026-10-13
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -96,3 +96,5 @@ Defined in ADR-0011 §7.
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-004.** §7: sub-flows never cross organizations.
+- **SPEC-001 (Amendment 10, 2026-10-13, owner decision).** §11 V8 also covers execution-variable reads: `$execution.variables` used other than with a literal name, or with a literal name not declared in `variables[]`, is an error (ADR-0008 §4.3).
+- **SPEC-001 (Amendment 10, 2026-10-13, owner decision).** §11 V13: the condition that ends a loop must read something its body writes: the output of a node inside the body, the data flowing through the body (`$json`, `$input`, `$binary`, `$prevNode`, `$items`), the iteration counter (`$runIndex`), or an execution variable (`$execution.variables.<name>`) that a node inside the body writes or that the loop carries. The expressions examined are those of the body node that sends tokens out of the body and the conditions of its exit edges; a name the analysis cannot classify counts as a read. A loop whose body has no edge leaving it is also a V13 warning: it can only end with `LoopLimitExceeded`. V13 is a warning stored with the version and never blocks publication.

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0015 — Storage contract: logical schema, SQLite and PostgreSQL adapters, migrations
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (ADR-0077); 2026-10-13 (SPEC-009: unique execution event order; stored enumerated values are UPPER_SNAKE in every table)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (ADR-0077); 2026-10-13 (SPEC-009: unique execution event order; stored enumerated values are UPPER_SNAKE in every table); 2026-10-13 (required timestamp columns clarified)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -99,3 +99,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-006.** Adds the tables of ADR-0060…ADR-0069 with the names and types of the `orcon-db` rulebook (ADR-0077); FTS5 on SQLite; `tsvector` and pgvector on PostgreSQL; `ai_stream_chunk` is `UNLOGGED` and carries `org_id`.
 - **SPEC-009 (2026-10-13).** §3 and §6: `execution_event.sequence_number` is unique per `(org_id, execution_id)` and is not the primary key, as ADR-0077 §3 states.
 - **SPEC-009 K19 (2026-10-13, owner decision).** §2: the value-spelling rule binds every enumerated column of every design, not only the tables of §3; no adapter translates an enumerated value between the database and the API. ADR-0009, ADR-0019, ADR-0038, ADR-0040 to ADR-0043, ADR-0045, ADR-0050, ADR-0053, ADR-0055 to ADR-0057, ADR-0059, ADR-0060, ADR-0062, ADR-0065 and ADR-0067 to ADR-0069 were aligned the same day.
+- **SPEC-009 D4 (2026-10-13, owner decision).** §3: the per-table column lists name each table's own columns. `created_at`, and `updated_at` unless the table is append-only, apply to every table, including `worker`, `principal` and `schema_migration`; `schema_migration` is append-only and exempt only from the `id` rule, and the migration runner writes its `created_at` with the same instant as `applied_at`.

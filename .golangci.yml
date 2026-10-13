@@ -202,6 +202,32 @@ linters:
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/wazero
               desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-sqlite:
+          files:
+            - "$all"
+            - "!**/internal/adapter/sqlite/**"
+            - "!**/internal/adapter/storetest/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/sqlite
+              desc: only cmd/orcon wires adapters (AL-8); storetest is the declared exception (AL-2.4)
+        adapter-private-postgres:
+          files:
+            - "$all"
+            - "!**/internal/adapter/postgres/**"
+            - "!**/internal/adapter/storetest/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/postgres
+              desc: only cmd/orcon wires adapters (AL-8); storetest is the declared exception (AL-2.4)
+        adapter-private-storetest:
+          files:
+            - "$all"
+            - "!**/internal/adapter/storetest/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/storetest
+              desc: only cmd/orcon wires adapters (AL-8)
         banned-everywhere:
           files:
             - "$all"

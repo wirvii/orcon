@@ -21,11 +21,11 @@ GOTOOL := $(TOOLS_ENV) go tool -modfile=$(CURDIR)/tools/go.mod
 WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
-	generate generate-check tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
+	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
 	build-go web build smoke test-postgres fuzz bench bench-compare sbom expr-corpus expr-compat expr-report
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
-check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check tidy-check test cover goleak-check vuln licenses skill-check build-go
+check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -38,6 +38,7 @@ tools: $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION) $(BIN)/.sqlc-$(SQLC_VERSIO
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/spdxcheck ./spdxcheck
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/benchgate ./benchgate
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/licensecheck ./licenses
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
 
 $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION):
 	mkdir -p $(BIN)
@@ -102,6 +103,19 @@ generate:
 generate-check:
 	sh scripts/generate.sh --check
 
+# db-check runs the static database checks (orcon-db checks.md CK-1) on the
+# migrations and queries of both adapters. DBCHECK_BASE names the base revision of
+# the immutability check (CI passes the pull request base).
+db-check:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	$(BIN)/dbcheck all
+
+# db-sum appends the lines of new migrations to both migrations.sum files and
+# never rewrites an existing line (migrations.md MG-5).
+db-sum:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	$(BIN)/dbcheck sum
+
 # tidy-check fails when go.mod or go.sum of any module, tools included, is not tidy.
 tidy-check:
 	set -e; for dir in $(WORKSPACE_DIRS); do \
@@ -145,9 +159,26 @@ cover:
 goleak-check:
 	sh scripts/check-goleak.sh
 
-# test-postgres needs Docker (testcontainers); the adapters skip without ORCON_TEST_POSTGRES.
+# PG_IMAGES are the PostgreSQL images the database tests run against: the oldest
+# supported release (14) and the latest (17), pinned by the digest of the
+# official multi-architecture image (resolved 2026-10-13). To move a pin, resolve
+# the new digest of the tag and change it here and in the postgres job of ci.yml.
+PG_IMAGES ?= postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b143664907d6e146eb6e1 postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+
+# test-postgres needs a container runtime (testcontainers); the adapters skip without
+# ORCON_TEST_POSTGRES. It runs the adapter tests once per image of PG_IMAGES.
 test-postgres:
-	ORCON_TEST_POSTGRES=1 go test -race -count=1 ./internal/adapter/...
+	set -e; for image in $(PG_IMAGES); do \
+		echo "test-postgres: $$image"; \
+		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/...; \
+	done
+
+# db-fixtures runs the planted database violations (SPEC-009 4.4.6) in both
+# engines; the PostgreSQL cases need a container runtime or
+# ORCON_TEST_POSTGRES_DSN. Add ARGS=--sqlite-only to run what needs no server.
+db-fixtures:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	sh scripts/check-db-fixtures.sh $(ARGS)
 
 fuzz:
 	sh scripts/fuzz.sh $(or $(FUZZTIME),10s)
@@ -199,13 +230,11 @@ expr-report:
 # Skill
 # ---------------------------------------------------------------------------
 
+# skill-sync copies each canonical skill to its generated copy.
 skill-sync:
-	sh .agents/skills/orcon-go/scripts/project.sh
-	sh .agents/skills/orcon-ui/scripts/project.sh
-	sh .agents/skills/orcon-api/scripts/project.sh
-	sh .agents/skills/orcon-connector/scripts/project.sh
-	sh .agents/skills/orcon-contributing/scripts/project.sh
-	sh .agents/skills/orcon-web/scripts/project.sh
+	set -e; for skill in orcon-go orcon-db orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do \
+		sh .agents/skills/$$skill/scripts/project.sh; \
+	done
 
 skill-check:
 	sh scripts/check-skill.sh

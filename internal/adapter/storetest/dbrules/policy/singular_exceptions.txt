@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Table names that end in s and are still singular (naming.md NM-2).
+# Format: <name>  # reason
+# Empty at birth.
