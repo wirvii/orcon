@@ -30,7 +30,7 @@ type schemaChecker struct {
 var supportedKeywords = map[string]bool{
 	"$schema": true, "$id": true, "$comment": true, "title": true, "description": true, "$defs": true,
 	"$ref": true, "type": true, "properties": true, "required": true, "additionalProperties": true,
-	"items": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true,
+	"items": true, "minItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true,
 	"minimum": true, "format": true, "oneOf": true, "allOf": true, "not": true, "propertyNames": true,
 }
 
@@ -256,11 +256,14 @@ func (c *schemaChecker) checkArray(schema, inst jsonvalue.Value, path string) []
 	if inst.Kind() != jsonvalue.KindArray {
 		return nil
 	}
+	var errs []string
+	if n, ok := intKeyword(schema, "minItems"); ok && inst.Len() < n {
+		errs = append(errs, fmt.Sprintf("%s: fewer than %d items", path, n))
+	}
 	items, ok := schema.Get("items")
 	if !ok {
-		return nil
+		return errs
 	}
-	var errs []string
 	for i, item := range inst.Items() {
 		errs = append(errs, c.validate(items, item, fmt.Sprintf("%s/%d", path, i))...)
 	}

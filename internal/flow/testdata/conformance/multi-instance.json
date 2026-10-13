@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "multi-instance",
+  "id": "01930000-0000-7000-8000-000000000005",
   "name": "Parallel multi-instance with an accumulator",
   "settings": { "concurrency": 32, "memoryLimit": 536870912 },
   "variables": [{ "name": "processed", "scope": "EXECUTION", "accumulator": "SUM" }],
@@ -18,8 +18,7 @@
         "inputCollection": "={{ $json.orders }}",
         "batchSize": 10,
         "completionCondition": "={{ $json.failed > 3 }}"
-      },
-      "writes": ["processed"]
+      }
     },
     { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
   ],

@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "parallel-join",
+  "id": "01930000-0000-7000-8000-000000000002",
   "name": "Parallel split and synchronizing join",
   "settings": { "branchMode": "PARALLEL", "priority": "NORMAL" },
   "variables": [{ "name": "seen", "scope": "EXECUTION", "accumulator": "SUM" }],
@@ -12,16 +12,14 @@
       "name": "Branch A",
       "element": "serviceTask",
       "type": "orcon.http@1",
-      "parameters": { "url": "https://example.test/a" },
-      "writes": ["seen"]
+      "parameters": { "url": "https://example.test/a" }
     },
     {
       "id": "b",
       "name": "Branch B",
       "element": "serviceTask",
       "type": "orcon.http@1",
-      "parameters": { "url": "https://example.test/b" },
-      "writes": ["seen"]
+      "parameters": { "url": "https://example.test/b" }
     },
     {
       "id": "join",

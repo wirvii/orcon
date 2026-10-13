@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "exclusive-and-inclusive",
+  "id": "01930000-0000-7000-8000-000000000003",
   "name": "Exclusive choice, inclusive choice and an activated-branches join",
   "settings": {},
   "variables": [],

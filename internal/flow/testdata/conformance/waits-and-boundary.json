@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "waits-and-boundary",
+  "id": "01930000-0000-7000-8000-000000000006",
   "name": "Timer, signal and human waits with a boundary timer",
   "settings": { "timeouts": { "executionActive": "PT30M" } },
   "variables": [],

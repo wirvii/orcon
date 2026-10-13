@@ -78,9 +78,6 @@ func TestSchemaEnumsMatchTheDomain(t *testing.T) {
 		"attentionNotify": mapStrings(flow.AttentionNotifies()),
 		"varScope":        mapStrings(flow.VarScopes()),
 		"accumulator":     mapStrings(flow.Accumulators()),
-		"effectKind":      mapStrings(flow.EffectKinds()),
-		"idempotencyMode": mapStrings(flow.IdempotencyModes()),
-		"onUncertain":     mapStrings(flow.OnUncertains()),
 		"element":         mapStrings(flow.Elements()),
 	}
 	defs, _ := c.root.Get("$defs")
@@ -158,7 +155,9 @@ func TestSchemaPatternsMatchTheDomain(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"id", patternOf(mustGet(t, defs, "id")), flow.IDPattern},
+		{"node and edge id", patternOf(mustGet(t, defs, "id")), flow.IDPattern},
+		{"flow id", patternOf(mustGet(t, defs, "uuid")), flow.UUIDPattern},
+		{"instant", patternOf(mustGet(t, defs, "instant")), flow.InstantPattern},
 		{"variableName", patternOf(mustGet(t, defs, "variableName")), flow.VariableNamePattern},
 		{"duration", patternOf(mustGet(t, defs, "duration")), flow.DurationPattern},
 		{"cycle", patternOf(mustGet(t, defs, "cycle")), flow.CyclePattern},
@@ -197,6 +196,9 @@ func TestSchemaAcceptsConformanceFlows(t *testing.T) {
 			}
 			if errs := c.errors(v); len(errs) > 0 {
 				t.Errorf("schema rejects %s: %v", name, errs)
+			}
+			if goRejectsShape(t, v) {
+				t.Errorf("the reader and validator disagree with the schema about %s", name)
 			}
 			doc, err := flowjson.Decode(data)
 			if err != nil {
@@ -247,7 +249,19 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"node name too long", "linear", "/nodes/1/name", `"` + strings.Repeat("n", 129) + `"`},
 		{"unknown node member", "linear", "/nodes/1/shade", `"red"`},
 		{"disabled is a string", "linear", "/nodes/1/disabled", `"yes"`},
-		{"writes holds a bad name", "parallel-join", "/nodes/2/writes/0", `"1x"`},
+		{"writes is not a member of the format", "parallel-join", "/nodes/2/writes", `["seen"]`},
+		{"effect is not a member of the format", "effects-calls-and-settings", "/nodes/1/effect", `{"effect":"READ"}`},
+		{"flow id is not a UUID", "linear", "/id", `"linear"`},
+		{"flow id with uppercase hexadecimal", "linear", "/id", `"01930000-0000-7000-8000-00000000000A"`},
+		{"errorFlow is not a UUID", "effects-calls-and-settings", "/settings/errorFlow", `"notify-failure"`},
+		{"call target neither a UUID nor an expression", "effects-calls-and-settings", "/nodes/4/call/target", `"ship-order"`},
+		{"allowed target is not a UUID", "effects-calls-and-settings", "/nodes/5/call/allowedTargets/0", `"partner-a"`},
+		{"empty allowedTargets", "effects-calls-and-settings", "/nodes/5/call/allowedTargets", `[]`},
+		{"empty loop carry", "loop", "/nodes/1/loop/carry", `[]`},
+		{"empty error codes", "waits-and-boundary", "/nodes/5/eventDefinition", `{"error":{"codes":[]}}`},
+		{"timer date with an offset", "waits-and-boundary", "/nodes/1/wait/timer", `{"date":"2026-10-12T10:00:00+01:00"}`},
+		{"timer date in lowercase z", "waits-and-boundary", "/nodes/1/wait/timer", `{"date":"2026-10-12T10:00:00z"}`},
+		{"edge order zero", "effects-calls-and-settings", "/edges/0/order", `0`},
 		{"join without data", "parallel-join", "/nodes/4/join/data", ""},
 		{"loop without maxIterations", "loop", "/nodes/1/loop/maxIterations", ""},
 		{"loop maxIterations zero", "loop", "/nodes/1/loop/maxIterations", `0`},
@@ -263,17 +277,13 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"call without perItem", "effects-calls-and-settings", "/nodes/4/call/perItem", ""},
 		{"call version zero", "effects-calls-and-settings", "/nodes/4/call/version", `0`},
 		{"call version other keyword", "effects-calls-and-settings", "/nodes/4/call/version", `"LATEST"`},
-		{"recursion depth zero", "effects-calls-and-settings", "/nodes/4/call", `{"target":"x","version":1,"mode":"WAIT","perItem":false,"intentionalRecursion":{"maxDepth":0}}`},
+		{"recursion depth zero", "effects-calls-and-settings", "/nodes/4/call", `{"target":"01930000-0000-7000-8000-000000000007","version":1,"mode":"WAIT","perItem":false,"intentionalRecursion":{"maxDepth":0}}`},
 		{"wait without kind", "waits-and-boundary", "/nodes/2/wait/kind", ""},
 		{"wait timeout not a duration", "waits-and-boundary", "/nodes/2/wait/timeout", `"1 hour"`},
 		{"timer date not a date-time", "waits-and-boundary", "/nodes/1/wait/timer", `{"date":"tomorrow"}`},
 		{"timer cycle malformed", "waits-and-boundary", "/nodes/6/eventDefinition/timer/cycle", `"every 10s"`},
 		{"unknown event definition", "waits-and-boundary", "/nodes/5/eventDefinition/signal", `{}`},
 		{"compensation event definition not empty", "waits-and-boundary", "/nodes/5/eventDefinition", `{"compensation":{"x":1}}`},
-		{"effect without kind", "effects-calls-and-settings", "/nodes/1/effect/effect", ""},
-		{"idempotency without mode", "effects-calls-and-settings", "/nodes/1/effect/idempotency/mode", ""},
-		{"idempotency ttl not a duration", "effects-calls-and-settings", "/nodes/1/effect/idempotency/ttl", `"a day"`},
-		{"verification without reconcile", "effects-calls-and-settings", "/nodes/1/effect/verification/reconcile", ""},
 		{"attention without notify", "effects-calls-and-settings", "/nodes/1/attention/notify", ""},
 		{"extension key without namespace", "effects-calls-and-settings", "/ext", `{"plain":1}`},
 		{"extension key in the reserved namespace", "effects-calls-and-settings", "/ext", `{"orcon.mine":1}`},
@@ -298,25 +308,32 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 			if c.valid(v) {
 				t.Errorf("the schema accepts %s although %s was changed", tt.flow, tt.pointer)
 			}
-			if !goRejects(t, v) {
-				t.Errorf("Decode and Validate accept the document the schema rejects (%s)", tt.name)
+			if !goRejectsShape(t, v) {
+				t.Errorf("the reader and validator accept the document the schema rejects (%s)", tt.name)
 			}
 		})
 	}
 }
 
-// goRejects reports whether reading and validating the value fails.
-func goRejects(t *testing.T, v jsonvalue.Value) bool {
+// shapeCodes are the issue codes of the levels the JSON Schema also covers.
+var shapeCodes = map[string]bool{
+	flow.CodeStructure: true, flow.CodeFormat: true, flow.CodeEnum: true, flow.CodeValue: true, flow.CodeExt: true,
+}
+
+// goRejectsShape reports whether the reader fails or the validator finds a
+// shape problem: the Go counterpart of "the schema rejects this document".
+func goRejectsShape(t *testing.T, v jsonvalue.Value) bool {
 	t.Helper()
-	data, err := jsonvalue.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	doc, err := flowjson.Decode(data)
+	doc, err := flowjson.Decode(mustMarshal(t, v))
 	if err != nil {
 		return true
 	}
-	return flow.Validate(&doc).HasErrors()
+	for _, issue := range flow.Validate(&doc).Errors() {
+		if shapeCodes[issue.Code] {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSchemaLeavesSemanticRulesToTheValidator(t *testing.T) {
@@ -344,6 +361,9 @@ func TestSchemaLeavesSemanticRulesToTheValidator(t *testing.T) {
 			}
 			if errs := c.errors(v); len(errs) > 0 {
 				t.Fatalf("the schema rejects a document that only breaks a graph rule: %v", errs)
+			}
+			if goRejectsShape(t, v) {
+				t.Fatalf("the reader reports a shape problem in a document the schema accepts")
 			}
 			data := mustMarshal(t, v)
 			doc, err := flowjson.Decode(data)
@@ -374,9 +394,6 @@ func TestEnumValuesUpperSnake(t *testing.T) {
 		{"effects-calls-and-settings", "/settings/priority", "priority"},
 		{"effects-calls-and-settings", "/settings/retention", "retention"},
 		{"effects-calls-and-settings", "/nodes/1/onError", "onError"},
-		{"effects-calls-and-settings", "/nodes/1/effect/effect", "effectKind"},
-		{"effects-calls-and-settings", "/nodes/1/effect/idempotency/mode", "idempotencyMode"},
-		{"effects-calls-and-settings", "/nodes/1/effect/onUncertain", "onUncertain"},
 		{"effects-calls-and-settings", "/nodes/1/attention/notify", "attentionNotify"},
 		{"effects-calls-and-settings", "/nodes/5/call/mode", "callMode"},
 		{"loop", "/variables/0/scope", "varScope"},

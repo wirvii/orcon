@@ -105,7 +105,7 @@ func (v *validator) concurrentWriters(g *graph) {
 	writers := map[string][]int{}
 	for i := range v.doc.Nodes {
 		n := &v.doc.Nodes[i]
-		for _, w := range n.Writes {
+		for _, w := range v.writers(n) {
 			if plain[w] && !slices.Contains(writers[w], i) {
 				writers[w] = append(writers[w], i)
 			}
@@ -183,3 +183,11 @@ func distinct(xs []int) []int {
 	slices.Sort(out)
 	return slices.Compact(out)
 }
+
+// writersOf lists the execution variables a node writes. It is the single
+// place V9 learns who writes what. The format does not yet say how a node
+// writes a variable (the owner's decision between a dedicated variables node
+// type and a per-node declaration is pending), so it reports none; the rule
+// itself is exercised through [validatorConfig.writers] in tests, and the
+// decision becomes a change to this function only.
+func writersOf(*Node) []string { return nil }

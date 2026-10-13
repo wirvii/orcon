@@ -16,9 +16,9 @@ func TestCallEdgesOfADocument(t *testing.T) {
 	doc := load(t, "effects-calls-and-settings")
 	got := doc.CallEdges()
 	want := []flow.CallEdge{
-		{From: "effects-calls-and-settings", To: "ship-order"},
-		{From: "effects-calls-and-settings", To: "partner-a"},
-		{From: "effects-calls-and-settings", To: "partner-b"},
+		{From: "01930000-0000-7000-8000-000000000007", To: "01930000-0000-7000-8000-000000000102"},
+		{From: "01930000-0000-7000-8000-000000000007", To: "01930000-0000-7000-8000-000000000103"},
+		{From: "01930000-0000-7000-8000-000000000007", To: "01930000-0000-7000-8000-000000000104"},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("CallEdges() = %v, want %v", got, want)

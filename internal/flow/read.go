@@ -83,7 +83,7 @@ func (o *obj) get(key string, required bool) (jsonvalue.Value, bool) {
 	o.seen[key] = struct{}{}
 	v, ok := o.v.Get(key)
 	if !ok && required {
-		o.d.failf(o.path, "missing required property %q", key)
+		o.d.failf(o.at(key), "missing required property %q", key)
 	}
 	return v, ok
 }
@@ -162,15 +162,6 @@ func (o *obj) optBool(key string) *bool {
 	return &b
 }
 
-func (o *obj) optInt(key string) *int {
-	if _, ok := o.v.Get(key); !ok {
-		o.seen[key] = struct{}{}
-		return nil
-	}
-	n := int(o.integerBetween(key, false, 0, math.MaxInt32))
-	return &n
-}
-
 // opaque reads a member that must be an object whose content the format
 // leaves open (parameters, editor, ext, form).
 func (o *obj) opaque(key string, required bool) jsonvalue.Value {
@@ -214,6 +205,10 @@ func (o *obj) strings(key string) []string {
 	if !ok {
 		return nil
 	}
+	if len(items) == 0 {
+		o.d.failf(o.at(key), "must not be empty; omit the property instead")
+		return nil
+	}
 	out := make([]string, 0, len(items))
 	for i, item := range items {
 		s, isStr := item.Str()
@@ -230,7 +225,7 @@ func (o *obj) strings(key string) []string {
 func (o *obj) done() {
 	for _, m := range o.v.Members() {
 		if _, ok := o.seen[m.Key]; !ok {
-			o.d.failf(o.path, "unknown property %q", m.Key)
+			o.d.failf(o.at(m.Key), "unknown property %q", m.Key)
 		}
 	}
 }
@@ -313,7 +308,7 @@ func (d *decoder) edge(o *obj) Edge {
 		Condition: o.str("condition", false),
 		Default:   o.optBool("default"),
 		Kind:      EdgeKind(o.str("kind", true)),
-		Order:     o.optInt("order"),
+		Order:     int(o.integerBetween("order", false, 1, math.MaxInt32)),
 	}
 	if from, ok := o.child("from", true); ok {
 		e.From = Endpoint{Node: NodeID(from.str("node", true)), Port: from.str("port", true)}
@@ -336,7 +331,6 @@ func (d *decoder) node(o *obj) Node {
 		Parameters: o.opaque("parameters", true),
 		Disabled:   o.optBool("disabled"),
 		Ext:        o.opaque("ext", false),
-		Writes:     o.strings("writes"),
 		Routing:    Routing(o.str("routing", false)),
 		OnError:    OnError(o.str("onError", false)),
 		AttachedTo: NodeID(o.str("attachedTo", false)),
@@ -390,9 +384,6 @@ func (d *decoder) nodeBlocks(o *obj, n *Node) {
 	if c, ok := o.child("eventDefinition", false); ok {
 		n.EventDefinition = d.eventDefinition(c)
 	}
-	if c, ok := o.child("effect", false); ok {
-		n.Effect = d.effect(c)
-	}
 	if c, ok := o.child("attention", false); ok {
 		n.Attention = &Attention{Notify: AttentionNotify(c.str("notify", true))}
 		c.done()
@@ -444,7 +435,7 @@ func (d *decoder) call(o *obj) *Call {
 	if _, ok := o.v.Get("version"); ok {
 		c.Version = *d.intOrKeyword(o, "version")
 	} else {
-		o.d.failf(o.path, "missing required property %q", "version")
+		o.d.failf(o.at("version"), "missing required property %q", "version")
 	}
 	c.PerItem, _ = o.boolean("perItem", true)
 	if r, ok := o.child("intentionalRecursion", false); ok {
@@ -481,25 +472,6 @@ func (d *decoder) eventDefinition(o *obj) *EventDefinition {
 	}
 	if c, ok := o.child("compensation", false); ok {
 		e.Compensation = true
-		c.done()
-	}
-	o.done()
-	return e
-}
-
-func (d *decoder) effect(o *obj) *Effect {
-	e := &Effect{
-		Kind:        EffectKind(o.str("effect", true)),
-		OnUncertain: OnUncertain(o.str("onUncertain", false)),
-		RetrySafe:   o.optBool("retrySafe"),
-	}
-	if c, ok := o.child("idempotency", false); ok {
-		e.Idempotency = &Idempotency{Mode: IdempotencyMode(c.str("mode", true)), TTL: c.str("ttl", false), KeyField: c.str("keyField", false)}
-		c.done()
-	}
-	if c, ok := o.child("verification", false); ok {
-		e.Verification = &Verification{}
-		e.Verification.Reconcile, _ = c.boolean("reconcile", true)
 		c.done()
 	}
 	o.done()

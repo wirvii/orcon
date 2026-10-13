@@ -76,10 +76,6 @@ type Node struct {
 	Disabled   *bool
 	Ext        jsonvalue.Value
 
-	// Writes names the variables this node writes. It is how the validator
-	// finds concurrent writers (ADR-0008 section 4, rule V9).
-	Writes []string
-
 	Routing       Routing
 	Join          *Join
 	Loop          *Loop
@@ -97,7 +93,6 @@ type Node struct {
 	CancelActivity  *bool
 	EventDefinition *EventDefinition
 
-	Effect    *Effect
 	Attention *Attention
 }
 
@@ -196,30 +191,9 @@ type EventDefinition struct {
 
 // ErrorDefinition matches the errors an error boundary event catches.
 type ErrorDefinition struct {
-	// Codes limits the match; empty catches every error.
+	// Codes limits the match; nil catches every error. A present list is
+	// never empty.
 	Codes []string
-}
-
-// Effect is the external-operation safety contract of a node (ADR-0012 section 1).
-type Effect struct {
-	Kind         EffectKind
-	Idempotency  *Idempotency
-	Verification *Verification
-	OnUncertain  OnUncertain
-	RetrySafe    *bool
-}
-
-// Idempotency describes how repeated requests are deduplicated.
-type Idempotency struct {
-	Mode IdempotencyMode
-	// TTL is the ISO 8601 duration a key stays valid at the provider.
-	TTL      string
-	KeyField string
-}
-
-// Verification tells whether the outcome can be looked up at the provider.
-type Verification struct {
-	Reconcile bool
 }
 
 // Attention overrides the human-attention notification class (ADR-0073 section 1a).
@@ -235,8 +209,9 @@ type Edge struct {
 	Condition string
 	Default   *bool
 	Kind      EdgeKind
-	// Order sequences siblings in SEQUENTIAL branch mode.
-	Order *int
+	// Order sequences siblings in SEQUENTIAL branch mode; it starts at 1 and
+	// 0 means absent.
+	Order int
 }
 
 // Endpoint is the source of an edge: a node and one of its output ports.

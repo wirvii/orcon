@@ -15,7 +15,7 @@ import (
 
 // docWith builds a small document JSON text with the given pieces filled in.
 func docWith(settings, nodes, edges, top string) string {
-	return fmt.Sprintf(`{"format":"orcon/flow@1","id":"x","name":"X","settings":{%s},"variables":[],"nodes":[%s],"edges":[%s],"editor":{}%s}`,
+	return fmt.Sprintf(`{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{%s},"variables":[],"nodes":[%s],"edges":[%s],"editor":{}%s}`,
 		settings, nodes, edges, top)
 }
 
@@ -31,7 +31,7 @@ func TestFromValueAcceptsMinimalDocument(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromValue error: %v", err)
 	}
-	if doc.ID != "x" || len(doc.Nodes) != 1 || doc.Nodes[0].ID != "a" {
+	if doc.ID != "01930000-0000-7000-8000-0000000000aa" || len(doc.Nodes) != 1 || doc.Nodes[0].ID != "a" {
 		t.Errorf("FromValue = %+v", doc)
 	}
 }
@@ -46,10 +46,10 @@ func TestFromValueRejectsMalformedShape(t *testing.T) {
 		{"not an object", `[]`, "must be an object"},
 		{"unknown top-level property", docWith("", goodNode, "", `,"surprise":1`), `unknown property "surprise"`},
 		{"missing id", `{"format":"orcon/flow@1","name":"X","settings":{},"variables":[],"nodes":[],"edges":[],"editor":{}}`, `missing required property "id"`},
-		{"missing editor", `{"format":"orcon/flow@1","id":"x","name":"X","settings":{},"variables":[],"nodes":[],"edges":[]}`, `missing required property "editor"`},
-		{"name is a number", `{"format":"orcon/flow@1","id":"x","name":7,"settings":{},"variables":[],"nodes":[],"edges":[],"editor":{}}`, "must be a string"},
+		{"missing editor", `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{},"variables":[],"nodes":[],"edges":[]}`, `missing required property "editor"`},
+		{"name is a number", `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":7,"settings":{},"variables":[],"nodes":[],"edges":[],"editor":{}}`, "must be a string"},
 		{"empty description", docWith("", goodNode, "", `,"description":""`), "must not be empty"},
-		{"settings not an object", `{"format":"orcon/flow@1","id":"x","name":"X","settings":[],"variables":[],"nodes":[],"edges":[],"editor":{}}`, "must be an object"},
+		{"settings not an object", `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":[],"variables":[],"nodes":[],"edges":[],"editor":{}}`, "must be an object"},
 		{"unknown setting", docWith(`"turbo":true`, goodNode, "", ""), `unknown property "turbo"`},
 		{"concurrency decimal", docWith(`"concurrency":1.5`, goodNode, "", ""), "integer of at least"},
 		{"concurrency negative", docWith(`"concurrency":-2`, goodNode, "", ""), "integer of at least"},
@@ -57,14 +57,12 @@ func TestFromValueRejectsMalformedShape(t *testing.T) {
 		{"memory limit zero", docWith(`"memoryLimit":0`, goodNode, "", ""), "integer of at least"},
 		{"retry factor zero", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"retry":{"maxAttempts":2,"factor":0}}`, "", ""), "number other than zero"},
 		{"keyword concurrency zero", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"concurrency":0}`, "", ""), "keyword string"},
-		{"nodes not an array", `{"format":"orcon/flow@1","id":"x","name":"X","settings":{},"variables":[],"nodes":{},"edges":[],"editor":{}}`, "must be an array"},
+		{"nodes not an array", `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{},"variables":[],"nodes":{},"edges":[],"editor":{}}`, "must be an array"},
 		{"node not an object", docWith("", `7`, "", ""), "must be an object"},
 		{"node missing parameters", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1"}`, "", ""), `missing required property "parameters"`},
 		{"node unknown property", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"shade":"red"}`, "", ""), `unknown property "shade"`},
 		{"parameters not an object", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":[]}`, "", ""), "must be an object"},
 		{"disabled not a boolean", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"disabled":"no"}`, "", ""), "must be a boolean"},
-		{"writes holds a number", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"writes":[1]}`, "", ""), "non-empty string"},
-		{"writes not an array", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"writes":"x"}`, "", ""), "must be an array"},
 		{"join missing data", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"join":{"mode":"ALL"}}`, "", ""), `missing required property "data"`},
 		{"join unknown property", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"join":{"mode":"ALL","data":"APPEND","x":1}}`, "", ""), `unknown property "x"`},
 		{"concurrency wrong type", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"concurrency":true}`, "", ""), "keyword string"},
@@ -74,11 +72,14 @@ func TestFromValueRejectsMalformedShape(t *testing.T) {
 		{"memory limit negative", docWith(`"memoryLimit":-1`, goodNode, "", ""), "integer of at least"},
 		{"edge missing kind", docWith("", goodNode, `{"id":"e","from":{"node":"a","port":"main"},"to":{"node":"a"}}`, ""), `missing required property "kind"`},
 		{"edge from not an object", docWith("", goodNode, `{"id":"e","from":"a","to":{"node":"a"},"kind":"SEQUENCE"}`, ""), "must be an object"},
-		{"edge order string", docWith("", goodNode, `{"id":"e","from":{"node":"a","port":"main"},"to":{"node":"a"},"kind":"SEQUENCE","order":"1"}`, ""), "integer of at least 0"},
-		{"variable missing scope", `{"format":"orcon/flow@1","id":"x","name":"X","settings":{},"variables":[{"name":"v"}],"nodes":[],"edges":[],"editor":{}}`, `missing required property "scope"`},
+		{"edge order string", docWith("", goodNode, `{"id":"e","from":{"node":"a","port":"main"},"to":{"node":"a"},"kind":"SEQUENCE","order":"1"}`, ""), "integer of at least 1"},
+		{"writes is not a member of the format", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"writes":["v"]}`, "", ""), `unknown property "writes"`},
+		{"effect is not a member of the format", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"effect":{"effect":"READ"}}`, "", ""), `unknown property "effect"`},
+		{"edge order zero", docWith("", goodNode, `{"id":"e","from":{"node":"a","port":"main"},"to":{"node":"a"},"kind":"SEQUENCE","order":0}`, ""), "integer of at least 1"},
+		{"empty optional array", docWith("", `{"id":"a","name":"A","element":"callActivity","type":"orcon.callFlow@1","parameters":{},"call":{"target":"=x","allowedTargets":[],"version":"CURRENT","mode":"WAIT","perItem":false}}`, "", ""), "must not be empty"},
+		{"empty loop carry", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.loop@1","parameters":{},"loop":{"maxIterations":2,"carry":[]}}`, "", ""), "must not be empty"},
+		{"variable missing scope", `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{},"variables":[{"name":"v"}],"nodes":[],"edges":[],"editor":{}}`, `missing required property "scope"`},
 		{"importedFrom incomplete", docWith(`"importedFrom":{"sourceVersion":"1"}`, goodNode, "", ""), `missing required property "reportId"`},
-		{"effect without kind", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"effect":{}}`, "", ""), `missing required property "effect"`},
-		{"verification without reconcile", docWith("", `{"id":"a","name":"A","element":"task","type":"orcon.set@1","parameters":{},"effect":{"effect":"READ","verification":{}}}`, "", ""), `missing required property "reconcile"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,6 +97,9 @@ func TestFromValueRejectsMalformedShape(t *testing.T) {
 			for _, issue := range ve.Report.Issues {
 				if issue.Code != flow.CodeStructure {
 					t.Errorf("issue code = %s, want %s", issue.Code, flow.CodeStructure)
+				}
+				if issue.Path == "" && tt.json != "[]" {
+					t.Errorf("issue %q carries no JSON Pointer", issue.Message)
 				}
 				found = found || strings.Contains(issue.Message, tt.want)
 			}

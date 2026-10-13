@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "item-routing",
+  "id": "01930000-0000-7000-8000-000000000008",
   "name": "Item routing with an inclusive switch",
   "settings": { "branchMode": "PARALLEL" },
   "variables": [],

@@ -3,66 +3,61 @@
 
 package flow
 
-// safety runs the effect rules of ADR-0007 section 9 level 5 and
-// ADR-0010 section 11 rule V10, plus the attention override of ADR-0073.
+import "strings"
+
+// safety runs the node-type rules of ADR-0007 section 9 level 5, rule V10, and
+// the attention override of ADR-0073. Without a node-type catalog it has
+// nothing to check against and does nothing.
 func (v *validator) safety() {
+	if v.cfg.lookup == nil {
+		return
+	}
 	for i := range v.doc.Nodes {
 		n := &v.doc.Nodes[i]
 		base := ptr("nodes", i)
-		if n.Effect != nil {
-			v.contract(base+"/effect", n)
+		var nt NodeType
+		known := false
+		if !isFormatType(n.Type) {
+			nt, known = v.cfg.lookup(n.Type)
+			if !known {
+				v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+				continue
+			}
+			v.contract(base+"/type", n, nt)
 		}
 		if n.Attention != nil {
-			v.attention(base+"/attention", n)
+			v.attention(base+"/attention", n, nt, known)
 		}
 	}
 }
 
-// contract implements V10 for one node: a write, delete or unknown effect
-// must say how an ambiguous outcome is recovered, and the recovery it names
-// must be backed by the rest of the contract (ADR-0012 sections 1 and 6).
-func (v *validator) contract(path string, n *Node) {
-	e := n.Effect
-	if e.Kind == EffectRead {
+// contract implements V10 for one node: an effect type must carry a valid
+// safety contract (ADR-0029 section 5; the rules are [CheckContract]).
+func (v *validator) contract(path string, n *Node, nt NodeType) {
+	if nt.Purity != PurityEffect {
 		return
 	}
-	if e.OnUncertain == "" {
-		v.r.errorf(CodeV10, path+"/onUncertain", "node %q has a %s effect, so its contract must say onUncertain", n.ID, e.Kind)
+	if nt.Contract == nil {
+		v.r.errorf(CodeV10, path, "node %q has effect type %q without a safety contract", n.ID, n.Type)
 		return
 	}
-	switch e.OnUncertain {
-	case OnUncertainResendWithKey:
-		v.resendNeedsKey(path, n)
-	case OnUncertainReconcile:
-		if e.Verification == nil || !e.Verification.Reconcile {
-			v.r.errorf(CodeV10, path+"/verification", "node %q recovers with RECONCILE, so verification.reconcile must be true", n.ID)
-		}
-	case OnUncertainSuspend:
-		// Always valid: a person decides.
-	}
-}
-
-func (v *validator) resendNeedsKey(path string, n *Node) {
-	idem := n.Effect.Idempotency
-	switch {
-	case idem == nil || idem.Mode == IdempotencyNone:
-		v.r.errorf(CodeV10, path+"/idempotency", "node %q recovers with RESEND_WITH_KEY, so it needs an idempotency mode of PROVIDER_KEY or NATURAL_KEY", n.ID)
-	case idem.TTL == "":
-		v.r.errorf(CodeV10, path+"/idempotency/ttl", "node %q recovers with RESEND_WITH_KEY, so the idempotency key needs a ttl (a key older than it is never resent)", n.ID)
+	for _, problem := range CheckContract(nt.Contract) {
+		v.r.errorf(CodeV10, path, "the contract of %q is invalid: %s", n.Type, strings.TrimSpace(problem))
 	}
 }
 
 // attention validates the notification override. OFF is an error on a node
 // whose uncertain operations always ask a person, and the block makes no sense
-// on a node that neither waits nor has an effect.
-func (v *validator) attention(path string, n *Node) {
-	hasEffect := n.Effect != nil
+// on a node that neither waits nor is an effect node.
+func (v *validator) attention(path string, n *Node, nt NodeType, known bool) {
+	isEffect := known && nt.Purity == PurityEffect
 	waits := n.Wait != nil || n.Element == ElementUserTask
-	if !hasEffect && !waits {
-		v.r.errorf(CodeAttention, path, "node %q has an attention block but neither waits for a person nor has an effect", n.ID)
+	if !isEffect && !waits {
+		v.r.errorf(CodeAttention, path, "node %q has an attention block but neither waits for a person nor is an effect node", n.ID)
 		return
 	}
-	if n.Attention.Notify == AttentionOff && hasEffect && n.Effect.Kind != EffectRead {
+	writes := isEffect && nt.Contract != nil && nt.Contract.Effect != EffectRead
+	if n.Attention.Notify == AttentionOff && writes {
 		v.r.errorf(CodeAttention, path+"/notify", "node %q has a write effect; notifying a person about an uncertain operation is mandatory and cannot be turned OFF", n.ID)
 	}
 }

@@ -137,8 +137,8 @@ func (e Edge) value() jsonvalue.Value {
 	b.str("condition", e.Condition)
 	b.flag("default", e.Default)
 	b.str("kind", string(e.Kind))
-	if e.Order != nil {
-		b.val("order", jsonvalue.Int(int64(*e.Order)))
+	if e.Order != 0 {
+		b.val("order", jsonvalue.Int(int64(e.Order)))
 	}
 	return b.build()
 }
@@ -152,7 +152,6 @@ func (n *Node) value() jsonvalue.Value {
 	b.val("parameters", orEmptyObject(n.Parameters))
 	b.flag("disabled", n.Disabled)
 	b.val("ext", n.Ext)
-	b.strs("writes", n.Writes)
 	b.str("routing", string(n.Routing))
 	n.writeBlocks(&b)
 	b.str("onError", string(n.OnError))
@@ -205,9 +204,6 @@ func (n *Node) writeBlocks(b *builder) {
 	}
 	if n.Wait != nil {
 		b.val("wait", n.Wait.value())
-	}
-	if n.Effect != nil {
-		b.val("effect", n.Effect.value())
 	}
 	if n.Attention != nil {
 		var a builder
@@ -304,25 +300,5 @@ func (e *EventDefinition) value() jsonvalue.Value {
 	if e.Compensation {
 		b.val("compensation", (&builder{}).build())
 	}
-	return b.build()
-}
-
-func (e *Effect) value() jsonvalue.Value {
-	var b builder
-	b.str("effect", string(e.Kind))
-	if e.Idempotency != nil {
-		var i builder
-		i.str("mode", string(e.Idempotency.Mode))
-		i.str("ttl", e.Idempotency.TTL)
-		i.str("keyField", e.Idempotency.KeyField)
-		b.val("idempotency", i.build())
-	}
-	if e.Verification != nil {
-		var v builder
-		v.val("reconcile", jsonvalue.Bool(e.Verification.Reconcile))
-		b.val("verification", v.build())
-	}
-	b.str("onUncertain", string(e.OnUncertain))
-	b.flag("retrySafe", e.RetrySafe)
 	return b.build()
 }

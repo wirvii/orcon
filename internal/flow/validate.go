@@ -4,6 +4,7 @@
 package flow
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"regexp"
@@ -19,8 +20,13 @@ import (
 // the flowjson tests compare against these constants so the two cannot drift.
 // They use only constructs that RE2 and ECMAScript read the same way.
 const (
-	// IDPattern is the form of flow, node and edge ids.
+	// IDPattern is the form of node and edge ids.
 	IDPattern = `^[A-Za-z0-9_-]{1,64}$`
+	// UUIDPattern is the canonical lowercase text form of a UUID, the form of
+	// flow ids (ADR-0015 sections 2 and 3).
+	UUIDPattern = `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+	// InstantPattern is an RFC 3339 date-time in UTC, written with a "Z".
+	InstantPattern = `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$`
 	// VariableNamePattern is the form of variable names.
 	VariableNamePattern = `^[A-Za-z_][A-Za-z0-9_]{0,63}$`
 	// NodeTypePattern is the form of node types: "<namespace>.<name>@<major>".
@@ -41,6 +47,8 @@ const (
 
 var (
 	idPattern       = regexp.MustCompile(IDPattern)
+	uuidPattern     = regexp.MustCompile(UUIDPattern)
+	instantPattern  = regexp.MustCompile(InstantPattern)
 	variablePattern = regexp.MustCompile(VariableNamePattern)
 	typePattern     = regexp.MustCompile(NodeTypePattern)
 	portPattern     = regexp.MustCompile(PortPattern)
@@ -61,8 +69,30 @@ const (
 // follow-up noise; once those pass it runs control-flow, data-access, safety
 // and call rules together. The document is never modified.
 func Validate(d *Document) Report {
+	return validate(d, validatorConfig{})
+}
+
+// ValidateWithTypes is [Validate] plus the node-type rules of level 5: every
+// node type must be known to the catalog, and the safety contract of an
+// effect type must be valid (rule V10, ADR-0029 section 5). Types the format
+// itself defines (orcon.loop, orcon.if, orcon.switch) are not looked up.
+func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report {
+	return validate(d, validatorConfig{lookup: func(nodeType string) (NodeType, bool) {
+		return types.Lookup(ctx, nodeType)
+	}})
+}
+
+// validatorConfig carries what a validation run needs besides the document.
+// Both members are optional: no lookup skips the node-type rules, and no
+// writers function uses [writersOf].
+type validatorConfig struct {
+	lookup  func(nodeType string) (NodeType, bool)
+	writers func(*Node) []string
+}
+
+func validate(d *Document, cfg validatorConfig) Report {
 	var c collector
-	v := &validator{doc: d, r: &c}
+	v := &validator{doc: d, r: &c, cfg: cfg}
 	v.structure()
 	v.references()
 	if c.hasErrors() {
@@ -79,6 +109,15 @@ func Validate(d *Document) Report {
 type validator struct {
 	doc *Document
 	r   *collector
+	cfg validatorConfig
+}
+
+// writers lists the variables a node writes, through the configured function.
+func (v *validator) writers(n *Node) []string {
+	if v.cfg.writers != nil {
+		return v.cfg.writers(n)
+	}
+	return writersOf(n)
 }
 
 // ptr builds a JSON Pointer from path segments.
@@ -172,7 +211,7 @@ func (v *validator) structure() {
 	if d.Format != FormatTag {
 		r.errorf(CodeFormat, "/format", "format %q is not %q", d.Format, FormatTag)
 	}
-	checkPattern(r, "/id", "flow id", string(d.ID), idPattern)
+	checkPattern(r, "/id", "flow id", string(d.ID), uuidPattern)
 	if n := utf8.RuneCountInString(d.Name); n == 0 || n > maxFlowNameRunes {
 		r.errorf(CodeValue, "/name", "name must have 1 to %d characters", maxFlowNameRunes)
 	}
@@ -206,7 +245,7 @@ func (v *validator) settings() {
 		r.errorf(CodeValue, "/settings/callDepthLimit", "must be at least 1")
 	}
 	if s.ErrorFlow != "" {
-		checkPattern(r, "/settings/errorFlow", "flow id", string(s.ErrorFlow), idPattern)
+		checkPattern(r, "/settings/errorFlow", "flow id", string(s.ErrorFlow), uuidPattern)
 	}
 	if s.Timeouts != nil {
 		checkDuration(r, "/settings/timeouts/executionActive", s.Timeouts.ExecutionActive)
@@ -232,8 +271,8 @@ func (v *validator) edge(i int, e Edge) {
 		r.errorf(CodeValue, base+"/from/port", "port %q is not a valid port name", e.From.Port)
 	}
 	checkEnum(r, base+"/kind", e.Kind, EdgeKinds())
-	if e.Order != nil && *e.Order < 0 {
-		r.errorf(CodeValue, base+"/order", "must not be negative")
+	if e.Order < 0 {
+		r.errorf(CodeValue, base+"/order", "must be at least 1")
 	}
 }
 
@@ -251,14 +290,8 @@ func (v *validator) node(i int, n *Node) {
 	v.routingAndLoop(base, n)
 	v.nodeBlocks(base, n)
 	v.waitAndBoundary(base, n)
-	for j, w := range n.Writes {
-		checkPattern(r, ptr("nodes", i, "writes", j), "variable name", w, variablePattern)
-	}
 	if n.Attention != nil {
 		checkEnum(r, base+"/attention/notify", n.Attention.Notify, AttentionNotifies())
-	}
-	if n.Effect != nil {
-		v.effectEnums(base+"/effect", n.Effect)
 	}
 }
 
@@ -350,10 +383,10 @@ func (v *validator) call(path string, n *Node, c *Call) {
 	if c.Target == "" {
 		r.errorf(CodeValue, path+"/target", "target must name a flow or be an expression")
 	} else if !strings.HasPrefix(c.Target, "=") {
-		checkPattern(r, path+"/target", "flow id", c.Target, idPattern)
+		checkPattern(r, path+"/target", "flow id", c.Target, uuidPattern)
 	}
 	for i, t := range c.AllowedTargets {
-		checkPattern(r, fmt.Sprintf("%s/allowedTargets/%d", path, i), "flow id", string(t), idPattern)
+		checkPattern(r, fmt.Sprintf("%s/allowedTargets/%d", path, i), "flow id", string(t), uuidPattern)
 	}
 	checkEnum(r, path+"/mode", c.Mode, CallModes())
 	v.intOrKeyword(path+"/version", &c.Version, KeywordCurrent)
@@ -424,8 +457,8 @@ func (v *validator) timer(path string, t *Timer, allowCycle bool) {
 	}
 	checkDuration(r, path+"/duration", t.Duration)
 	if t.Date != "" {
-		if _, err := time.Parse(time.RFC3339, t.Date); err != nil {
-			r.errorf(CodeValue, path+"/date", "%q is not an RFC 3339 date-time", t.Date)
+		if _, err := time.Parse(time.RFC3339, t.Date); err != nil || !instantPattern.MatchString(t.Date) {
+			r.errorf(CodeValue, path+"/date", "%q is not an RFC 3339 date-time in UTC written with a Z, such as 2026-10-12T10:00:00Z", t.Date)
 		}
 	}
 	if t.Cycle != "" {
@@ -461,16 +494,6 @@ func (v *validator) boundary(base string, n *Node) {
 	}
 	if set != 1 {
 		r.errorf(CodeValue, base+"/eventDefinition", "set exactly one of timer, error and compensation")
-	}
-}
-
-func (v *validator) effectEnums(path string, e *Effect) {
-	r := v.r
-	checkEnum(r, path+"/effect", e.Kind, EffectKinds())
-	checkOptEnum(r, path+"/onUncertain", e.OnUncertain, OnUncertains())
-	if e.Idempotency != nil {
-		checkEnum(r, path+"/idempotency/mode", e.Idempotency.Mode, IdempotencyModes())
-		checkDuration(r, path+"/idempotency/ttl", e.Idempotency.TTL)
 	}
 }
 
@@ -537,9 +560,9 @@ func (v *validator) nodeRefs(i int, n *Node, nodes map[NodeID]*Node, declared ma
 			r.errorf(CodeReference, base+"/compensation/handler", "compensation handler %q has a compensation of its own; compensations are not themselves compensated", c.Handler)
 		}
 	}
-	for j, w := range n.Writes {
+	for _, w := range v.writers(n) {
 		if _, ok := declared[w]; !ok {
-			r.errorf(CodeReference, ptr("nodes", i, "writes", j), "node %q writes undeclared variable %q", n.ID, w)
+			r.errorf(CodeReference, ptr("nodes", i), "node %q writes undeclared variable %q", n.ID, w)
 		}
 	}
 	if n.Loop != nil {

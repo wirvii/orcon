@@ -9,7 +9,7 @@
   "required": ["format", "id", "name", "settings", "variables", "nodes", "edges", "editor"],
   "properties": {
     "format": { "const": "orcon/flow@1" },
-    "id": { "$ref": "#/$defs/id" },
+    "id": { "$ref": "#/$defs/uuid" },
     "name": { "type": "string", "minLength": 1, "maxLength": 256 },
     "description": { "$ref": "#/$defs/text" },
     "settings": { "$ref": "#/$defs/settings" },
@@ -22,9 +22,19 @@
   "$defs": {
     "text": { "type": "string", "minLength": 1 },
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
     "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
     "duration": {
       "type": "string",
+      "format": "duration",
       "pattern": "^P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
     },
     "cycle": {
@@ -51,9 +61,6 @@
     "attentionNotify": { "enum": ["DEFAULT", "ON", "OFF"] },
     "varScope": { "enum": ["EXECUTION", "ITERATION"] },
     "accumulator": { "enum": ["SUM", "APPEND", "MAX", "MIN"] },
-    "effectKind": { "enum": ["READ", "WRITE", "DELETE", "UNKNOWN"] },
-    "idempotencyMode": { "enum": ["PROVIDER_KEY", "NATURAL_KEY", "NONE"] },
-    "onUncertain": { "enum": ["RESEND_WITH_KEY", "RECONCILE", "SUSPEND"] },
     "element": {
       "enum": [
         "startEvent",
@@ -92,7 +99,7 @@
         },
         "retention": { "$ref": "#/$defs/retention" },
         "memoryLimit": { "$ref": "#/$defs/positiveInteger" },
-        "errorFlow": { "$ref": "#/$defs/id" },
+        "errorFlow": { "$ref": "#/$defs/uuid" },
         "callDepthLimit": { "$ref": "#/$defs/positiveInteger" },
         "importedFrom": {
           "type": "object",
@@ -128,7 +135,6 @@
         "parameters": { "type": "object" },
         "disabled": { "type": "boolean" },
         "ext": { "$ref": "#/$defs/ext" },
-        "writes": { "type": "array", "items": { "$ref": "#/$defs/variableName" } },
         "routing": { "$ref": "#/$defs/routing" },
         "join": {
           "type": "object",
@@ -146,7 +152,7 @@
           "required": ["maxIterations"],
           "properties": {
             "maxIterations": { "$ref": "#/$defs/positiveInteger" },
-            "carry": { "type": "array", "items": { "$ref": "#/$defs/variableName" } }
+            "carry": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/variableName" } }
           }
         },
         "multiInstance": {
@@ -197,8 +203,10 @@
           "additionalProperties": false,
           "required": ["target", "version", "mode", "perItem"],
           "properties": {
-            "target": { "$ref": "#/$defs/text" },
-            "allowedTargets": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+            "target": {
+              "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "string", "pattern": "^=" }]
+            },
+            "allowedTargets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/uuid" } },
             "version": {
               "oneOf": [{ "$ref": "#/$defs/positiveInteger" }, { "const": "CURRENT" }]
             },
@@ -233,35 +241,9 @@
             "error": {
               "type": "object",
               "additionalProperties": false,
-              "properties": { "codes": { "type": "array", "items": { "$ref": "#/$defs/text" } } }
+              "properties": { "codes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } } }
             },
             "compensation": { "type": "object", "additionalProperties": false }
-          }
-        },
-        "effect": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["effect"],
-          "properties": {
-            "effect": { "$ref": "#/$defs/effectKind" },
-            "idempotency": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode"],
-              "properties": {
-                "mode": { "$ref": "#/$defs/idempotencyMode" },
-                "ttl": { "$ref": "#/$defs/duration" },
-                "keyField": { "$ref": "#/$defs/text" }
-              }
-            },
-            "verification": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["reconcile"],
-              "properties": { "reconcile": { "type": "boolean" } }
-            },
-            "onUncertain": { "$ref": "#/$defs/onUncertain" },
-            "retrySafe": { "type": "boolean" }
           }
         },
         "attention": {
@@ -277,7 +259,7 @@
       "additionalProperties": false,
       "properties": {
         "duration": { "$ref": "#/$defs/duration" },
-        "date": { "type": "string", "format": "date-time" },
+        "date": { "$ref": "#/$defs/instant" },
         "cycle": { "$ref": "#/$defs/cycle" }
       }
     },
@@ -305,7 +287,7 @@
         "condition": { "$ref": "#/$defs/text" },
         "default": { "type": "boolean" },
         "kind": { "$ref": "#/$defs/edgeKind" },
-        "order": { "type": "integer", "minimum": 0 }
+        "order": { "$ref": "#/$defs/positiveInteger" }
       }
     }
   }

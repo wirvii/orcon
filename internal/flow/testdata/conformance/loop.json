@@ -1,6 +1,6 @@
 {
   "format": "orcon/flow@1",
-  "id": "loop",
+  "id": "01930000-0000-7000-8000-000000000004",
   "name": "Loop with a carried variable",
   "settings": { "retention": "FAILED_ONLY" },
   "variables": [
@@ -22,8 +22,7 @@
       "name": "Fetch page",
       "element": "serviceTask",
       "type": "orcon.http@1",
-      "parameters": { "url": "={{ 'https://example.test/items?page=' + $runIndex }}" },
-      "writes": ["total", "pages"]
+      "parameters": { "url": "={{ 'https://example.test/items?page=' + $runIndex }}" }
     },
     {
       "id": "more",

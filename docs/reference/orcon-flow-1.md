@@ -11,7 +11,7 @@ The JSON document that defines a flow. ADR-0007 is normative; if this page and t
 ```json
 {
   "format": "orcon/flow@1",
-  "id": "order-fulfilment",
+  "id": "01930000-0000-7000-8000-000000000001",
   "name": "Order fulfilment",
   "settings": {},
   "variables": [],
@@ -21,7 +21,9 @@ The JSON document that defines a flow. ADR-0007 is normative; if this page and t
 }
 ```
 
-Required: `format`, `id`, `name`, `settings`, `variables`, `nodes`, `edges`, `editor`. Optional: `description`, `ext`. Every object is closed (unknown members are errors) except `parameters`, `editor`, `ext` and a wait's `form`, whose content the format leaves open. An empty string is never written: leave the member out.
+Required: `format`, `id`, `name`, `settings`, `variables`, `nodes`, `edges`, `editor`. Optional: `description`, `ext`. Every object is closed (unknown members are errors) except `parameters`, `editor`, `ext` and a wait's `form`, whose content the format leaves open and the reader never inspects.
+
+The reader is strict so that reading and writing a document gives back the same data, and therefore the same `contentHash`: an empty string, a `0` where a count or limit is meant, and an empty optional array are errors (leave the member out). The required arrays `variables`, `nodes` and `edges` may be empty. An explicit `false` is kept. The published schema states the same rules (`minLength`, `minimum`, `minItems`). Every error carries the JSON Pointer of the offending member.
 
 `ext` keys are namespaced `vendor.key`; `orcon.*` is reserved.
 
@@ -50,22 +52,26 @@ Every enumerated value is UPPER_SNAKE (ADR-0007 §11), because the API returns t
 | `nodes[].effect.onUncertain` | `RESEND_WITH_KEY`, `RECONCILE`, `SUSPEND` |
 | `edges[].kind` | `SEQUENCE`, `BACK` |
 
+The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`, `RESEND_WITH_KEY`, ...) belong to node types, not to flow documents; see "Node types and safety contracts".
+
 `nodes[].element` is a BPMN 2.0 name and keeps its camelCase form: `startEvent`, `endEvent`, `task`, `serviceTask`, `scriptTask`, `userTask`, `receiveTask`, `sendTask`, `callActivity`, `exclusiveGateway`, `inclusiveGateway`, `parallelGateway`, `eventBasedGateway`, `complexGateway`, `intermediateCatchEvent`, `intermediateThrowEvent`, `boundaryEvent`.
 
 ## Patterns and limits
 
 | Value | Rule |
 |---|---|
-| flow, node and edge ids | `[A-Za-z0-9_-]{1,64}` |
-| node `name` | 1 to 128 characters, unique in the flow (used by `$('Name')`) |
-| flow `name` | 1 to 256 characters |
+| flow `id`, `settings.errorFlow`, a literal `call.target`, `call.allowedTargets[]` | canonical lowercase UUID text, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (ADR-0015 sections 2 and 3) |
+| node and edge ids | `[A-Za-z0-9_-]{1,64}` |
+| node `name` | 1 to 128 Unicode code points, unique in the flow (used by `$('Name')`) |
+| flow `name` | 1 to 256 Unicode code points |
 | node `type` | `<namespace>.<name>@<major>`, for example `orcon.http@1` |
 | port names | identifiers such as `main`, `true`, `false`, `error`, `timeout`, `done`, `loop`, `case:<key>` |
 | variable names | `[A-Za-z_][A-Za-z0-9_]{0,63}` |
-| durations | ISO 8601 with weeks, days, hours, minutes and seconds only (`PT30S`, `PT1H30M`, `P2D`); years and months are not allowed |
-| timer `date` | RFC 3339 date-time |
+| durations | ISO 8601 with weeks, days, hours, minutes and seconds only (`PT30S`, `PT1H30M`, `P2D`; weeks are not mixed with other units); years and months are not allowed because their length varies. The schema marks them `format: duration` and enforces the pattern |
+| timer `date` | RFC 3339 date-time in UTC written with `Z` (`2026-10-12T10:00:00Z`), enforced by pattern in the schema and by the reader |
 | timer `cycle` | repeating interval, `R/PT10M` or `R5/PT10M` |
-| integers | at least 1 where a count or limit is meant (`maxIterations`, `batchSize`, `maxAttempts`, `concurrency`, `memoryLimit` in bytes); `edges[].order` may be 0 |
+| integers | at least 1 where a count or limit is meant (`maxIterations`, `batchSize`, `maxAttempts`, `concurrency`, `callDepthLimit`); `edges[].order` also starts at 1 |
+| `settings.memoryLimit` | integer number of bytes, at least 1; the instance maximum is checked at publication with the instance configuration (cut C12), not by the schema |
 
 ## Node blocks
 
@@ -81,9 +87,9 @@ A node has `id`, `name`, `element`, `type` and `parameters` (an object whose str
 - `call` `{ target, allowedTargets?, version, mode, perItem, intentionalRecursion? }` on `callActivity` nodes only. A `target` starting with `=` is an expression.
 - `wait` `{ kind, timer?, timeout?, form? }` on `receiveTask`, `userTask` and `intermediateCatchEvent`. A `TIMER` wait needs a `timer` with a duration or a date.
 - `attachedTo`, `cancelActivity` and `eventDefinition` on `boundaryEvent` nodes only; the event definition holds exactly one of `timer`, `error` or `compensation`.
-- `effect` `{ effect, idempotency?, verification?, onUncertain?, retrySafe? }`, the external-operation safety contract (ADR-0012 §1).
 - `attention` `{ notify }` on waits, user tasks and effect nodes.
-- `writes` (a list of variable names): the variables the node writes. This is how rule V9 finds concurrent writers. See "Open points".
+
+A document that carries `effect` or `writes` is rejected as an unknown member (see "Open points").
 
 ## Edges
 
@@ -106,9 +112,13 @@ Validation runs in levels; the first level that has errors is reported alone so 
 | V6 | 3 | a join has at least two incoming edges | error |
 | V7 | 3 | a boundary event is attached to an activity | error |
 | V8 | 4 | a node reads only nodes that dominate it, or that a join upstream merged; reads of unknown, own, sibling or downstream nodes are errors; a read through an `ACTIVATED` or `FIRST` join without `.isExecuted` is a warning | error / warning |
-| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time | error |
-| V10 | 5 | an effect node that writes says how an uncertain outcome is recovered, and the recovery is backed by the contract; `attention.notify: OFF` is refused on a node with a write effect | error |
+| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; the writers come from one function, `writersOf`, which reports none until the format says how a node writes a variable | error |
+| V10 | 5 | with a node-type catalog: every node type is known, and the contract of an effect type is valid (ADR-0029 §5); `attention.notify: OFF` is refused on a node whose type writes | error |
 | V11 | 6 | a call activity has a call block and does not call its own flow without `intentionalRecursion`; dynamic targets without `allowedTargets` are warned about; across flows, a call cycle with an unmarked edge blocks publication (`CheckCallGraph`) | error / warning |
+
+### Node types and safety contracts
+
+A node type, not a flow, owns its safety contract (ADR-0007 §3, ADR-0029 §5), so a document cannot declare itself safer than its type. `internal/flow` consumes a port, `NodeTypes.Lookup(ctx, type)`, that returns the purity (ADR-0008 §5) and, for `EFFECT` types, the contract. `ValidateWithTypes` applies rule V10 through it: an unknown type is a level 5 error naming the type, and the contract rules of ADR-0029 §5 (`CheckContract`) are a pure function: `UNKNOWN` is held to the `WRITE` rules, `READ_ONLY` only with `READ`, `IDEMPOTENCY_KEY` needs a key mode, location and ttl, `RECONCILE` needs a verification operation of purity `READ`, `UNSAFE` needs `retrySafe` false and `onUncertain` `SUSPEND`, and `RESEND_WITH_KEY` needs `IDEMPOTENCY_KEY`. `Validate` without a catalog skips these rules. The connector registry implements the port in SPEC-003; tests use a fake catalog. The types the format itself defines (`orcon.loop`, `orcon.if`, `orcon.switch`) are not looked up.
 
 The expression scan behind V8 is lexical: it recognises `$('Name')` and `$node["Name"]` inside `{{ }}` segments of `=` strings and in edge and multi-instance conditions. The full expression grammar belongs to the expression engine (ADR-0018).
 
@@ -122,9 +132,10 @@ A breaking change creates `orcon/flow@2` and an `upgrade_1_to_2` function; reade
 
 ## Open points
 
-These need an owner decision or an ADR amendment before the format is final; the implementation takes the interim reading shown.
+These wait for an owner decision or a later cut; the implementation takes the reading shown.
 
-- **Variable writes.** ADR-0007 §3 and ADR-0008 §4.3 do not say how a node declares that it writes a variable, which rule V9 needs. Interim: the optional `writes` member above.
-- **Node-level `effect` block.** ADR-0007 §3 says `effect` references the node type's contract with per-node overrides, but connector contracts (SPEC-003) do not exist yet. Interim: the block carries the ADR-0012 §1 runtime contract inline, and V10 checks it. Whether a node is an effect node by its type waits for the node-type registry.
+- **How a node writes an execution variable** (owner decision pending): either a built-in `orcon.variables@1` node type or a per-node `writes` declaration. Until then no `writes` member exists in the format and V9 reads writers from `writersOf`, the one function the decision will change.
+- **The per-node override of a safety contract** (ADR-0007 §3 "per-node overrides allowed by that contract") is defined by the SPEC-003 cut that implements the node-type registry, as an additive amendment within `@1`.
 - **Additive blocks of later specs** (`trigger`, `connector`, `credentials`, `ai`) are not in the schema yet; each arrives with its own cut, which extends the schema.
-- **Limits.** The ranges for `memoryLimit` (bytes), the id and name lengths, and the allowed duration forms are interim choices, listed in the tables above.
+- **Rule V13** (loop-exit heuristic warning, ADR-0010 §11) belongs to cut C5, which builds expression reference extraction; the in-memory cache of upgraded documents (ADR-0007 §7) belongs to cut C4, the first cut that loads pinned revisions on the hot path.
+- **Tests of the schema** use a small in-repository checker with a closed list of supported keywords and a differential check against the Go reader; a full validator library is a separate owner decision.

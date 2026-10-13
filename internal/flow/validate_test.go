@@ -149,20 +149,6 @@ func TestValidateDataAccessRules(t *testing.T) {
 		{"V8 edge condition reads an unrelated node", "exclusive-and-inclusive", func(d *flow.Document) {
 			edge(d, "e2").Condition = "$('After notifications').item.json.ok"
 		}, flow.CodeV8, flow.SeverityError},
-		{"V9 concurrent branch writers of a plain variable", "parallel-join", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-		}, flow.CodeV9, flow.SeverityError},
-		{"V9 parallel multi-instance writer of a plain variable", "multi-instance", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-		}, flow.CodeV9, flow.SeverityError},
-		{"V9 writer after an uncontrolled merge", "parallel-join", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-			node(d, "a").Writes = nil
-			node(d, "b").Writes = nil
-			join := node(d, "join")
-			join.Join = nil
-			join.Writes = []string{"seen"}
-		}, flow.CodeV9, flow.SeverityError},
 	})
 }
 
@@ -173,20 +159,6 @@ func TestValidateDataAccessAccepts(t *testing.T) {
 		base   string
 		mutate func(d *flow.Document)
 	}{
-		{"sequential multi-instance writes a plain variable", "multi-instance", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-			node(d, "each").MultiInstance.Sequential = true
-		}},
-		{"parallel multi-instance with concurrency 1 writes a plain variable", "multi-instance", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-			mi := node(d, "each").MultiInstance
-			mi.Concurrency = &flow.IntOrKeyword{N: 1}
-			mi.Sequential = true
-		}},
-		{"a join between the writers makes a plain variable safe", "parallel-join", func(d *flow.Document) {
-			d.Variables[0].Accumulator = ""
-			node(d, "b").Writes = nil
-		}},
 		{"guarded read of a maybe-skipped branch", "exclusive-and-inclusive", func(d *flow.Document) {
 			node(d, "after").Parameters = params("={{ $('Mail').isExecuted && $('Mail').item.json.x }}")
 		}},
@@ -206,32 +178,9 @@ func TestValidateDataAccessAccepts(t *testing.T) {
 	}
 }
 
-func TestValidateSafetyAndCallRules(t *testing.T) {
+func TestValidateCallRules(t *testing.T) {
 	t.Parallel()
 	runRuleCases(t, []ruleCase{
-		{"V10 write effect without onUncertain", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.OnUncertain = ""
-		}, flow.CodeV10, flow.SeverityError},
-		{"V10 resend without idempotency", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.Idempotency = nil
-		}, flow.CodeV10, flow.SeverityError},
-		{"V10 resend with idempotency mode NONE", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.Idempotency = &flow.Idempotency{Mode: flow.IdempotencyNone}
-		}, flow.CodeV10, flow.SeverityError},
-		{"V10 resend without ttl", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.Idempotency.TTL = ""
-		}, flow.CodeV10, flow.SeverityError},
-		{"V10 reconcile without verification", "effects-calls-and-settings", func(d *flow.Document) {
-			e := node(d, "charge").Effect
-			e.OnUncertain = flow.OnUncertainReconcile
-			e.Verification = nil
-		}, flow.CodeV10, flow.SeverityError},
-		{"attention OFF on a write effect", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Attention.Notify = flow.AttentionOff
-		}, flow.CodeAttention, flow.SeverityError},
-		{"attention on a node that neither waits nor writes", "linear", func(d *flow.Document) {
-			node(d, "fetch").Attention = &flow.Attention{Notify: flow.AttentionOn}
-		}, flow.CodeAttention, flow.SeverityError},
 		{"V11 call activity without a call block", "effects-calls-and-settings", func(d *flow.Document) {
 			node(d, "child").Call = nil
 		}, flow.CodeV11, flow.SeverityError},
@@ -275,9 +224,6 @@ func TestValidateReferenceRules(t *testing.T) {
 		{"duplicate variable", "loop", func(d *flow.Document) {
 			d.Variables = append(d.Variables, d.Variables[0])
 		}, flow.CodeReference, flow.SeverityError},
-		{"write of an undeclared variable", "parallel-join", func(d *flow.Document) {
-			node(d, "a").Writes = []string{"nope"}
-		}, flow.CodeReference, flow.SeverityError},
 		{"loop carries an undeclared variable", "loop", func(d *flow.Document) {
 			node(d, "loop").Loop.Carry = []string{"nope"}
 		}, flow.CodeReference, flow.SeverityError},
@@ -306,7 +252,7 @@ func TestValidateValueAndBlockRules(t *testing.T) {
 		{"node type without a major", "linear", func(d *flow.Document) { node(d, "fetch").Type = "orcon.http" }, flow.CodeValue, flow.SeverityError},
 		{"unknown element", "linear", func(d *flow.Document) { node(d, "fetch").Element = "subProcess" }, flow.CodeEnum, flow.SeverityError},
 		{"port with a space", "linear", func(d *flow.Document) { edge(d, "e1").From.Port = "my port" }, flow.CodeValue, flow.SeverityError},
-		{"negative edge order", "effects-calls-and-settings", func(d *flow.Document) { *edge(d, "e1").Order = -1 }, flow.CodeValue, flow.SeverityError},
+		{"negative edge order", "effects-calls-and-settings", func(d *flow.Document) { edge(d, "e1").Order = -1 }, flow.CodeValue, flow.SeverityError},
 		{"parameters not an object", "linear", func(d *flow.Document) { node(d, "fetch").Parameters = jsonvalue.String("x") }, flow.CodeStructure, flow.SeverityError},
 		{"extension key without namespace", "effects-calls-and-settings", func(d *flow.Document) {
 			d.Ext = obj(jsonvalue.Member{Key: "plain", Value: jsonvalue.Null()})
@@ -434,15 +380,6 @@ func TestEnumValuesUpperSnake(t *testing.T) {
 		{"variable accumulator", "loop", func(d *flow.Document) {
 			d.Variables[1].Accumulator = "append"
 		}, flow.CodeEnum, flow.SeverityError},
-		{"effect kind", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.Kind = "write"
-		}, flow.CodeEnum, flow.SeverityError},
-		{"idempotency mode", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.Idempotency.Mode = "provider_key"
-		}, flow.CodeEnum, flow.SeverityError},
-		{"onUncertain", "effects-calls-and-settings", func(d *flow.Document) {
-			node(d, "charge").Effect.OnUncertain = "resend_with_key"
-		}, flow.CodeEnum, flow.SeverityError},
 	})
 	t.Run("hint names the UPPER_SNAKE spelling", func(t *testing.T) {
 		t.Parallel()
@@ -509,6 +446,15 @@ func TestEnumValueSetsAreUpperSnake(t *testing.T) {
 		add(string(v))
 	}
 	for _, v := range flow.OnUncertains() {
+		add(string(v))
+	}
+	for _, v := range flow.SafetyLevels() {
+		add(string(v))
+	}
+	for _, v := range flow.KeyLocations() {
+		add(string(v))
+	}
+	for _, v := range flow.Purities() {
 		add(string(v))
 	}
 	add(flow.KeywordAll, flow.KeywordCurrent)

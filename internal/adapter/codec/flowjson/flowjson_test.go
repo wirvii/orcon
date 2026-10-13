@@ -40,9 +40,7 @@ func TestValidateRulesFromJSON(t *testing.T) {
 		{"V6 join with one incoming edge", "parallel-join", "/edges/4", ``, flow.CodeV6, flow.SeverityError},
 		{"V7 boundary on a non-activity", "waits-and-boundary", "/nodes/5/attachedTo", `"pause"`, flow.CodeV7, flow.SeverityError},
 		{"V8 read of a sibling branch", "parallel-join", "/nodes/3/parameters", `{"v":"={{ $('Branch A').item }}"}`, flow.CodeV8, flow.SeverityError},
-		{"V9 concurrent writers", "parallel-join", "/variables/0/accumulator", ``, flow.CodeV9, flow.SeverityError},
-		{"V10 write effect without recovery", "effects-calls-and-settings", "/nodes/1/effect/onUncertain", ``, flow.CodeV10, flow.SeverityError},
-		{"V11 call to itself", "effects-calls-and-settings", "/nodes/4/call/target", `"effects-calls-and-settings"`, flow.CodeV11, flow.SeverityError},
+		{"V11 call to itself", "effects-calls-and-settings", "/nodes/4/call/target", `"01930000-0000-7000-8000-000000000007"`, flow.CodeV11, flow.SeverityError},
 		{"V12 duplicate names", "linear", "/nodes/2/name", `"Fetch"`, flow.CodeV12, flow.SeverityError},
 	}
 	for _, tt := range cases {
@@ -178,8 +176,8 @@ func TestUpgradeLeavesStoredBytesAlone(t *testing.T) {
 
 func TestCanonicalIgnoresMemberOrder(t *testing.T) {
 	t.Parallel()
-	a := `{"format":"orcon/flow@1","id":"x","name":"X","settings":{"concurrency":10},"variables":[],"nodes":[],"edges":[],"editor":{}}`
-	b := `{"editor":{},"edges":[],"nodes":[],"variables":[],"settings":{"concurrency":10},"name":"X","id":"x","format":"orcon/flow@1"}`
+	a := `{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{"concurrency":10},"variables":[],"nodes":[],"edges":[],"editor":{}}`
+	b := `{"editor":{},"edges":[],"nodes":[],"variables":[],"settings":{"concurrency":10},"name":"X","id":"01930000-0000-7000-8000-0000000000aa","format":"orcon/flow@1"}`
 	da, errA := flowjson.Decode([]byte(a))
 	db, errB := flowjson.Decode([]byte(b))
 	if errA != nil || errB != nil {
@@ -197,7 +195,7 @@ func FuzzDecode(f *testing.F) {
 		f.Add(data)
 	}
 	f.Add([]byte(`{"format":"orcon/flow@2"}`))
-	f.Add([]byte(`{"format":"orcon/flow@1","id":"x","name":"X","settings":{},"variables":[],"nodes":[],"edges":[],"editor":{}}`))
+	f.Add([]byte(`{"format":"orcon/flow@1","id":"01930000-0000-7000-8000-0000000000aa","name":"X","settings":{},"variables":[],"nodes":[],"edges":[],"editor":{}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doc, err := flowjson.Decode(data)
 		if err != nil {
