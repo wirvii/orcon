@@ -108,6 +108,7 @@ Organization-scoped tables carry `org_id` and follow ADR-0046 as amended by ADR-
 - ADR-0073 also covers situations that need an administrator but belong to no single execution. They use the same channels, deduplication, coalescing, escalation, acknowledgement and inbox (an "alerts" tab), and no execution actions. Closed set of kinds:
   - `CONNECTOR_REVOKED` — a `CRITICAL` revocation of a connector version (SPEC-003 N2); one `operational_alert` row per affected organization. Payload: connector, revoked version, severity, reason, fixed version, affected flows (id, name, project; capped with a link). Recipients, notified immediately and subject to escalation: the organization's Owners and Admins plus the owners of each affected project (owner decision, SPEC-003 N2). Event `connector.revoked` (public; SPEC-005 adds it to the ADR-0055 catalog). The alert closes when no active flow still uses the revoked version; acknowledging it stops escalation but does not close it. `ADVISORY` revocations raise no alert.
   - `STORAGE_RETENTION_PRESSURE` — ADR-0017 §5–6; an `instance_alert` row. Recipients: instance admins. Event `storage.retention_pressure`.
+  - `INSTANCE_RESTORED` — an instance was restored from a backup (ADR 0083 §4); an `instance_alert` row. Recipients: instance admins. The alert closes when the instance hold is released. Event `instance.restored`.
 - A new kind requires amending this ADR.
 
 ### 14. Value casing
@@ -131,3 +132,4 @@ Every enumerated value this ADR defines is UPPER_SNAKE wherever it crosses a pub
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-005.** Cross-reference: "Programmatic surface (public events `execution.awaiting_human`, `execution.awaiting_human.escalated`, `execution.human_resolved`; REST operations to list items awaiting human action and to continue/repeat/cancel; MCP tools) is defined by ADR-0052 §3, ADR-0055 §2 and ADR-0059; this ADR defines the semantics, notification routing and escalation."
+- **SPEC-015 (2026-10-13).** §13 gains the operational alert kind `INSTANCE_RESTORED` (ADR 0083 §4).

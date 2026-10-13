@@ -23,3 +23,10 @@ Resolved on 2026-10-12 (SPEC-001):
 - Leader election: not needed (singleton jobs use an advisory lock; timers use `SKIP LOCKED`).
 
 Still open: partition handling, backups, disaster recovery.
+
+Backups and disaster recovery: ADR 0083 §4
+
+## Amendments
+Changes applied on 2026-10-13 by specifications the owner accepted; each entry names its source.
+
+- **SPEC-015 (2026-10-13).** "Open": clarification only, the decision is unchanged. Backups and disaster recovery: ADR 0083 §4.

@@ -21,3 +21,6 @@ code_library  # SPEC-003 code libraries shared by the instance
 session  # SPEC-004 login sessions are resolved before the organization is known
 ai_price_table  # SPEC-006 model price table of the instance
 knowledge_chunk_fts5  # SPEC-006 SQLite FTS5 virtual table; its synchronisation triggers need a TI-10 exception
+backup_run  # SPEC-015 backup runs of the instance
+instance_hold  # SPEC-015 hold placed on the instance after a restore
+instance_setup  # SPEC-015 first-run state of the instance

@@ -45,6 +45,7 @@ Spec: <!-- SPEC-NNN for maintainer work tracked in mneme, otherwise n/a -->
 - [ ] The title is a Conventional Commit with one scope from the list.
 - [ ] Tests cover the change, and "How it was tested" lists the commands and results.
 - [ ] Documentation and translations are updated where behavior or text changed.
+- [ ] User-visible behavior changed: `docs/user/en` and `docs/user/es` updated in this pull request
 - [ ] No secrets, credentials or personal data in code, fixtures, logs or screenshots.
 - [ ] Code comments, commit messages and this description contain no AI authorship trailers or AI tool attributions.
 - [ ] Any new dependency has an allowed license and a reason in "What and why".
