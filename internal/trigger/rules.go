@@ -81,12 +81,14 @@ func (s *Service) documentIssues(ctx context.Context, doc *flow.Document, rc *ru
 		if err := s.credentialIssues(ctx, rc, n, add); err != nil {
 			return nil, err
 		}
-		importedAddressIssues(doc, n, rc, add)
 		respondIssues(doc, n, add)
 		s.localFileIssues(n.Trigger, add)
 		callersIssues(n.Trigger, add)
 		dedupeWindowIssues(n.Trigger, add)
 	}
+	importedAddressIssues(doc, rc, func(sev flow.Severity, code, at, format string, args ...any) {
+		issues = append(issues, flow.Issue{Severity: sev, Code: code, Path: at, Message: fmt.Sprintf(format, args...)})
+	})
 	return issues, nil
 }
 
@@ -192,31 +194,42 @@ func (s *Service) credentialIssues(ctx context.Context, rc *ruleContext, n *flow
 }
 
 // importedAddressIssues is T-V4: an n8n address of a flow imported from n8n is
-// kept as it was published unless the author confirms the change.
-func importedAddressIssues(doc *flow.Document, n *flow.Node, rc *ruleContext, add addIssue) {
-	if rc.previous == nil || doc.Settings.ImportedFrom == nil || rc.allowImportedAddressChange {
+// kept as it was published unless the author confirms the change. It walks the
+// trigger nodes of the previous version, not those of the draft, so deleting a
+// whole trigger node (or only its trigger block) is caught like editing an
+// address is. Every affected address becomes one error issue.
+func importedAddressIssues(doc *flow.Document, rc *ruleContext, add addIssue) {
+	if rc.previous == nil || rc.allowImportedAddressChange {
 		return
 	}
-	var old *flow.Node
+	if doc.Settings.ImportedFrom == nil && rc.previous.Settings.ImportedFrom == nil {
+		return
+	}
 	for i := range rc.previous.Nodes {
-		if rc.previous.Nodes[i].ID == n.ID {
-			old = &rc.previous.Nodes[i]
-			break
-		}
-	}
-	if old == nil || old.Trigger == nil {
-		return
-	}
-	for _, oa := range old.Trigger.Addresses {
-		if oa.Family != flow.AddressN8N {
+		old := &rc.previous.Nodes[i]
+		if old.Trigger == nil || !slices.ContainsFunc(old.Trigger.Addresses, isN8NAddress) {
 			continue
 		}
-		kept := slices.ContainsFunc(n.Trigger.Addresses, func(a flow.TriggerAddress) bool { return sameN8NAddress(oa, a) })
-		if !kept {
-			add(flow.SeverityError, CodeTV4, "/addresses", "the imported n8n address /%s was removed or changed; confirm the change explicitly to publish it", oa.Path)
+		at, now := "/nodes", (*flow.Trigger)(nil)
+		if j := slices.IndexFunc(doc.Nodes, func(n flow.Node) bool { return n.ID == old.ID }); j >= 0 {
+			at, now = fmt.Sprintf("/nodes/%d/trigger", j), doc.Nodes[j].Trigger
+			if now != nil {
+				at += "/addresses"
+			}
+		}
+		for _, oa := range old.Trigger.Addresses {
+			if !isN8NAddress(oa) {
+				continue
+			}
+			if now != nil && slices.ContainsFunc(now.Addresses, func(a flow.TriggerAddress) bool { return sameN8NAddress(oa, a) }) {
+				continue
+			}
+			add(flow.SeverityError, CodeTV4, at, "the imported n8n address /%s of node %q was removed or changed; confirm the change explicitly to publish it", oa.Path, old.ID)
 		}
 	}
 }
+
+func isN8NAddress(a flow.TriggerAddress) bool { return a.Family == flow.AddressN8N }
 
 func sameN8NAddress(a, b flow.TriggerAddress) bool {
 	return b.Family == flow.AddressN8N && a.Path == b.Path && a.WebhookID == b.WebhookID &&

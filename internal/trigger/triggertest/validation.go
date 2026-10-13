@@ -30,6 +30,7 @@ func TriggerValidation(t *testing.T, f Factory) {
 		{"T-V1 overlapping patterns only warn", overlapWarns},
 		{"T-V3 a trigger that needs a missing credential", missingCredential},
 		{"T-V4 an imported n8n address stays unless the author confirms", importedAddress},
+		{"T-V4 deleting a trigger node that owns an imported address needs the confirmation", importedAddressNodeRemoved},
 		{"T-V5 a respond node that cannot be reached only warns", unreachableRespondNode},
 		{"T-V6 a local file inside the allowed paths publishes", localFileInside},
 		{"a dry run reports what publication would", dryRun},
@@ -220,6 +221,29 @@ func importedAddress(t *testing.T, f Factory) {
 	e.saveDraft(e.orgA, id, spec("v2", "renamed-hook"))
 	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
 	validationIssue(t, "change an imported address", err, trigger.CodeTV4)
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
+	must(t, "publish with the confirmation", err)
+}
+
+// importedAddressNodeRemoved checks T-V4 for a draft that deletes a whole
+// trigger node owning an imported n8n address: publishing stops with an error
+// that names the address, and succeeds with the explicit confirmation.
+func importedAddressNodeRemoved(t *testing.T, f Factory) {
+	t.Helper()
+	e := newEnv(t, f, trigger.Settings{})
+	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
+	both := Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: n8n}, {ID: "keep", Block: WebhookBlock("kept")}}})
+	id := e.newFlow(e.orgA, e.projA, "imported", both)
+	e.publish(e.orgA, id)
+	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "keep", Block: WebhookBlock("kept")}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	issue := validationIssue(t, "delete a trigger node that owns an imported address", err, trigger.CodeTV4)
+	if !contains(issue.Message, "/legacy-hook") {
+		t.Fatalf("message %q does not name the address", issue.Message)
+	}
+	if n := versionCount(t, e, id); n != 1 {
+		t.Fatalf("the refused publication left %d versions, want 1", n)
+	}
 	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
 	must(t, "publish with the confirmation", err)
 }
