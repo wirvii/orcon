@@ -4,6 +4,9 @@
 node_modules/
 **/dist/
 !internal/adapter/webui/dist/
+!internal/adapter/httpapi/reference/dist/
+internal/adapter/httpapi/reference/dist/*
+!internal/adapter/httpapi/reference/dist/.gitkeep
 .DS_Store
 .env
 .env.*

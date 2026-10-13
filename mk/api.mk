@@ -9,7 +9,7 @@
 # Targets that need the contract (packages/openapi/v1/openapi.yaml) say so and succeed while
 # it does not exist yet; nothing is invented to make a step run.
 
-.PHONY: api-generate api-lint api-compat api-compat-selftest api-examples api-reference \
+.PHONY: api-generate api-lint api-compat api-compat-selftest api-examples api-reference api-reference-embed \
 	api-changelog api-changelog-check api-changelog-selftest api-check
 
 API_TOOLS := packages/js/openapi-tools
@@ -91,7 +91,18 @@ api-check: api-lint api-compat-selftest api-compat api-changelog-selftest api-re
 # The release pull request branch gets the API changelog of its version (SPEC-013 H-REL-2).
 release-prepare: api-changelog
 
-# make build generates the reference site first once the contract exists (SPEC-005 API1).
+# api-reference-embed copies the built site into the package that embeds it into the binary
+# (internal/adapter/httpapi/reference/dist), keeping only the .gitkeep that holds the directory.
+API_REFERENCE_EMBED := internal/adapter/httpapi/reference/dist
+
+api-reference-embed: api-reference
+	mkdir -p $(API_REFERENCE_EMBED)
+	find $(API_REFERENCE_EMBED) -mindepth 1 ! -name .gitkeep -delete
+	cp -R $(API_REFERENCE_DIR)/. $(API_REFERENCE_EMBED)/
+
+# make build generates and embeds the reference site before it compiles the binary (SPEC-005
+# API1, H-API1-3). `web` is the first prerequisite of `build`, so hanging the embed on it puts
+# it ahead of build-go: web builds everything that is embedded into the binary.
 ifneq ($(wildcard $(API_CONTRACT)),)
-build: api-reference
+web: api-reference-embed
 endif

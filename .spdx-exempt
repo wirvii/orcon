@@ -20,6 +20,8 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 tools/licenses/npm-exceptions.txt  # plain-text data file read by the web license check (it carries the SPDX lines as comments)
 
 **/tsconfig*.json  # JSON has no comment syntax
+packages/openapi/v1/openapi.bundle.json  # generated JSON bundle of the API contract for Go tests; JSON has no comment syntax
+internal/adapter/httpapi/reference/dist/**  # build output of the API reference site, replaced by make build
 packages/js/tokens/src/**/*.json  # design token sources in the W3C format; JSON has no comment syntax
 packages/js/tokens/src/*.json  # design token sources in the W3C format; JSON has no comment syntax
 packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has no comment syntax
