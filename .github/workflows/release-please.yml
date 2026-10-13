@@ -12,12 +12,14 @@ on:
   push:
     branches: [main]
 permissions: {}
-concurrency:
-  group: release-please
-  cancel-in-progress: false
+# Concurrency is per job, not per workflow: a workflow-level group keeps only one pending
+# run, so a queued run (and its `tag` job) could be replaced by a newer push.
 jobs:
   release-pr:
     if: ${{ vars.ORCON_RELEASE_ENABLED == 'true' }}
+    concurrency:
+      group: release-please-pr
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -40,6 +42,9 @@ jobs:
   release-pr-extras:
     needs: release-pr
     if: ${{ needs.release-pr.outputs.pr != '' }}
+    concurrency:
+      group: release-please-extras
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -85,6 +90,10 @@ jobs:
           fi
   tag:
     if: "${{ vars.ORCON_RELEASE_ENABLED == 'true' && startsWith(github.event.head_commit.message, 'chore(tooling): release ') }}"
+    # One group per merge commit: a queued tag job is never replaced by a later push.
+    concurrency:
+      group: release-tag-${{ github.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: release
     permissions:

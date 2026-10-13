@@ -15,8 +15,16 @@ cd "$root"
 repo=${GITHUB_REPOSITORY:-wirvii/orcon}
 sha=${GITHUB_SHA:-$(git rev-parse HEAD)}
 
-gitsign=gitsign
-[ -x "$root/.bin/gitsign" ] && gitsign=$root/.bin/gitsign
+# Absolute path of gitsign: git runs gpg.x509.program from its own environment, where
+# .bin is not on PATH.
+if [ -x "$root/.bin/gitsign" ]; then
+  gitsign=$root/.bin/gitsign
+else
+  gitsign=$(command -v gitsign) || {
+    echo "tag: gitsign is not installed (sh scripts/release/install-tools.sh gitsign)" >&2
+    exit 1
+  }
+fi
 
 # 1. The merge commit changed the release manifest.
 if ! git diff --name-only "$sha^" "$sha" | grep -qx '.release-please-manifest.json'; then
@@ -27,8 +35,9 @@ version=$(node -p 'require("./.release-please-manifest.json")["."]')
 tag=v$version
 
 # 2. The merged pull request is the release pull request of the bot.
-pr=$(gh pr list --repo "$repo" --state merged --search "$sha" --json number,headRefName,labels \
-  --jq '.[0] | select(.headRefName == "release-please--branches--main" and any(.labels[]; .name == "autorelease: pending")) | .number')
+# The pull requests associated with the merge commit come from the API, not from a search.
+pr=$(gh api "repos/$repo/commits/$sha/pulls" \
+  --jq 'first(.[] | select(.merged_at != null and .head.ref == "release-please--branches--main" and any(.labels[]; .name == "autorelease: pending")) | .number) // empty')
 if [ -z "$pr" ]; then
   echo "tag: no merged release pull request (branch release-please--branches--main, label autorelease: pending) for $sha" >&2
   exit 1
@@ -44,7 +53,7 @@ fi
 git config user.name "orcon-release[bot]"
 git config user.email "orcon-release[bot]@users.noreply.github.com"
 git config gpg.format x509
-git config gpg.x509.program gitsign
+git config gpg.x509.program "$gitsign"
 git config tag.gpgSign true
 
 # 5. Create, 6. verify and 7. push the tag.

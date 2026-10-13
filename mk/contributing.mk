@@ -8,7 +8,7 @@
 # `make contrib-check` and `sh .agents/skills/orcon-contributing/scripts/verify.sh`.
 
 .PHONY: commit-lint pr-title-lint commitlint-selftest prcheck-test pr-check workflows-lint \
-	release-tools release-config-check release-check release-prepare contrib-check
+	release-tools release-pins-check release-config-check release-check release-prepare contrib-check
 
 # Revision range of commit-lint and pr-check; the pull request base and head in CI.
 FROM ?= origin/main
@@ -50,8 +50,12 @@ workflows-lint:
 release-tools:
 	sh scripts/release/install-tools.sh goreleaser cosign gitsign slsa-verifier
 
+# release-pins-check keeps the tool versions of release.yml equal to tools/versions.mk.
+release-pins-check:
+	sh scripts/release/check-pins.sh
+
 # release-config-check validates the release configuration without building anything.
-release-config-check: release-tools
+release-config-check: release-tools release-pins-check
 	$(BIN)/goreleaser check
 	node scripts/release/check-release-please-config.mjs
 	sh scripts/release/notes-selftest.sh

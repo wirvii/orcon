@@ -41,7 +41,7 @@ jobs:
         env:
           FROM: ${{ github.event.pull_request.base.sha }}
           TO: ${{ github.event.pull_request.head.sha }}
-        run: make commit-lint FROM="$FROM" TO="$TO"
+        run: make commit-lint
   pr-advisory:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -61,5 +61,7 @@ jobs:
           TO: ${{ github.event.pull_request.head.sha }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
+          # FROM, TO and BRANCH reach make through the environment (mk/contributing.mk
+          # reads them with ?=), so no value from the pull request is spliced into a command line.
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
-          make pr-check FROM="$FROM" TO="$TO" BODY="$RUNNER_TEMP/pr-body.md" BRANCH="$BRANCH"
+          BODY="$RUNNER_TEMP/pr-body.md" make pr-check

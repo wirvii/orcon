@@ -31,6 +31,7 @@ jobs:
       packages: write
       id-token: write
     outputs:
+      version: ${{ steps.out.outputs.version }}
       hashes: ${{ steps.out.outputs.hashes }}
       image: ${{ steps.out.outputs.image }}
       digest: ${{ steps.out.outputs.digest }}
@@ -38,6 +39,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
@@ -59,7 +61,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # The version equals COSIGN_VERSION in tools/versions.mk (make release-pins-check).
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        with:
+          cosign-release: v3.1.3
       - run: make sbom
       - run: sh scripts/release/notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
       # The version equals GORELEASER_VERSION in tools/versions.mk.
@@ -73,6 +78,7 @@ jobs:
       - id: out
         run: |
           {
+            echo "version=${GITHUB_REF_NAME#v}"
             echo "hashes=$(base64 -w0 < build/goreleaser/checksums.txt)"
             echo "image=ghcr.io/wirvii/orcon"
             echo "digest=$(jq -r '[.[] | select(.type=="Docker Manifest" and (.name|endswith(":latest")|not))][0].extra.Digest' build/goreleaser/artifacts.json)"
@@ -90,6 +96,7 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0 # tag required by slsa-verifier (ADR 0081 section 7)
     with:
       base64-subjects: ${{ needs.goreleaser.outputs.hashes }}
+      provenance-name: orcon_${{ needs.goreleaser.outputs.version }}.intoto.jsonl
       upload-assets: true
   provenance-image:
     needs: goreleaser
@@ -114,6 +121,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      # The package is private until the owner makes it public after the first release.
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - run: sh scripts/release/install-tools.sh cosign slsa-verifier
       - env:
           GH_TOKEN: ${{ github.token }}
