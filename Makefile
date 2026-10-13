@@ -187,7 +187,7 @@ expr-corpus:
 expr-compat: expr-corpus
 	ORCON_EXPR_CORPUS=$(EXPR_CORPUS) N8N_VERSION=$(N8N_VERSION) ORCON_EXPR_REPORT=$(EXPR_REPORT) \
 		ORCON_EXPR_COMMIT="$(EXPR_COMMIT)" ORCON_EXPR_HARDWARE="$(EXPR_HARDWARE)" \
-		go test -count=1 -v ./internal/adapter/wazero -run 'TestExprCompat|TestExprMeasurementReport'
+		go test -count=1 -v ./internal/adapter/wazero -run 'TestExprCompat|TestExprCorpusParity|TestExprMeasurementReport'
 
 # expr-report rewrites the report from the corpus already downloaded, without the gate.
 expr-report:
