@@ -313,6 +313,9 @@ func (v *validator) node(i int, n *Node) {
 	v.variablesShape(i, n)
 	v.nodeBlocks(base, n)
 	v.waitAndBoundary(base, n)
+	if n.Trigger != nil {
+		v.trigger(base, n)
+	}
 	if n.Attention != nil {
 		checkEnum(r, base+"/attention/notify", n.Attention.Notify, AttentionNotifies())
 	}

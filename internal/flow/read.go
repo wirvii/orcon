@@ -393,6 +393,10 @@ func (d *decoder) nodeBlocks(o *obj, n *Node) {
 	if c, ok := o.child("eventDefinition", false); ok {
 		n.EventDefinition = d.eventDefinition(c)
 	}
+	if c, ok := o.child("trigger", false); ok {
+		n.Trigger = d.trigger(c)
+		c.done()
+	}
 	if c, ok := o.child("attention", false); ok {
 		n.Attention = &Attention{Notify: AttentionNotify(c.str("notify", true))}
 		c.done()

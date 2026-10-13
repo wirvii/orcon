@@ -212,6 +212,9 @@ func (n *Node) writeBlocks(b *builder) {
 	if n.Wait != nil {
 		b.val("wait", n.Wait.value())
 	}
+	if n.Trigger != nil {
+		b.val("trigger", n.Trigger.value())
+	}
 	if n.Attention != nil {
 		var a builder
 		a.str("notify", string(n.Attention.Notify))

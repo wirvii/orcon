@@ -98,6 +98,9 @@ type Node struct {
 	EventDefinition *EventDefinition
 
 	Attention *Attention
+
+	// Trigger is the trigger block of a startEvent node (ADR-0020 section 2).
+	Trigger *Trigger
 }
 
 // ConnectorPin names the exact connector package a node uses: its version and

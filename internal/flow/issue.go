@@ -8,7 +8,33 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
+
+// WarningsFormat is the format tag of the warning document stored with a
+// published version.
+const WarningsFormat = "orcon/flow-warnings@1"
+
+// WarningsValue returns the warnings of the report as the JSON array stored
+// with a version: one object per warning with severity, code, path and
+// message. It is the zero value when the report has no warnings.
+func (r Report) WarningsValue() jsonvalue.Value {
+	warnings := r.Warnings()
+	if len(warnings) == 0 {
+		return jsonvalue.Value{}
+	}
+	items := make([]jsonvalue.Value, len(warnings))
+	for i, w := range warnings {
+		var b builder
+		b.str("severity", string(w.Severity))
+		b.str("code", w.Code)
+		b.str("path", w.Path)
+		b.str("message", w.Message)
+		items[i] = b.build()
+	}
+	return jsonvalue.Array(items...)
+}
 
 // Severity tells whether an [Issue] blocks publication.
 type Severity string
