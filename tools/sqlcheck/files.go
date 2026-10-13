@@ -307,13 +307,13 @@ var outsideAllowed = []string{
 	"internal/adapter/sqlite/",
 	"internal/adapter/postgres/",
 	"internal/adapter/storetest/",
-	"tools/",   // test data of the tools
-	".agents/", // skill templates
-	".claude/", // generated copy of the skills
+	"tools/", // test data of the tools
 }
 
-// skipDirs are never walked.
-var skipDirs = map[string]bool{".git": true, "node_modules": true, ".bin": true, "bin": true, "dist": true, ".turbo": true, ".pnpm-store": true}
+// skipDirs are never walked, besides every hidden directory (the version
+// control data, tool caches and the agent skill folders, whose templates are
+// not Orcon's SQL).
+var skipDirs = map[string]bool{"node_modules": true, "bin": true, "dist": true}
 
 // checkOutsideSQL reports the .sql files that live outside the data-access layer.
 func checkOutsideSQL(root string) ([]Finding, error) {
@@ -323,7 +323,7 @@ func checkOutsideSQL(root string) ([]Finding, error) {
 			return err
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] && path != root {
+			if path != root && (skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".")) {
 				return filepath.SkipDir
 			}
 			return nil

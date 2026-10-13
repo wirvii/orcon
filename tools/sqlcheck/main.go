@@ -14,8 +14,8 @@
 //
 //   - SQL-1: no .sql file anywhere in the repository outside the data-access
 //     layer (internal/adapter/sqlite, internal/adapter/postgres), the contract
-//     suites (internal/adapter/storetest), the tools module (its test data) and
-//     the skills (templates). The Go side of this rule is the orgscope analyzer
+//     suites (internal/adapter/storetest) and the tools module (its test data);
+//     hidden directories, node_modules, bin and dist are not scanned. The Go side of this rule is the orgscope analyzer
 //     of tools/orconvet.
 //   - TI-2: every query carries -- orcon:scope org|instance|engine.
 //   - TI-3, scope org: every organization-scoped table the statement reads or
