@@ -1,0 +1,57 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+
+import { parse } from 'yaml';
+
+import { RULE_NAMES } from '../plugin/orcon.js';
+import { DEFAULT_PROTOCOL_PATHS } from '../plugin/model.js';
+import { packageDir } from '../scripts/lib.mjs';
+
+const config = parse(readFileSync(join(packageDir, 'redocly.yaml'), 'utf8'));
+const severityOf = (rule) => (typeof rule === 'string' ? rule : rule.severity);
+
+test('redocly.yaml registers the plugin and enables all 31 orcon rules as errors', () => {
+  assert.deepEqual(config.plugins, ['./plugin/orcon.js']);
+  for (const name of RULE_NAMES) {
+    const rule = config.rules[`orcon/${name}`];
+    assert.ok(rule, `orcon/${name} is not enabled`);
+    assert.equal(severityOf(rule), 'error', `orcon/${name} is not an error`);
+  }
+  assert.equal(Object.keys(config.rules).filter((k) => k.startsWith('orcon/')).length, 31);
+});
+
+test('orcon/path-shape runs first and lists the protocol paths of the plugin', () => {
+  const orcon = Object.keys(config.rules).filter((k) => k.startsWith('orcon/'));
+  assert.equal(orcon[0], 'orcon/path-shape', 'path-shape applies protocolPaths to the shared model before the other rules read it');
+  assert.deepEqual(config.rules['orcon/path-shape'].protocolPaths, [...DEFAULT_PROTOCOL_PATHS]);
+});
+
+test('the only rule turned off is the built-in operation-4xx-problem-details-rfc7807', () => {
+  const off = Object.entries(config.rules).filter(([, rule]) => severityOf(rule) === 'off').map(([name]) => name);
+  assert.deepEqual(off, ['operation-4xx-problem-details-rfc7807']);
+  for (const [name, rule] of Object.entries(config.rules)) {
+    if (!off.includes(name)) assert.equal(severityOf(rule), 'error', `${name} is not an error`);
+  }
+});
+
+test('the built-in rules of the toolchain are enabled', () => {
+  const required = [
+    'struct',
+    'operation-operationId-unique',
+    'operation-operationId-url-safe',
+    'path-parameters-defined',
+    'no-ambiguous-paths',
+    'no-invalid-media-type-examples',
+    'no-invalid-schema-examples',
+    'no-unused-components',
+    'security-defined',
+    'no-server-trailing-slash',
+    'operation-4xx-problem-details-rfc7807',
+  ];
+  for (const name of required) assert.equal(severityOf(config.rules[name]), name === 'operation-4xx-problem-details-rfc7807' ? 'off' : 'error', name);
+});

@@ -13,7 +13,7 @@ export interface ScrollAreaProps {
   label: string;
   children: ReactNode;
   /** Give the area a height (or max height) so it can overflow, for example `max-h-panel-width`. */
-  className?: string;
+  className?: string | undefined;
 }
 
 /**

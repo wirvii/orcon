@@ -9,7 +9,6 @@ import { FormField } from '../form-field/FormField';
 import { Input } from '../input/Input';
 
 import { ErrorSummary } from './ErrorSummary';
-import { states } from './ErrorSummary.meta';
 
 const errors = [
   { fieldId: 'flow-name', message: 'Enter a name for the flow.' },
@@ -69,4 +68,3 @@ export const Matrix: Story = {
   ),
 };
 
-void states;

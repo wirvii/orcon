@@ -163,6 +163,8 @@ func postgresSession(t *testing.T, params map[string]string, setRole bool) *pgx.
 	cfg.RuntimeParams["TimeZone"] = "UTC"
 	cfg.RuntimeParams["idle_in_transaction_session_timeout"] = "10s"
 	cfg.RuntimeParams["lock_timeout"] = "5s"
+	cfg.RuntimeParams["statement_timeout"] = "30s"
+	cfg.RuntimeParams["application_name"] = "orcon-test"
 	for k, v := range params {
 		cfg.RuntimeParams[k] = v
 	}
@@ -194,6 +196,8 @@ func TestPostgresSession(t *testing.T) {
 		{name: "not the application role", role: false, object: "current_user"},
 		{name: "no idle timeout", params: map[string]string{"idle_in_transaction_session_timeout": "0"}, role: true, object: "idle_in_transaction_session_timeout"},
 		{name: "no lock timeout", params: map[string]string{"lock_timeout": "0"}, role: true, object: "lock_timeout"},
+		{name: "no statement timeout", params: map[string]string{"statement_timeout": "0"}, role: true, object: "statement_timeout"},
+		{name: "no application name", params: map[string]string{"application_name": ""}, role: true, object: "application_name"},
 		{name: "session-level organization leaked", role: true, setup: "SELECT set_config('orcon.org_id', '00000000-0000-0000-0000-000000000001', false)", object: "orcon.org_id"},
 		{name: "serializable by default", params: map[string]string{"default_transaction_isolation": "serializable"}, role: true, object: "transaction_isolation"},
 	}

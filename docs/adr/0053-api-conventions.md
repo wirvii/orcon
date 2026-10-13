@@ -30,6 +30,7 @@ The code catalog is part of the contract (`components/schemas/ProblemCode` with 
 - Same key and fingerprint after completion → stored response replayed with `Idempotent-Replayed: true`. Different fingerprint → `422 idempotency-key-reused`. In progress → `409 idempotency-in-progress` with `Retry-After`.
 - The record is written in the same transaction as the state change; handlers that start durable work store the created resource id so a replay returns it even if the first response was lost.
 - Responses disclosing a newly issued secret are stored without it; a replay returns `409 secret-already-issued` with the resource id.
+- A secret Orcon generates (API key, OAuth client secret, webhook signing secret) is disclosed exactly once: in the response of the operation that creates or rotates it, as the read-only property `secret` of a response schema named `<Resource>WithSecret` that extends the resource; that operation requires `Idempotency-Key`. Secrets of the credential store are never returned (ADR-0043 §2).
 - `PUT` and `DELETE` are idempotent by definition.
 
 ### 5. Optimistic concurrency
@@ -48,6 +49,7 @@ The code catalog is part of the contract (`components/schemas/ProblemCode` with 
 ### 7. Long-running operations
 - Imports, Git syncs and conflict resolution, bulk export, bulk retry, connector installation from a remote catalog and webhook replay return `202 Accepted`, `Location: /api/v1/operations/{operationId}` and the `Operation` resource; declared with `x-orcon-long-running: { kind }`.
 - `api_operation(org_id, id, project_id, kind, status, progress, request_reference, result_reference, error_document?, error_document_format?, created_by_principal_id?, created_at, started_at, finished_at, lease_owner, lease_epoch, lease_expires_at, cancel_requested_at)`; `Operation.status` in the API: `PENDING → RUNNING → SUCCEEDED | FAILED | CANCELED`.
+- A failed operation carries `failure` (`code` from the problem-code catalog, `title`, `detail?`), built from `error_document`; no resource names a member `error` (§9).
 - Executed by `worker` (or `standalone`), claimed through an `orcon_engine` function (ADR-0047 §2) with lease and fencing (ADR-0013 §4); a crashed holder's operation is reclaimed; each kind defines idempotent steps or checkpoints.
 - Readable by its creator and by principals holding the read permission of its target; completion emits `operation.finished`.
 
@@ -55,7 +57,7 @@ The code catalog is part of the contract (`components/schemas/ProblemCode` with 
 `POST /flows/{flowId}/executions` (permission `flow:execute`) accepts `wait` (≤ 60 s). Finished in time → `200` with the `Execution` resource, which carries its output summary (data only with `execution:read-data`, else the resource field `dataHidden: true`); otherwise `202` with the `Execution` resource. The wait uses the cross-process notification pattern of ADR-0023 §2.
 
 ### 9. Response shapes (ADR-0080 §7; owner decision 2026-10-12)
-- A single resource is returned as the object itself; a list is exactly `{ items, nextPageToken? }` (plus `total`/`totalIsLowerBound` only where `x-orcon-include-total` is declared); an error is always `application/problem+json` (§3).
+- A single resource is returned as the object itself; a list is exactly `{ items, nextPageToken? }` (plus `total`/`totalIsLowerBound` only where `x-orcon-include-total` is declared); an error is always `application/problem+json` (§3), except in `protocol`-tagged operations (ADR-0052 §1), whose errors follow their external standard (for example RFC 6749 §5.2 for the OAuth token endpoint).
 - Auxiliary data travels in headers — `Orcon-Request-Id`, `ETag`, `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Location`, `Idempotent-Replayed`, `Deprecation`, `Sunset`, `Link` — and is never copied into bodies.
 - Status codes: `200` with the resource; `201` with the created resource and `Location`; `202` with the `Operation` resource or the execution (`wait` expired); `204` with no body.
 - Forbidden at the root of a 2xx body: `data`, `meta`, `success`, `ok`, `result`, `results`, `payload`, `response`, `error`, `errors`, `pagination`, `links`, `requestId`, `etag`, and a boolean `status`. Visibility flags that describe the resource itself (`dataHidden`) are resource fields, not envelopes.
@@ -72,3 +74,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-014 (Amendment 5, carried by SPEC-005).** §3 gains error codes for new conditions. Additive only (ADR-0054 §3): no existing operation, field, permission, MCP level or tool changes; semantics of test runs, pinned data and effect confirmation: ADR-0082 (SPEC-014).
 - **SPEC-009 K19 (2026-10-13, owner decision).** §4 (`idempotency_record.status`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
+- **SPEC-012 (Amendment 2, 2026-10-13, owner decision).** §4: a secret Orcon generates is returned once, in `<Resource>WithSecret.secret`, by the operation that creates or rotates it, which requires idempotency. §7: a failed `Operation` reports `failure`, never `error`. §9: protocol-tagged operations are the only exception to problem+json errors.

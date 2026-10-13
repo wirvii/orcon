@@ -1,0 +1,7 @@
+request-property-removed  err
+request-parameter-removed  err
+request-parameter-default-value-changed  err
+request-property-default-value-changed  err
+response-optional-property-removed  err
+response-property-enum-value-removed  err
+response-property-enum-value-added  info

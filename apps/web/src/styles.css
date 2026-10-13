@@ -1,0 +1,8 @@
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The design system stylesheet: tokens, theme, fonts and the component classes. */
+@import '@orcon/ui/styles.css';
+
+/* The app's own markup uses the same token utilities, so Tailwind scans these sources too. */
+@source './';

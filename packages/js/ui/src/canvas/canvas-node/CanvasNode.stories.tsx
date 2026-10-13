@@ -4,6 +4,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 
+import { must } from '../../lib/must';
 import { CanvasStage } from '../../stories/CanvasStage';
 import { agentGraph, exampleNodes, placeholderNode } from '../fixtures';
 import type { GraphNode } from '../model';
@@ -30,7 +31,7 @@ type Story = StoryObj<typeof meta>;
 const plain: GraphNode = { ...exampleNodes.http, status: undefined };
 const trigger: GraphNode = { ...exampleNodes.webhook, status: undefined };
 const logic: GraphNode = { ...exampleNodes.validate, status: undefined };
-const agent: GraphNode = { ...agentGraph.nodes[1] } as GraphNode;
+const agent: GraphNode = { ...must(agentGraph.nodes[1]) };
 const connector: GraphNode = { ...exampleNodes.slack, status: undefined };
 
 export const Default: Story = {

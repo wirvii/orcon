@@ -18,10 +18,10 @@ export interface PaneSplitterProps {
    * Which way a drag to the right moves the size: `1` when moving right makes the pane larger, `-1`
    * when it makes it smaller. Arrow keys follow the same direction.
    */
-  direction?: 1 | -1;
+  direction?: 1 | -1 | undefined;
   /** Step of the arrow keys, in px. */
-  step?: number;
-  className?: string;
+  step?: number | undefined;
+  className?: string | undefined;
 }
 
 /**

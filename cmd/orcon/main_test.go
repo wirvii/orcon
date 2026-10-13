@@ -41,6 +41,21 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
+func TestRunVersion(t *testing.T) {
+	// Not parallel: the test replaces the package variables the release build injects.
+	oldVersion, oldCommit := version, commit
+	t.Cleanup(func() { version, commit = oldVersion, oldCommit })
+	version, commit = "1.2.3", "0123456789abcdef"
+
+	var stdout, stderr syncBuffer
+	if code := run(t.Context(), []string{"--version"}, &stdout, &stderr); code != exitOK {
+		t.Fatalf("exit code = %d, want %d (stderr %q)", code, exitOK, stderr.String())
+	}
+	if got, want := stdout.String(), "orcon 1.2.3 (0123456789abcdef)\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestRun(t *testing.T) {
 	t.Run("invalid role exits 2", func(t *testing.T) {
 		var stdout, stderr syncBuffer

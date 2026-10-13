@@ -22,7 +22,7 @@ const messages = defineMessages({
  */
 export interface ToasterProps {
   /** How many toasts show at once; older ones wait behind. Defaults to 3. */
-  visibleToasts?: number;
+  visibleToasts?: number | undefined;
 }
 
 export function Toaster({ visibleToasts }: ToasterProps) {
@@ -32,7 +32,7 @@ export function Toaster({ visibleToasts }: ToasterProps) {
       position="bottom-right"
       closeButton
       expand
-      visibleToasts={visibleToasts}
+      {...(visibleToasts === undefined ? {} : { visibleToasts })}
       containerAriaLabel={intl.formatMessage(messages.region)}
       icons={{
         success: <CircleCheck aria-hidden className="size-icon-16" />,

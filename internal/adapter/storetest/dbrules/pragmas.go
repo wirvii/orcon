@@ -103,7 +103,7 @@ var zeroTimeoutRE = regexp.MustCompile(`^0+(\.0+)?\s*(us|ms|s|min|h|d)?$`)
 // CheckPostgresSession verifies the settings of a PostgreSQL transaction at
 // its start (connections.md CN-7, CN-8, tenant-isolation.md TI-6): TimeZone =
 // UTC, current_user = orcon_application, an empty orcon.org_id, read committed
-// isolation and non-zero idle_in_transaction_session_timeout and lock_timeout.
+// isolation and non-zero idle_in_transaction_session_timeout, lock_timeout and statement_timeout, an application_name starting with orcon.
 func CheckPostgresSession(ctx context.Context, tx pgx.Tx) []Finding {
 	var out []Finding
 	read := func(query string) (string, bool) {
@@ -129,7 +129,10 @@ func CheckPostgresSession(ctx context.Context, tx pgx.Tx) []Finding {
 	if v, ok := read(`SELECT current_setting('transaction_isolation')`); ok && v != "read committed" {
 		out = append(out, Finding{Rule: "CN-7", Object: "transaction_isolation", Message: "must be read committed (found " + v + ")"})
 	}
-	for _, name := range []string{"idle_in_transaction_session_timeout", "lock_timeout"} {
+	if v, ok := read(`SELECT current_setting('application_name')`); ok && !strings.HasPrefix(v, "orcon") {
+		out = append(out, Finding{Rule: "CN-7", Object: "setting application_name", Message: "must be orcon-<role> (found " + orDefault(v, "empty") + ")"})
+	}
+	for _, name := range []string{"idle_in_transaction_session_timeout", "lock_timeout", "statement_timeout"} {
 		if v, ok := read(`SELECT current_setting('` + name + `')`); ok && (v == "" || zeroTimeoutRE.MatchString(v)) {
 			out = append(out, Finding{Rule: "CN-7", Object: "setting " + name, Message: "must not be disabled (found " + orDefault(v, "empty") + ")"})
 		}

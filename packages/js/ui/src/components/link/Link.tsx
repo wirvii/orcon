@@ -17,16 +17,16 @@ const messages = defineMessages({
 });
 
 export interface LinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
-  ref?: Ref<HTMLAnchorElement>;
+  ref?: Ref<HTMLAnchorElement> | undefined;
   /** Opens in a new tab, shows an external icon and tells assistive technology. */
-  external?: boolean;
+  external?: boolean | undefined;
   /**
    * The link sits inside running text. Its target size is then exempt, but only
    * when an ancestor carries the `data-prose` attribute.
    */
-  inText?: boolean;
+  inText?: boolean | undefined;
   /** Render the child element (a router link) with the link styling. */
-  asChild?: boolean;
+  asChild?: boolean | undefined;
 }
 
 export function Link({ className, external = false, inText = false, asChild = false, children, ref, ...props }: LinkProps) {

@@ -50,8 +50,11 @@ for rel in $pkgdirs; do
   head_bin="$work/head-$i.test"
   base_bin="$work/base-$i.test"
   (cd "$root/$rel" && go test -c -o "$head_bin" .)
-  # A package or benchmark new in this change has no base side.
-  if [ -d "$work/base/$rel" ] && (cd "$work/base/$rel" && go test -c -o "$base_bin" . 2>/dev/null); then
+  # A package or benchmark new in this change has no base side: the package is
+  # missing, has no test files (go test -c then writes no binary), or has no
+  # benchmark.
+  if [ -d "$work/base/$rel" ] && (cd "$work/base/$rel" && go test -c -o "$base_bin" . 2>/dev/null) &&
+    [ -x "$base_bin" ] && "$base_bin" -test.list '^Benchmark' 2>/dev/null | grep -q '^Benchmark'; then
     runs="$runs $i:$rel"
   else
     echo "bench-compare: $rel has no base side; skipped in the comparison"

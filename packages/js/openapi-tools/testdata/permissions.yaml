@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Permission catalog used by the plugin self-tests, in the strict format of
+# internal/authz/permissions.yaml (SPEC-012 Amendment 2): version 1 and the scopes
+# organization, project and instance, each a list of items with a name.
+version: 1
+permissions:
+  organization:
+    - name: org:read
+    - name: org:update
+    - name: org:delete
+    - name: member:read
+    - name: member:invite
+    - name: member:remove
+    - name: member:update-role
+    - name: group:manage
+    - name: role:read
+    - name: role:manage
+    - name: project:create
+    - name: project:read-all
+    - name: project:delete
+    - name: auth-source:manage
+    - name: scim:manage
+    - name: domain:manage
+    - name: security-policy:manage
+    - name: service-account:manage
+    - name: audit:read
+    - name: audit:export
+    - name: siem:manage
+    - name: secret-store:manage
+    - name: secret-store:reference
+    - name: connector:approve
+    - name: key:rotate-org
+    - name: limits:read
+    - name: notification:manage
+    - name: apikey:manage-org
+  project:
+    - name: project:read
+    - name: project:update
+    - name: project:manage-members
+    - name: flow:read
+    - name: flow:create
+    - name: flow:update
+    - name: flow:delete
+    - name: flow:move
+    - name: flow:publish
+    - name: flow:activate
+    - name: flow:rollback
+    - name: flow:execute
+    - name: flow:export
+    - name: flow:import
+    - name: flow:submit-form
+    - name: execution:read
+    - name: execution:read-data
+    - name: execution:retry
+    - name: execution:cancel
+    - name: execution:resolve
+    - name: execution:delete
+    - name: human-task:resolve
+    - name: credential:read
+    - name: credential:create
+    - name: credential:update
+    - name: credential:delete
+    - name: credential:use
+    - name: credential:share
+    - name: variable:read
+    - name: variable:manage
+  instance:
+    - name: instance:orgs
+    - name: instance:keys
+    - name: instance:connectors
+    - name: instance:policy
+    - name: instance:limits
+    - name: instance:siem
+    - name: instance:users
+roles: {}   # role definitions; not read by the contract lint

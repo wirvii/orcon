@@ -11,10 +11,10 @@ export type MenuEntry =
   | {
       type: 'item';
       label: string;
-      onSelect?: () => void;
-      disabled?: boolean;
+      onSelect?: (() => void) | undefined;
+      disabled?: boolean | undefined;
       /** Irreversible or risky action. Shown in the danger color with the label unchanged; confirm it with an AlertDialog. */
-      destructive?: boolean;
+      destructive?: boolean | undefined;
     }
   | { type: 'separator' }
   | { type: 'label'; label: string };
@@ -23,7 +23,7 @@ export interface DropdownMenuProps extends Pick<ComponentProps<typeof MenuPrimit
   /** The button that opens the menu. */
   trigger: ReactElement;
   items: readonly MenuEntry[];
-  align?: ComponentProps<typeof MenuPrimitive.Content>['align'];
+  align?: ComponentProps<typeof MenuPrimitive.Content>['align'] | undefined;
 }
 
 /** A list of actions opened from a button. Arrow keys move, Enter selects, Escape closes and returns focus. */

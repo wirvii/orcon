@@ -18,10 +18,10 @@ export interface NodePalettePanelProps {
   /** The nodes that can be added. */
   items: readonly CatalogItem[];
   /** "triggers" lists only triggers, for the first step of an empty flow. */
-  filter?: 'triggers';
+  filter?: 'triggers' | undefined;
   onPick: (item: CatalogItem) => void;
   onClose: () => void;
-  className?: string;
+  className?: string | undefined;
 }
 
 /**

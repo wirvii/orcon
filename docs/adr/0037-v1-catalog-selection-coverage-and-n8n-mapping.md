@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0037 — V1 catalog selection, published coverage, n8n node mapping and host-access nodes
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-003.
 
@@ -44,3 +44,8 @@ Connector work is prioritised by evidence; coverage claims are reproducible and 
 
 ## Alternatives considered
 Hand-picked "top N" list (rejected: not evidence-based); node-type-level counting only (rejected: overstates coverage when only some operations exist); view-weighted release gate (rejected, SPEC-003 Q15); excluding host-access nodes from V1 (rejected, SPEC-003 Q5: breaks 100 % core coverage).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-014 (2026-10-13, owner decision OQ1).** §6: an n8n node that has no mapping is imported as the reserved built-in node type `orcon.unsupported@1`, in full import and in paste conversion alike. The node is inert: always disabled and impossible to enable; it keeps the original n8n node JSON and the reason in `ext["orcon.import"]`, and keeps its connections. Publishing a flow that contains it fails with a message naming the node. The importer gains a fragment entry point for paste conversion: the same mapping rules, at most 200 nodes (otherwise `fragment-too-large`), nothing persisted, and n8n `pinData` returned beside the fragment, never inside the flow document.
