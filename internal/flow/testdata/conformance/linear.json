@@ -1,0 +1,30 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000001",
+  "name": "Linear flow",
+  "description": "A start event, one HTTP request and an end event.",
+  "settings": {},
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "fetch",
+      "name": "Fetch",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "=https://example.test/items/{{ $json.id }}", "method": "GET" }
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "element": "endEvent",
+      "type": "orcon.end@1",
+      "parameters": { "message": "={{ $('Fetch').item.json.title }}" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "fetch" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "fetch", "port": "main" }, "to": { "node": "done" }, "kind": "SEQUENCE" }
+  ],
+  "editor": { "nodes": { "start": { "x": 0, "y": 0 }, "fetch": { "x": 200, "y": 0 }, "done": { "x": 400, "y": 0 } } }
+}

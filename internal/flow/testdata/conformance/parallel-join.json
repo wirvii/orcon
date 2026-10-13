@@ -1,0 +1,51 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000002",
+  "name": "Parallel split and synchronizing join",
+  "settings": { "branchMode": "PARALLEL", "priority": "NORMAL" },
+  "variables": [{ "name": "seen", "scope": "EXECUTION", "accumulator": "SUM" }],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    { "id": "split", "name": "Split", "element": "parallelGateway", "type": "orcon.split@1", "parameters": {} },
+    {
+      "id": "a",
+      "name": "Branch A",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "https://example.test/a" }
+    },
+    {
+      "id": "b",
+      "name": "Branch B",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "https://example.test/b" }
+    },
+    {
+      "id": "join",
+      "name": "Join",
+      "element": "parallelGateway",
+      "type": "orcon.merge@1",
+      "parameters": {},
+      "join": { "mode": "ALL", "data": "APPEND" }
+    },
+    {
+      "id": "use",
+      "name": "Use both",
+      "element": "task",
+      "type": "orcon.set@1",
+      "parameters": { "a": "={{ $('Branch A').item.json.value }}", "b": "={{ $('Branch B').item.json.value }}" }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "split" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "split", "port": "main" }, "to": { "node": "a" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "split", "port": "main" }, "to": { "node": "b" }, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "a", "port": "main" }, "to": { "node": "join" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "b", "port": "main" }, "to": { "node": "join" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "join", "port": "main" }, "to": { "node": "use" }, "kind": "SEQUENCE" },
+    { "id": "e7", "from": { "node": "use", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}
