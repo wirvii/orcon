@@ -198,8 +198,9 @@ bench-compare:
 
 # skill-sync copies each canonical skill to its generated copy.
 skill-sync:
-	sh .agents/skills/orcon-go/scripts/project.sh
-	sh .agents/skills/orcon-db/scripts/project.sh
+	set -e; for skill in orcon-go orcon-db orcon-api orcon-connector orcon-contributing orcon-web; do \
+		sh .agents/skills/$$skill/scripts/project.sh; \
+	done
 
 skill-check:
 	sh scripts/check-skill.sh
