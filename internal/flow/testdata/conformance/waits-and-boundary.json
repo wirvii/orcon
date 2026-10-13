@@ -1,0 +1,82 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000006",
+  "name": "Timer, signal and human waits with a boundary timer",
+  "settings": { "timeouts": { "executionActive": "PT30M" } },
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "pause",
+      "name": "Pause",
+      "element": "intermediateCatchEvent",
+      "type": "orcon.wait@1",
+      "parameters": {},
+      "wait": { "kind": "TIMER", "timer": { "duration": "PT5M" } }
+    },
+    {
+      "id": "callback",
+      "name": "Wait for callback",
+      "element": "receiveTask",
+      "type": "orcon.wait@1",
+      "parameters": {},
+      "wait": { "kind": "SIGNAL", "timeout": "PT1H" }
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "element": "userTask",
+      "type": "orcon.humanTask@1",
+      "parameters": { "assignee": "role:reviewer" },
+      "wait": {
+        "kind": "HUMAN",
+        "timeout": "P2D",
+        "form": { "type": "object", "properties": { "approved": { "type": "boolean" } } }
+      },
+      "attention": { "notify": "DEFAULT" }
+    },
+    {
+      "id": "slow",
+      "name": "Slow call",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "https://example.test/slow" },
+      "onError": "CONTINUE_WITH_ERROR"
+    },
+    {
+      "id": "too-slow",
+      "name": "Too slow",
+      "element": "boundaryEvent",
+      "type": "orcon.boundary@1",
+      "parameters": {},
+      "attachedTo": "slow",
+      "cancelActivity": true,
+      "eventDefinition": { "timer": { "duration": "PT30S" } }
+    },
+    {
+      "id": "reminder",
+      "name": "Reminder",
+      "element": "boundaryEvent",
+      "type": "orcon.boundary@1",
+      "parameters": {},
+      "attachedTo": "slow",
+      "cancelActivity": false,
+      "eventDefinition": { "timer": { "cycle": "R3/PT10S" } }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} },
+    { "id": "timed-out", "name": "Timed out", "element": "endEvent", "type": "orcon.end@1", "parameters": {} },
+    { "id": "gave-up", "name": "Gave up", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "pause" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "pause", "port": "main" }, "to": { "node": "callback" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "callback", "port": "main" }, "to": { "node": "review" }, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "callback", "port": "timeout" }, "to": { "node": "timed-out" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "review", "port": "main" }, "to": { "node": "slow" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "review", "port": "timeout" }, "to": { "node": "gave-up" }, "kind": "SEQUENCE" },
+    { "id": "e7", "from": { "node": "slow", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" },
+    { "id": "e8", "from": { "node": "too-slow", "port": "main" }, "to": { "node": "gave-up" }, "kind": "SEQUENCE" },
+    { "id": "e9", "from": { "node": "reminder", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

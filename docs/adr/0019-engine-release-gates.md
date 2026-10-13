@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0019 — Engine release gates: conformance, fault injection and benchmark
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -44,7 +44,7 @@ This matrix is the single registry of fault-injection IDs. An ADR that adds a fa
 | FI-30 | `kill -9` during MK rotation | restart resumes; every OK unwraps; no credential unreadable | ADR-0050 §2 |
 | FI-31 | `kill -9` during OK rotation re-wrap | resumes; old version retired only after all DEKs moved | ADR-0050 §2 |
 | FI-32 | wrong MK at startup | process exits before any write; clear message | ADR-0050 §2 |
-| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `needs_reauth` only if the provider rotated the token | ADR-0050 §2 |
+| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `NEEDS_REAUTH` only if the provider rotated the token | ADR-0050 §2 |
 | FI-34 | three processes need the same expired token concurrently | exactly one token-endpoint call (mock provider counts) | ADR-0050 §2 |
 | FI-35 | audit sealer killed mid-seal | no gaps, no duplicates; verification passes | ADR-0050 §2 |
 | FI-36 | direct DB update/delete/reorder of audit rows | verification detects and alerts within the next run | ADR-0050 §2 |
@@ -93,3 +93,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-003.** New gates: the conformance kit over every official connector (ADR-0031 §5); the WASM escape suite (FI-25, ADR-0032 §9); TUF attacks (ADR-0033); unweighted coverage ≥ 90 % (ADR-0037 §4); the Code node measurement reports (ADR-0036); a single notification for an `UNSAFE` operation left uncertain after a crash.
 - **SPEC-004.** New gates FI-30..FI-37 and the isolation suite (ADR-0050); §4: D20 is measured with the secure default configuration (RLS with several organizations, audit, encryption).
 - **SPEC-006.** Adds the gates of ADR-0072: FI-40..FI-49, benchmark scenario S7, per-step overhead, retrieval, redaction and injection.
+- **SPEC-009 K19 (2026-10-13, owner decision).** FI-33 (`credential.status` `NEEDS_REAUTH`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.

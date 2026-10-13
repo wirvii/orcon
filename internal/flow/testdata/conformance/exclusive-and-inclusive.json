@@ -1,0 +1,65 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000003",
+  "name": "Exclusive choice, inclusive choice and an activated-branches join",
+  "settings": {},
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    { "id": "xor", "name": "Route by size", "element": "exclusiveGateway", "type": "orcon.exclusive@1", "parameters": {} },
+    { "id": "small", "name": "Small", "element": "task", "type": "orcon.set@1", "parameters": {} },
+    { "id": "large", "name": "Large", "element": "task", "type": "orcon.set@1", "parameters": {} },
+    { "id": "merge", "name": "Merge", "element": "task", "type": "orcon.noop@1", "parameters": {} },
+    { "id": "or", "name": "Notify channels", "element": "inclusiveGateway", "type": "orcon.inclusive@1", "parameters": {} },
+    { "id": "mail", "name": "Mail", "element": "sendTask", "type": "orcon.email@1", "parameters": {} },
+    { "id": "chat", "name": "Chat", "element": "sendTask", "type": "orcon.chat@1", "parameters": {} },
+    {
+      "id": "after",
+      "name": "After notifications",
+      "element": "task",
+      "type": "orcon.set@1",
+      "parameters": { "mail": "={{ $('Mail').isExecuted ? 'yes' : 'no' }}" },
+      "join": { "mode": "ACTIVATED", "data": "APPEND" }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "xor" }, "kind": "SEQUENCE" },
+    {
+      "id": "e2",
+      "from": { "node": "xor", "port": "main" },
+      "to": { "node": "small" },
+      "condition": "$json.size < 10",
+      "kind": "SEQUENCE"
+    },
+    {
+      "id": "e3",
+      "from": { "node": "xor", "port": "main" },
+      "to": { "node": "large" },
+      "default": true,
+      "kind": "SEQUENCE"
+    },
+    { "id": "e4", "from": { "node": "small", "port": "main" }, "to": { "node": "merge" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "large", "port": "main" }, "to": { "node": "merge" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "merge", "port": "main" }, "to": { "node": "or" }, "kind": "SEQUENCE" },
+    {
+      "id": "e7",
+      "from": { "node": "or", "port": "main" },
+      "to": { "node": "mail" },
+      "condition": "$json.mail === true",
+      "kind": "SEQUENCE"
+    },
+    {
+      "id": "e8",
+      "from": { "node": "or", "port": "main" },
+      "to": { "node": "chat" },
+      "condition": "$json.chat === true",
+      "default": true,
+      "kind": "SEQUENCE"
+    },
+    { "id": "e9", "from": { "node": "mail", "port": "main" }, "to": { "node": "after" }, "kind": "SEQUENCE" },
+    { "id": "e10", "from": { "node": "chat", "port": "main" }, "to": { "node": "after" }, "kind": "SEQUENCE" },
+    { "id": "e11", "from": { "node": "after", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

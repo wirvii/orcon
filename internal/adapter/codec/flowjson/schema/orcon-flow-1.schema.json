@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:orcon:schema:flow:1",
+  "$comment": "SPDX-FileCopyrightText: The Orcon Authors. SPDX-License-Identifier: Apache-2.0.",
+  "title": "orcon/flow@1",
+  "description": "Canonical Orcon flow definition (ADR-0007). This schema checks the shape of the document: member names, JSON types, closed UPPER_SNAKE value sets, ranges and patterns. Rules that need the whole graph (reachability, cycles, data access, concurrent writers, references between nodes) are checked by the validator and are not expressible here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "name", "settings", "variables", "nodes", "edges", "editor"],
+  "properties": {
+    "format": { "const": "orcon/flow@1" },
+    "id": { "$ref": "#/$defs/uuid" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "description": { "$ref": "#/$defs/text" },
+    "settings": { "$ref": "#/$defs/settings" },
+    "variables": { "type": "array", "items": { "$ref": "#/$defs/variable" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "editor": { "type": "object" },
+    "ext": { "$ref": "#/$defs/ext" }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
+    "duration": {
+      "type": "string",
+      "format": "duration",
+      "pattern": "^P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
+    },
+    "cycle": {
+      "type": "string",
+      "pattern": "^R\\d*/P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
+    },
+    "positiveInteger": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "byteCount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "ext": {
+      "type": "object",
+      "propertyNames": {
+        "allOf": [{ "pattern": "^[a-z0-9][a-z0-9-]*\\.[A-Za-z0-9_.-]+$" }, { "not": { "pattern": "^orcon\\." } }]
+      }
+    },
+    "branchMode": { "enum": ["PARALLEL", "SEQUENTIAL"] },
+    "priority": { "enum": ["HIGH", "NORMAL", "LOW"] },
+    "retention": { "enum": ["ALWAYS", "FAILED_ONLY", "NEVER", "DEFAULT"] },
+    "routing": { "enum": ["EXCLUSIVE", "INCLUSIVE"] },
+    "joinMode": { "enum": ["ALL", "ACTIVATED", "FIRST"] },
+    "joinData": { "enum": ["APPEND", "MATCH_FIELD", "MATCH_POSITION"] },
+    "onError": { "enum": ["STOP_EXECUTION", "CONTINUE_WITH_ERROR", "ERROR_OUTPUT"] },
+    "callMode": { "enum": ["WAIT", "FIRE_AND_FORGET"] },
+    "waitKind": { "enum": ["TIMER", "SIGNAL", "HUMAN"] },
+    "edgeKind": { "enum": ["SEQUENCE", "BACK"] },
+    "attentionNotify": { "enum": ["DEFAULT", "ON", "OFF"] },
+    "varScope": { "enum": ["EXECUTION", "ITERATION"] },
+    "accumulator": { "enum": ["SUM", "APPEND", "MAX", "MIN"] },
+    "element": {
+      "enum": [
+        "startEvent",
+        "endEvent",
+        "task",
+        "serviceTask",
+        "scriptTask",
+        "userTask",
+        "receiveTask",
+        "sendTask",
+        "callActivity",
+        "exclusiveGateway",
+        "inclusiveGateway",
+        "parallelGateway",
+        "eventBasedGateway",
+        "complexGateway",
+        "intermediateCatchEvent",
+        "intermediateThrowEvent",
+        "boundaryEvent"
+      ]
+    },
+    "concurrency": {
+      "oneOf": [{ "$ref": "#/$defs/positiveInteger" }, { "const": "ALL" }]
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "branchMode": { "$ref": "#/$defs/branchMode" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "concurrency": { "$ref": "#/$defs/positiveInteger" },
+        "timeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "executionActive": { "$ref": "#/$defs/duration" } }
+        },
+        "retention": { "$ref": "#/$defs/retention" },
+        "memoryLimit": { "$ref": "#/$defs/byteCount" },
+        "errorFlow": { "$ref": "#/$defs/uuid" },
+        "callDepthLimit": { "$ref": "#/$defs/positiveInteger" },
+        "importedFrom": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceVersion", "reportId"],
+          "properties": {
+            "sourceVersion": { "$ref": "#/$defs/text" },
+            "reportId": { "$ref": "#/$defs/text" }
+          }
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "scope"],
+      "properties": {
+        "name": { "$ref": "#/$defs/variableName" },
+        "scope": { "$ref": "#/$defs/varScope" },
+        "accumulator": { "$ref": "#/$defs/accumulator" },
+        "carry": { "type": "boolean" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "element", "type", "parameters"],
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "pattern": "^orcon\\.variables@" } } },
+          "then": {
+            "properties": {
+              "element": { "const": "task" },
+              "parameters": { "$ref": "#/$defs/variablesParameters" }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "element": { "$ref": "#/$defs/element" },
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$" },
+        "parameters": { "type": "object" },
+        "disabled": { "type": "boolean" },
+        "ext": { "$ref": "#/$defs/ext" },
+        "routing": { "$ref": "#/$defs/routing" },
+        "join": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "data"],
+          "properties": {
+            "mode": { "$ref": "#/$defs/joinMode" },
+            "data": { "$ref": "#/$defs/joinData" },
+            "matchField": { "$ref": "#/$defs/text" }
+          }
+        },
+        "loop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxIterations"],
+          "properties": {
+            "maxIterations": { "$ref": "#/$defs/positiveInteger" },
+            "carry": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/variableName" } }
+          }
+        },
+        "multiInstance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sequential", "batchSize"],
+          "properties": {
+            "sequential": { "type": "boolean" },
+            "concurrency": { "$ref": "#/$defs/concurrency" },
+            "inputCollection": { "$ref": "#/$defs/text" },
+            "batchSize": { "$ref": "#/$defs/positiveInteger" },
+            "completionCondition": { "$ref": "#/$defs/text" }
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxAttempts"],
+          "properties": {
+            "maxAttempts": { "$ref": "#/$defs/positiveInteger" },
+            "initialInterval": { "$ref": "#/$defs/duration" },
+            "factor": { "type": "number", "minimum": 1 },
+            "maxInterval": { "$ref": "#/$defs/duration" },
+            "respectRetryAfter": { "type": "boolean" }
+          }
+        },
+        "timeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attempt": { "$ref": "#/$defs/duration" },
+            "node": { "$ref": "#/$defs/duration" }
+          }
+        },
+        "onError": { "$ref": "#/$defs/onError" },
+        "concurrency": { "$ref": "#/$defs/concurrency" },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["handler"],
+          "properties": {
+            "handler": { "$ref": "#/$defs/id" },
+            "precondition": { "$ref": "#/$defs/text" }
+          }
+        },
+        "call": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "version", "mode", "perItem"],
+          "properties": {
+            "target": {
+              "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "string", "pattern": "^=" }]
+            },
+            "allowedTargets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/uuid" } },
+            "version": {
+              "oneOf": [{ "$ref": "#/$defs/positiveInteger" }, { "const": "CURRENT" }]
+            },
+            "mode": { "$ref": "#/$defs/callMode" },
+            "perItem": { "type": "boolean" },
+            "intentionalRecursion": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["maxDepth"],
+              "properties": { "maxDepth": { "$ref": "#/$defs/positiveInteger" } }
+            }
+          }
+        },
+        "wait": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "$ref": "#/$defs/waitKind" },
+            "timer": { "$ref": "#/$defs/timer" },
+            "timeout": { "$ref": "#/$defs/duration" },
+            "form": { "type": "object" }
+          }
+        },
+        "attachedTo": { "$ref": "#/$defs/id" },
+        "cancelActivity": { "type": "boolean" },
+        "eventDefinition": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timer": { "$ref": "#/$defs/timer" },
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "codes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } } }
+            },
+            "compensation": { "type": "object", "additionalProperties": false }
+          }
+        },
+        "attention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["notify"],
+          "properties": { "notify": { "$ref": "#/$defs/attentionNotify" } }
+        }
+      }
+    },
+    "variablesParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assignments"],
+      "properties": {
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["variable", "value"],
+            "properties": {
+              "variable": { "$ref": "#/$defs/variableName" },
+              "value": {}
+            }
+          }
+        }
+      }
+    },
+    "timer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration": { "$ref": "#/$defs/duration" },
+        "date": { "$ref": "#/$defs/instant" },
+        "cycle": { "$ref": "#/$defs/cycle" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node", "port"],
+          "properties": {
+            "node": { "$ref": "#/$defs/id" },
+            "port": { "type": "string", "maxLength": 80, "pattern": "^[A-Za-z][A-Za-z0-9_-]*(:[A-Za-z0-9_.-]+)?$" }
+          }
+        },
+        "to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node"],
+          "properties": { "node": { "$ref": "#/$defs/id" } }
+        },
+        "condition": { "$ref": "#/$defs/text" },
+        "default": { "type": "boolean" },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "order": { "$ref": "#/$defs/positiveInteger" }
+      }
+    }
+  }
+}

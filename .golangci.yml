@@ -168,6 +168,14 @@ linters:
             - pkg: github.com/oapi-codegen/runtime
               desc: generated API code is confined to internal/adapter/httpapi
         # adapter-private-<name>: one rule per directory in internal/adapter (coverage script enforces)
+        adapter-private-codec:
+          files:
+            - "$all"
+            - "!**/internal/adapter/codec/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/codec
+              desc: only cmd/orcon wires adapters (AL-8)
         adapter-private-httpapi:
           files:
             - "$all"

@@ -9,10 +9,12 @@ toolchain go1.26.9
 
 ignore node_modules
 
+require go.uber.org/goleak v1.3.0
+
 require (
+	github.com/google/go-cmp v0.7.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/testcontainers/testcontainers-go v0.44.0
-	go.uber.org/goleak v1.3.0
 	modernc.org/sqlite v1.59.0
 )
 

@@ -1,0 +1,67 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000009",
+  "name": "Execution variables written by orcon.variables nodes",
+  "settings": {},
+  "variables": [
+    { "name": "total", "scope": "EXECUTION", "accumulator": "SUM" },
+    { "name": "status", "scope": "EXECUTION" }
+  ],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    { "id": "split", "name": "Split", "element": "parallelGateway", "type": "orcon.split@1", "parameters": {} },
+    {
+      "id": "left",
+      "name": "Count left",
+      "element": "task",
+      "type": "orcon.variables@1",
+      "parameters": { "assignments": [{ "variable": "total", "value": 1 }] }
+    },
+    {
+      "id": "right",
+      "name": "Count right",
+      "element": "task",
+      "type": "orcon.variables@1",
+      "parameters": { "assignments": [{ "variable": "total", "value": "={{ $json.size }}" }] }
+    },
+    {
+      "id": "join",
+      "name": "Join",
+      "element": "parallelGateway",
+      "type": "orcon.merge@1",
+      "parameters": {},
+      "join": { "mode": "ALL", "data": "APPEND" }
+    },
+    {
+      "id": "opened",
+      "name": "Mark opened",
+      "element": "task",
+      "type": "orcon.variables@1",
+      "parameters": { "assignments": [{ "variable": "status", "value": "opened" }] }
+    },
+    {
+      "id": "closed",
+      "name": "Mark closed",
+      "element": "task",
+      "type": "orcon.variables@1",
+      "parameters": {
+        "assignments": [
+          { "variable": "status", "value": "={{ 'closed:' + $('Count left').item.json.n }}" },
+          { "variable": "total", "value": 10 }
+        ]
+      }
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "split" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "split", "port": "main" }, "to": { "node": "left" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "split", "port": "main" }, "to": { "node": "right" }, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "left", "port": "main" }, "to": { "node": "join" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "right", "port": "main" }, "to": { "node": "join" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "join", "port": "main" }, "to": { "node": "opened" }, "kind": "SEQUENCE" },
+    { "id": "e7", "from": { "node": "opened", "port": "main" }, "to": { "node": "closed" }, "kind": "SEQUENCE" },
+    { "id": "e8", "from": { "node": "closed", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

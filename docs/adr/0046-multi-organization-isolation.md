@@ -43,11 +43,10 @@ ADR-0050 §1.
 ## Consequences
 Two independent walls on PostgreSQL, each tested alone; SQLite users are told plainly what they do not get; no view or optional `org_id` can open a path around row-level security.
 
-## Amendments
-
-Changes applied on 2026-10-13 by specifications the owner accepted together with this ADR; each entry names its source.
-
-- **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.
-
 ## Alternatives considered
 Schema per organization (rejected: migrations × N, connection/catalog bloat, cross-organization engine batches impossible); database per organization (rejected: same, plus SQLite-per-org rejected by the owner); RLS only, without the application layer (rejected by S3); warning only when the runtime role does not satisfy the checks (rejected: RLS would stop being a guarantee, SPEC-004 Q12); `security_invoker` views (rejected: not available on PostgreSQL 14).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.
