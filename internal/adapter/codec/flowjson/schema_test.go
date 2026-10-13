@@ -73,6 +73,7 @@ func TestSchemaEnumsMatchTheDomain(t *testing.T) {
 		"routing":         mapStrings(flow.Routings()),
 		"joinMode":        mapStrings(flow.JoinModes()),
 		"joinData":        mapStrings(flow.JoinDataModes()),
+		"joinRemaining":   mapStrings(flow.JoinRemainings()),
 		"onError":         mapStrings(flow.OnErrors()),
 		"callMode":        mapStrings(flow.CallModes()),
 		"waitKind":        mapStrings(flow.WaitKinds()),
@@ -420,6 +421,7 @@ func TestEnumValuesUpperSnake(t *testing.T) {
 		{"parallel-join", "/nodes/4/join/mode", "joinMode"},
 		{"parallel-join", "/nodes/4/join/data", "joinData"},
 		{"item-routing", "/nodes/1/routing", "routing"},
+		{"discriminator", "/nodes/5/join/remaining", "joinRemaining"},
 		{"waits-and-boundary", "/nodes/2/wait/kind", "waitKind"},
 	}
 	c := schemaChecked(t)

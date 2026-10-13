@@ -1,0 +1,46 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-00000000000a",
+  "name": "Blocking discriminator that lets the other branches finish",
+  "settings": { "branchMode": "PARALLEL" },
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    { "id": "split", "name": "Split", "element": "parallelGateway", "type": "orcon.split@1", "parameters": {} },
+    { "id": "a", "name": "Quote A", "element": "serviceTask", "type": "orcon.http@1", "parameters": { "url": "https://example.test/a" } },
+    { "id": "b", "name": "Quote B", "element": "serviceTask", "type": "orcon.http@1", "parameters": { "url": "https://example.test/b" } },
+    { "id": "c", "name": "Quote C", "element": "serviceTask", "type": "orcon.http@1", "parameters": { "url": "https://example.test/c" } },
+    {
+      "id": "first",
+      "name": "First quote",
+      "element": "complexGateway",
+      "type": "orcon.merge@1",
+      "parameters": {},
+      "join": { "mode": "FIRST", "data": "APPEND", "remaining": "LET_FINISH" }
+    },
+    {
+      "id": "canceling",
+      "name": "First quote, cancel the rest",
+      "element": "complexGateway",
+      "type": "orcon.merge@1",
+      "parameters": {},
+      "join": { "mode": "FIRST", "data": "APPEND", "remaining": "CANCEL" }
+    },
+    { "id": "use", "name": "Use it", "element": "task", "type": "orcon.set@1", "parameters": {} },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "split" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "split", "port": "main" }, "to": { "node": "a" }, "kind": "SEQUENCE" },
+    { "id": "e3", "from": { "node": "split", "port": "main" }, "to": { "node": "b" }, "kind": "SEQUENCE" },
+    { "id": "e4", "from": { "node": "split", "port": "main" }, "to": { "node": "c" }, "kind": "SEQUENCE" },
+    { "id": "e5", "from": { "node": "a", "port": "main" }, "to": { "node": "first" }, "kind": "SEQUENCE" },
+    { "id": "e6", "from": { "node": "b", "port": "main" }, "to": { "node": "first" }, "kind": "SEQUENCE" },
+    { "id": "e7", "from": { "node": "c", "port": "main" }, "to": { "node": "first" }, "kind": "SEQUENCE" },
+    { "id": "e8", "from": { "node": "first", "port": "main" }, "to": { "node": "canceling" }, "kind": "SEQUENCE" },
+    { "id": "e9", "from": { "node": "split", "port": "main" }, "to": { "node": "canceling" }, "kind": "SEQUENCE" },
+    { "id": "e10", "from": { "node": "canceling", "port": "main" }, "to": { "node": "use" }, "kind": "SEQUENCE" },
+    { "id": "e11", "from": { "node": "use", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

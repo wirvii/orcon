@@ -27,6 +27,7 @@ apps/web/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/perf/fixtures/*.json  # the reference flow of the editor performance test; JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+**/testdata/fuzz/**  # Go fuzz corpus entries, a fixed format written by the go tool
 .agents/skills/orcon-connector/assets/templates/**/*.json  # connector template packages and cassettes; JSON has no comment syntax
 
 # Contribution workflow (orcon-contributing, SPEC-013).
