@@ -181,6 +181,34 @@ Fraction of the container memory limit that becomes the soft memory limit of the
 | Takes effect | after a restart |
 | Roles | all |
 
+### `expr`
+
+#### `expr.sandboxSlots`
+
+Expression sandbox calls that may execute guest code at once, from 1 to GOMAXPROCS - 1. 0 means GOMAXPROCS - 1. The server rejects a value above GOMAXPROCS - 1 at start.
+
+| | |
+|---|---|
+| Type | integer, from 0 to 1024 |
+| Default | `0` |
+| Environment variable | `ORCON_EXPR_SANDBOX_SLOTS` |
+| Flag | `--expr-sandbox-slots` |
+| Takes effect | after a restart |
+| Roles | `standalone`, `api`, `worker` |
+
+#### `expr.maxAbandoned`
+
+Maximum number of expression evaluations abandoned at their deadline that may still be running. When the limit is reached, new sandbox calls fail at once and a lasting saturation restarts the process.
+
+| | |
+|---|---|
+| Type | integer, from 1 to 64 |
+| Default | `8` |
+| Environment variable | `ORCON_EXPR_MAX_ABANDONED` |
+| Flag | `--expr-max-abandoned` |
+| Takes effect | after a restart |
+| Roles | `standalone`, `api`, `worker` |
+
 ### `store`
 
 #### `store.driver`
@@ -893,12 +921,12 @@ Address of the OpenTelemetry collector that receives metrics, traces and logs.
 
 #### `observability.otlp.protocol`
 
-Protocol used to talk to the collector.
+Protocol used to talk to the collector: http (http/protobuf, the default of the OpenTelemetry exporter specification) or grpc.
 
 | | |
 |---|---|
 | Type | one of `grpc`, `http` |
-| Default | `grpc` |
+| Default | `http` |
 | Environment variable | `ORCON_OBSERVABILITY_OTLP_PROTOCOL` |
 | Flag | `--observability-otlp-protocol` |
 | Takes effect | after a restart |

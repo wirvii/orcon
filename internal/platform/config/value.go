@@ -6,7 +6,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
 	"math"
 	"net"
@@ -15,38 +14,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/wirvii/orcon/internal/platform/redact"
 )
 
 // Redacted is what is printed in place of a secret value.
-const Redacted = "[REDACTED]"
-
-// Secret is a secret value held in memory. Its text form is [Redacted] for
-// every formatter and logger; the plain text is available only through
-// [Secret.Reveal], which a caller uses at the point it hands the value to the
-// component that needs it. It stands in for the redact types of
-// internal/platform/redact until that package exists.
-type Secret struct{ plain string }
-
-// NewSecret wraps a plain value.
-func NewSecret(plain string) Secret { return Secret{plain: plain} }
-
-// Reveal returns the plain value.
-func (s Secret) Reveal() string { return s.plain }
-
-// IsSet reports whether the secret holds a value.
-func (s Secret) IsSet() bool { return s.plain != "" }
-
-// String returns [Redacted].
-func (Secret) String() string { return Redacted }
-
-// GoString returns [Redacted], so %#v does not leak the value.
-func (Secret) GoString() string { return Redacted }
-
-// MarshalText returns [Redacted], so encoders do not leak the value.
-func (Secret) MarshalText() ([]byte, error) { return []byte(Redacted), nil }
-
-// LogValue returns [Redacted] for log/slog.
-func (Secret) LogValue() slog.Value { return slog.StringValue(Redacted) }
+const Redacted = redact.Redacted
 
 // Value is the resolved value of a key. The zero Value is "unset".
 type Value struct {
@@ -90,8 +63,8 @@ func (v Value) IsZero() bool { return v.scalar == "" && len(v.list) == 0 && len(
 // Text returns the scalar text of a non-secret value.
 func (v Value) Text() string { return v.plain() }
 
-// Secret returns the value as a [Secret].
-func (v Value) Secret() Secret { return NewSecret(v.plain()) }
+// Secret returns the value as a [redact.Secret].
+func (v Value) Secret() redact.Secret { return redact.New(v.plain()) }
 
 // Int returns the value as an integer, or 0 when it is unset or not a number.
 func (v Value) Int() int {

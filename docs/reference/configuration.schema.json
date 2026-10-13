@@ -417,6 +417,42 @@
       "x-orcon-flag": "--data-dir",
       "x-orcon-reload": "restart"
     },
+    "expr": {
+      "additionalProperties": false,
+      "properties": {
+        "maxAbandoned": {
+          "default": 8,
+          "description": "Maximum number of expression evaluations abandoned at their deadline that may still be running. When the limit is reached, new sandbox calls fail at once and a lasting saturation restarts the process.",
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer",
+          "x-orcon-env": "ORCON_EXPR_MAX_ABANDONED",
+          "x-orcon-flag": "--expr-max-abandoned",
+          "x-orcon-reload": "restart",
+          "x-orcon-roles": [
+            "standalone",
+            "api",
+            "worker"
+          ]
+        },
+        "sandboxSlots": {
+          "default": 0,
+          "description": "Expression sandbox calls that may execute guest code at once, from 1 to GOMAXPROCS - 1. 0 means GOMAXPROCS - 1. The server rejects a value above GOMAXPROCS - 1 at start.",
+          "maximum": 1024,
+          "minimum": 0,
+          "type": "integer",
+          "x-orcon-env": "ORCON_EXPR_SANDBOX_SLOTS",
+          "x-orcon-flag": "--expr-sandbox-slots",
+          "x-orcon-reload": "restart",
+          "x-orcon-roles": [
+            "standalone",
+            "api",
+            "worker"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "http": {
       "additionalProperties": false,
       "properties": {
@@ -770,8 +806,8 @@
               "x-orcon-reload": "restart"
             },
             "protocol": {
-              "default": "grpc",
-              "description": "Protocol used to talk to the collector.",
+              "default": "http",
+              "description": "Protocol used to talk to the collector: http (http/protobuf, the default of the OpenTelemetry exporter specification) or grpc.",
               "enum": [
                 "grpc",
                 "http"

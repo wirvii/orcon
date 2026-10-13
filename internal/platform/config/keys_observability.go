@@ -20,8 +20,10 @@ func keysObservability() []Key {
 				"Dirección del colector de OpenTelemetry que recibe métricas, trazas y registros."),
 		},
 		{
-			Path: "observability.otlp.protocol", Kind: KindEnum, Enum: []string{"grpc", "http"}, Default: "grpc",
-			Description: text("Protocol used to talk to the collector.", "Protocolo que se usa para hablar con el colector."),
+			Path: "observability.otlp.protocol", Kind: KindEnum, Enum: []string{"grpc", "http"}, Default: "http",
+			Description: text(
+				"Protocol used to talk to the collector: http (http/protobuf, the default of the OpenTelemetry exporter specification) or grpc.",
+				"Protocolo que se usa para hablar con el colector: http (http/protobuf, el valor por defecto de la especificación de exportadores de OpenTelemetry) o grpc."),
 		},
 		{
 			Path: "observability.otlp.insecure", Kind: KindBool, Default: "false",

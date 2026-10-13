@@ -10,6 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -70,18 +73,13 @@ func exec(t *testing.T, env cli.Env, args ...string) *run {
 	}
 	env.Decode = decode
 	env.GOOS = "linux"
-	r.code, r.handled = cli.Run(t.Context(), args, env)
-	return r
-}
-
-func TestRunIgnoresServerArguments(t *testing.T) {
-	t.Parallel()
-
-	for _, args := range [][]string{nil, {"--role", "api"}, {"serve"}} {
-		if r := exec(t, cli.Env{}, args...); r.handled {
-			t.Errorf("Run(%q) handled = true, want false so the server flags apply", args)
-		}
+	switch {
+	case len(args) > 0 && args[0] == "config":
+		r.code, r.handled = cli.RunConfig(t.Context(), args[1:], env), true
+	case len(args) > 0 && args[0] == "docs":
+		r.code, r.handled = cli.RunDocs(args[1:], env), true
 	}
+	return r
 }
 
 func TestConfigCheckRedactsSecretsAndShowsSource(t *testing.T) {
@@ -220,9 +218,9 @@ func TestConfigCheckYAMLNeedsACodec(t *testing.T) {
 func TestConfigCheckNoNetworkWithoutProbe(t *testing.T) {
 	t.Parallel()
 
-	probe := cli.Probe{Name: "database", Run: func(context.Context, *config.Config) error {
+	probe := cli.Probe{Name: "database", Run: func(context.Context, *config.Config) (string, error) {
 		t.Error("a probe ran without --probe")
-		return nil
+		return "", nil
 	}}
 	r := exec(t, cli.Env{Probes: []cli.Probe{probe}}, "config", "check", "-o", "json")
 	if r.code != cli.ExitOK {
@@ -238,13 +236,13 @@ func TestConfigCheckProbe(t *testing.T) {
 
 	var deadline time.Duration
 	probes := []cli.Probe{
-		{Name: "ok", Run: func(ctx context.Context, _ *config.Config) error {
+		{Name: "ok", Key: "store.driver", Run: func(ctx context.Context, _ *config.Config) (string, error) {
 			d, _ := ctx.Deadline()
 			deadline = time.Until(d)
-			return nil
+			return "fine", nil
 		}},
-		{Name: "off", Applies: func(*config.Config) bool { return false }, Run: func(context.Context, *config.Config) error { return errors.New("never") }},
-		{Name: "later", Run: func(context.Context, *config.Config) error { return cli.ErrProbeUnavailable }},
+		{Name: "off", Applies: func(*config.Config) bool { return false }, Run: func(context.Context, *config.Config) (string, error) { return "", errors.New("never") }},
+		{Name: "later", Run: func(context.Context, *config.Config) (string, error) { return "", cli.ErrProbeUnavailable }},
 	}
 	r := exec(t, cli.Env{Probes: probes}, "config", "check", "--probe", "-o", "table")
 	if r.code != cli.ExitOK {
@@ -253,7 +251,7 @@ func TestConfigCheckProbe(t *testing.T) {
 	if deadline <= 9*time.Second || deadline > 10*time.Second {
 		t.Errorf("probe deadline = %v, want about 10s", deadline)
 	}
-	for _, want := range []string{"PROBE  ok: ok", "PROBE  off: skipped", "PROBE  later: skipped"} {
+	for _, want := range []string{"PROBE  ok (store.driver): OK - fine", "PROBE  off: SKIPPED", "PROBE  later: SKIPPED"} {
 		if !strings.Contains(r.out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, r.out.String())
 		}
@@ -265,15 +263,15 @@ func TestConfigCheckProbeFailureScrubsSecrets(t *testing.T) {
 
 	env := cli.Env{
 		Environ: []string{"HOME=/h", "ORCON_STORE_DRIVER=postgres", "ORCON_ROLE=api", "ORCON_STORE_POSTGRES_DSN=postgres://u:" + sentinel + "@db/x"},
-		Probes: []cli.Probe{{Name: "database", Run: func(_ context.Context, c *config.Config) error {
-			return errors.New("connect " + c.Secret("store.postgres.dsn").Reveal() + ": refused")
+		Probes: []cli.Probe{{Name: "database", Run: func(_ context.Context, c *config.Config) (string, error) {
+			return "", errors.New("connect " + c.Secret("store.postgres.dsn").Reveal() + ": refused")
 		}}},
 	}
 	r := exec(t, env, "config", "check", "--probe", "-o", "table")
-	if r.code != cli.ExitValidation {
-		t.Fatalf("exit = %d, want %d for a failed probe", r.code, cli.ExitValidation)
+	if r.code != cli.ExitError {
+		t.Fatalf("exit = %d, want %d for a failed probe", r.code, cli.ExitError)
 	}
-	if strings.Contains(r.out.String(), sentinel) || !strings.Contains(r.out.String(), "PROBE  database: failed") {
+	if strings.Contains(r.out.String(), sentinel) || !strings.Contains(r.out.String(), "PROBE  database: FAILED") {
 		t.Fatalf("output:\n%s", r.out.String())
 	}
 }
@@ -281,12 +279,12 @@ func TestConfigCheckProbeFailureScrubsSecrets(t *testing.T) {
 func TestConfigCheckProbeSkippedWhenConfigHasErrors(t *testing.T) {
 	t.Parallel()
 
-	probe := cli.Probe{Name: "database", Run: func(context.Context, *config.Config) error {
+	probe := cli.Probe{Name: "database", Run: func(context.Context, *config.Config) (string, error) {
 		t.Error("probed an invalid configuration")
-		return nil
+		return "", nil
 	}}
 	r := exec(t, cli.Env{Environ: []string{"HOME=/h", "ORCON_ROLE=worker"}, Probes: []cli.Probe{probe}}, "config", "check", "--probe", "-o", "table")
-	if r.code != cli.ExitValidation || !strings.Contains(r.out.String(), "skipped") {
+	if r.code != cli.ExitValidation || !strings.Contains(r.out.String(), "SKIPPED") {
 		t.Fatalf("exit = %d, out:\n%s", r.code, r.out.String())
 	}
 }
@@ -320,31 +318,137 @@ func TestConfigSchema(t *testing.T) {
 	}
 }
 
-func TestConfigReload(t *testing.T) {
+func TestReloadNoServerTimesOut(t *testing.T) {
 	t.Parallel()
 
-	var got string
-	env := cli.Env{Reload: func(_ context.Context, c *config.Config) error {
-		got = c.Value("dataDir").Text()
-		return nil
-	}}
-	r := exec(t, env, "config", "reload", "--data-dir", "/d")
-	if r.code != cli.ExitOK || got != "/d" {
-		t.Fatalf("exit = %d dataDir = %q: %s", r.code, got, r.err.String())
+	dir := t.TempDir()
+	if err := os.MkdirAll(cli.RunDir(dir), 0o700); err != nil {
+		t.Fatal(err)
 	}
+	env := cli.Env{
+		Environ:    []string{"HOME=/h", "ORCON_DATA_DIR=" + dir},
+		ReloadWait: 300 * time.Millisecond,
+		ReloadPoll: 20 * time.Millisecond,
+	}
+	started := time.Now()
+	r := exec(t, env, "config", "reload")
+	if r.code != cli.ExitError {
+		t.Fatalf("exit = %d, want %d; stdout %q stderr %q", r.code, cli.ExitError, r.out.String(), r.err.String())
+	}
+	if took := time.Since(started); took < 250*time.Millisecond || took > 5*time.Second {
+		t.Errorf("took %v, want about the wait of 300 ms", took)
+	}
+	want := "no running Orcon server picked up the reload request in " + dir + "; is it running with this data directory?"
+	if !strings.Contains(r.err.String(), want) {
+		t.Errorf("stderr = %q, want %q", r.err.String(), want)
+	}
+	entries, err := os.ReadDir(cli.RunDir(dir))
+	if err != nil || len(entries) != 0 {
+		t.Errorf("the command left files behind: %v %v", entries, err)
+	}
+	// Without a run directory there is no server at all and the command does not wait.
+	empty := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + t.TempDir()}, ReloadWait: 10 * time.Second}
+	started = time.Now()
+	if r := exec(t, empty, "config", "reload"); r.code != cli.ExitError || time.Since(started) > 2*time.Second {
+		t.Errorf("no run directory: exit %d after %v", r.code, time.Since(started))
+	}
+}
 
-	failing := cli.Env{Reload: func(context.Context, *config.Config) error { return errors.New("no running local instance") }}
-	if r := exec(t, failing, "config", "reload"); r.code != cli.ExitPrecondition || !strings.Contains(r.err.String(), "no running local instance") {
-		t.Errorf("exit = %d stderr = %q", r.code, r.err.String())
+func TestReloadChannelRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
 	}
-	if r := exec(t, cli.Env{}, "config", "reload"); r.code != cli.ExitPrecondition {
-		t.Errorf("without a way to reach an instance: exit = %d", r.code)
+	info, err := os.Stat(cli.RunDir(dir))
+	if err != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("run directory = %v, %v; want mode 0700", info, err)
 	}
-	invalid := cli.Env{Environ: []string{"HOME=/h", "ORCON_ROLE=worker"}, Reload: func(context.Context, *config.Config) error {
-		t.Error("asked the instance to reload an invalid configuration")
-		return nil
-	}}
-	if r := exec(t, invalid, "config", "reload"); r.code != cli.ExitValidation {
-		t.Errorf("invalid configuration: exit = %d", r.code)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
+			return cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"role"}}
+		}, slog.New(slog.DiscardHandler))
+	}()
+	res, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond)
+	cancel()
+	<-done
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.RequestID == "" || len(res.AppliedKeys) != 1 || len(res.RestartRequiredKeys) != 1 {
+		t.Fatalf("result = %+v", res)
+	}
+}
+
+func TestReloadChannelIgnoresMalformedRequests(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	request := filepath.Join(cli.RunDir(dir), "reload-request")
+	if err := os.WriteFile(request, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
+			t.Error("a malformed request reached the handler")
+			return cli.ReloadResult{}
+		}, slog.New(slog.DiscardHandler))
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(request); os.IsNotExist(err) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond) // polling a real file for the watcher to consume it
+	}
+	cancel()
+	<-done
+	if _, err := os.Stat(request); !os.IsNotExist(err) {
+		t.Fatalf("the malformed request was not consumed: %v", err)
+	}
+}
+
+func TestConfigReloadFormats(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cli.WatchReloadRequests(ctx, dir, 10*time.Millisecond, func(string) cli.ReloadResult {
+			return cli.ReloadResult{AppliedKeys: []string{"log.level"}, RestartRequiredKeys: []string{"http.address"}}
+		}, slog.New(slog.DiscardHandler))
+	}()
+	defer func() { cancel(); <-done }()
+	env := cli.Env{Environ: []string{"HOME=/h", "ORCON_DATA_DIR=" + dir}, MarshalYAML: json.Marshal, ReloadWait: 5 * time.Second, ReloadPoll: 10 * time.Millisecond}
+	for format, want := range map[string]string{
+		"table": "Applied: log.level",
+		"json":  `"appliedKeys"`,
+		"yaml":  `"restartRequiredKeys"`,
+	} {
+		r := exec(t, env, "config", "reload", "-o", format)
+		if r.code != cli.ExitOK || !strings.Contains(r.out.String(), want) {
+			t.Errorf("-o %s: exit %d out %q, want it to contain %q", format, r.code, r.out.String(), want)
+		}
+	}
+	if r := exec(t, env, "config", "reload", "-o", "table"); !strings.Contains(r.out.String(), "need a restart") || !strings.Contains(r.out.String(), "http.address") {
+		t.Errorf("the restart keys are not reported: %q", r.out.String())
+	}
+	if r := exec(t, env, "config", "reload", "-o", "xml"); r.code != cli.ExitUsage {
+		t.Errorf("bad format: exit %d", r.code)
 	}
 }

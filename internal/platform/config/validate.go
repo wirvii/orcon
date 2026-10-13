@@ -165,7 +165,7 @@ func (l *loader) checkMasterKey(c *Config) {
 		"awskms":        {"keys.master.awskms.keyArn"},
 		"gcpkms":        {"keys.master.gcpkms.keyName"},
 		"azurekv":       {"keys.master.azurekv.keyId"},
-		"vault-transit": {"keys.master.vaultTransit.address", "keys.master.vaultTransit.keyName", "keys.master.vaultTransit.token"},
+		"vault-transit": {"keys.master.vaultTransit.address", "keys.master.vaultTransit.mount", "keys.master.vaultTransit.keyName", "keys.master.vaultTransit.token"},
 	}
 	provider := c.Value("keys.master.provider").Text()
 	if provider == "env" {

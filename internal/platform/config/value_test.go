@@ -4,53 +4,10 @@
 package config_test
 
 import (
-	"bytes"
-	"encoding"
-	"fmt"
-	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/platform/config"
 )
-
-func TestSecretNeverPrintsItsValue(t *testing.T) {
-	t.Parallel()
-
-	const plain = "hunter2-the-secret"
-	s := config.NewSecret(plain)
-	if !s.IsSet() || s.Reveal() != plain {
-		t.Fatalf("Reveal = %q", s.Reveal())
-	}
-	var logged bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&logged, nil))
-	logger.Info("test", "secret", s)
-	text, err := s.MarshalText()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var _ encoding.TextMarshaler = s
-	for name, got := range map[string]string{
-		"String":  s.String(),
-		"%v":      fmt.Sprintf("%v", s),
-		"%+v":     fmt.Sprintf("%+v", s),
-		"%#v":     fmt.Sprintf("%#v", s),
-		"%s":      fmt.Sprint(s),
-		"struct":  fmt.Sprintf("%+v", struct{ S config.Secret }{s}),
-		"slog":    logged.String(),
-		"marshal": string(text),
-	} {
-		if strings.Contains(got, plain) {
-			t.Errorf("%s leaks the secret: %q", name, got)
-		}
-		if !strings.Contains(got, config.Redacted) {
-			t.Errorf("%s = %q, want it to show %s", name, got, config.Redacted)
-		}
-	}
-	if config.NewSecret("").IsSet() {
-		t.Error("an empty secret reports as set")
-	}
-}
 
 func TestValueEdgeCases(t *testing.T) {
 	t.Parallel()

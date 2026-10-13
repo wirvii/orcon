@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+
+	"github.com/wirvii/orcon/internal/platform/redact"
 )
 
 // maxFileSize bounds the configuration file and every secret file. Both are
@@ -162,7 +164,7 @@ func (c *Config) Source(path string) Source {
 func (c *Config) Role() Role { return Role(c.Value("role").Text()) }
 
 // Secret returns the value of a secret key.
-func (c *Config) Secret(path string) Secret { return c.Value(path).Secret() }
+func (c *Config) Secret(path string) redact.Secret { return c.Value(path).Secret() }
 
 // Result is the outcome of [Schema.Load]: a configuration and everything that is wrong with it.
 type Result struct {

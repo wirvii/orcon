@@ -24,6 +24,7 @@ func productKeys() []Key {
 	var all []Key
 	for _, group := range [][]Key{
 		keysProcess(),
+		keysExpr(),
 		keysStore(),
 		keysSecurity(),
 		keysBackup(),

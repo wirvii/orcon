@@ -104,15 +104,9 @@ func configCheck(ctx context.Context, args []string, env Env) int {
 	if code, done := p.parse(args, env); done {
 		return code
 	}
-	format := *output
-	if format == "" {
-		format = "json"
-		if env.IsTerminal {
-			format = "table"
-		}
-	}
-	if !slices.Contains([]string{"table", "json", "yaml"}, format) {
-		return usagef(env, "-o must be table, json or yaml, not %q", format)
+	format, ok := outputFormat(*output, env)
+	if !ok {
+		return usagef(env, "-o must be table, json or yaml, not %q", *output)
 	}
 
 	res := env.load(p)
@@ -125,10 +119,14 @@ func configCheck(ctx context.Context, args []string, env Env) int {
 		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
 		return ExitError
 	}
-	if !rep.Valid {
+	switch {
+	case !rep.Valid:
 		return ExitValidation
+	case slices.ContainsFunc(probes, func(p probeResult) bool { return p.Status == "failed" }):
+		return ExitError
+	default:
+		return ExitOK
 	}
-	return ExitOK
 }
 
 // report is the shape printed by orcon config check, in every format.
@@ -156,6 +154,7 @@ type reportIssue struct {
 
 type probeResult struct {
 	Name   string `json:"name" yaml:"name"`
+	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
 	Status string `json:"status" yaml:"status"`
 	Detail string `json:"detail,omitempty" yaml:"detail,omitempty"`
 }
@@ -176,11 +175,6 @@ func buildReport(res *config.Result, probes []probeResult) report {
 	rep.Issues = []reportIssue{}
 	for _, i := range res.Issues {
 		rep.Issues = append(rep.Issues, reportIssue{Severity: strings.ToLower(i.Severity.String()), Key: i.Key, Message: i.Message})
-	}
-	for _, pr := range probes {
-		if pr.Status == "failed" {
-			rep.Valid = false
-		}
 	}
 	return rep
 }
@@ -290,7 +284,17 @@ func writeTable(w io.Writer, rep report) error {
 		_, _ = fmt.Fprintf(w, "%-5s  %s: %s\n", strings.ToUpper(i.Severity), i.Key, i.Message)
 	}
 	for _, p := range rep.Probes {
-		line := fmt.Sprintf("PROBE  %s: %s", p.Name, p.Status)
+		status := "OK"
+		switch p.Status {
+		case "failed":
+			status = "FAILED"
+		case "skipped":
+			status = "SKIPPED"
+		}
+		line := fmt.Sprintf("PROBE  %s: %s", p.Name, status)
+		if p.Key != "" {
+			line = fmt.Sprintf("PROBE  %s (%s): %s", p.Name, p.Key, status)
+		}
 		if p.Detail != "" {
 			line += " - " + p.Detail
 		}
@@ -311,21 +315,20 @@ func runProbes(ctx context.Context, env Env, res *config.Result) []probeResult {
 	}
 	for _, p := range env.Probes {
 		if p.Applies != nil && !p.Applies(res.Config) {
-			out = append(out, probeResult{Name: p.Name, Status: "skipped", Detail: "not configured"})
+			out = append(out, probeResult{Name: p.Name, Key: p.Key, Status: "skipped", Detail: "not configured"})
 			continue
 		}
 		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
-		err := p.Run(pctx, res.Config)
+		detail, err := p.Run(pctx, res.Config)
 		cancel()
-		if errors.Is(err, ErrProbeUnavailable) {
-			out = append(out, probeResult{Name: p.Name, Status: "skipped", Detail: ErrProbeUnavailable.Error()})
-			continue
+		switch {
+		case errors.Is(err, ErrProbeUnavailable):
+			out = append(out, probeResult{Name: p.Name, Key: p.Key, Status: "skipped", Detail: ErrProbeUnavailable.Error()})
+		case err != nil:
+			out = append(out, probeResult{Name: p.Name, Key: p.Key, Status: "failed", Detail: scrub(res.Config, err.Error())})
+		default:
+			out = append(out, probeResult{Name: p.Name, Key: p.Key, Status: "ok", Detail: scrub(res.Config, detail)})
 		}
-		if err != nil {
-			out = append(out, probeResult{Name: p.Name, Status: "failed", Detail: scrub(res.Config, err.Error())})
-			continue
-		}
-		out = append(out, probeResult{Name: p.Name, Status: "ok"})
 	}
 	return out
 }
@@ -385,22 +388,109 @@ func configSchema(args []string, env Env) int {
 
 func configReload(ctx context.Context, args []string, env Env) int {
 	p := newFlagSet("orcon config reload", env)
+	output := p.flags.String("o", "", "output format: table, json or yaml (default: table on a terminal, json otherwise)")
 	if code, done := p.parse(args, env); done {
 		return code
 	}
+	format, ok := outputFormat(*output, env)
+	if !ok {
+		return usagef(env, "-o must be table, json or yaml, not %q", *output)
+	}
+	// Only the data directory matters here: the server validates the whole
+	// configuration with its own flags and environment, which this command may not share.
 	res := env.load(p)
-	if err := res.Err(); err != nil {
-		_, _ = fmt.Fprintf(env.Stderr, "orcon: the configuration has errors, so the instance was not asked to reload it\n%v\n", err)
+	for _, i := range res.Issues {
+		if i.Severity == config.SeverityError && i.Key == "dataDir" {
+			_, _ = fmt.Fprintf(env.Stderr, "orcon: cannot find the data directory: %s\n", i.Message)
+			return ExitValidation
+		}
+	}
+	wait, poll := env.ReloadWait, env.ReloadPoll
+	if wait <= 0 {
+		wait = ReloadWait
+	}
+	if poll <= 0 {
+		poll = clientPollInterval
+	}
+	result, err := RequestReload(ctx, res.Config.Value("dataDir").Text(), wait, poll)
+	if err != nil {
+		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
+		return ExitError
+	}
+	if err := writeReload(env, format, result); err != nil {
+		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
+		return ExitError
+	}
+	if len(result.Errors) > 0 {
 		return ExitValidation
 	}
-	if env.Reload == nil {
-		_, _ = fmt.Fprintln(env.Stderr, "orcon: this build cannot reach a local instance")
-		return ExitPrecondition
-	}
-	if err := env.Reload(ctx, res.Config); err != nil {
-		_, _ = fmt.Fprintf(env.Stderr, "orcon: %v\n", err)
-		return ExitPrecondition
-	}
-	_, _ = fmt.Fprintln(env.Stdout, "The local instance was asked to reread its configuration. Settings that need a restart keep their value; see orcon config check.")
 	return ExitOK
+}
+
+// outputFormat resolves -o: table on a terminal, json otherwise (ADR 0058 section 4).
+func outputFormat(flagValue string, env Env) (string, bool) {
+	switch {
+	case flagValue == "" && env.IsTerminal:
+		return "table", true
+	case flagValue == "":
+		return "json", true
+	case slices.Contains([]string{"table", "json", "yaml"}, flagValue):
+		return flagValue, true
+	default:
+		return "", false
+	}
+}
+
+func writeReload(env Env, format string, r *ReloadResult) error {
+	r.AppliedKeys, r.RestartRequiredKeys, r.Errors = nonNil(r.AppliedKeys), nonNil(r.RestartRequiredKeys), nonNil(r.Errors)
+	switch format {
+	case "json":
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(r); err != nil {
+			return fmt.Errorf("encode JSON: %w", err)
+		}
+		_, err := env.Stdout.Write(buf.Bytes())
+		return wrapWrite(err)
+	case "yaml":
+		if env.MarshalYAML == nil {
+			return errors.New("this build cannot write YAML")
+		}
+		out, err := env.MarshalYAML(r)
+		if err != nil {
+			return err
+		}
+		_, err = env.Stdout.Write(out)
+		return wrapWrite(err)
+	default:
+		var b strings.Builder
+		if len(r.Errors) > 0 {
+			b.WriteString("The new configuration was refused; the running configuration is unchanged.\n")
+			for _, e := range r.Errors {
+				b.WriteString("ERROR  " + e + "\n")
+			}
+		} else {
+			fmt.Fprintf(&b, "Reloaded. Applied: %s\n", listOrNone(r.AppliedKeys))
+		}
+		if len(r.RestartRequiredKeys) > 0 {
+			fmt.Fprintf(&b, "These keys changed but need a restart, so they keep their running value: %s\n", strings.Join(r.RestartRequiredKeys, ", "))
+		}
+		_, err := io.WriteString(env.Stdout, b.String())
+		return wrapWrite(err)
+	}
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func listOrNone(keys []string) string {
+	if len(keys) == 0 {
+		return "no key changed"
+	}
+	return strings.Join(keys, ", ")
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/wirvii/orcon/internal/platform/config"
 )
@@ -31,14 +32,18 @@ const (
 var ErrProbeUnavailable = errors.New("not available in this build")
 
 // Probe is one connection check of orcon config check --probe: a database, a KMS,
-// a backup target, an SMTP server. It reads and never writes.
+// a backup target, an SMTP server. It reads and never writes. Whoever registers the
+// key of an outgoing connection registers its probe.
 type Probe struct {
 	// Name is shown in the output, for example "database".
 	Name string
+	// Key is the configuration key the probe checks, shown with the result.
+	Key string
 	// Applies tells whether the configuration uses the thing the probe checks.
 	Applies func(cfg *config.Config) bool
-	// Run checks the connection. The context carries the 10 second deadline.
-	Run func(ctx context.Context, cfg *config.Config) error
+	// Run checks the connection. The context carries the 10 second deadline. The
+	// detail is shown next to a successful result, for example a warning.
+	Run func(ctx context.Context, cfg *config.Config) (detail string, err error)
 }
 
 // Env is everything a command needs from the outside.
@@ -59,8 +64,10 @@ type Env struct {
 	IsTerminal bool
 	// Probes are the connection checks available to --probe.
 	Probes []Probe
-	// Reload asks the local instance to reread its configuration.
-	Reload func(ctx context.Context, cfg *config.Config) error
+	// ReloadWait is how long orcon config reload waits for a server. Zero means [ReloadWait].
+	ReloadWait time.Duration
+	// ReloadPoll is how often it looks for the answer. Zero means 100 ms.
+	ReloadPoll time.Duration
 	// Schema is the configuration schema. Nil means [config.Default].
 	Schema *config.Schema
 }
@@ -72,23 +79,11 @@ func (e Env) schema() *config.Schema {
 	return config.Default()
 }
 
-// Run executes the command named by args[0].
-// The result handled is false when args do not name a command of this package,
-// so the caller can treat them as server flags.
-func Run(ctx context.Context, args []string, env Env) (code int, handled bool) {
-	if len(args) == 0 {
-		return 0, false
-	}
-	rest := args[1:]
-	switch args[0] {
-	case "config":
-		return runConfig(ctx, rest, env), true
-	case "docs":
-		return runDocs(rest, env), true
-	default:
-		return 0, false
-	}
-}
+// RunConfig runs orcon config <command>; args are the arguments after "config".
+func RunConfig(ctx context.Context, args []string, env Env) int { return runConfig(ctx, args, env) }
+
+// RunDocs runs orcon docs <command>; args are the arguments after "docs".
+func RunDocs(args []string, env Env) int { return runDocs(args, env) }
 
 func usagef(env Env, format string, a ...any) int {
 	_, _ = fmt.Fprintf(env.Stderr, "orcon: "+format+"\n", a...)

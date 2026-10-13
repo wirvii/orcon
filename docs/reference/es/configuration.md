@@ -181,6 +181,34 @@ Fracción del límite de memoria del contenedor que se usa como límite blando d
 | Cuándo toma efecto | al reiniciar |
 | Roles | todos |
 
+### `expr`
+
+#### `expr.sandboxSlots`
+
+Llamadas del sandbox de expresiones que pueden ejecutar código invitado a la vez, de 1 a GOMAXPROCS - 1. 0 significa GOMAXPROCS - 1. El servidor rechaza al arrancar un valor mayor que GOMAXPROCS - 1.
+
+| | |
+|---|---|
+| Tipo | entero, de 0 a 1024 |
+| Valor por defecto | `0` |
+| Variable de entorno | `ORCON_EXPR_SANDBOX_SLOTS` |
+| Bandera | `--expr-sandbox-slots` |
+| Cuándo toma efecto | al reiniciar |
+| Roles | `standalone`, `api`, `worker` |
+
+#### `expr.maxAbandoned`
+
+Número máximo de evaluaciones de expresiones abandonadas al vencer su plazo que pueden seguir ejecutándose. Al llegar al límite, las llamadas nuevas al sandbox fallan de inmediato y una saturación prolongada reinicia el proceso.
+
+| | |
+|---|---|
+| Tipo | entero, de 1 a 64 |
+| Valor por defecto | `8` |
+| Variable de entorno | `ORCON_EXPR_MAX_ABANDONED` |
+| Bandera | `--expr-max-abandoned` |
+| Cuándo toma efecto | al reiniciar |
+| Roles | `standalone`, `api`, `worker` |
+
 ### `store`
 
 #### `store.driver`
@@ -893,12 +921,12 @@ Dirección del colector de OpenTelemetry que recibe métricas, trazas y registro
 
 #### `observability.otlp.protocol`
 
-Protocolo que se usa para hablar con el colector.
+Protocolo que se usa para hablar con el colector: http (http/protobuf, el valor por defecto de la especificación de exportadores de OpenTelemetry) o grpc.
 
 | | |
 |---|---|
 | Tipo | uno de `grpc`, `http` |
-| Valor por defecto | `grpc` |
+| Valor por defecto | `http` |
 | Variable de entorno | `ORCON_OBSERVABILITY_OTLP_PROTOCOL` |
 | Bandera | `--observability-otlp-protocol` |
 | Cuándo toma efecto | al reiniciar |
