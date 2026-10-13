@@ -151,6 +151,30 @@ func TestCompatSeparatesAnalysisGaps(t *testing.T) {
 	}
 }
 
+func TestCompatCountsLuxon(t *testing.T) {
+	t.Parallel()
+	entries := []bench.Entry{
+		{Template: 1, Views: 10, Expression: "={{ $now.toISO() }} {{ $json.a }}"},
+		{Template: 1, Views: 10, Expression: "={{ DateTime.now().plus({days: 1}) }}"},
+		{Template: 2, Views: 30, Expression: "={{ $json.a.trim() }}"},
+	}
+	verdicts, err := bench.Compat(t.Context(), bench.CompatInput{
+		Evaluator: expr.New(expr.Options{}), Env: testEnv(),
+		Prober: probeFunc(func(string) error { return nil }),
+	}, entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := bench.Summarize(verdicts)
+	// Four code segments: two use Luxon (both need the sandbox), one is fast, one needs it without Luxon.
+	if sum.Luxon.Count != 2 || sum.Luxon.Total != 4 || sum.SandboxLuxon.Count != 2 || sum.SandboxLuxon.Total != 3 {
+		t.Errorf("luxon = %+v, sandbox luxon = %+v", sum.Luxon, sum.SandboxLuxon)
+	}
+	if got := sum.Luxon.WeightedPercent(); got < 30 || got > 60 {
+		t.Errorf("weighted share of Luxon = %.1f", got)
+	}
+}
+
 func TestSummarize(t *testing.T) {
 	t.Parallel()
 	entries, err := bench.ReadCorpus(strings.NewReader(corpusText))

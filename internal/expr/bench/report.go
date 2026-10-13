@@ -222,9 +222,41 @@ func (m *Measurements) Markdown() string {
 		w("\n")
 	}
 
+	m.writeReading(&b)
+
 	w("## Isolation and determinism\n\nThese are tests, not measurements: `TestSandboxIsolation` (memory bombs, infinite loops, regular-expression backtracking, runaway recursion, attempts to reach the host, state left behind; run in both modes), `TestSandboxContainsABadNeighbour` (one failing execution among many; both modes) and `TestDeterminism` (recorded time and seeded randomness). They run in `make check`.\n\n")
 	w("## Reproducing\n\n```sh\nmake expr-compat N8N_VERSION=<pinned n8n release>   # corpus download, compatibility gate, this report\nmake expr-report                                   # this report from the last corpus, without the gate\n```\n")
 	return b.String()
+}
+
+// writeReading explains, from the numbers, which expressions miss the latency
+// target and what the owner can do about it.
+func (m *Measurements) writeReading(b *strings.Builder) {
+	if len(m.Modes) == 0 {
+		return
+	}
+	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
+	w("## Reading the result\n\n")
+	for _, mode := range m.Modes {
+		s := &mode.Suite
+		w("- %s: median-complexity expressions without Luxon have a p99 of %s (%s the %s target); expressions that run Luxon, %s (%s).\n",
+			mode.Name, dur(s.BandPlain.P99), verb(s.BandPlain.P99 <= WarmP99Target), WarmP99Target, dur(s.BandLuxon.P99), verb(s.BandLuxon.P99 <= WarmP99Target))
+	}
+	if m.Compat.Expressions > 0 {
+		l := m.Compat.Luxon
+		sl := m.Compat.SandboxLuxon
+		w("- Luxon is used by %.1f %% of the code segments of the corpus (%.1f %% weighted by views) and by %.1f %% of the segments that need the sandbox. It is a large library that the interpreter runs operation by operation, so a single date operation costs tens to hundreds of microseconds however fast the call into the sandbox is.\n",
+			l.Percent(), l.WeightedPercent(), sl.Percent())
+	}
+	w("- The cost of the time limit is the difference between the modes: wazero's close-on-context-done adds a check to every function and loop of the module, and the interpreter runs several times slower with it. The alternative mode gives the interpreter its full speed and stops runaway code at the next poll of the interrupt handler, but code that never polls is bounded by the memory cap only.\n")
+	w("- This report applies the targets as written and does not amend ADR-0018. Whether to keep the prescribed mechanism, adopt the cooperative one, restate the target for date expressions, or give the most common date operations a fast path is the owner's decision.\n\n")
+}
+
+func verb(ok bool) string {
+	if ok {
+		return "meets"
+	}
+	return "misses"
 }
 
 func (m *Measurements) writeSuite(b *strings.Builder, heading string, mode *ModeResult) {

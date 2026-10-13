@@ -51,6 +51,10 @@ type Summary struct {
 	// Fast is the share of {{ }} segments the fast path evaluates, weighted by
 	// the views of the template that holds them.
 	Fast Rate
+	// Luxon is the share of code segments that use Luxon, plain and weighted;
+	// SandboxLuxon the share of Luxon segments among those that need the
+	// sandbox.
+	Luxon, SandboxLuxon Rate
 	// AnalysisGaps counts expressions the static parser rejected and the
 	// sandbox accepted.
 	AnalysisGaps int
@@ -80,6 +84,14 @@ func Summarize(verdicts []Verdict) Summary {
 		s.Fast.Total += v.CodeSegments
 		s.Fast.Weighted += w * float64(v.FastSegments)
 		s.Fast.WeightedTotal += w * float64(v.CodeSegments)
+		s.Luxon.Count += v.LuxonSegments
+		s.Luxon.Total += v.CodeSegments
+		s.Luxon.Weighted += w * float64(v.LuxonSegments)
+		s.Luxon.WeightedTotal += w * float64(v.CodeSegments)
+		s.SandboxLuxon.Count += v.SandboxLuxon
+		s.SandboxLuxon.Total += v.SandboxSegments
+		s.SandboxLuxon.Weighted += w * float64(v.SandboxLuxon)
+		s.SandboxLuxon.WeightedTotal += w * float64(v.SandboxSegments)
 		if v.AnalysisGap {
 			s.AnalysisGaps++
 		}

@@ -64,6 +64,10 @@ type Verdict struct {
 	// FastSegments and CodeSegments count the {{ }} segments of the expression
 	// and those the fast path evaluates.
 	FastSegments, CodeSegments int
+	// LuxonSegments counts the code segments that use Luxon (DateTime,
+	// Duration, Interval, $now, $today), and SandboxLuxon those of them that
+	// need the sandbox.
+	LuxonSegments, SandboxSegments, SandboxLuxon int
 	// AnalysisGap is set when the static parser rejected code that the sandbox
 	// accepts: the analysis, not the expression, is the limit.
 	AnalysisGap bool
@@ -113,6 +117,16 @@ func Compat(ctx context.Context, in CompatInput, entries []Entry) ([]Verdict, er
 			if !seg.Code {
 				continue
 			}
+			luxon := usesLuxon(seg.Text)
+			if luxon {
+				v.LuxonSegments++
+			}
+			if !seg.Fast {
+				v.SandboxSegments++
+				if luxon {
+					v.SandboxLuxon++
+				}
+			}
 			reasons, gap := checkCode(ctx, in, seg.Text)
 			v.Reasons = append(v.Reasons, reasons...)
 			v.AnalysisGap = v.AnalysisGap || gap
@@ -121,6 +135,17 @@ func Compat(ctx context.Context, in CompatInput, entries []Entry) ([]Verdict, er
 		out = append(out, v)
 	}
 	return out, nil
+}
+
+// usesLuxon reports whether the code uses a Luxon name of the context.
+func usesLuxon(code string) bool {
+	a := expr.Analyze(code)
+	for _, name := range []string{"DateTime", "Duration", "Interval", "$now", "$today"} {
+		if a.Uses(name) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkCode(ctx context.Context, in CompatInput, code string) (reasons []Reason, gap bool) {

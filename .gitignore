@@ -11,3 +11,4 @@ node_modules/
 coverage/
 .bin/
 bin/
+.cache/
