@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -35,6 +36,9 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	flow.Store
 	flow.VersionStore
 	flow.SnapshotStore
+	flow.ReferenceStore
+	connector.PackageStore
+	connector.GrantStore
 	execution.WorkerStore
 	store.Reader
 	store.Inbox
@@ -138,6 +142,9 @@ func Conformance(t *testing.T, newStore Factory) {
 		{"Versions", versionsCase},
 		{"PublishIsAtomic", publishAtomicCase},
 		{"Snapshots", snapshotsCase},
+		{"ConnectorPackages", connectorPackagesCase},
+		{"ConnectorGrants", connectorGrantsCase},
+		{"ConnectorReferences", connectorReferencesCase},
 		{"OrganizationIsolation", isolationCase},
 		{"InstantsAndBytesRoundTrip", roundTripCase},
 		{"ConcurrentWriters", concurrencyCase},
@@ -162,7 +169,7 @@ func Smoke(t *testing.T, newStore Factory) {
 	if err != nil || got.ActiveVersionID.IsZero() {
 		t.Fatalf("a published flow must have an active version: %+v, %v", got, err)
 	}
-	if _, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{}`), got.DraftRevision, base); err != nil {
+	if _, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{}`), got.DraftRevision, nil, base); err != nil {
 		t.Fatalf("update draft: %v", err)
 	}
 }
@@ -342,19 +349,19 @@ func draftRevisionsCase(t *testing.T, newStore Factory) {
 	t.Helper()
 	f := newFixture(t, newStore)
 	rec := f.flow(f.orgA, f.projA, "draft")
-	rev, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":1}`), 0, base.Add(time.Second))
+	rev, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":1}`), 0, nil, base.Add(time.Second))
 	if err != nil || rev != 1 {
 		t.Fatalf("first update = %d, %v", rev, err)
 	}
-	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":2}`), 0, base.Add(2*time.Second))
+	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":2}`), 0, nil, base.Add(2*time.Second))
 	wantErr(t, "a stale revision", err, flow.ErrDraftConflict)
 	got, _ := f.s.GetFlow(f.ctx(), f.orgA, rec.ID)
 	if got.DraftRevision != 1 || string(got.Draft) != `{"n":1}` || !got.UpdatedAt.Equal(base.Add(time.Second).Truncate(time.Microsecond)) {
 		t.Fatalf("a rejected update changed the flow: %+v", got)
 	}
-	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, next[flow.FlowID](f.ids), []byte(`{}`), 0, base)
+	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, next[flow.FlowID](f.ids), []byte(`{}`), 0, nil, base)
 	wantErr(t, "an unknown flow", err, flow.ErrNotFound)
-	if rev, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":3}`), 1, base.Add(3*time.Second)); err != nil || rev != 2 {
+	if rev, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(`{"n":3}`), 1, nil, base.Add(3*time.Second)); err != nil || rev != 2 {
 		t.Fatalf("second update = %d, %v", rev, err)
 	}
 }
@@ -498,7 +505,7 @@ func isolationCase(t *testing.T, newStore Factory) {
 	// Writes cannot cross either: a flow of B pointing at A's project is rejected.
 	cross := flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgB, ProjectID: f.projA, Name: "cross", Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base}
 	wantErr(t, "a flow in another organization's project", f.s.CreateFlow(ctx, cross), flow.ErrReference)
-	if _, err := f.s.UpdateFlowDraft(ctx, f.orgB, rec.ID, []byte(`{}`), 0, base); !errors.Is(err, flow.ErrNotFound) {
+	if _, err := f.s.UpdateFlowDraft(ctx, f.orgB, rec.ID, []byte(`{}`), 0, nil, base); !errors.Is(err, flow.ErrNotFound) {
 		t.Errorf("draft update of another organization's flow: %v", err)
 	}
 	vb := flow.VersionRecord{ID: next[flow.FlowVersionID](f.ids), OrgID: f.orgB, FlowID: rec.ID, Number: 7, Document: []byte(`{}`), ContentHash: "h", PublishedAt: base, CreatedAt: base}
@@ -548,7 +555,7 @@ func concurrencyCase(t *testing.T, newStore Factory) {
 	var wg sync.WaitGroup
 	for i := range writers {
 		wg.Go(func() {
-			_, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(fmt.Sprintf(`{"writer":%d}`, i)), 0, base)
+			_, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, rec.ID, []byte(fmt.Sprintf(`{"writer":%d}`, i)), 0, nil, base)
 			switch {
 			case err == nil:
 				wins.Add(1)
