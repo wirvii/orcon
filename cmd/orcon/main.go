@@ -71,6 +71,9 @@ func main() {
 // within the configured shutdown timeout. Help goes to stdout, diagnostics
 // and logs to stderr.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if code, handled := runSubcommand(ctx, args, stdout, stderr); handled {
+		return code
+	}
 	return runWith(ctx, args, stdout, stderr, productionSandbox)
 }
 

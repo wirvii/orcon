@@ -180,6 +180,14 @@ linters:
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/codec
               desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-cli:
+          files:
+            - "$all"
+            - "!**/internal/adapter/cli/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/cli
+              desc: only cmd/orcon wires adapters (AL-8)
         adapter-private-egress:
           files:
             - "$all"
@@ -416,6 +424,11 @@ linters:
         linters:
           - forbidigo
         text: os\.Exit
+      # The generated reference and the key descriptions carry Spanish text (decision P3);
+      # the spell checker only knows American English.
+      - path: ^internal/(platform/config/keys.*|adapter/cli/docs)\.go$
+        linters:
+          - misspell
       # table-driven test functions are long by design
       - path: _test\.go
         linters:
