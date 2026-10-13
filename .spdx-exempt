@@ -37,3 +37,4 @@ CODE_OF_CONDUCT.md                       # third-party text, Contributor Covenan
 .github/pull_request_template.md         # copied into every pull request description
 .agents/skills/orcon-contributing/assets/github-settings.expected.json   # JSON has no comment syntax
 .agents/skills/orcon-contributing/assets/templates/commit-message.txt   # plain-text commit template (it carries the SPDX lines as comments)
+internal/adapter/wazero/assets/quickjs-interrupt-poll.patch   # unified diff of third-party MIT source; a header would break the patch
