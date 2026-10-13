@@ -10,13 +10,13 @@ One Go executable, built from a monorepo, embeds the production React/React Flow
 
 ## Responsibilities
 
-- **API / web:** authentication, workflow CRUD, versioning, execution management, static editor hosting, authorization.
+- **API / web:** authentication, workflow CRUD, versioning, execution management, static editor hosting, authorization; public REST API is the only management API; the editor is a client of it (ADR-0052).
 - **Workflow engine:** graph validation, scheduling eligibility, node transitions, branch/join semantics, lifecycle and cancellation.
 - **Scheduler:** trigger handling, durable timers, retries, fair dispatch, concurrency quotas.
 - **Worker:** leases tasks, executes trusted connectors or isolated extensions, records outcomes and heartbeats.
 - **State store:** transactional workflow versions, executions, attempts, task leases, events and timers.
 - **Connector subsystem:** versioned node contracts, credentials and external side-effect policies.
-- **Agent subsystem:** model-provider abstraction, tools/MCP, memory, human approval, observability.
+- **Agent subsystem:** model-provider abstraction, tools/MCP, memory, human approval, observability; specified by ADR-0060…ADR-0072, without a second runtime.
 
 ## Deployment profiles
 
@@ -46,4 +46,17 @@ SQLite is not a shared distributed coordinator. PostgreSQL task claims are plann
 
 ## Deferred architecture decisions
 
-Engine state machine; event history model; SQLite/PostgreSQL abstraction; scheduling and fairness; idempotency protocol; secrets and tenancy; plugin execution; API versioning; n8n expression compatibility; auth/IAM; object storage; observability schema. Do not implement these based on assumptions.
+Still deferred: observability schema. Object storage is partially specified by ADR-0016. Do not implement these based on assumptions.
+
+Resolved by accepted ADRs:
+- Engine state machine → ADR-0009 (SPEC-001, 2026-10-12).
+- Event history model → ADR-0009 and ADR-0017 (SPEC-001, 2026-10-12).
+- SQLite/PostgreSQL abstraction → ADR-0015 (SPEC-001, 2026-10-12).
+- Scheduling and fairness → ADR-0014 (SPEC-001, 2026-10-12).
+- n8n expression compatibility → ADR-0018 (SPEC-001, 2026-10-12).
+- Plugin execution → ADR-0032 (SPEC-003, 2026-10-12).
+- Idempotency protocol at the connector SDK level → ADR-0029 §5 and ADR-0030 (SPEC-003, 2026-10-12).
+- Secrets and tenancy → ADR-0042…ADR-0047 (SPEC-004, 2026-10-12).
+- Auth/IAM → ADR-0038…ADR-0041 (SPEC-004, 2026-10-12).
+- API versioning → ADR-0054 (SPEC-005, 2026-10-12).
+- Agent subsystem → ADR-0060…ADR-0072, without a second runtime (SPEC-006, 2026-10-12).

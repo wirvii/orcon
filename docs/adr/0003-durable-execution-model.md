@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0003 — Durable state plus execution history
 
-Status: **Accepted (architectural direction); detailed schema Proposed** | Date: 2026-10-10
+Status: **Accepted (architectural direction); detailed model specified by ADR-0007…ADR-0019** | Date: 2026-10-10 | Amended: 2026-10-12 (SPEC-001)
 
 ## Decision
 Orcon will use materialized persistent workflow state and append-only execution events, committed together in local database transactions. The engine interprets immutable, version-pinned workflow graphs. Recovery first resumes from confirmed state; full deterministic replay/forking is optional future work. This is not pure event sourcing.
@@ -19,7 +19,17 @@ Orcon will use materialized persistent workflow state and append-only execution 
 - Explicit branch/join, retry, timeout, cancellation and failure-routing semantics are mandatory before production.
 
 ## Proposed entities
-WorkflowDefinition, WorkflowExecution, NodeExecution, TaskAttempt, ExecutionEvent, TaskLease, Timer, PayloadReference, ExternalOperation.
+WorkflowDefinition, WorkflowExecution, NodeExecution, TaskAttempt, ExecutionEvent, TaskLease, Timer, PayloadReference, ExternalOperation, Token, JoinInstance, Wait, Variable, NondeterminismRecord, OutboxMessage, Blob.
 
 ## Deferred
 Exact state machine, storage schema, event catalog, replay contract, scheduling fairness, isolation levels, retention and failure-injection acceptance matrix. Specifications must be written and accepted before these details are implemented.
+
+Resolved on 2026-10-12 (SPEC-001):
+- State machine → ADR-0009.
+- Storage schema → ADR-0015 (as amended by ADR-0077).
+- Event catalog → ADR-0009.
+- Replay contract → ADR-0013 §7 (bounded recomputation from the last confirmation point; full replay remains future work).
+- Scheduling fairness → ADR-0014.
+- Isolation → ADR-0013 §10.
+- Retention → ADR-0017.
+- Failure-injection acceptance matrix → ADR-0019.
