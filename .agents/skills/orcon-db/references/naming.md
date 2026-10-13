@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Naming
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon names database objects (tables, columns, constraints, indexes, functions, schemas, roles, queries and migration files) and how values that cross a public interface are spelled. Rule IDs (`NM-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

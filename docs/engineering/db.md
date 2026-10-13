@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Database engineering standards
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 Orcon runs on SQLite (single server) and PostgreSQL (distributed) with one logical schema. Every schema change is a forward-only pair of migrations, one per database, every row of customer data carries its organization, and the database itself enforces integrity through named constraints. The decisions behind these standards are recorded in [ADR 0077](../adr/0077-database-schema-standards-and-storage-contract-corrections.md).
 

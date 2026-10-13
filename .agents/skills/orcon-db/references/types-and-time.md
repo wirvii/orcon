@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Types and time
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines the type mapping between PostgreSQL and SQLite, the forbidden types and how instants are stored. Rule IDs (`TY-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

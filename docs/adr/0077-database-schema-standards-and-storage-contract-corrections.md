@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0077: Database schema standards and storage contract corrections
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 ADR-0015 defines the storage contract (type mapping, logical schema, migrations) and ADR-0046/0047 define multi-organization isolation. ADR-0075 and ADR-0076 (accepted) fix the module layout and the SQL toolchain (sqlc with separate SQLite and PostgreSQL query sets), and the accepted Go rulebook (`.agents/skills/orcon-go/references/data-access.md`, rules DA-1 to DA-8) governs how Go code reaches the database. The maintainers fixed binding database standards: singular snake_case names without abbreviations, `id` primary keys holding application-generated UUIDv7 values, `<table>_id` foreign keys, `org_id` on every organization-scoped row, actor columns that reference a principal, forward-only paired migrations, constraints enforced by the database, JSON only for whole documents, soft delete only for flows, bounded indexed queries. Checked against these standards, the ADR-0015 logical schema lacks `org_id` on 28 organization-scoped tables, lacks `id` on many, and uses plural, abbreviated and reserved names. Some mappings cannot be enforced as written (SQLite `BLOB(16)` in STRICT tables, `INTEGER PRIMARY KEY` sequences), PostgreSQL 14 views bypass row-level security, and lookups that happen before the organization is known are missing from the engine-plane function list.

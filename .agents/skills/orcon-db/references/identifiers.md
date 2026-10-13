@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Identifiers
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines row identity, its storage and text form, secrets, sequence numbers and natural keys. Rule IDs (`ID-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

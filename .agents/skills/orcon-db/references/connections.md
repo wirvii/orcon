@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Connections
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines the per-connection settings of SQLite and the session settings of PostgreSQL. Rule IDs (`CN-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

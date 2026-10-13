@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # JSON documents
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how JSON documents are stored and what SQL may do with them. Rule IDs (`JS-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

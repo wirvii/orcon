@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Migrations
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how schema migrations are written, named, checked, kept immutable and tested on upgrade. Rule IDs (`MG-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 

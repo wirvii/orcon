@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Checks
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document lists every automated check that enforces the database rulebook: the tool, its license, where it runs, what it verifies, how to fix a finding and how to ask for an exception. Rule IDs (`CK-…`) are stable. `policy/` means `internal/adapter/storetest/dbrules/policy/`.
 
