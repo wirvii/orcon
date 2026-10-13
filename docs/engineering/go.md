@@ -32,7 +32,7 @@ The complete Go rulebook is in `.agents/skills/orcon-go/references/`:
 - GNU make and git.
 - uv.
 - Docker, only for `make test-postgres`.
-- Node 22 and pnpm 9, only for `make web`.
+- Node 22 and pnpm 9, only for `make web` and `make build`.
 
 ## Project tooling — mneme
 
