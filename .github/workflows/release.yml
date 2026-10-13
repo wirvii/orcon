@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Build, sign, attest and verify a release (orcon-contributing RL-6..RL-8; ADR 0081 section 5 to 7).
+# Starts on a `v*` tag, which only the release GitHub App can push (ruleset release-tags).
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions: {}
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  verify-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: sh scripts/release/install-tools.sh gitsign
+      - run: sh scripts/release/verify-tag.sh "$GITHUB_REF_NAME"
+  goreleaser:
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    outputs:
+      hashes: ${{ steps.out.outputs.hashes }}
+      image: ${{ steps.out.outputs.image }}
+      digest: ${{ steps.out.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - run: make sbom
+      - run: sh scripts/release/notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
+      # The version equals GORELEASER_VERSION in tools/versions.mk.
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          distribution: goreleaser
+          version: v2.18.3
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: out
+        run: |
+          {
+            echo "hashes=$(base64 -w0 < build/goreleaser/checksums.txt)"
+            echo "image=ghcr.io/wirvii/orcon"
+            echo "digest=$(jq -r '[.[] | select(.type=="Docker Manifest" and (.name|endswith(":latest")|not))][0].extra.Digest' build/goreleaser/artifacts.json)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Attest the SBOM on the image
+        env:
+          IMAGE_DIGEST: ${{ steps.out.outputs.digest }}
+        run: cosign attest --yes --type cyclonedx --predicate dist/sbom/orcon.cdx.json "ghcr.io/wirvii/orcon@${IMAGE_DIGEST}"
+  provenance-binaries:
+    needs: goreleaser
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0 # tag required by slsa-verifier (ADR 0081 section 7)
+    with:
+      base64-subjects: ${{ needs.goreleaser.outputs.hashes }}
+      upload-assets: true
+  provenance-image:
+    needs: goreleaser
+    permissions:
+      actions: read
+      id-token: write
+      packages: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0 # tag required by slsa-verifier (ADR 0081 section 7)
+    with:
+      image: ${{ needs.goreleaser.outputs.image }}
+      digest: ${{ needs.goreleaser.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
+  verify:
+    needs: [provenance-binaries, provenance-image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: sh scripts/release/install-tools.sh cosign slsa-verifier
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/release/verify.sh "$GITHUB_REF_NAME"

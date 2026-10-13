@@ -44,6 +44,13 @@ const (
 
 const defaultShutdownTimeout = 30 * time.Second
 
+// version and commit are injected by the release build with
+// -X main.version=<version> -X main.commit=<commit> (.goreleaser.yaml).
+var (
+	version = "dev"
+	commit  = ""
+)
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
@@ -61,6 +68,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	role := flags.String("role", "standalone", "standalone|api|scheduler|worker")
 	addr := flags.String("addr", ":8080", "HTTP listen address")
 	shutdownTimeout := flags.Duration("shutdown-timeout", defaultShutdownTimeout, "maximum time to drain in-flight requests on shutdown")
+	showVersion := flags.Bool("version", false, "print the version and exit")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printUsage(stdout, flags)
@@ -69,6 +77,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "orcon:", err)
 		printUsage(stderr, flags)
 		return exitUsage
+	}
+
+	if *showVersion {
+		_, _ = fmt.Fprintf(stdout, "orcon %s (%s)\n", version, commit)
+		return exitOK
 	}
 
 	selected := config.Role(strings.ToLower(*role))

@@ -40,7 +40,7 @@
         "integration_id": 15368,
         "checks": [
           { "context": "commit-lint", "workflow": "pr.yml", "job": "commit-lint" },
-          { "context": "release-check", "workflow": "ci.yml", "job": "release-check" },
+          { "context": "release-check", "workflow": "contributing.yml", "job": "release-check" },
           { "context": "integration", "workflow": "ci.yml", "job": "integration" },
           { "context": "ui-quality", "workflow": "ci.yml", "job": "ui-quality" },
           { "context": "ui-visual", "workflow": "ci.yml", "job": "ui-visual" },
