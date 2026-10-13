@@ -248,11 +248,13 @@ func (e *postgresEngine) Fresh(testing.TB) error {
 }
 
 func (e *postgresEngine) Exec(ctx context.Context, sqlText string) error {
+	//orcon:dynamic-sql test helper: runs the statements of the migration and rule checks
 	_, err := e.conn.Exec(ctx, sqlText, pgx.QueryExecModeSimpleProtocol)
 	return err
 }
 
 func (e *postgresEngine) Query(ctx context.Context, statement string) ([][]string, error) {
+	//orcon:dynamic-sql test helper: runs the statements of the migration and rule checks
 	rows, err := e.conn.Query(ctx, statement, pgx.QueryExecModeSimpleProtocol)
 	if err != nil {
 		return nil, err

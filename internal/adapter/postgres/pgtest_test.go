@@ -122,6 +122,7 @@ func newPostgresDatabase(tb testing.TB) string {
 		tb.Fatal(err)
 	}
 	name := "orcon_" + hex.EncodeToString(suffix[:])
+	//orcon:dynamic-sql test helper: names a throwaway database or runs a statement of a rule check
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+name+" TEMPLATE template0"); err != nil {
 		tb.Fatalf("create database: %v", err)
 	}
@@ -133,6 +134,7 @@ func newPostgresDatabase(tb testing.TB) string {
 			return
 		}
 		defer c.Close(cleanup) //nolint:errcheck // closing the admin connection cannot fail a test
+		//orcon:dynamic-sql test helper: names a throwaway database or runs a statement of a rule check
 		if _, err := c.Exec(cleanup, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
 			tb.Errorf("drop %s: %v", name, err)
 		}

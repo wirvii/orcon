@@ -69,9 +69,11 @@ lint:
 		(cd "$$dir" && $(GOLANGCI_LINT) run --config $(CURDIR)/.golangci.yml ./...); \
 	done
 
+# The orgscope allowlist is named explicitly so the run never depends on how the repository root is found
+# (a linked worktree sits below another checkout, whose own allowlist would be read instead).
 vet:
 	set -e; for dir in $(WORKSPACE_DIRS); do \
-		(cd "$$dir" && go vet -vettool=$(CURDIR)/$(BIN)/orconvet ./...); \
+		(cd "$$dir" && go vet -vettool=$(CURDIR)/$(BIN)/orconvet -orgscope.allowlist=$(CURDIR)/internal/adapter/storetest/dbrules/policy/dynamic_sql_allowlist.txt ./...); \
 	done
 
 arch-coverage:
