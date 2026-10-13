@@ -86,7 +86,9 @@ Dependencies point inward.
 - AL-2.1 Area packages MUST NOT import `internal/adapter/...`, `cmd/...`, `database/sql`, `net/http`, `net/rpc`, `encoding/json`, `encoding/xml`, `encoding/csv`, `encoding/gob`, any YAML package, `pgx`, `modernc.org/sqlite`, `wazero`, the OpenTelemetry SDK or exporters, or `os/exec`. They MAY import the rest of the standard library, `log/slog`, the OpenTelemetry API, other areas, platform packages and `packages/go/connector/sdk`.
 - AL-2.2 Platform packages MUST NOT import adapters or areas.
 - AL-2.3 Each technology is confined to its adapter: `pgx` to `adapter/postgres`, `adapter/connectors/postgres` and `adapter/storetest`; `modernc.org/sqlite` and `database/sql` to `adapter/sqlite` and `adapter/storetest`; `wazero` to `adapter/wazero`; the OpenTelemetry SDK and exporters to `adapter/otel` and `cmd/**`; `github.com/oapi-codegen/runtime` to `adapter/httpapi`.
-- AL-2.4 An adapter package is imported only by `cmd/**` and by its own subtree. The single declared exception is `storetest`, which imports `sqlite` and `postgres`.
+- AL-2.4 An adapter package is imported only by `cmd/**` and by its own subtree. The declared exceptions are:
+  - `storetest`, which imports `sqlite` and `postgres`.
+  - `internal/adapter/connectortest` (connector recording, replay, scrubbing, detection, fault injection and live runs) may be imported only by `_test.go` files under `internal/adapter/connectors/**` and by `internal/adapter/cli`. No other package, and no non-test file under `internal/adapter/connectors/**`, may import it. Approved by the maintainers on 2026-10-12 (SPEC-011, ADR-0079 §8); this exception covers this package only.
 - AL-2.5 Cycles between areas are not allowed (the compiler rejects them); when two areas need each other, one of them declares a port that the other satisfies, or a new area owns the shared concept.
 
 Each rule is a depguard rule in `.golangci.yml`:

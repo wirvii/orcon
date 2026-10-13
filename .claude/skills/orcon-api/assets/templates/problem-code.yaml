@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Template: one problem code in the catalog and its reusable response.
+# Add the catalog entry to components/schemas/ProblemCode (x-orcon-problem-catalog and enum)
+# and the response to components/responses in the same pull request that first returns the
+# code, then run `make api-lint`. Rules: references/errors.md (ERR-6, ERR-7).
+components:
+  schemas:
+    ProblemCode:
+      type: string
+      description: Stable code of a problem; the type URI is urn:orcon:problem:<code>.
+      x-orcon-enum-kind: identifier
+      enum:
+        - project-managed-by-git
+      x-orcon-problem-catalog:
+        project-managed-by-git:
+          status: 409
+          title: Project managed by Git
+          when: >-
+            The project is bound to a Git repository, so its flows change only through a Git
+            sync; edits and publications through the API are refused.
+          retryable: false
+  responses:
+    ProjectManagedByGit:
+      description: The project is managed by Git; change its flows through the repository.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            projectManagedByGit:
+              summary: The flow belongs to a project bound to Git
+              value:
+                type: urn:orcon:problem:project-managed-by-git
+                title: Project managed by Git
+                status: 409
+                detail: Project 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70 is managed by Git; push the change to its repository.
+                instance: /api/v1/flows/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60/publish
+                code: project-managed-by-git
+                requestId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a62
+                errors: []

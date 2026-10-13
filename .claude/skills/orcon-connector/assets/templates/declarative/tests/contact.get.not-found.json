@@ -1,0 +1,21 @@
+{
+  "format": "orcon/cassette@1",
+  "operation": "contact.get",
+  "case": "not-found",
+  "example": false,
+  "parameters": { "contactId": "c_404" },
+  "items": [ {} ],
+  "credential": { "type": "apiKey", "fixture": "default" },
+  "interactions": [
+    {
+      "request": { "method": "GET", "url": "https://api.acme.example/v1/contacts/c_404", "headers": { "Authorization": "[REDACTED:credential.apiKey]" }, "body": null },
+      "response": {
+        "status": 404,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "error": { "message": "contact not found" } }
+      }
+    }
+  ],
+  "expect": { "error": { "class": "PERMANENT", "code": "NotFound" } },
+  "recorded": { "at": "2026-10-13T00:00:00Z", "orconVersion": "0.0.0", "scrubber": { "version": 1, "rulesDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000" } }
+}
