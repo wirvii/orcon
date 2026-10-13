@@ -32,6 +32,7 @@ Only the owner can apply these settings. Required checks are added only after th
 - [ ] Deployment branches and tags: selected — branch `main` and tag `v*`.
 - [ ] Environment secrets: `ORCON_RELEASE_APP_ID`, `ORCON_RELEASE_APP_PRIVATE_KEY`.
 - [ ] No required reviewers (merging the release pull request is the decision to publish).
+- [ ] Repository variable `ORCON_RELEASE_ENABLED` set to `true` once the App and the environment above exist. Until then the jobs of `release-please.yml` are skipped and never touch the environment.
 
 ### C. General (Settings → General → Pull Requests)
 
@@ -84,11 +85,11 @@ Only the owner can apply these settings. Required checks are added only after th
 | Check (displayed name) | Workflow / job | Added by | When to require it |
 |---|---|---|---|
 | `commit-lint` | PR / commit-lint | SPEC-013 | when `pr.yml` is on `main` |
-| `release-check` | CI / release-check | SPEC-013 | when it is on `main` |
+| `release-check` | Contributing / release-check | SPEC-013 | when `contributing.yml` is on `main` |
 | `integration` | CI / integration | existing | now |
 | `ui-quality`, `ui-visual`, `skills` | CI | SPEC-007 | when SPEC-007 merges |
-| `check (oldstable)`, `check (stable)`, `provenance` | CI | SPEC-008 | when SPEC-008 merges (and remove `go` from the list) |
-| `postgres` (matrix names as displayed) | CI | SPEC-008/009 | when they merge |
+| `check (go oldstable)`, `check (go stable)`, `provenance` | CI | SPEC-008 | when SPEC-008 merges (and remove `go` from the list) |
+| `postgres` | CI / postgres (the aggregate job over the image matrix; do not require the matrix names `postgres (postgres:…@sha256:…)`) | SPEC-008/009 | when they merge |
 | `web-e2e`, `web-perf` | CI | SPEC-010 | when it merges |
 | `connectors` | CI | SPEC-011 | when it merges |
 | `api-contract` | CI | SPEC-012 | when it merges |

@@ -69,7 +69,7 @@ No external linter knows these rules for both dialects at once, so Orcon has two
 ## Connection checks
 
 - **CK-5** `dbrules.CheckSQLiteConnection(ctx, *sql.Conn, role)` verifies `foreign_keys = 1`, `busy_timeout ≥ 1000`, `trusted_schema = 0`; on the writer `journal_mode = wal` and `synchronous = 2` (FULL) or the explicitly configured value; on a reader `query_only = 1` (CN-2..CN-6).
-- **CK-6** `dbrules.CheckPostgresSession(ctx, pgx.Tx)` verifies `TimeZone = UTC`, `current_user = 'orcon_application'`, an empty `current_setting('orcon.org_id', true)` when the transaction starts, `transaction_isolation = 'read committed'`, and non-null `idle_in_transaction_session_timeout` and `lock_timeout` (CN-7, CN-8, TI-6).
+- **CK-6** `dbrules.CheckPostgresSession(ctx, pgx.Tx)` verifies `TimeZone = UTC`, `current_user = 'orcon_application'`, an empty `current_setting('orcon.org_id', true)` when the transaction starts, `transaction_isolation = 'read committed'`, non-null `idle_in_transaction_session_timeout`, `lock_timeout` and `statement_timeout`, and an `application_name` that starts with `orcon` (CN-7, CN-8, TI-6). The PostgreSQL adapter also asserts, at the start of every transaction, that the role is `orcon_application` and the organization context is empty, and its tests run this check on every pooled connection and through a login role that is not a superuser.
 - **CK-7** `TestForeignKeysOnEveryConnection` holds several reader connections and the writer at the same time and checks each one (successive queries are not enough: they reuse one connection). Fix: set the pragma through the driver's per-connection parameters.
 
 ## Plan checks

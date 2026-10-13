@@ -24,3 +24,4 @@ bin/
 
 # A binary built by `go build ./cmd/orcon` at the repository root.
 /orcon
+build/goreleaser/

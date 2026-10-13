@@ -13,6 +13,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -69,14 +70,26 @@ var contentTypes = map[string]string{
 // gzipped once on first use and the result is cached for the life of the
 // handler.
 func Handler(assets fs.FS) http.Handler {
-	return &spa{assets: assets, gz: make(map[string][]byte)}
+	return &spa{assets: assets, variants: make(map[variantKey]*variant)}
+}
+
+// variantKey identifies one servable form of a file.
+type variantKey struct {
+	name     string
+	encoding string // "", "br" or "gzip"
+}
+
+// variant is the bytes sent for a variantKey and their validator.
+type variant struct {
+	body []byte
+	etag string
 }
 
 type spa struct {
 	assets fs.FS
 
-	mu sync.Mutex
-	gz map[string][]byte
+	mu       sync.RWMutex
+	variants map[variantKey]*variant
 }
 
 func (s *spa) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +153,11 @@ func (s *spa) isFile(name string) bool {
 
 func (s *spa) serve(w http.ResponseWriter, r *http.Request, name, cache string) {
 	ctype := contentType(name)
-	body, encoding, ok := s.variant(name, ctype, r.Header.Get("Accept-Encoding"))
+	encoding := ""
+	if compressible(ctype) {
+		encoding = s.negotiate(name, r.Header.Values("Accept-Encoding"))
+	}
+	v, ok := s.lookup(variantKey{name: name, encoding: encoding})
 	if !ok {
 		writeNotFound(w, "/"+name)
 		return
@@ -155,56 +172,78 @@ func (s *spa) serve(w http.ResponseWriter, r *http.Request, name, cache string) 
 	if encoding != "" {
 		h.Set("Content-Encoding", encoding)
 	}
-	sum := sha256.Sum256(body)
-	h.Set("ETag", `"`+hex.EncodeToString(sum[:8])+encoding+`"`)
-	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(body))
+	h.Set("ETag", v.etag)
+	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(v.body))
 }
 
-// variant picks the bytes and Content-Encoding to send for name.
-func (s *spa) variant(name, ctype, acceptEncoding string) ([]byte, string, bool) {
-	if compressible(ctype) {
-		if accepts(acceptEncoding, "br") {
-			if b, err := fs.ReadFile(s.assets, name+".br"); err == nil {
-				return b, "br", true
-			}
-		}
-		if accepts(acceptEncoding, "gzip") {
-			if b, err := fs.ReadFile(s.assets, name+".gz"); err == nil {
-				return b, "gzip", true
-			}
-			if b, ok := s.gzipped(name); ok {
-				return b, "gzip", true
-			}
-		}
+// negotiate picks the Content-Encoding to send for name: brotli when a
+// pre-compressed .br sits beside the file, then gzip (pre-compressed or made on
+// the fly), otherwise identity.
+func (s *spa) negotiate(name string, acceptEncoding []string) string {
+	if accepts(acceptEncoding, "br") && s.isFile(name+".br") {
+		return "br"
 	}
-	b, err := fs.ReadFile(s.assets, name)
-	return b, "", err == nil
+	if accepts(acceptEncoding, "gzip") {
+		return "gzip"
+	}
+	return ""
 }
 
-// gzipped returns the cached gzip form of name, compressing it on first use.
-func (s *spa) gzipped(name string) ([]byte, bool) {
+// lookup returns the cached variant, building and caching it on first use.
+// The mutex is never held while reading or compressing: concurrent first
+// requests may build the same variant, and the first one stored wins.
+func (s *spa) lookup(key variantKey) (*variant, bool) {
+	s.mu.RLock()
+	v, ok := s.variants[key]
+	s.mu.RUnlock()
+	if ok {
+		return v, true
+	}
+	body, ok := s.build(key)
+	if !ok {
+		return nil, false
+	}
+	sum := sha256.Sum256(body)
+	built := &variant{body: body, etag: `"` + hex.EncodeToString(sum[:8]) + key.encoding + `"`}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if b, ok := s.gz[name]; ok {
-		return b, true
+	if existing, ok := s.variants[key]; ok {
+		return existing, true
 	}
-	raw, err := fs.ReadFile(s.assets, name)
-	if err != nil {
-		return nil, false
+	s.variants[key] = built
+	return built, true
+}
+
+func (s *spa) build(key variantKey) ([]byte, bool) {
+	switch key.encoding {
+	case "br":
+		b, err := fs.ReadFile(s.assets, key.name+".br")
+		return b, err == nil
+	case "gzip":
+		if b, err := fs.ReadFile(s.assets, key.name+".gz"); err == nil {
+			return b, true
+		}
+		raw, err := fs.ReadFile(s.assets, key.name)
+		if err != nil {
+			return nil, false
+		}
+		var buf bytes.Buffer
+		zw, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+		if err != nil {
+			return nil, false
+		}
+		if _, err := zw.Write(raw); err != nil {
+			return nil, false
+		}
+		if err := zw.Close(); err != nil {
+			return nil, false
+		}
+		return buf.Bytes(), true
+	default:
+		b, err := fs.ReadFile(s.assets, key.name)
+		return b, err == nil
 	}
-	var buf bytes.Buffer
-	zw, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-	if err != nil {
-		return nil, false
-	}
-	if _, err := zw.Write(raw); err != nil {
-		return nil, false
-	}
-	if err := zw.Close(); err != nil {
-		return nil, false
-	}
-	s.gz[name] = buf.Bytes()
-	return s.gz[name], true
 }
 
 func contentType(name string) string {
@@ -229,15 +268,42 @@ func compressible(ctype string) bool {
 	return false
 }
 
-// accepts reports whether an Accept-Encoding header allows the coding.
-func accepts(header, coding string) bool {
-	for _, part := range strings.Split(header, ",") {
-		token, params, _ := strings.Cut(strings.TrimSpace(part), ";")
-		if !strings.EqualFold(strings.TrimSpace(token), coding) {
+// accepts reports whether the Accept-Encoding header lines allow the coding.
+// An explicit entry decides; otherwise a "*" entry does; a q value of zero
+// refuses the coding.
+func accepts(lines []string, coding string) bool {
+	explicit, wildcard := -1, -1 // -1: not mentioned, 0: refused, 1: allowed
+	for _, line := range lines {
+		for _, part := range strings.Split(line, ",") {
+			token, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+			token = strings.TrimSpace(token)
+			allowed := 1
+			if qualityIsZero(params) {
+				allowed = 0
+			}
+			switch {
+			case strings.EqualFold(token, coding):
+				explicit = allowed
+			case token == "*":
+				wildcard = allowed
+			}
+		}
+	}
+	if explicit >= 0 {
+		return explicit == 1
+	}
+	return wildcard == 1
+}
+
+// qualityIsZero reports whether a parameter list carries q=0 (any spelling).
+func qualityIsZero(params string) bool {
+	for _, p := range strings.Split(params, ";") {
+		key, value, ok := strings.Cut(strings.TrimSpace(p), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
 			continue
 		}
-		params = strings.ReplaceAll(strings.ToLower(params), " ", "")
-		return params != "q=0" && params != "q=0.0" && params != "q=0.00" && params != "q=0.000"
+		f, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		return err == nil && f == 0
 	}
 	return false
 }
@@ -245,6 +311,7 @@ func accepts(header, coding string) bool {
 func writeNotFound(w http.ResponseWriter, p string) {
 	if isUnder(p, "/api") {
 		w.Header().Set("Content-Type", "application/problem+json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"type":"about:blank","title":"Not Found","status":404}`)
 		return

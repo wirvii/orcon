@@ -52,6 +52,13 @@ const (
 
 const defaultShutdownTimeout = 30 * time.Second
 
+// version and commit are injected by the release build with
+// -X main.version=<version> -X main.commit=<commit> (.goreleaser.yaml).
+var (
+	version = "dev"
+	commit  = ""
+)
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
@@ -90,6 +97,7 @@ func runWith(ctx context.Context, args []string, stdout, stderr io.Writer, newSa
 	role := flags.String("role", "standalone", "standalone|api|scheduler|worker")
 	addr := flags.String("addr", ":8080", "HTTP listen address")
 	shutdownTimeout := flags.Duration("shutdown-timeout", defaultShutdownTimeout, "maximum time to drain in-flight requests on shutdown")
+	showVersion := flags.Bool("version", false, "print the version and exit")
 	slots := flags.Int("expr-sandbox-slots", 0, "expression sandbox calls that may execute guest code at once (1 to GOMAXPROCS-1; 0 means GOMAXPROCS-1)")
 	maxAbandoned := flags.Int("expr-max-abandoned", config.SandboxMaxAbandonedDefault,
 		"maximum expression evaluations abandoned at their deadline that may still be running (1 to 64)")
@@ -101,6 +109,11 @@ func runWith(ctx context.Context, args []string, stdout, stderr io.Writer, newSa
 		_, _ = fmt.Fprintln(stderr, "orcon:", err)
 		printUsage(stderr, flags)
 		return exitUsage
+	}
+
+	if *showVersion {
+		_, _ = fmt.Fprintf(stdout, "orcon %s (%s)\n", version, commit)
+		return exitOK
 	}
 
 	selected := config.Role(strings.ToLower(*role))
