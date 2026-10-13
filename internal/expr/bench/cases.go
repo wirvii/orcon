@@ -25,7 +25,7 @@ type Case struct {
 	// Nodes maps node names to the JSON array of their output items.
 	Nodes map[string]string
 	// Luxon marks the cases that run Luxon, the largest JavaScript library of
-	// the runtime and the slowest to interpret.
+	// the runtime and the slowest to interpret (see [UsesLuxon]).
 	Luxon bool
 }
 
@@ -39,12 +39,12 @@ const sampleItem = `{"id":1042,"name":"Ada Lovelace","first":"Ada","last":"Lovel
 // Cases returns the benchmark expressions.
 func Cases() []Case {
 	nodes := map[string]string{"Fetch": `[{"json":{"id":7,"token":"t-1"}},{"json":{"id":8,"token":"t-2"}}]`}
-	mk := func(name, tmpl string) Case { return Case{Name: name, Template: tmpl, Item: sampleItem, Nodes: nodes} }
-	luxon := func(name, tmpl string) Case {
-		c := mk(name, tmpl)
-		c.Luxon = true
-		return c
+	// Whether a case runs Luxon is decided by the classifier of the targets
+	// ([UsesLuxon]), not by hand.
+	mk := func(name, tmpl string) Case {
+		return Case{Name: name, Template: tmpl, Item: sampleItem, Nodes: nodes, Luxon: TemplateUsesLuxon(tmpl)}
 	}
+	luxon := mk
 	return []Case{
 		mk("member", `={{ $json.name }}`),
 		mk("deep member", `={{ $json.user.address.city }}`),

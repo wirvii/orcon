@@ -113,4 +113,59 @@ var (
 	// ErrSandbox means the sandbox failed in a way the code did not cause
 	// directly, for example a trap of the WebAssembly module.
 	ErrSandbox = errors.New("expr: sandbox failure")
+	// ErrSandboxSaturated means the process holds as many abandoned
+	// evaluations still running as it allows, so it starts no new sandbox
+	// call (ADR-0018 section 3, amendment 10). It is an infrastructure error,
+	// not an error of the expression: it is not an [*EvalError], it does not
+	// count against the node's retries, and the activation that met it must
+	// not be committed, so it is recovered like the work of a worker that
+	// exits (ADR-0013).
+	ErrSandboxSaturated = errors.New("expr: sandbox saturated by abandoned evaluations")
 )
+
+// RestartReason is the reason a process gives when it shuts down because its
+// sandbox is saturated or holds a stuck call.
+const RestartReason = "sandbox_abandoned"
+
+// Health lets the composition root know that the sandbox can no longer be
+// trusted to serve this process, so the process must restart (ADR-0018
+// section 3, amendment 10).
+type Health interface {
+	// Degraded returns a channel that is closed when the sandbox is saturated
+	// or holds a stuck abandoned call. It never reopens.
+	Degraded() <-chan struct{}
+	// HealthReport describes the state, for the log line of the restart.
+	HealthReport() HealthReport
+}
+
+// HealthReport counts the abandoned evaluations of a sandbox.
+type HealthReport struct {
+	// AbandonedRunning and Stuck are the abandoned calls still running now and
+	// the part of them that has run longer than the stuck limit.
+	AbandonedRunning, Stuck int
+	// MaxAbandoned is the limit of abandoned calls still running.
+	MaxAbandoned int
+	// Abandoned and Saturated count, since the process started, the calls
+	// abandoned at their deadline and the calls refused because of the limit.
+	Abandoned, Saturated uint64
+}
+
+// CallIdentity names the execution a sandbox call belongs to, for the log
+// line of an abandoned call. It never holds the expression or its data.
+type CallIdentity struct {
+	OrganizationID, ExecutionID, NodeID string
+}
+
+type callIdentityKey struct{}
+
+// WithCallIdentity returns a context that carries id to the sandbox adapter.
+func WithCallIdentity(ctx context.Context, id CallIdentity) context.Context {
+	return context.WithValue(ctx, callIdentityKey{}, id)
+}
+
+// CallIdentityFrom returns the identity [WithCallIdentity] stored, or the zero
+// value.
+func CallIdentityFrom(ctx context.Context) CallIdentity {
+	id, _ := ctx.Value(callIdentityKey{}).(CallIdentity)
+	return id
+}

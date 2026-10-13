@@ -8,11 +8,14 @@ import (
 	_ "embed" // quickjs.wasm is embedded.
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 
 	"github.com/wirvii/orcon/internal/expr"
+	"github.com/wirvii/orcon/internal/platform/config"
 )
 
 //go:embed assets/quickjs.wasm
@@ -52,9 +55,11 @@ const (
 	// deadline: the call runs on its own goroutine and the caller stops waiting
 	// when the context is done, whatever the module is doing. The abandoned call
 	// still runs until its next poll of the interrupt handler or its end, then
-	// its runtime is closed and never used again. This is the mode SPEC-001
-	// amendment 10 (A.4, B.1 option 2) prototypes; it is not for production
-	// until the owner decides.
+	// its runtime is closed and never used again. It is the production mode of
+	// expression evaluations (ADR-0018 section 3, SPEC-001 amendment 10) and
+	// the default of [New]. ModeHardLimit stays for the measurement and for the
+	// slices that run other guests (the Code node, WASM connectors) until each
+	// measures its own stop.
 	ModeCooperativeAbandon
 )
 
@@ -75,14 +80,38 @@ func (m Mode) String() string {
 type Option func(*Sandbox)
 
 // WithMode selects how the time limit is enforced. The default is
-// [ModeHardLimit].
+// [ModeCooperativeAbandon]. The other two modes exist for the measurement
+// report and the tests; the composition root must not select them
+// (TestProductionStopMode).
 func WithMode(m Mode) Option { return func(s *Sandbox) { s.mode = m } }
+
+// WithMaxAbandoned sets the limit of abandoned calls still running. The
+// default is [config.SandboxMaxAbandonedDefault]; a value outside the range
+// 1 to 64 is moved to the nearest bound (the composition root rejects it
+// earlier, with [config.ValidSandboxMaxAbandoned]).
+func WithMaxAbandoned(n int) Option { return func(s *Sandbox) { s.maxAbandoned = n } }
+
+// WithStuckAfter sets how long an abandoned call may keep running before it
+// counts as stuck. The default is [DefaultStuckAfter].
+func WithStuckAfter(d time.Duration) Option { return func(s *Sandbox) { s.stuckAfter = d } }
+
+// WithLogger sets the logger of the abandon accounting.
+func WithLogger(l *slog.Logger) Option { return func(s *Sandbox) { s.log = l } }
+
+// WithMetrics sets the receiver of the abandon metrics.
+func WithMetrics(m Metrics) Option { return func(s *Sandbox) { s.metrics = m } }
 
 // Sandbox implements [expr.Sandbox]. It compiles the QuickJS module once and
 // instantiates it for every [Sandbox.Open]. It is safe for concurrent use.
 type Sandbox struct {
 	mode  Mode
 	cache wazero.CompilationCache
+
+	maxAbandoned int
+	stuckAfter   time.Duration
+	log          *slog.Logger
+	metrics      Metrics
+	track        *tracker
 
 	mu       sync.Mutex
 	closed   bool
@@ -93,6 +122,7 @@ type Sandbox struct {
 // so each distinct cap gets its own, sharing the compilation cache.
 type engine struct {
 	mode     Mode
+	track    *tracker
 	rt       wazero.Runtime
 	compiled wazero.CompiledModule
 
@@ -104,13 +134,20 @@ type engine struct {
 
 var _ expr.Sandbox = (*Sandbox)(nil)
 
+// Mode reports how the sandbox enforces the time limit of a call.
+func (s *Sandbox) Mode() Mode { return s.mode }
+
 // New returns a sandbox. It compiles the module on the first Open of each
 // memory cap; the compiled code is shared.
 func New(opts ...Option) *Sandbox {
-	s := &Sandbox{cache: wazero.NewCompilationCache(), runtimes: map[uint32]*engine{}}
+	s := &Sandbox{
+		mode: ModeCooperativeAbandon, cache: wazero.NewCompilationCache(), runtimes: map[uint32]*engine{},
+		maxAbandoned: config.SandboxMaxAbandonedDefault,
+	}
 	for _, o := range opts {
 		o(s)
 	}
+	s.track = newTracker(s.maxAbandoned, s.stuckAfter, s.log, s.metrics)
 	return s
 }
 
@@ -153,7 +190,7 @@ func (s *Sandbox) engineFor(ctx context.Context, pages uint32) (*engine, error) 
 		_ = rt.Close(ctx)
 		return nil, fmt.Errorf("wazero: compile the expression runtime: %w", err)
 	}
-	e := &engine{mode: s.mode, rt: rt, compiled: compiled, snapshots: map[snapshotKey]*snapshot{}}
+	e := &engine{mode: s.mode, track: s.track, rt: rt, compiled: compiled, snapshots: map[snapshotKey]*snapshot{}}
 	s.runtimes[pages] = e
 	return e, nil
 }

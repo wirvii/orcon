@@ -83,9 +83,9 @@ func TestExprMeasurementReport(t *testing.T) {
 		mode        wazero.Mode
 		description string
 	}{
-		{wazero.ModeHardLimit, "The deadline closes the WebAssembly module when the context is done (wazero close-on-context-done), as ADR-0018 section 3 prescribes. wazero compiles a check into every function and loop of the module for this; the QuickJS interpreter loop pays it on every bytecode operation."},
-		{wazero.ModeCooperativeLimit, "The deadline is enforced by the QuickJS interrupt handler, polled by the interpreter every ten thousand operations and, in the patched module (QuickJS-ng 0.17.0 plus the interrupt-poll patch), inside the built-ins whose work grows with the input (string search, replace, split, repeat, pad, JSON, join, concat, flat, case conversion, URI encoding) as well as the regular-expression, sorting and array built-ins upstream already polls; the wazero checks are not compiled in. The caller still waits for the code to reach a poll, and code in a built-in the patch does not cover is bounded by the memory cap only (upstream, a crafted `JSON.stringify` of a 100000-deep array outlived a 150 ms limit by about 2.7 s). This is a deviation from ADR-0018 section 3 and would need an amendment; it is not a production mode."},
-		{wazero.ModeCooperativeAbandon, "The cooperative mode of the patched module plus an answer at the deadline: the call runs on its own goroutine and the caller stops waiting when the context is done, whatever the module is doing; the abandoned call stops at its next poll, closes its runtime, and the runtime is never reused. This is the prototype of SPEC-001 amendment 10, A.4; the choice between it and the hard limit is the owner's (B.1)."},
+		{wazero.ModeCooperativeAbandon, "The production stop of expression evaluations (ADR-0018 section 3 as amended by SPEC-001 amendment 10): the QuickJS interrupt handler checks the deadline every ten thousand operations and, in the patched module (QuickJS-ng 0.17.0 plus the interrupt-poll patch), inside the built-ins whose work grows with the input; every call runs on its own goroutine and the caller stops waiting when the context is done, so it gets its timeout within the deadline plus 5 ms whatever the guest is doing. The abandoned call stops at its next check, refuses further requests to the host, closes its runtime, and the runtime is never reused. At most eight abandoned calls may still be running in a process."},
+		{wazero.ModeHardLimit, "Measured for comparison only; not a production mode for expressions. The deadline closes the WebAssembly module when the context is done (wazero close-on-context-done), as ADR-0018 section 3 prescribed before the amendment. wazero compiles a check into every function and loop of the module for this; the QuickJS interpreter loop pays it on every bytecode operation. It stays for the Code node and WASM connectors until their cuts measure their own stop."},
+		{wazero.ModeCooperativeLimit, "Measured for comparison only. The cooperative stop of the production mode without the answer at the deadline: the caller waits for the code to reach a check. Code in a built-in the patch does not cover is bounded by the memory cap only (upstream, a crafted `JSON.stringify` of a 100000-deep array outlived a 150 ms limit by about 2.7 s)."},
 	}
 	for _, md := range modes {
 		sb := wazero.New(wazero.WithMode(md.mode))
@@ -107,6 +107,8 @@ func TestExprMeasurementReport(t *testing.T) {
 		mr := &bench.ModeResult{Name: md.mode.String(), Description: md.description, Suite: runs[len(runs)/2]}
 		for _, r := range runs {
 			mr.BandP99Runs = append(mr.BandP99Runs, r.MedianBand.P99)
+			mr.PlainP99Runs = append(mr.PlainP99Runs, r.BandPlain.P99)
+			mr.LuxonP99Runs = append(mr.LuxonP99Runs, r.BandLuxon.P99)
 		}
 		if md.mode == wazero.ModeCooperativeAbandon {
 			mr.Abandon = measureAbandon(t, cfg)
@@ -114,7 +116,7 @@ func TestExprMeasurementReport(t *testing.T) {
 		m.Modes = append(m.Modes, mr)
 	}
 	decision, checks := m.Verdict()
-	t.Logf("decision with the ADR-prescribed limit (%s): %s", m.Modes[0].Name, decision)
+	t.Logf("decision with the production stop (%s): %s", m.Modes[0].Name, decision)
 	for _, mr := range m.Modes {
 		d, cs := m.VerdictOf(mr)
 		t.Logf("%s: %s", mr.Name, d)

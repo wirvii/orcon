@@ -127,7 +127,7 @@ func Compat(ctx context.Context, in CompatInput, entries []Entry) ([]Verdict, er
 			if !seg.Code {
 				continue
 			}
-			luxon := usesLuxon(seg.Text)
+			luxon := UsesLuxon(seg.Text)
 			if luxon {
 				v.LuxonSegments++
 			}
@@ -147,11 +147,45 @@ func Compat(ctx context.Context, in CompatInput, entries []Entry) ([]Verdict, er
 	return out, nil
 }
 
-// usesLuxon reports whether the code uses a Luxon name of the context.
-func usesLuxon(code string) bool {
+// luxonNames are the context names that bring Luxon into an expression.
+var luxonNames = []string{"DateTime", "Duration", "Interval", "$now", "$today"}
+
+// dateMethods are the date extension methods and toDateTime: calling one runs
+// Luxon even when no Luxon name appears (the receiver is a date).
+var dateMethods = []string{
+	"beginningOf", "diffTo", "endOfMonth", "extract", "format", "isDst", "isInLast", "isWeekend",
+	"minus", "plus", "toDateTime",
+}
+
+// UsesLuxon reports whether the analysis of the code names DateTime, Duration,
+// Interval, $now, $today, a date extension method or toDateTime. It is the
+// classification of ADR-0018 section 4 (SPEC-001 amendment 10, B.2): the
+// latency target is 200 µs for expressions that do not run Luxon and 500 µs
+// for those that do.
+func UsesLuxon(code string) bool {
 	a := expr.Analyze(code)
-	for _, name := range []string{"DateTime", "Duration", "Interval", "$now", "$today"} {
+	for _, name := range luxonNames {
 		if a.Uses(name) {
+			return true
+		}
+	}
+	for _, m := range a.Methods {
+		if slices.Contains(dateMethods, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// TemplateUsesLuxon is [UsesLuxon] for a parameter value: true when any of its
+// code segments does.
+func TemplateUsesLuxon(template string) bool {
+	body, ok := strings.CutPrefix(template, "=")
+	if !ok {
+		return false
+	}
+	for _, seg := range expr.Segments(body) {
+		if seg.Code && UsesLuxon(seg.Text) {
 			return true
 		}
 	}
@@ -178,6 +212,9 @@ func checkCode(ctx context.Context, in CompatInput, code string) (reasons []Reas
 			reasons = append(reasons, Reason{CategoryUnknownMethod, f.Name})
 		case expr.FindingDynamicReference:
 			// A computed node name is still runnable; the importer reports it.
+		case expr.FindingExecutionVariables:
+			// Publication rejects it (rule V8); the sandbox runs it, and no
+			// n8n template uses the name.
 		}
 	}
 	for _, id := range a.Identifiers {

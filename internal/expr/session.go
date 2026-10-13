@@ -71,7 +71,7 @@ func (s *Session) sandboxMode(ctx context.Context, code string, need needs, env 
 	}
 	s.ev.sandboxed.Add(1)
 	req := buildRequest(code, mode, lenient, env, need)
-	callCtx, cancel := context.WithTimeout(ctx, s.ev.opts.Timeout)
+	callCtx, cancel := context.WithTimeout(WithCallIdentity(ctx, env.Identity), s.ev.opts.Timeout)
 	defer cancel()
 	out, err := s.rt.Call(callCtx, req, &guest{env: env})
 	if err != nil {

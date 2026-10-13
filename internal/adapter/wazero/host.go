@@ -142,7 +142,7 @@ func fdWrite(_ context.Context, mod api.Module, stack []uint64) {
 // done, which includes its deadline.
 func interrupt(ctx context.Context, _ api.Module, stack []uint64) {
 	stack[0] = 0
-	if st := stateOf(ctx); st != nil && ctx.Err() != nil {
+	if st := stateOf(ctx); st != nil && st.inst.refuses(ctx) {
 		stack[0] = 1
 	}
 }
@@ -152,8 +152,8 @@ func hostCall(ctx context.Context, mod api.Module, stack []uint64) {
 	op, ptr, n := api.DecodeI32(stack[0]), api.DecodeU32(stack[1]), api.DecodeU32(stack[2])
 	st := stateOf(ctx)
 	stack[0] = 0
-	if st == nil {
-		return
+	if st == nil || st.inst.refuses(ctx) {
+		return // an abandoned call is refused without reading execution data
 	}
 	payload, ok := mod.Memory().Read(ptr, n)
 	if !ok {

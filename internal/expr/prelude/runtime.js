@@ -133,6 +133,14 @@
   });
   // The helpers below are shared by every evaluation of the runtime; freezing
   // them keeps an expression from leaving state on them.
+  function deepFreeze(v) {
+    if (v !== null && typeof v === 'object' && !Object.isFrozen(v)) {
+      Object.freeze(v);
+      for (const k of Object.keys(v)) deepFreeze(v[k]);
+    }
+    return v;
+  }
+
   Object.freeze(ifEmpty);
   Object.freeze(ifFn);
   Object.freeze(minFn);
@@ -250,7 +258,12 @@
     },
     $now: (req) => clock(req).now,
     $today: (req) => clock(req).today,
-    $execution: (req) => Object.assign({ id: '', mode: 'production', resumeUrl: '', resumeFormUrl: '' }, req.x),
+    $execution(req) {
+      // The variables are read-only and constant during the activation.
+      const x = Object.assign({ id: '', mode: 'production', resumeUrl: '', resumeFormUrl: '', variables: {} }, req.x);
+      deepFreeze(x.variables);
+      return x;
+    },
     $workflow: (req) => Object.assign({ id: '', name: '', active: false }, req.w),
     $runIndex: (req) => req.r,
     $itemIndex: (req) => req.i,

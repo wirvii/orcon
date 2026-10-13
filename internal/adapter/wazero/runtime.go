@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tetratelabs/wazero"
@@ -36,12 +37,22 @@ type instance struct {
 	// waiting when the context is done (ModeCooperativeAbandon). stateMu guards
 	// the hand-over between the caller and that goroutine.
 	answerAtDeadline bool
-	stateMu          sync.Mutex
-	callDone         bool
-	abandoned        bool
-	abandonedAt      time.Time
-	endedAt          time.Time
-	ended            chan struct{}
+	track            *tracker
+	// abandoned is set, before the caller returns, once the call was given up;
+	// the host functions read it to refuse the guest from then on.
+	abandoned   atomic.Bool
+	stateMu     sync.Mutex
+	callDone    bool
+	abandonedAt time.Time
+	endedAt     time.Time
+	ended       chan struct{}
+}
+
+// refuses reports whether the host must stop serving the guest of the call:
+// the call was abandoned or its context is done. An abandoned runtime reads no
+// more execution data and draws no more random numbers.
+func (in *instance) refuses(ctx context.Context) bool {
+	return in != nil && in.abandoned.Load() || ctx.Err() != nil
 }
 
 var _ expr.Runtime = (*instance)(nil)
@@ -105,7 +116,7 @@ func (e *engine) restore(ctx context.Context, snap *snapshot) (*instance, error)
 	if err != nil {
 		return nil, fmt.Errorf("wazero: instantiate the expression runtime: %w", err)
 	}
-	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon}
+	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon, track: e.track}
 	have := in.mem.Size() / pageSize
 	if need := uint32((len(snap.memory) + pageSize - 1) / pageSize); need > have { //nolint:gosec // bounded by the memory cap.
 		if _, ok := in.mem.Grow(need - have); !ok {
@@ -132,7 +143,7 @@ func (e *engine) build(ctx context.Context, cfg expr.SandboxConfig, memoryLimit 
 	if err != nil {
 		return nil, fmt.Errorf("wazero: instantiate the expression runtime: %w", err)
 	}
-	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon}
+	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon, track: e.track}
 	if err := in.bind(); err != nil {
 		_ = mod.Close(ctx)
 		return nil, err
@@ -311,13 +322,19 @@ type callResult struct {
 // (its next poll of the interrupt handler sees the done context), then the
 // runtime is closed and never used again. SPEC-001 amendment 10, A.2 and A.4.
 func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest expr.Guest) ([]byte, error) {
+	if err := in.track.admit(ctx); err != nil {
+		return nil, err
+	}
 	in.mu.Lock()
 	if in.broken {
 		in.mu.Unlock()
 		return nil, fmt.Errorf("%w: the runtime failed earlier and must be reopened", expr.ErrSandbox)
 	}
+	started := time.Now()
 	in.ended = make(chan struct{})
-	in.callDone, in.abandoned = false, false
+	in.callDone = false
+	in.abandoned.Store(false)
+	var gave *abandonment // set by the caller, under stateMu, when it gives up
 	done := make(chan callResult, 1)
 	st := &callState{guest: guest, inst: in}
 	go func() {
@@ -331,12 +348,13 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 		in.stateMu.Lock()
 		in.callDone = true
 		in.endedAt = time.Now()
-		abandoned := in.abandoned
+		given := gave
 		in.stateMu.Unlock()
-		if abandoned {
+		if given != nil {
 			// Nobody is waiting: the runtime is not reused, so close it here.
 			in.broken = true
 			_ = in.mod.Close(context.WithoutCancel(ctx))
+			given.ended()
 		}
 		close(in.ended)
 		done <- callResult{out, err}
@@ -352,8 +370,9 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 			r := <-done
 			return r.out, r.err
 		}
-		in.abandoned = true
+		in.abandoned.Store(true)
 		in.abandonedAt = time.Now()
+		gave = in.track.abandon(ctx, in.abandonedAt.Sub(started))
 		in.stateMu.Unlock()
 		return nil, fmt.Errorf("%w: %w", expr.ErrTimeout, context.Cause(ctx))
 	}
@@ -365,7 +384,7 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 // the measurement report.
 func (in *instance) AbandonedOvershoot(ctx context.Context) (time.Duration, bool) {
 	in.stateMu.Lock()
-	ended, abandoned := in.ended, in.abandoned
+	ended, abandoned := in.ended, in.abandoned.Load()
 	in.stateMu.Unlock()
 	if ended == nil || !abandoned {
 		return 0, false
@@ -431,10 +450,7 @@ func (in *instance) MemoryUsage(ctx context.Context) int64 {
 
 // Close implements [expr.Runtime].
 func (in *instance) Close(ctx context.Context) error {
-	in.stateMu.Lock()
-	abandoned := in.abandoned
-	in.stateMu.Unlock()
-	if abandoned {
+	if in.abandoned.Load() {
 		return nil // the abandoned call closes the runtime when it ends
 	}
 	in.mu.Lock()

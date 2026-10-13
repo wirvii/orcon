@@ -46,6 +46,11 @@ type ExecutionInfo struct {
 	Mode          string
 	ResumeURL     string
 	ResumeFormURL string
+	// Variables are the execution variables an expression may read as
+	// $execution.variables.<name> (ADR-0008 section 4.3): an object from name
+	// to value, constant during the activation. Zero means none has a value;
+	// reading one then gives undefined.
+	Variables jsonvalue.Value
 }
 
 // WorkflowInfo describes the flow being executed ($workflow).
@@ -87,6 +92,9 @@ type Env struct {
 	Vars jsonvalue.Value
 	// Parameters are the parameters of the node being evaluated ($parameter).
 	Parameters jsonvalue.Value
+	// Identity names the organization, execution and node of the evaluation.
+	// The sandbox adapter logs it when it abandons the call; zero is allowed.
+	Identity CallIdentity
 }
 
 // current returns the current item, or an item with empty data when the

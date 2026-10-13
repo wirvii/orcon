@@ -4,6 +4,7 @@
 package expr
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,10 @@ type needs struct {
 	info bool
 	// paths limits $json to these property paths; nil means all of it.
 	paths [][]string
+	// variables are the execution variables the code reads by literal name;
+	// allVariables asks for every one (the code could not be analyzed).
+	variables    []string
+	allVariables bool
 }
 
 // needsOf analyzes code and returns what it reads.
@@ -41,6 +46,7 @@ func needsOf(code string, noProjection bool) needs {
 	n.vars = n.all || a.Uses("$vars")
 	n.params = n.all || a.Uses("$parameter") || input
 	n.info = n.all || a.Uses("$execution") || a.Uses("$workflow") || a.Uses("$prevNode")
+	n.variables, n.allVariables = a.Variables, n.all
 	if n.json && !input && !a.JSONWhole && !noProjection {
 		n.paths = a.JSONPaths
 	}
@@ -75,6 +81,7 @@ func buildRequest(code, mode string, lenient bool, env *Env, n needs) []byte {
 		b.WriteString(quote(env.Execution.ResumeURL))
 		b.WriteString(`,"resumeFormUrl":`)
 		b.WriteString(quote(env.Execution.ResumeFormURL))
+		writeVariables(&b, env.Execution.Variables, n)
 		b.WriteString(`},"w":{"id":`)
 		b.WriteString(quote(env.Workflow.ID))
 		b.WriteString(`,"name":`)
@@ -109,6 +116,29 @@ func buildRequest(code, mode string, lenient bool, env *Env, n needs) []byte {
 	section(n.vars, env.Vars)
 	section(n.params, env.Parameters)
 	return []byte(b.String())
+}
+
+// writeVariables adds the execution variables the code reads to the "x"
+// header, only those it names (every one when the code could not be analyzed).
+func writeVariables(b *strings.Builder, vars jsonvalue.Value, n needs) {
+	if vars.Kind() != jsonvalue.KindObject || (len(n.variables) == 0 && !n.allVariables) {
+		return
+	}
+	b.WriteString(`,"variables":{`)
+	first := true
+	for _, m := range vars.Members() {
+		if !n.allVariables && !slices.Contains(n.variables, m.Key) {
+			continue
+		}
+		if !first {
+			b.WriteByte(',')
+		}
+		first = false
+		b.WriteString(quote(m.Key))
+		b.WriteByte(':')
+		b.WriteString(jsonText(m.Value))
+	}
+	b.WriteByte('}')
 }
 
 // trie is the set of property paths read from an item.

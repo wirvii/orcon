@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/wirvii/orcon/internal/adapter/wazero"
 )
 
 // repoRoot finds the directory with the go.mod of the module.
@@ -44,8 +46,12 @@ func goFiles(t *testing.T) []string {
 			return err
 		}
 		if d.IsDir() {
+			// Hidden directories hold caches, tools, worktrees and agent files.
+			if strings.HasPrefix(d.Name(), ".") && path != root {
+				return filepath.SkipDir
+			}
 			switch d.Name() {
-			case "node_modules", ".cache", ".bin", ".git", "testdata", "dist", ".claude", ".agents":
+			case "node_modules", "testdata", "dist":
 				return filepath.SkipDir
 			}
 			return nil
@@ -61,23 +67,29 @@ func goFiles(t *testing.T) []string {
 	return out
 }
 
-// TestCooperativeModesStayOutOfProduction enforces SPEC-001 amendment 10, A.1:
-// the hard limit of ADR-0018 section 3 is the only production mode. The
-// cooperative modes exist to measure and to test, so nothing outside the
-// adapter and the measurement harness may name them: they are not reachable
-// from configuration, flags or cmd/orcon.
-func TestCooperativeModesStayOutOfProduction(t *testing.T) {
+// TestProductionStopMode enforces SPEC-001 amendment 10 (B.1, which replaces
+// A.1): ModeCooperativeAbandon is the only production mode of expression
+// evaluations. A sandbox built without options uses it, nothing outside the
+// adapter and the measurement harness may name the other two modes or select a
+// mode at all, and configuration, flags and cmd/orcon expose no way to choose.
+func TestProductionStopMode(t *testing.T) {
+	if got := wazero.New().Mode(); got != wazero.ModeCooperativeAbandon {
+		t.Errorf("the default mode is %v, want %v", got, wazero.ModeCooperativeAbandon)
+	}
 	root := repoRoot(t)
 	allowed := []string{
 		filepath.Join(root, "internal", "adapter", "wazero") + string(filepath.Separator),
 		filepath.Join(root, "internal", "expr", "bench") + string(filepath.Separator),
 	}
-	names := []string{"ModeCooperativeLimit", "ModeCooperativeAbandon"}
+	names := []string{"ModeHardLimit", "ModeCooperativeLimit", "WithMode"}
+	words := []string{"cooperative", "close-on-context", "hard-limit", "hard limit"}
 	files := goFiles(t)
 	if len(files) < 20 {
 		t.Fatalf("only %d Go files found; the walk is broken", len(files))
 	}
+	wired := false
 	for _, path := range files {
+		rel := strings.TrimPrefix(path, root+string(filepath.Separator))
 		if slices.ContainsFunc(allowed, func(a string) bool { return strings.HasPrefix(path, a) }) {
 			continue
 		}
@@ -86,18 +98,26 @@ func TestCooperativeModesStayOutOfProduction(t *testing.T) {
 			t.Fatalf("%s: %v", path, err)
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
-			var name string
 			switch x := n.(type) {
 			case *ast.Ident:
-				name = x.Name
+				if slices.Contains(names, x.Name) {
+					t.Errorf("%s names %s; only internal/adapter/wazero and internal/expr/bench may select a stop mode", rel, x.Name)
+				}
 			case *ast.BasicLit:
-				name = strings.Trim(x.Value, `"`)
-			}
-			if slices.Contains(names, name) {
-				t.Errorf("%s names %s; the cooperative modes are only for internal/adapter/wazero and internal/expr/bench", strings.TrimPrefix(path, root+string(filepath.Separator)), name)
+				lit := strings.ToLower(x.Value)
+				if slices.ContainsFunc(words, func(w string) bool { return strings.Contains(lit, w) }) && !strings.HasSuffix(path, "_test.go") {
+					t.Errorf("%s has the literal %s; configuration and flags must not expose a stop mode", rel, x.Value)
+				}
+			case *ast.SelectorExpr:
+				if id, ok := x.X.(*ast.Ident); ok && id.Name == "wazero" && x.Sel.Name == "New" && rel == filepath.Join("cmd", "orcon", "main.go") {
+					wired = true
+				}
 			}
 			return true
 		})
+	}
+	if !wired {
+		t.Error("cmd/orcon/main.go does not build the sandbox with wazero.New; the production wiring moved")
 	}
 }
 

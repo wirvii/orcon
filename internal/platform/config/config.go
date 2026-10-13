@@ -20,6 +20,24 @@ const (
 	RoleWorker Role = "worker"
 )
 
+// Bounds of the number of abandoned expression evaluations a process allows
+// to keep running (ADR-0018 section 3, SPEC-001 amendment 10). An evaluation
+// that outlives its deadline is abandoned and finishes in the background; the
+// memory they can hold is this number times the memory cap of a runtime.
+const (
+	// SandboxMaxAbandonedDefault is the default limit.
+	SandboxMaxAbandonedDefault = 8
+	// SandboxMaxAbandonedMin and SandboxMaxAbandonedMax bound the setting.
+	SandboxMaxAbandonedMin = 1
+	SandboxMaxAbandonedMax = 64
+)
+
+// ValidSandboxMaxAbandoned reports whether n is an allowed limit of abandoned
+// evaluations still running.
+func ValidSandboxMaxAbandoned(n int) bool {
+	return n >= SandboxMaxAbandonedMin && n <= SandboxMaxAbandonedMax
+}
+
 // Valid reports whether r is one of the known roles.
 func (r Role) Valid() bool {
 	switch r {

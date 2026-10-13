@@ -43,7 +43,7 @@ func (v *validator) loopExits(g *graph) {
 				"loop %q has no exit; it can only end with LoopLimitExceeded (maxIterations %d)", loop.ID, loop.Loop.MaxIterations)
 			continue
 		}
-		if v.exitReadsBody(exits, body, v.carriedWrites(body)) {
+		if v.exitReadsBody(exits, body, v.changingVariables(loop, body)) {
 			continue
 		}
 		v.r.warnf(CodeV13, path,
@@ -188,30 +188,31 @@ func readsBody(a *expr.Analysis, body map[int]bool, names map[string]int, carrie
 	return false
 }
 
-// carriedWrites returns the iteration variables with carry that a node of the
-// loop body writes (ADR-0008 section 4.3), found through [writersOf]: they are
-// the state an iteration hands to the next one.
-func (v *validator) carriedWrites(body map[int]bool) map[string]bool {
-	carry := map[string]bool{}
-	for _, vr := range v.doc.Variables {
-		if vr.Carry != nil && *vr.Carry {
-			carry[vr.Name] = true
-		}
-	}
+// changingVariables returns the execution variables whose value can change
+// from one iteration to the next (ADR-0008 section 4.3, ADR-0010 section 11):
+// those a node of the loop body writes, found through [writersOf], and those
+// the loop carries to the next iteration.
+func (v *validator) changingVariables(loop *Node, body map[int]bool) map[string]bool {
 	out := map[string]bool{}
 	for i := range body {
 		for _, name := range v.writers(&v.doc.Nodes[i]) {
-			if carry[name] {
-				out[name] = true
-			}
+			out[name] = true
+		}
+	}
+	if loop.Loop != nil {
+		for _, name := range loop.Loop.Carry {
+			out[name] = true
+		}
+	}
+	for _, vr := range v.doc.Variables {
+		if vr.Carry != nil && *vr.Carry {
+			out[vr.Name] = true
 		}
 	}
 	return out
 }
 
-// variableReadsOf returns the execution variables an expression reads. No
-// accepted document defines how an expression reads one (ADR-0018 section 1
-// lists no name for it; $vars is the project environment), so it returns
-// nothing until that decision is taken (SPEC-001 amendment 10, B.3). V13 calls
-// it, so completing it is the only change the rule needs.
-func variableReadsOf(*expr.Analysis) []string { return nil }
+// variableReadsOf returns the execution variables an expression reads, by
+// literal name (SPEC-001 amendment 10, B.3). Any other use of
+// $execution.variables is a finding, which V13 already counts as a read.
+func variableReadsOf(a *expr.Analysis) []string { return a.Variables }

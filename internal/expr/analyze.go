@@ -28,6 +28,11 @@ const (
 	// FindingDynamicReference means a node reference whose name is computed, so
 	// the analysis cannot tell which node it reads.
 	FindingDynamicReference FindingKind = "DYNAMIC_NODE_REFERENCE"
+	// FindingExecutionVariables means $execution.variables is used other than
+	// with a literal name: a computed key, the object as a whole, enumeration
+	// or destructuring (ADR-0018 section 1, amendment 10). Publication rejects
+	// it (rule V8).
+	FindingExecutionVariables FindingKind = "EXECUTION_VARIABLES"
 )
 
 // Finding is something about an expression that a reader of the import report
@@ -78,6 +83,11 @@ type Analysis struct {
 	// Dynamic is set when the code can build names at run time (eval, the
 	// Function constructor, arguments, with), so any context name may be read.
 	Dynamic bool
+	// Variables are the execution variables the code reads by literal name,
+	// $execution.variables.name or $execution.variables["name"], sorted,
+	// without repeats. Any other use of $execution.variables is a finding of
+	// kind [FindingExecutionVariables].
+	Variables []string
 }
 
 // Syntax reports whether the code failed to parse.
@@ -116,6 +126,7 @@ func Analyze(code string) Analysis {
 	a.Size = w.size
 	a.JSONWhole = w.jsonWhole
 	a.JSONPaths = dedupePaths(w.jsonPaths)
+	a.Variables = slices.Sorted(maps(w.variables))
 	for _, name := range []string{"eval", "Function", "arguments"} {
 		if _, ok := w.free[name]; ok {
 			a.Dynamic, a.JSONWhole = true, true
@@ -158,7 +169,7 @@ func AnalyzeTemplate(s string) Analysis {
 		return Analysis{}
 	}
 	var out Analysis
-	ids, methods := map[string]struct{}{}, map[string]struct{}{}
+	ids, methods, variables := map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}
 	for _, seg := range Segments(body) {
 		if !seg.Code {
 			continue
@@ -174,6 +185,9 @@ func AnalyzeTemplate(s string) Analysis {
 		for _, m := range a.Methods {
 			methods[m] = struct{}{}
 		}
+		for _, name := range a.Variables {
+			variables[name] = struct{}{}
+		}
 		for _, r := range a.NodeRefs {
 			r.Offset += seg.Offset
 			out.NodeRefs = append(out.NodeRefs, r)
@@ -185,6 +199,7 @@ func AnalyzeTemplate(s string) Analysis {
 	}
 	out.Identifiers = slices.Sorted(maps(ids))
 	out.Methods = slices.Sorted(maps(methods))
+	out.Variables = slices.Sorted(maps(variables))
 	out.JSONPaths = dedupePaths(out.JSONPaths)
 	return out
 }
@@ -219,6 +234,7 @@ type walker struct {
 	jsonPaths [][]string
 	jsonWhole bool
 	dynamic   bool
+	variables map[string]struct{}
 }
 
 // rename is a method name to replace in the source text.
@@ -232,6 +248,7 @@ func (w *walker) offset(idx file.Idx) int { return int(idx) - 1 - w.base }
 func (w *walker) push(names map[string]struct{}) {
 	if w.free == nil {
 		w.free, w.methods = map[string]int{}, map[string]int{}
+		w.variables = map[string]struct{}{}
 	}
 	w.scopes = append(w.scopes, names)
 }
@@ -312,6 +329,72 @@ func (w *walker) jsonMember(e ast.Expression) bool {
 		}
 	}
 	w.jsonPaths = append(w.jsonPaths, path)
+	return true
+}
+
+// unwrapOptional strips the optional-chaining wrappers of a node.
+func unwrapOptional(e ast.Expression) ast.Expression { //nolint:ireturn // returns the AST node it was given, whatever its type
+	for {
+		switch n := e.(type) {
+		case *ast.Optional:
+			e = n.Expression
+		case *ast.OptionalChain:
+			e = n.Expression
+		default:
+			return e
+		}
+	}
+}
+
+// isExecution reports whether e is the free identifier $execution.
+func (w *walker) isExecution(e ast.Expression) bool {
+	id, ok := unwrapOptional(e).(*ast.Identifier)
+	return ok && string(id.Name) == "$execution" && !w.bound("$execution")
+}
+
+// isExecVariables reports whether e is $execution.variables, written with a
+// dot or with a literal bracket key.
+func (w *walker) isExecVariables(e ast.Expression) bool {
+	switch n := unwrapOptional(e).(type) {
+	case *ast.DotExpression:
+		return n.Identifier.Name == "variables" && w.isExecution(n.Left)
+	case *ast.BracketExpression:
+		key, lit := stringLiteral(n.Member)
+		return lit && key == "variables" && w.isExecution(n.Left)
+	}
+	return false
+}
+
+// variableAccess handles $execution.variables.name and
+// $execution.variables["name"]: it records the variable read, or a finding
+// when the key is computed. It reports whether e was such an access.
+func (w *walker) variableAccess(e ast.Expression) bool {
+	var left, member ast.Expression
+	var name string
+	lit := true
+	switch n := e.(type) {
+	case *ast.DotExpression:
+		left, name = n.Left, n.Identifier.Name.String()
+	case *ast.BracketExpression:
+		left, member = n.Left, n.Member
+		name, lit = stringLiteral(n.Member)
+	default:
+		return false
+	}
+	if !w.isExecVariables(left) {
+		return false
+	}
+	w.use("$execution", e.Idx0())
+	w.size++
+	if lit {
+		w.variables[name] = struct{}{}
+		return true
+	}
+	w.findings = append(w.findings, Finding{
+		Kind: FindingExecutionVariables, Name: "$execution.variables", Offset: w.offset(e.Idx0()),
+		Message: "$execution.variables is read with a computed key; use a literal name, such as $execution.variables.total",
+	})
+	w.expr(member)
 	return true
 }
 
@@ -427,6 +510,29 @@ func (w *walker) markGuarded(left ast.Expression) {
 	}
 }
 
+// contextMember handles the member chains that read a part of the context the
+// analysis tracks: an execution variable by name, $execution.variables as a
+// whole, or a path of $json. It reports whether e was one.
+func (w *walker) contextMember(e ast.Expression) bool {
+	if w.variableAccess(e) {
+		return true
+	}
+	if w.isExecVariables(e) {
+		w.wholeVariables(e)
+		return true
+	}
+	return w.jsonMember(e)
+}
+
+// wholeVariables records a use of $execution.variables as an object.
+func (w *walker) wholeVariables(e ast.Expression) {
+	w.use("$execution", e.Idx0())
+	w.findings = append(w.findings, Finding{
+		Kind: FindingExecutionVariables, Name: "$execution.variables", Offset: w.offset(e.Idx0()),
+		Message: "$execution.variables is used as a whole object; read one declared variable by a literal name, such as $execution.variables.total",
+	})
+}
+
 func (w *walker) expr(e ast.Expression) {
 	if e != nil {
 		w.size++
@@ -438,7 +544,7 @@ func (w *walker) expr(e ast.Expression) {
 	case *ast.CallExpression:
 		w.call(n)
 	case *ast.DotExpression:
-		if w.jsonMember(n) {
+		if w.contextMember(n) {
 			return
 		}
 		if n.Identifier.Name == "isExecuted" {
@@ -446,7 +552,7 @@ func (w *walker) expr(e ast.Expression) {
 		}
 		w.expr(n.Left)
 	case *ast.BracketExpression:
-		if w.jsonMember(n) {
+		if w.contextMember(n) {
 			return
 		}
 		if id, ok := n.Left.(*ast.Identifier); ok && string(id.Name) == "$node" && !w.bound("$node") {

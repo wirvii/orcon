@@ -372,7 +372,7 @@ func TestRunSuiteAndReport(t *testing.T) {
 			m.CorpusMedianSize = 4
 		}
 		dec, checks := m.Verdict()
-		if dec != tc.wantDec || len(checks) != 3 {
+		if dec != tc.wantDec || len(checks) != 4 {
 			t.Errorf("%s: decision %s with %d checks, want %s", tc.name, dec, len(checks), tc.wantDec)
 		}
 		md := m.Markdown()
@@ -406,8 +406,61 @@ func slowSandbox(res *bench.SuiteResult) bench.SuiteResult {
 
 func withBandP99(res *bench.SuiteResult, p99 time.Duration) bench.SuiteResult {
 	c := *res
-	c.MedianBand.P99 = p99
+	c.MedianBand.P99, c.BandPlain.P99, c.BandLuxon.P99 = p99, p99, p99
+	c.BandPlain.N, c.BandLuxon.N = max(c.BandPlain.N, 1), max(c.BandLuxon.N, 1)
 	return c
+}
+
+// TestLuxonBandHasItsOwnTarget checks SPEC-001 amendment 10, B.2: p99 is
+// judged at 200 us without Luxon and at 500 us with it, on the median of the
+// runs.
+func TestLuxonBandHasItsOwnTarget(t *testing.T) {
+	t.Parallel()
+	mk := func(plain, luxon []time.Duration) bench.Decision {
+		suite := bench.SuiteResult{}
+		suite.BandPlain.N, suite.BandLuxon.N, suite.MedianBand.N = 1, 1, 2
+		m := bench.Measurements{Compat: bench.Summary{Expressions: 1}, Modes: []*bench.ModeResult{{Suite: suite, PlainP99Runs: plain, LuxonP99Runs: luxon}}}
+		m.Compat.Fast = bench.Rate{Count: 1, Total: 1, Weighted: 1, WeightedTotal: 1}
+		dec, _ := m.Verdict()
+		return dec
+	}
+	us := func(v ...int) []time.Duration {
+		out := make([]time.Duration, len(v))
+		for i, x := range v {
+			out[i] = time.Duration(x) * time.Microsecond
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name         string
+		plain, luxon []time.Duration
+		want         bench.Decision
+	}{
+		{"both inside their targets", us(150, 160, 170), us(450, 460, 470), bench.DecisionConfirmed},
+		{"luxon between 200 and 500 passes", us(100, 100, 100), us(499, 499, 499), bench.DecisionConfirmed},
+		{"luxon above 500 fails", us(100, 100, 100), us(501, 502, 503), bench.DecisionReversalCriterionMet},
+		{"plain above 200 fails", us(201, 202, 203), us(100, 100, 100), bench.DecisionReversalCriterionMet},
+		{"the median decides, not the worst run", us(100, 100, 900), us(100, 100, 900), bench.DecisionConfirmed},
+		{"one good run does not hide two bad ones", us(100, 900, 900), us(100, 100, 100), bench.DecisionReversalCriterionMet},
+	} {
+		if got := mk(tc.plain, tc.luxon); got != tc.want {
+			t.Errorf("%s: decision %s, want %s", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestUsesLuxonFollowsTheNamedList(t *testing.T) {
+	t.Parallel()
+	for code, want := range map[string]bool{
+		"$json.a + 1": false, "$now.toISO()": true, "$today": true, "DateTime.now()": true,
+		"Duration.fromObject({a: 1})": true, "Interval.after(a, 1)": true,
+		"$json.d.toDateTime()": true, "$json.d.beginningOf('day')": true, "$json.d.isWeekend()": true,
+		"$json.s.toUpperCase()": false, "$json.tags.join(',')": false,
+	} {
+		if got := bench.UsesLuxon(code); got != want {
+			t.Errorf("UsesLuxon(%s) = %v, want %v", code, got, want)
+		}
+	}
 }
 
 func compatSummary(t *testing.T) bench.Summary {
