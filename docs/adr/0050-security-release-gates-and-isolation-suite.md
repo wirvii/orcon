@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0050 — Security release gates and adversarial isolation suite
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (cross-organization webhook path collision case)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (cross-organization webhook path collision case); 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -25,7 +25,7 @@ S3 requires adversarial cross-organization tests on every subsystem on both stor
 | FI-30 | `kill -9` during MK rotation | restart resumes; every OK unwraps; no credential unreadable |
 | FI-31 | `kill -9` during OK rotation re-wrap | resumes; old version retired only after all DEKs moved |
 | FI-32 | wrong MK at startup | process exits before any write; clear message |
-| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `needs_reauth` only if the provider rotated the token |
+| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `NEEDS_REAUTH`                                                    (0019 línea 47; 0050 línea 28) only if the provider rotated the token |
 | FI-34 | three processes need the same expired token concurrently | exactly one token-endpoint call (mock provider counts) |
 | FI-35 | audit sealer killed mid-seal | no gaps, no duplicates; verification passes |
 | FI-36 | direct DB update/delete/reorder of audit rows | verification detects and alerts within the next run |
@@ -47,3 +47,4 @@ Sampling endpoints (rejected: new endpoints would escape coverage).
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-005.** The isolation suite generates cases from the OpenAPI contract (every operation) and from the MCP tool catalog (every tool), and includes the non-bypass tests of ADR-0059 §7.
+- **SPEC-009 K19 (2026-10-13, owner decision).** FI-33 (`credential.status` `NEEDS_REAUTH`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.

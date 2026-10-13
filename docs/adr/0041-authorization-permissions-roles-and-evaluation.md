@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0041 — Authorization: permission catalog, roles, sharing, evaluation and caching
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077); 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -12,7 +12,7 @@ S4: predefined organization roles (Owner, Admin, Member) and project roles (Proj
 ## Decision
 
 ### 1. Model
-Role-based access control with scopes instance → organization → project → resource. Bindings: `role_binding(org_id, id, scope_kind: org|project, project_id?, subject_kind: user|group|service_account, application_user_id?, org_group_id?, service_account_id?, role_id, created_by_principal_id?)` with a check constraint that exactly the subject column named by `subject_kind` is set. Groups: `org_group(org_id, id, name, source)` + `org_group_member(org_id, id, org_group_id, application_user_id)`, unique `(org_id, org_group_id, application_user_id)`.
+Role-based access control with scopes instance → organization → project → resource. Bindings: `role_binding(org_id, id, scope_kind: ORG|PROJECT, project_id?, subject_kind: USER|GROUP|SERVICE_ACCOUNT, application_user_id?, org_group_id?, service_account_id?, role_id, created_by_principal_id?)` with a check constraint that exactly the subject column named by `subject_kind` is set. Groups: `org_group(org_id, id, name, source)` + `org_group_member(org_id, id, org_group_id, application_user_id)`, unique `(org_id, org_group_id, application_user_id)`.
 
 ### 2. Permission catalog (version 1; source `internal/authz/permissions.yaml`, generated code and docs)
 Organization scope: `org:read`, `org:update`, `org:delete`, `member:read`, `member:invite`, `member:remove`, `member:update-role`, `group:manage`, `role:read`, `role:manage`, `project:create`, `project:read-all`, `project:delete`, `auth-source:manage`, `scim:manage`, `domain:manage`, `security-policy:manage`, `service-account:manage`, `audit:read`, `audit:export`, `siem:manage`, `secret-store:manage`, `secret-store:reference`, `connector:approve`, `key:rotate-org`, `limits:read`, `notification:manage` (human-attention notification channels, recipients and escalation rules, ADR-0073), `apikey:manage-org` (SPEC-005).
@@ -61,3 +61,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-005.** §2: permission catalog **version 2** adds `apikey:create-personal`, `event-subscription:manage` and `mcp:use` (organization scope) and `git:manage` and `git:sync` (project scope), granted in predefined roles per SPEC-005 Q14: `apikey:create-personal` and `mcp:use` to Owner, Admin and Member; `event-subscription:manage` to Owner and Admin; `git:manage` to Project Admin; `git:sync` to Project Admin and Editor. §6: for `apiKey` principals, evaluation adds the step scope ∩ permissions of `boundTo`. §7: key changes increment `authorization_epoch`. §8: the per-route permission declaration is the OpenAPI extension `x-orcon-permission`.
 - **SPEC-006.** §2: permission catalog **version 3** adds, at organization scope, `ai-budget:manage` and `ai-price:manage`; at project scope, `knowledge:read`, `knowledge:manage`, `conversation:read`, `conversation:read-data`, `conversation:delete`, `evaluation:read`, `evaluation:manage` and `evaluation:run`; at instance scope, `instance:ai-prices`. Grants in predefined roles (SPEC-006 Q14): Editor and Project Admin receive every new project permission; Operator `conversation:read`, `evaluation:read`, `evaluation:run`; Viewer `conversation:read`, `evaluation:read`, `knowledge:read`; no `*:read-data` permission (such as `conversation:read-data`) is granted to Operator or Viewer by default; `ai-budget:manage` and `ai-price:manage` to organization Owner and Admin; `instance:ai-prices` to the instance administrator. Reindexing requires `knowledge:manage`.
+- **SPEC-009 K19 (2026-10-13, owner decision).** §1 (`role_binding.scope_kind`, `role_binding.subject_kind`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
