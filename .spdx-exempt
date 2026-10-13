@@ -22,3 +22,4 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 internal/adapter/storetest/dbrules/policy/*.txt  # policy declaration files (SPEC-009 4.4.7)
 **/migrations.sum  # migration checksum list read by dbcheck (migrations.md MG-5)
 tools/dbcheck/testdata/**/expect.txt  # planted-case expectation read by the dbcheck tests
+internal/adapter/storetest/dbrules/testdata/**/expect.txt  # planted-case expectation read by the dbrules tests

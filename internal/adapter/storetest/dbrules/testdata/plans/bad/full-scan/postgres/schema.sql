@@ -1,0 +1,12 @@
+-- SPDX-FileCopyrightText: The Orcon Authors
+-- SPDX-License-Identifier: Apache-2.0
+
+CREATE TABLE thing (
+  id bigint NOT NULL,
+  org_id bigint NOT NULL,
+  name text NOT NULL,
+  created_at bigint NOT NULL,
+  CONSTRAINT pk_thing PRIMARY KEY (id)
+);
+CREATE INDEX ix_thing_org_id_created_at_id ON thing (org_id, created_at, id);
+

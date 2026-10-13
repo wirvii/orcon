@@ -21,7 +21,7 @@ GOTOOL := $(TOOLS_ENV) go tool -modfile=$(CURDIR)/tools/go.mod
 WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
-	generate generate-check db-check db-sum tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
+	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
 	build-go web build smoke test-postgres fuzz bench bench-compare sbom
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
@@ -159,9 +159,26 @@ cover:
 goleak-check:
 	sh scripts/check-goleak.sh
 
-# test-postgres needs Docker (testcontainers); the adapters skip without ORCON_TEST_POSTGRES.
+# PG_IMAGES are the PostgreSQL images the database tests run against: the oldest
+# supported release (14) and the latest (17), pinned by the digest of the
+# official multi-architecture image (resolved 2026-10-13). To move a pin, resolve
+# the new digest of the tag and change it here and in the postgres job of ci.yml.
+PG_IMAGES ?= postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b143664907d6e146eb6e1 postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+
+# test-postgres needs a container runtime (testcontainers); the adapters skip without
+# ORCON_TEST_POSTGRES. It runs the adapter tests once per image of PG_IMAGES.
 test-postgres:
-	ORCON_TEST_POSTGRES=1 go test -race -count=1 ./internal/adapter/...
+	set -e; for image in $(PG_IMAGES); do \
+		echo "test-postgres: $$image"; \
+		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/...; \
+	done
+
+# db-fixtures runs the planted database violations (SPEC-009 4.4.6) in both
+# engines; the PostgreSQL cases need a container runtime or
+# ORCON_TEST_POSTGRES_DSN. Add ARGS=--sqlite-only to run what needs no server.
+db-fixtures:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	sh scripts/check-db-fixtures.sh $(ARGS)
 
 fuzz:
 	sh scripts/fuzz.sh $(or $(FUZZTIME),10s)
