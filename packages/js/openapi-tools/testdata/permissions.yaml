@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Permission catalog used by the plugin self-tests (version 1 of the catalog in the
+# access-control design). The plugin reads every `resource:action` name in the file, so
+# the real internal/authz/permissions.yaml may use any structure that lists names.
+version: 1
+permissions:
+  organization:
+    - org:read
+    - org:update
+    - org:delete
+    - member:read
+    - member:invite
+    - member:remove
+    - member:update-role
+    - group:manage
+    - role:read
+    - role:manage
+    - project:create
+    - project:read-all
+    - project:delete
+    - auth-source:manage
+    - scim:manage
+    - domain:manage
+    - security-policy:manage
+    - service-account:manage
+    - audit:read
+    - audit:export
+    - siem:manage
+    - secret-store:manage
+    - secret-store:reference
+    - connector:approve
+    - key:rotate-org
+    - limits:read
+    - notification:manage
+    - apikey:manage-org
+  project:
+    - project:read
+    - project:update
+    - project:manage-members
+    - flow:read
+    - flow:create
+    - flow:update
+    - flow:delete
+    - flow:move
+    - flow:publish
+    - flow:activate
+    - flow:rollback
+    - flow:execute
+    - flow:export
+    - flow:import
+    - flow:submit-form
+    - execution:read
+    - execution:read-data
+    - execution:retry
+    - execution:cancel
+    - execution:resolve
+    - execution:delete
+    - human-task:resolve
+    - credential:read
+    - credential:create
+    - credential:update
+    - credential:delete
+    - credential:use
+    - credential:share
+    - variable:read
+    - variable:manage
+  instance:
+    - instance:orgs
+    - instance:keys
+    - instance:connectors
+    - instance:policy
+    - instance:limits
+    - instance:siem
+    - instance:users

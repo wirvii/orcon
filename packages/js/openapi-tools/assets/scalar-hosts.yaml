@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Hosts that appear as literal strings in the vendored Scalar script (scalar.standalone.js).
+#
+# Scalar's script contains documentation links, example values for its own demo content, the
+# endpoints of Scalar's hosted services and XML namespaces. With the configuration written by
+# scripts/build-reference.mjs (no proxy, no CDN fonts, telemetry off, MCP and developer tools
+# off, no registry) none of them is requested: the A3 cut verified this in a browser by
+# listing the network requests of the loaded site (only same-origin requests).
+#
+# build-reference.mjs fails when a new host appears after a Scalar upgrade, so a person
+# reviews what the new version mentions, repeats the browser check and adds the host here.
+hosts:
+  - "."
+  - 127.0.0.1
+  - api-hub.com
+  - api.example.com
+  - api.scalar.com
+  - apidocumentation.com
+  - app.cal.com
+  - avatars.githubusercontent.com
+  - byte-craft.io
+  - client.scalar.com
+  - cloud-nest.org
+  - cloud.google.com
+  - code-base.dev
+  - dashboard.scalar.com
+  - data-flow.co
+  - dev-portal.net
+  - developer.mozilla.org
+  - developers.cloudflare.com
+  - discord.gg
+  - docs.scalar.com
+  - editor.scalar.com
+  - example.com
+  - fonts.scalar.com
+  - galaxy.scalar.com
+  - github.com
+  - html.spec.whatwg.org
+  - json-schema.org
+  - localhost
+  - loremflickr.com
+  - my-app.io
+  - open-source.dev
+  - picsum.photos
+  - proxy.scalar.com
+  - registry.scalar.com
+  - scalar.cal.com
+  - scalar.com
+  - scratch
+  - tailwindcss.com
+  - tech-wave.net
+  - test-site.org
+  - unhead.unjs.io
+  - vuejs.org
+  - web-pulse.io
+  - www.ibm.com
+  - www.scalar.com
+  - www.w3.org
+  - x.com
