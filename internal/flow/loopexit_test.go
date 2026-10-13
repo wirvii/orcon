@@ -57,7 +57,7 @@ func TestLoopExitWarning(t *testing.T) {
 		}, false},
 		{"is not an expression", func(d *flow.Document) { setCondition(d, "done") }, true},
 		{"cannot be classified: a syntax error", func(d *flow.Document) { setCondition(d, "={{ $now. }}") }, false},
-		{"cannot be classified: an unknown name", func(d *flow.Document) { setCondition(d, "={{ mystery }}") }, false},
+		{"unclassified name", func(d *flow.Document) { setCondition(d, "={{ mystery }}") }, false},
 		{"cannot be classified: a node chosen at run time", func(d *flow.Document) { setCondition(d, "={{ $($json.name).first().json.x }}") }, false},
 		{"is decided by an edge condition on the exit edge", func(d *flow.Document) {
 			node(d, "more").Parameters = obj()
@@ -67,7 +67,7 @@ func TestLoopExitWarning(t *testing.T) {
 			node(d, "more").Parameters = obj()
 			edge(d, "e5").Condition = "={{ $now.hour > 3 }}"
 		}, true},
-		{"has no edge leaving the body", func(d *flow.Document) {
+		{"no exit edge", func(d *flow.Document) {
 			dropEdge(d, "e5")
 			d.Nodes = d.Nodes[:len(d.Nodes)-1] // the end event, now unreachable
 		}, true},

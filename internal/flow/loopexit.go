@@ -40,10 +40,10 @@ func (v *validator) loopExits(g *graph) {
 		path := ptr("nodes", li)
 		if len(exits) == 0 {
 			v.r.warnf(CodeV13, path,
-				"loop %q has no edge leaving its body, so it can only end by reaching maxIterations (%d)", loop.ID, loop.Loop.MaxIterations)
+				"loop %q has no exit; it can only end with LoopLimitExceeded (maxIterations %d)", loop.ID, loop.Loop.MaxIterations)
 			continue
 		}
-		if v.exitReadsBody(exits, body) {
+		if v.exitReadsBody(exits, body, v.carriedWrites(body)) {
 			continue
 		}
 		v.r.warnf(CodeV13, path,
@@ -105,7 +105,7 @@ func (v *validator) exitEdges(g *graph, loop int, body map[int]bool) []exitEdge 
 
 // exitReadsBody reports whether any expression deciding the exit reads
 // something the body writes, or cannot be classified.
-func (v *validator) exitReadsBody(exits []exitEdge, body map[int]bool) bool {
+func (v *validator) exitReadsBody(exits []exitEdge, body map[int]bool, carried map[string]bool) bool {
 	names := map[string]int{}
 	for i := range v.doc.Nodes {
 		names[v.doc.Nodes[i].Name] = i
@@ -121,7 +121,7 @@ func (v *validator) exitReadsBody(exits []exitEdge, body map[int]bool) bool {
 			analyses = append(analyses, analyzeTemplates(v.doc.Nodes[x.from].Parameters)...)
 		}
 		for i := range analyses {
-			if readsBody(&analyses[i], body, names) {
+			if readsBody(&analyses[i], body, names, carried) {
 				return true
 			}
 		}
@@ -165,7 +165,7 @@ func analyzeTemplates(v jsonvalue.Value) []expr.Analysis {
 
 // readsBody reports whether the analyzed expression reads the data a loop
 // iteration changes, or cannot be told apart.
-func readsBody(a *expr.Analysis, body map[int]bool, names map[string]int) bool {
+func readsBody(a *expr.Analysis, body map[int]bool, names map[string]int, carried map[string]bool) bool {
 	if len(a.Findings) > 0 {
 		return true // could not be fully classified: stay silent
 	}
@@ -180,5 +180,38 @@ func readsBody(a *expr.Analysis, body map[int]bool, names map[string]int) bool {
 			return true
 		}
 	}
+	for _, name := range variableReadsOf(a) {
+		if carried[name] {
+			return true
+		}
+	}
 	return false
 }
+
+// carriedWrites returns the iteration variables with carry that a node of the
+// loop body writes (ADR-0008 section 4.3), found through [writersOf]: they are
+// the state an iteration hands to the next one.
+func (v *validator) carriedWrites(body map[int]bool) map[string]bool {
+	carry := map[string]bool{}
+	for _, vr := range v.doc.Variables {
+		if vr.Carry != nil && *vr.Carry {
+			carry[vr.Name] = true
+		}
+	}
+	out := map[string]bool{}
+	for i := range body {
+		for _, name := range v.writers(&v.doc.Nodes[i]) {
+			if carry[name] {
+				out[name] = true
+			}
+		}
+	}
+	return out
+}
+
+// variableReadsOf returns the execution variables an expression reads. No
+// accepted document defines how an expression reads one (ADR-0018 section 1
+// lists no name for it; $vars is the project environment), so it returns
+// nothing until that decision is taken (SPEC-001 amendment 10, B.3). V13 calls
+// it, so completing it is the only change the rule needs.
+func variableReadsOf(*expr.Analysis) []string { return nil }
