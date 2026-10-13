@@ -61,7 +61,7 @@ Precedence: accepted ADRs (ADR 0081) > `references/` > reviewer preference. The 
 | Check | What it verifies | How to fix |
 |---|---|---|
 | CI `commit-lint` title step (`make pr-title-lint`) | The pull request title is a Conventional Commit with one allowed scope | Edit the title; the check re-runs on edit |
-| CI `commit-lint` commits step (`make commit-lint`) | Every commit of the pull request follows the same format | `git rebase -i origin/main`, reword, push with `--force-with-lease` |
+| CI `commit-lint` commits step (`make commit-lint`) | Warns when a commit of the pull request does not follow the same format (merge commits are ignored; only the title reaches `main`) | Optional: `git rebase -i origin/main`, reword, push with `--force-with-lease` |
 | `pre-push` hook (enabled by `make hooks`) | Outgoing commits follow the format before they leave your machine | Reword the commits; never use `--no-verify` |
 | CI `pr-advisory` size | Changed lines without `pr-size-exclude` paths against 400 | Split the pull request or write the `Size justification` |
 | CI `pr-advisory` spec, branch and skills | `Spec:` line, branch name, every applicable skill ticked | Add the line, tick and paste the checklist |

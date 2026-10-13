@@ -8,7 +8,7 @@ This document defines the format of commit messages and pull request titles, the
 
 ## Rules
 
-- **CM-1** Format: `<type>(<scope>)[!]: <summary>`, optional body after a blank line, optional footers. Header at most 72 characters. [`commit-lint`]
+- **CM-1** Format: `<type>(<scope>)[!]: <summary>`, optional body after a blank line, optional footers. Header at most 72 characters. The pull request title must pass in CI; the commits of a pull request are linted locally by the `pre-push` hook and in CI as warnings only, and merge commits are ignored, because the squash merge keeps only the title. [`commit-lint`]
 - **CM-2** Types: `feat` (new user-visible capability; minor), `fix` (bug fix; patch), `perf` (performance; patch), `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`. Changelog shows feat, fix, perf, revert and docs.
 - **CM-3** Scopes (closed list; the table is checked against `commitlint.config.mjs`):
 
