@@ -15,11 +15,12 @@ import (
 // wantBadCases is the number of planted violations of SPEC-009 4.4.6.
 const wantBadCases = 29
 
-func fixtureConfig(dir string) config {
+func fixtureConfig(t *testing.T, dir string) config {
+	t.Helper()
 	return config{
 		SQLiteDir:   filepath.Join(dir, "sqlite"),
 		PostgresDir: filepath.Join(dir, "postgres"),
-		PolicyDir:   realPolicy,
+		PolicyDir:   fixturePolicy(t),
 	}
 }
 
@@ -30,7 +31,7 @@ func TestGoodFixturesPass(t *testing.T) {
 	}
 	for _, dir := range dirs {
 		t.Run(filepath.Base(dir), func(t *testing.T) {
-			findings, _, code := runCheck(t, "all", fixtureConfig(dir))
+			findings, _, code := runCheck(t, "all", fixtureConfig(t, dir))
 			if code != 0 || len(findings) != 0 {
 				t.Fatalf("exit %d, findings:\n%s", code, strings.Join(findings, "\n"))
 			}
@@ -54,7 +55,7 @@ func TestBadFixturesAreDetected(t *testing.T) {
 			}
 			want := strings.Fields(string(raw))
 			sort.Strings(want)
-			findings, _, code := runCheck(t, "all", fixtureConfig(dir))
+			findings, _, code := runCheck(t, "all", fixtureConfig(t, dir))
 			if code != 1 {
 				t.Fatalf("the planted violation was not detected (exit %d)", code)
 			}
@@ -72,7 +73,7 @@ func TestEachPlantedCaseNamesItsCheck(t *testing.T) {
 	dirs, _ := filepath.Glob("testdata/bad/*")
 	for _, dir := range dirs {
 		for _, c := range checks {
-			findings, _, _ := runCheck(t, c.name, fixtureConfig(dir))
+			findings, _, _ := runCheck(t, c.name, fixtureConfig(t, dir))
 			if len(findings) > 0 {
 				covered[c.name] = true
 			}

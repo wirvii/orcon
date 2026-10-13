@@ -39,6 +39,7 @@ func tree(t *testing.T, files map[string]string, policyOverrides map[string]*str
 	}
 	policyDir := filepath.Join(root, "policy")
 	copyDir(t, realPolicy, policyDir)
+	blankDialectOnlyQueries(t, policyDir)
 	for name, content := range policyOverrides {
 		path := filepath.Join(policyDir, name)
 		if content == nil {
@@ -135,4 +136,35 @@ const sqlHeader = "-- SPDX-FileCopyrightText: The Orcon Authors\n-- SPDX-License
 
 func mig(kind, floor, body string) string {
 	return sqlHeader + "-- orcon:kind " + kind + "\n-- orcon:compatibility-floor " + floor + "\n" + body
+}
+
+// blankDialectOnlyQueries keeps the comment lines of dialect_only_queries.txt and
+// drops its entries. The entries of the real file name queries of the real
+// adapters; a planted case has queries of its own, and an entry that names none
+// of them would be reported as stale.
+func blankDialectOnlyQueries(t *testing.T, policyDir string) {
+	t.Helper()
+	path := filepath.Join(policyDir, "dialect_only_queries.txt")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kept []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "#") {
+			kept = append(kept, line)
+		}
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(kept, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fixturePolicy returns a copy of the real policy for the planted cases.
+func fixturePolicy(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "policy")
+	copyDir(t, realPolicy, dir)
+	blankDialectOnlyQueries(t, dir)
+	return dir
 }
