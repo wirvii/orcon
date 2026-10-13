@@ -171,3 +171,7 @@ The V1 bar for the flow editor is that every interaction of the parity table in 
 | P-28 | Multi-output node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
 | P-29 | Trigger node | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
 | P-30 | Same experience in dark theme and by keyboard | Equal or better | 2026-10-13 | 2f9aa73 | Approved by the owner (SPEC-007 E-PAR-3) |
+
+## Third-party licenses
+
+Every web dependency is compatible with Apache-2.0; the notices that ship with the binary are in [`NOTICE`](../../NOTICE) (shadcn/ui and @xyflow/react attribution, the OFL-1.1 fonts, and the note that axe-core is development-only). The version-pinned table with the verified license of each dependency is in [`third-party-licenses.md`](third-party-licenses.md).

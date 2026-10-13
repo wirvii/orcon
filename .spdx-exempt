@@ -9,6 +9,7 @@
 
 # Formats without comment syntax, or whose bytes are significant.
 LICENSE  # canonical license text, must stay byte-identical
+NOTICE  # third-party attribution notices, shipped verbatim with the binary
 **/go.sum  # generated checksum list; comments are not allowed
 **/package.json  # JSON has no comment syntax
 turbo.json  # JSON has no comment syntax
