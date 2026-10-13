@@ -5,11 +5,13 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createConfig } from '@orcon/lint-config';
+import { createWebAppConfig } from '@orcon/lint-config/web-app';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 export default [
   ...createConfig({ cwd: here }),
+  ...createWebAppConfig({ appRoot: here }),
   {
     // The service worker free browser scripts under public/ run as plain scripts, not modules.
     files: ['public/**/*.js'],

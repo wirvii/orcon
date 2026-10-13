@@ -21,15 +21,15 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 function initialLocale(): Locale {
   const saved = readPreference(LOCALE_STORAGE_KEY);
   if (isLocale(saved)) return saved;
-  return matchProductLocale(typeof navigator === 'undefined' ? [] : Array.from(navigator.languages ?? []));
+  return matchProductLocale(typeof navigator === 'undefined' ? [] : Array.from(navigator.languages));
 }
 
 export interface I18nProviderProps {
   children: ReactNode;
-  defaultLocale?: Locale;
+  defaultLocale?: Locale | undefined;
   /** Controlled locale (Storybook globals, tests). Disables persistence. */
-  locale?: Locale;
-  onLocaleChange?: (locale: Locale) => void;
+  locale?: Locale | undefined;
+  onLocaleChange?: ((locale: Locale) => void) | undefined;
 }
 
 export function I18nProvider({ children, defaultLocale, locale: controlled, onLocaleChange }: I18nProviderProps) {

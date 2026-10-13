@@ -14,14 +14,14 @@ export function toDate(value: DateInput): Date {
 export interface DateTimeProps {
   value: DateInput;
   /** Date style. Defaults to medium. */
-  dateStyle?: 'full' | 'long' | 'medium' | 'short';
+  dateStyle?: 'full' | 'long' | 'medium' | 'short' | undefined;
   /** Adds the time of day after the date. */
-  timeStyle?: 'long' | 'medium' | 'short';
+  timeStyle?: 'long' | 'medium' | 'short' | undefined;
   /** Show only the time of day. */
-  timeOnly?: boolean;
+  timeOnly?: boolean | undefined;
   /** Show the time zone name. Use when the reader could confuse zones. Spells the date out as day, month and year. */
-  showTimeZone?: boolean;
-  className?: string;
+  showTimeZone?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /**

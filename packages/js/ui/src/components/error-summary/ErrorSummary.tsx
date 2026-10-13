@@ -24,8 +24,8 @@ export interface FieldError {
 export interface ErrorSummaryProps {
   errors: readonly FieldError[];
   /** Move focus to the summary when it appears, so a screen reader announces it. Use after a failed submit. */
-  focusOnMount?: boolean;
-  className?: string;
+  focusOnMount?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /** Lists every field error at the top of a form. Each entry moves focus to its field. */

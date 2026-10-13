@@ -26,7 +26,7 @@ export const badgeVariants = cva(
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {
   /** Optional leading icon (decorative). Status meaning must also be in the text. */
-  icon?: ReactNode;
+  icon?: ReactNode | undefined;
 }
 
 /** A small label. It is never the only carrier of meaning: the text says it, the color reinforces it. */

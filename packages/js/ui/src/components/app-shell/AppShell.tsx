@@ -34,26 +34,26 @@ export interface NavEntry {
   label: string;
   icon: LucideIcon;
   /** Count of things waiting in that section. */
-  badge?: number;
+  badge?: number | undefined;
 }
 
 export interface AppShellProps {
   navigation: readonly NavEntry[];
   /** The `id` of the entry being shown. */
-  currentId?: string;
+  currentId?: string | undefined;
   /** Shown at the start of the top bar, usually the BrandMark. */
-  brand?: ReactNode;
+  brand?: ReactNode | undefined;
   /** Controls at the end of the top bar. */
-  actions?: ReactNode;
+  actions?: ReactNode | undefined;
   children: ReactNode;
   /** Open the drawer when the page loads. Only for stories and tests. */
-  defaultDrawerOpen?: boolean;
+  defaultDrawerOpen?: boolean | undefined;
   /**
    * The shell is exactly one viewport tall and the page content fills the space
    * between the bars, scrolling inside it. For screens that need a definite
    * height, such as the flow editor.
    */
-  fill?: boolean;
+  fill?: boolean | undefined;
 }
 
 /**

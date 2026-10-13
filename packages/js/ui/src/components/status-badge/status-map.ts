@@ -104,9 +104,9 @@ export interface StatusEntry {
   icon: LucideIcon;
   label: MessageDescriptor;
   /** The icon turns while the state lasts. Rotation stops under reduced motion; icon and text remain. */
-  spins?: boolean;
+  spins?: boolean | undefined;
   /** Longer explanation exposed to assistive technology. */
-  description?: MessageDescriptor;
+  description?: MessageDescriptor | undefined;
 }
 
 export const statusMap: Readonly<Record<StatusKey, StatusEntry>> = {

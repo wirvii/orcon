@@ -10,9 +10,9 @@ import type { Locale } from '../i18n/locales';
 
 export interface ProvidersProps {
   children: ReactNode;
-  theme?: ThemePreference;
-  density?: Density;
-  locale?: Locale;
+  theme?: ThemePreference | undefined;
+  density?: Density | undefined;
+  locale?: Locale | undefined;
 }
 
 /** Theme, density and locale in one wrapper. Props make each one controlled (stories, tests). */

@@ -14,7 +14,7 @@ import { states } from './DensitySwitcher.meta';
 const meta = {
   title: 'Components/DensitySwitcher',
   component: DensitySwitcher,
-  render: (args) => {
+  render: function Render(args) {
     const [value, setValue] = useState<Density>('comfortable');
     return <DensitySwitcher {...args} value={value} onValueChange={setValue} />;
   },

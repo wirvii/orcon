@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createConfig } from '@orcon/lint-config';
+import { createWebAppConfig } from '@orcon/lint-config/web-app';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -14,6 +15,7 @@ export default [
     tailwindEntryPoint: resolve(here, 'src/styles/index.css'),
     cwd: here,
   }),
+  ...createWebAppConfig({ tsconfigRootDir: here, untypedFiles: ['.storybook/main.ts'] }),
   {
     // React Flow marks parts of a node that must not start a drag, a pan or a wheel zoom with these classes.
     files: ['**/*.{ts,tsx}'],

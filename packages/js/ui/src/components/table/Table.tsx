@@ -12,7 +12,7 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 
 export interface TableCaptionProps extends HTMLAttributes<HTMLTableCaptionElement> {
   /** Keep the caption for screen readers only. It still names the table. */
-  visuallyHidden?: boolean;
+  visuallyHidden?: boolean | undefined;
 }
 
 export function TableCaption({ className, visuallyHidden = false, ...props }: TableCaptionProps) {
@@ -29,9 +29,9 @@ export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSecti
 
 export interface TableRowProps extends HTMLAttributes<HTMLTableRowElement> {
   /** A selected row gets a background and an inset frame, so selection is not only a color. Add a checkbox cell when people can change the selection. */
-  selected?: boolean;
+  selected?: boolean | undefined;
   /** A body row: its height follows the density (40 px comfortable, 32 px compact). Header rows are not data rows. */
-  header?: boolean;
+  header?: boolean | undefined;
 }
 
 export function TableRow({ className, selected = false, header = false, ...props }: TableRowProps) {
@@ -51,7 +51,7 @@ export function TableRow({ className, selected = false, header = false, ...props
 
 export interface TableHeadProps extends ThHTMLAttributes<HTMLTableCellElement> {
   /** Keep the header visible while the body scrolls. Put the table in a scrolling container with a height. */
-  sticky?: boolean;
+  sticky?: boolean | undefined;
 }
 
 export function TableHead({ className, sticky = false, scope = 'col', ...props }: TableHeadProps) {
@@ -73,7 +73,7 @@ export interface TableCellProps extends TdHTMLAttributes<HTMLTableCellElement> {
    * Let the text wrap. By default a cell stays on one line so every row is exactly as tall as
    * the density says; a wrapping cell makes its row taller. Declared truncation needs a tooltip.
    */
-  wrap?: boolean;
+  wrap?: boolean | undefined;
 }
 
 export function TableCell({ className, wrap = false, ...props }: TableCellProps) {

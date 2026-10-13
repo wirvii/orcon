@@ -11,14 +11,14 @@ import { edgeLooks, familyClasses } from '../state';
 
 export interface EdgeLabelProps {
   /** Items that travelled the connection in the execution being shown. */
-  items?: number;
+  items?: number | undefined;
   /** The connection state. An uncertain connection shows "unknown" instead of a count. */
-  state?: EdgeState;
+  state?: EdgeState | undefined;
   /** The connection comes from a pinned node. */
-  pinned?: boolean;
+  pinned?: boolean | undefined;
   /** The connection goes back to an earlier node: a Repeat chip leads the label. */
-  loopBack?: boolean;
-  className?: string;
+  loopBack?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /** The text of a connection label: an ICU item count, "unknown" when uncertain, " · pinned" for pinned data. */

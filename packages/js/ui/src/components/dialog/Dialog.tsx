@@ -12,18 +12,18 @@ import { commonMessages } from '../../lib/messages';
 import { IconButton } from '../icon-button/IconButton';
 
 export interface DialogProps {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   /** The button that opens the dialog. Omit it when `open` is controlled. */
-  trigger?: ReactElement;
+  trigger?: ReactElement | undefined;
   /** Names the dialog. */
   title: string;
-  description?: ReactNode;
-  children?: ReactNode;
+  description?: ReactNode | undefined;
+  children?: ReactNode | undefined;
   /** Buttons at the bottom. The primary action goes last. */
-  footer?: ReactNode;
-  className?: string;
+  footer?: ReactNode | undefined;
+  className?: string | undefined;
 }
 
 /**

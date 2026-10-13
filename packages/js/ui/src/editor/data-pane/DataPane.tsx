@@ -26,23 +26,23 @@ export interface DataPaneProps {
   /** Input shows what the node received; output what it produced (and can be pinned). */
   mode: 'input' | 'output';
   /** The data to show. Absent means nothing has run: the pane shows its empty state. */
-  data?: PaneData;
+  data?: PaneData | undefined;
   /** `loading` shows placeholders; `error` shows the message. */
-  status?: 'data' | 'loading' | 'error';
-  error?: string;
-  view?: DataView;
-  defaultView?: DataView;
-  onViewChange?: (view: DataView) => void;
+  status?: 'data' | 'loading' | 'error' | undefined;
+  error?: string | undefined;
+  view?: DataView | undefined;
+  defaultView?: DataView | undefined;
+  onViewChange?: ((view: DataView) => void) | undefined;
   /** The outputs of a node with several, as tabs with counts. */
-  ports?: readonly OutputPort[];
-  activePort?: string;
-  onPortChange?: (id: string) => void;
+  ports?: readonly OutputPort[] | undefined;
+  activePort?: string | undefined;
+  onPortChange?: ((id: string) => void) | undefined;
   /** The action of the empty state: run the previous nodes (input) or this step (output). */
-  onExecute?: () => void;
-  onPinChange?: (pinned: boolean) => void;
-  onEdit?: () => void;
-  headingLevel?: 2 | 3 | 4;
-  className?: string;
+  onExecute?: (() => void) | undefined;
+  onPinChange?: ((pinned: boolean) => void) | undefined;
+  onEdit?: (() => void) | undefined;
+  headingLevel?: 2 | 3 | 4 | undefined;
+  className?: string | undefined;
 }
 
 const views: { id: DataView; message: typeof editorMessages.viewTable }[] = [
@@ -96,7 +96,7 @@ export function DataPane({
   };
   const copy = () => {
     // Only what is visible is copied: protected values become a fixed notice.
-    void navigator.clipboard?.writeText(JSON.stringify(items.map((item) => visibleValue(item)), null, 2)).then(() => setCopied(true), () => undefined);
+    void navigator.clipboard.writeText(JSON.stringify(items.map((item) => visibleValue(item)), null, 2)).then(() => setCopied(true), () => undefined);
   };
 
   let body: ReactNode;

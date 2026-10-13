@@ -45,13 +45,13 @@ const bannerVariants = cva('flex items-start gap-3 rounded-md border p-3 text-ba
 });
 
 export interface BannerProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
-  tone?: BannerTone;
+  tone?: BannerTone | undefined;
   /** Short statement of what happened or what is needed. */
   title: ReactNode;
   /** Extra buttons or links. Decisions never live in toasts; they live in banners and dialogs. */
-  action?: ReactNode;
+  action?: ReactNode | undefined;
   /** Replaces the icon of the tone, for a banner about one specific thing (such as pinned data). The tone still sets the colors. */
-  icon?: LucideIcon;
+  icon?: LucideIcon | undefined;
 }
 
 /**

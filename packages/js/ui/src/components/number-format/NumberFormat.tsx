@@ -5,20 +5,25 @@ import { useIntl } from 'react-intl';
 
 export interface NumberFormatProps {
   value: number;
-  format?: 'decimal' | 'percent' | 'currency';
+  format?: 'decimal' | 'percent' | 'currency' | undefined;
   /** ISO 4217 code. Required with format="currency". */
-  currency?: string;
+  currency?: string | undefined;
   /** "1.2K" instead of "1,200". */
-  compact?: boolean;
-  maximumFractionDigits?: number;
-  className?: string;
+  compact?: boolean | undefined;
+  maximumFractionDigits?: number | undefined;
+  className?: string | undefined;
 }
 
 /** A number, percentage or amount of money formatted with Intl for the active locale. */
 export function NumberFormat({ value, format = 'decimal', currency, compact = false, maximumFractionDigits, className }: NumberFormatProps) {
   const intl = useIntl();
   const notation = compact ? 'compact' : 'standard';
-  const text = intl.formatNumber(value, { style: format, currency, notation, maximumFractionDigits });
+  const text = intl.formatNumber(value, {
+    style: format,
+    notation,
+    ...(currency === undefined ? {} : { currency }),
+    ...(maximumFractionDigits === undefined ? {} : { maximumFractionDigits }),
+  });
   return <span className={className}>{text}</span>;
 }
 

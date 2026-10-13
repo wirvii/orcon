@@ -8,6 +8,7 @@ import { MatrixTable } from '../../stories/MatrixTable';
 import { manyItems, mixedItems, orderItems } from '../fixtures';
 
 import { DataTableView } from './DataTableView';
+import { must } from '../../lib/must';
 
 const meta = {
   title: 'Editor/DataTableView',
@@ -31,7 +32,7 @@ export const Default: Story = {
     await expect(view.getByRole('columnheader', { name: '#' })).toBeVisible();
     // null is dimmed, nested data is collapsed and expandable.
     await expect(view.getAllByText('null').length).toBeGreaterThan(0);
-    const toggle = view.getAllByRole('button', { name: /, shipping$/ })[0]!;
+    const toggle = must(view.getAllByRole('button', { name: /, shipping$/ })[0]);
     await expect(toggle).toHaveTextContent('{…} 3 keys');
     await userEvent.click(toggle);
     await expect(within(canvasElement).getByText(/"city": "Neiva"/)).toBeVisible();

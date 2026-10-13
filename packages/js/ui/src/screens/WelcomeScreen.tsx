@@ -46,9 +46,9 @@ const messages = defineMessages({
 });
 
 export interface WelcomeScreenProps {
-  onCreateFlow?: () => void;
+  onCreateFlow?: (() => void) | undefined;
   /** Where the documentation link goes. */
-  docsHref?: string;
+  docsHref?: string | undefined;
 }
 
 /**

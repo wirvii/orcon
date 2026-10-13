@@ -24,23 +24,23 @@ export interface NodeDetailsViewProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** `dialog` (lg and wider): three panes over the canvas. `docked` (md to lg): only the parameters pane, docked at the right of the canvas. */
-  layout?: 'dialog' | 'docked';
+  layout?: 'dialog' | 'docked' | undefined;
   /** The Input pane. A trigger has none. */
-  input?: ReactNode;
+  input?: ReactNode | undefined;
   /** The Output pane. */
-  output?: ReactNode;
+  output?: ReactNode | undefined;
   /** The content of each tab of the parameters pane. The Agent tab is for AI nodes. */
   tabs: Partial<Record<DetailsTab, ReactNode>> & { parameters: ReactNode };
   /** A status alert that heads the form when the last run left the node failed or uncertain. */
-  alert?: ReactNode;
-  tab?: DetailsTab;
-  onTabChange?: (tab: DetailsTab) => void;
+  alert?: ReactNode | undefined;
+  tab?: DetailsTab | undefined;
+  onTabChange?: ((tab: DetailsTab) => void) | undefined;
   /** Runs the step. */
-  onExecute?: () => void;
-  onRename?: (name: string) => void;
+  onExecute?: (() => void) | undefined;
+  onRename?: ((name: string) => void) | undefined;
   /** Moves focus back to the node tile on the canvas when the view closes. */
-  onReturnFocus?: () => void;
-  className?: string;
+  onReturnFocus?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 const tabMessages = {
@@ -51,7 +51,7 @@ const tabMessages = {
 } as const;
 
 /** The name of the node: text that turns into a field when pressed, so it can be renamed in place. */
-function NodeName({ name, onRename }: { name: string; onRename?: (name: string) => void }) {
+function NodeName({ name, onRename }: { name: string; onRename?: ((name: string) => void) | undefined }) {
   const intl = useIntl();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -95,7 +95,7 @@ function NodeName({ name, onRename }: { name: string; onRename?: (name: string) 
   );
 }
 
-function Header({ node, onBack, onExecute, onRename, compact = false }: { node: GraphNode; onBack: () => void; onExecute?: () => void; onRename?: (name: string) => void; compact?: boolean }) {
+function Header({ node, onBack, onExecute, onRename, compact = false }: { node: GraphNode; onBack: () => void; onExecute?: (() => void) | undefined; onRename?: ((name: string) => void) | undefined; compact?: boolean }) {
   const intl = useIntl();
   const back = intl.formatMessage(editorMessages.backToCanvas);
   const execute = onExecute ? (

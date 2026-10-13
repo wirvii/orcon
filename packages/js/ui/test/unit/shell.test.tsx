@@ -15,6 +15,7 @@ import { NotificationBell } from '../../src/components/notification-bell/Notific
 import { TopBar } from '../../src/components/top-bar/TopBar';
 
 import { renderWithProviders } from './helpers';
+import { must } from '../../src/lib/must';
 
 describe('NavItem', () => {
   it('marks the current page with aria-current and a heavier weight', () => {
@@ -212,7 +213,7 @@ describe('CommandPalette', () => {
   ];
 
   it('opens with Ctrl+K, filters, runs the chosen command and closes', async () => {
-    commands[1]!.onSelect.mockClear();
+    must(commands[1]).onSelect.mockClear();
     renderWithProviders(<CommandPalette commands={commands} />);
     expect(screen.queryByRole('dialog')).toBeNull();
     await userEvent.keyboard('{Control>}k{/Control}');
@@ -220,7 +221,7 @@ describe('CommandPalette', () => {
     await userEvent.type(search, 'history');
     expect(screen.queryByRole('option', { name: /Create a flow/ })).toBeNull();
     await userEvent.keyboard('{Enter}');
-    expect(commands[1]!.onSelect).toHaveBeenCalledTimes(1);
+    expect(must(commands[1]).onSelect).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

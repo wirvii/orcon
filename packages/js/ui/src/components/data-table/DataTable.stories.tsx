@@ -54,7 +54,7 @@ export const Default: Story = {
 
 /** The caller sorts (usually on the server); the header reports the order with aria-sort and an icon. */
 export const Sorted: Story = {
-  render: (args) => {
+  render: function Render(args) {
     const [sort, setSort] = useState<SortState>({ columnId: 'flow', direction: 'ascending' });
     const sorted = [...args.rows].sort((a, b) => (sort.direction === 'ascending' ? 1 : -1) * a.flow.localeCompare(b.flow));
     return <DataTable {...args} rows={sorted} sort={sort} onSortChange={setSort} />;

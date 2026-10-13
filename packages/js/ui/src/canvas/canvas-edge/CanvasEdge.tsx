@@ -11,25 +11,25 @@ import { arrowFill, edgeLooks } from '../state';
 
 export interface CanvasEdgeData extends Record<string, unknown> {
   /** Execution state of the connection. Absent at design time. */
-  state?: EdgeState;
+  state?: EdgeState | undefined;
   /** Items that travelled the connection. Shows the label. */
-  items?: number;
+  items?: number | undefined;
   /** The connection comes from a pinned node. */
-  pinned?: boolean;
+  pinned?: boolean | undefined;
   /** The connection goes back to an earlier node and is routed under the flow. */
-  loopBack?: boolean;
+  loopBack?: boolean | undefined;
   /** The pointer or the keyboard is on the connection: stroke 3 and the action bar. */
-  active?: boolean;
-  sourceName?: string;
-  targetName?: string;
+  active?: boolean | undefined;
+  sourceName?: string | undefined;
+  targetName?: string | undefined;
   /** Show the action bar when active. False in read-only mode. */
-  editable?: boolean;
-  onAdd?: () => void;
-  onDelete?: () => void;
-  onBarEnter?: () => void;
-  onBarLeave?: () => void;
+  editable?: boolean | undefined;
+  onAdd?: (() => void) | undefined;
+  onDelete?: (() => void) | undefined;
+  onBarEnter?: (() => void) | undefined;
+  onBarLeave?: (() => void) | undefined;
   /** Level of detail: labels and the action bar are hidden at low zoom. */
-  detail?: 'full' | 'detail' | 'minimal';
+  detail?: 'full' | 'detail' | 'minimal' | undefined;
 }
 
 export type CanvasFlowEdge = FlowEdge<CanvasEdgeData, 'canvas'>;
@@ -85,7 +85,7 @@ export function CanvasEdge({ id, sourceX, sourceY, targetX, targetY, data }: Edg
   const { d, mid, tip } = edgeGeometry(sourceX, sourceY, targetX, targetY, loopBack);
   const active = data?.active ?? false;
   const showLabel = (state !== undefined || loopBack) && data?.detail !== 'detail' && data?.detail !== 'minimal';
-  const showBar = active && data?.editable && data?.detail === 'full';
+  const showBar = active && data?.editable && data.detail === 'full';
   const arrow = `M ${tip.x - ARROW},${tip.y - ARROW / 2 - 0.5} L ${tip.x},${tip.y} L ${tip.x - ARROW},${tip.y + ARROW / 2 + 0.5} Z`;
   return (
     <>
@@ -109,12 +109,12 @@ export function CanvasEdge({ id, sourceX, sourceY, targetX, targetY, data }: Edg
             {showBar ? (
               <div className="pointer-events-auto">
                 <EdgeActions
-                  source={data?.sourceName ?? ''}
-                  target={data?.targetName ?? ''}
-                  onAdd={data?.onAdd}
-                  onDelete={data?.onDelete}
-                  onPointerEnter={data?.onBarEnter}
-                  onPointerLeave={data?.onBarLeave}
+                  source={data.sourceName ?? ''}
+                  target={data.targetName ?? ''}
+                  onAdd={data.onAdd}
+                  onDelete={data.onDelete}
+                  onPointerEnter={data.onBarEnter}
+                  onPointerLeave={data.onBarLeave}
                 />
               </div>
             ) : null}

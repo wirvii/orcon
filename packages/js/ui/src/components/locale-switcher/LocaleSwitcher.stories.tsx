@@ -14,7 +14,7 @@ const meta = {
   title: 'Components/LocaleSwitcher',
   component: LocaleSwitcher,
   decorators: [(Story, context) => (context.name === 'Matrix' ? <Story /> : <div className="w-panel-width"><Story /></div>)],
-  render: (args) => {
+  render: function Render(args) {
     const [value, setValue] = useState<ProductLocale>('en');
     return <LocaleSwitcher {...args} value={value} onValueChange={setValue} />;
   },

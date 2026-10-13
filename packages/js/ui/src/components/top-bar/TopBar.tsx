@@ -18,12 +18,12 @@ const messages = defineMessages({
 
 export interface TopBarProps {
   /** Shown at the start, usually the BrandMark. */
-  brand?: ReactNode;
+  brand?: ReactNode | undefined;
   /** Shows the menu button, used below the md breakpoint where the sidebar is hidden. */
-  onOpenNavigation?: () => void;
+  onOpenNavigation?: (() => void) | undefined;
   /** Controls at the end: notification bell, theme and density, account. */
-  actions?: ReactNode;
-  className?: string;
+  actions?: ReactNode | undefined;
+  className?: string | undefined;
 }
 
 /** The bar across the top of the app. It stays in view while the page scrolls. */

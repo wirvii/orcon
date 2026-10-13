@@ -11,7 +11,7 @@ import { statusMap, type StatusKey } from './status-map';
 
 export interface StatusBadgeProps {
   status: StatusKey;
-  className?: string;
+  className?: string | undefined;
 }
 
 /**

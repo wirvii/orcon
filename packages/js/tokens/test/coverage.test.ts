@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { model, pairs, themeNames } from './helpers/model';
 
 /** Semantic color tokens that appear in no pair, given the declared pairs. */
-export function uncovered(colorKeys: string[], declared: Array<{ fg: string; bg: string }>): string[] {
+export function uncovered(colorKeys: string[], declared: { fg: string; bg: string }[]): string[] {
   const used = new Set(declared.flatMap((p) => [p.fg, p.bg]));
   return colorKeys.filter((key) => !used.has(key));
 }

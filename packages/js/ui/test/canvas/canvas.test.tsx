@@ -12,6 +12,7 @@ import { exampleCatalog, exampleDraft, exampleGraph } from '../../src/canvas/fix
 import type { Graph } from '../../src/canvas/model';
 import { WorkflowCanvas, type WorkflowCanvasHandle, type WorkflowCanvasProps } from '../../src/canvas/WorkflowCanvas';
 import { Providers } from '../../src/providers/Providers';
+import { must } from '../../src/lib/must';
 
 beforeAll(async () => {
   await page.viewport(1440, 900);
@@ -39,8 +40,8 @@ function renderCanvas(props: Partial<WorkflowCanvasProps> = {}) {
 // Node names start with the node name and a comma; connections (also groups) start with it and a parenthesis.
 const nodeName = (name: string) => new RegExp(`^${name}, `);
 const node = (name: string) => screen.findByRole('group', { name: nodeName(name) });
-const last = (mock: ReturnType<typeof vi.fn<(graph: Graph) => void>>) => mock.mock.calls.at(-1)![0];
-const position = (graph: Graph, id: string) => graph.nodes.find((candidate) => candidate.id === id)!.position;
+const last = (mock: ReturnType<typeof vi.fn<(graph: Graph) => void>>) => must(mock.mock.calls.at(-1))[0];
+const position = (graph: Graph, id: string) => must(graph.nodes.find((candidate) => candidate.id === id)).position;
 
 // user-event mouse events carry no window, which React Flow's drag handling needs, so a node is focused directly.
 async function focusNode(name: string) {
@@ -104,7 +105,7 @@ describe('every graph operation works from the keyboard', () => {
     await user.keyboard('{Enter}');
     await waitFor(() => expect(onGraphChange).toHaveBeenCalled());
     const graph = last(onGraphChange);
-    const added = graph.nodes.find((candidate) => candidate.name === 'Send email')!;
+    const added = must(graph.nodes.find((candidate) => candidate.name === 'Send email'));
     const merge = position(exampleDraft, 'merge');
     expect(added.position).toEqual({ x: merge.x + 200, y: merge.y });
     expect(graph.edges.some((edge) => edge.source === 'merge' && edge.target === added.id)).toBe(true);
@@ -257,7 +258,7 @@ describe('the tools and the outline are keyboard paths too', () => {
     await waitFor(() => expect(last(onGraphChange).edges.some((edge) => edge.id === 'e1')).toBe(false));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Removed the connection from Webhook to Validate order'));
 
-    await user.click(within(outline).getAllByRole('button', { name: /^Delete / })[0]!);
+    await user.click(must(within(outline).getAllByRole('button', { name: /^Delete / })[0]));
     await waitFor(() => expect(last(onGraphChange).nodes).toHaveLength(exampleGraph.nodes.length - 1));
   });
 });
@@ -280,7 +281,7 @@ describe('connections are focusable and have the same actions as the bar', () =>
     await waitFor(() => expect(onGraphChange).toHaveBeenCalled());
     const graph = last(onGraphChange);
     expect(graph.edges.some((candidate) => candidate.id === 'e1')).toBe(false);
-    const added = graph.nodes.find((candidate) => !exampleDraft.nodes.some((existing) => existing.id === candidate.id))!;
+    const added = must(graph.nodes.find((candidate) => !exampleDraft.nodes.some((existing) => existing.id === candidate.id)));
     expect(graph.edges.some((candidate) => candidate.source === 'webhook' && candidate.target === added.id)).toBe(true);
     expect(graph.edges.some((candidate) => candidate.source === added.id && candidate.target === 'validate')).toBe(true);
   });
@@ -288,7 +289,7 @@ describe('connections are focusable and have the same actions as the bar', () =>
   it('Delete removes the focused connection', async () => {
     const { user, onGraphChange } = renderCanvas();
     await node('Webhook');
-    const edge = await waitFor(() => document.querySelector<HTMLElement>('.react-flow__edge[data-id="e3"]')!);
+    const edge = await waitFor(() => must(document.querySelector<HTMLElement>('.react-flow__edge[data-id="e3"]')));
     act(() => edge.focus());
     await user.keyboard('{Delete}');
     expect(last(onGraphChange).edges.some((candidate) => candidate.id === 'e3')).toBe(false);
@@ -360,7 +361,7 @@ describe('execution overlay', () => {
 describe('the canvas opens fitted to the flow with readable text', () => {
   const zoomOf = (container: HTMLElement) => {
     const viewport = container.querySelector<HTMLElement>('.react-flow__viewport');
-    return Number(/matrix\(([\d.]+)/.exec(getComputedStyle(viewport!).transform)?.[1] ?? 'NaN');
+    return Number(/matrix\(([\d.]+)/.exec(getComputedStyle(must(viewport)).transform)?.[1] ?? 'NaN');
   };
   const inside = (inner: DOMRect, outer: DOMRect) => inner.left >= outer.left - 1 && inner.top >= outer.top - 1 && inner.right <= outer.right + 1 && inner.bottom <= outer.bottom + 1;
 
@@ -369,7 +370,7 @@ describe('the canvas opens fitted to the flow with readable text', () => {
     try {
       const { container } = renderCanvas({ defaultGraph: exampleGraph });
       await node('Webhook');
-      const region = container.querySelector<HTMLElement>('[role="region"]')!;
+      const region = must(container.querySelector<HTMLElement>('[role="region"]'));
       await waitFor(() => {
         const nodes = Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node'));
         expect(nodes.length).toBe(exampleGraph.nodes.length + (exampleGraph.notes?.length ?? 0));
@@ -385,7 +386,7 @@ describe('the canvas opens fitted to the flow with readable text', () => {
     try {
       const { container } = renderCanvas({ defaultGraph: exampleGraph });
       const trigger = await node('Webhook');
-      const region = container.querySelector<HTMLElement>('[role="region"]')!;
+      const region = must(container.querySelector<HTMLElement>('[role="region"]'));
       await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
     } finally {
       await page.viewport(1440, 900);
@@ -395,7 +396,7 @@ describe('the canvas opens fitted to the flow with readable text', () => {
   it('never fits to more than 100 % and shows the whole flow on a wide screen', async () => {
     const { container } = renderCanvas();
     await node('Webhook');
-    const region = container.querySelector<HTMLElement>('[role="region"]')!;
+    const region = must(container.querySelector<HTMLElement>('[role="region"]'));
     await waitFor(() => {
       const nodes = Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node'));
       expect(nodes.length).toBe(exampleDraft.nodes.length + (exampleDraft.notes?.length ?? 0));
@@ -417,7 +418,7 @@ describe('level of detail', () => {
     expect(container.querySelector('[data-edge-label]')).toBeNull();
     expect(container.querySelector('[data-node-toolbar]')).toBeNull();
     // The name keeps an on-screen size of at least 10 px: 13 px text scaled by the counter-scale and the zoom.
-    const name = container.querySelector<HTMLElement>('[data-node-name]')!;
+    const name = must(container.querySelector<HTMLElement>('[data-node-name]'));
     const lineHeight = 18;
     const onScreen = (name.getBoundingClientRect().height / lineHeight) * 13;
     expect(onScreen).toBeGreaterThanOrEqual(9.5);

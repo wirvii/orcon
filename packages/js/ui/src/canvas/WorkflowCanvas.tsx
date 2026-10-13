@@ -16,7 +16,7 @@ import {
   type Connection,
   type OnConnectStartParams,
 } from '@xyflow/react';
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
 import { toast } from 'sonner';
 
@@ -104,19 +104,19 @@ const arrowStep: Record<Direction, { x: number; y: number }> = {
 export interface NodeExecutionState {
   status: StatusKey;
   /** A short error code for the Failed chip. */
-  statusCode?: string;
-  uncertainCount?: number;
+  statusCode?: string | undefined;
+  uncertainCount?: number | undefined;
 }
 
 export interface EdgeExecutionState {
   state: EdgeState;
-  items?: number;
+  items?: number | undefined;
 }
 
 /** The execution being shown on top of the flow: the state of each node and each connection. */
 export interface ExecutionOverlay {
-  nodes?: Readonly<Record<string, NodeExecutionState>>;
-  edges?: Readonly<Record<string, EdgeExecutionState>>;
+  nodes?: Readonly<Record<string, NodeExecutionState>> | undefined;
+  edges?: Readonly<Record<string, EdgeExecutionState>> | undefined;
 }
 
 /** Where a node picked in the palette goes. */
@@ -144,31 +144,31 @@ export interface WorkflowCanvasProps {
   /** The flow to start with. The canvas keeps its own copy and reports every change. */
   defaultGraph: Graph;
   /** Nodes that can be added. Without it the add button, the plus buttons and the A shortcut are not offered. */
-  catalog?: readonly CatalogItem[];
+  catalog?: readonly CatalogItem[] | undefined;
   /** The execution being shown. Changes of node state are announced politely, at most every five seconds. */
-  overlay?: ExecutionOverlay;
-  onGraphChange?: (graph: Graph) => void;
+  overlay?: ExecutionOverlay | undefined;
+  onGraphChange?: ((graph: Graph) => void) | undefined;
   /** Enter, double-click or "Open details" on a node. Without it, a node opens a panel with its state and counts. */
-  onOpenDetails?: (nodeId: string, tab?: 'agent') => void;
+  onOpenDetails?: ((nodeId: string, tab?: 'agent') => void) | undefined;
   /** Run one node (the toolbar and the R key). */
-  onRunStep?: (nodeId: string) => void;
+  onRunStep?: ((nodeId: string) => void) | undefined;
   /** Run the whole flow from a trigger. */
-  onExecuteWorkflow?: (nodeId: string) => void;
+  onExecuteWorkflow?: ((nodeId: string) => void) | undefined;
   /** Link to the execution detail of a node, shown in the node details. */
-  executionHref?: (nodeId: string) => string;
+  executionHref?: ((nodeId: string) => string) | undefined;
   /** Force view-only mode. Below the md breakpoint the canvas is always view-only. */
-  readOnly?: boolean;
+  readOnly?: boolean | undefined;
   /** Say that the canvas is view only when it is. Off where the page already makes that clear. */
-  notice?: boolean;
+  notice?: boolean | undefined;
   /** Show the strip of tools (add, connect, delete, undo, redo, outline, shortcuts) above the canvas. */
-  tools?: boolean;
-  defaultOutlineOpen?: boolean;
+  tools?: boolean | undefined;
+  defaultOutlineOpen?: boolean | undefined;
   /** Show the minimap while the canvas moves. Default true when editing. */
-  minimap?: boolean;
+  minimap?: boolean | undefined;
   /** Offer the Tidy up control, which snaps the nodes to the grid. */
-  tidyUp?: boolean;
-  ref?: Ref<WorkflowCanvasHandle>;
-  className?: string;
+  tidyUp?: boolean | undefined;
+  ref?: Ref<WorkflowCanvasHandle> | undefined;
+  className?: string | undefined;
 }
 
 /** The graph with the execution overlay on top: the state of each node and connection being shown. */
@@ -202,6 +202,12 @@ interface SyncOptions {
 }
 
 /** Builds the React Flow nodes from the graph, keeping what React Flow measured and what is selected. */
+/** The radius style of a tile, only when it has one (an absent property differs from an undefined one). */
+function tileStyleProps(node: GraphNode): { style?: CSSProperties } {
+  const style = tileRadiusStyle(node);
+  return style ? { style } : {};
+}
+
 function syncNodes(previous: CanvasFlowNodeUnion[], graph: Graph, { intl, editable, activeId, select, onNoteChange, onNoteResize }: SyncOptions): CanvasFlowNodeUnion[] {
   const before = new Map(previous.map((node) => [node.id, node]));
   const tiles = graph.nodes.map((node): TileFlowNode => {
@@ -220,7 +226,7 @@ function syncNodes(previous: CanvasFlowNodeUnion[], graph: Graph, { intl, editab
       ariaLabel: nodeAriaLabel(intl, node),
       ariaRole: 'group',
       className: tileRadius(node),
-      style: tileRadiusStyle(node),
+      ...tileStyleProps(node),
       // One node is in the tab order; the arrow keys move between nodes (a roving tab stop).
       domAttributes: { tabIndex: node.id === activeId ? 0 : -1, 'aria-roledescription': intl.formatMessage(canvasMessages.nodeRoleDescription) },
       selected: select ? select.has(node.id) : (old?.selected ?? false),
@@ -321,6 +327,7 @@ function Canvas({
   const firstNodes = useMemo(
     () => syncNodes([], graph, { intl, editable, activeId, select: undefined, onNoteChange, onNoteResize }),
     // Only the first render needs this: later changes go through the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the first render reads the initial values once on purpose
     [],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNodeUnion>(firstNodes);
@@ -348,7 +355,8 @@ function Canvas({
       void flow.setViewport(fitted, { duration });
       return;
     }
-    const first = all.find((node) => node.id === readingOrder(graphRef.current)[0]?.id) ?? all[0]!;
+    const first = all.find((node) => node.id === readingOrder(graphRef.current)[0]?.id) ?? all[0];
+    if (!first) return;
     void flow.setViewport(
       { x: ANCHOR_MARGIN - first.position.x * readable, y: rect.height / 2 - (bounds.y + bounds.height / 2) * readable, zoom: readable },
       { duration },
@@ -458,7 +466,7 @@ function Canvas({
     paletteOrigin.current = null;
     // Back to where the person was; when that element has been replaced, to the last focused item or the canvas itself.
     setTimeout(() => {
-      const edgeId = origin?.closest<HTMLElement>('.react-flow__edge')?.dataset.id;
+      const edgeId = origin?.closest<HTMLElement>('.react-flow__edge')?.dataset['id'];
       const replaced = edgeId ? containerRef.current?.querySelector<HTMLElement>(`.react-flow__edge[data-id="${CSS.escape(edgeId)}"]`) : null;
       const target = origin?.isConnected ? origin : replaced ?? (lastFocus.current?.isConnected ? lastFocus.current : containerRef.current);
       target?.focus({ preventScroll: true });
@@ -634,7 +642,7 @@ function Canvas({
       },
       copy: (nodeId) => {
         const node = baseRef.current.nodes.find((candidate) => candidate.id === nodeId);
-        if (node) void navigator.clipboard?.writeText(JSON.stringify({ ...node, status: undefined })).catch(() => undefined);
+        if (node) void navigator.clipboard.writeText(JSON.stringify({ ...node, status: undefined })).catch(() => undefined);
       },
       openAiBlock: (nodeId) => callbacks.current.openDetails(nodeId, 'agent'),
     }),
@@ -655,8 +663,8 @@ function Canvas({
     [focusNode, fitFlow, openPalette, flow],
   );
 
-  const currentItemId = (target: HTMLElement | null): string | undefined => target?.closest<HTMLElement>('.react-flow__node')?.dataset.id ?? activeId;
-  const currentEdgeId = (target: HTMLElement | null): string | undefined => target?.closest<HTMLElement>('.react-flow__edge')?.dataset.id;
+  const currentItemId = (target: HTMLElement | null): string | undefined => target?.closest<HTMLElement>('.react-flow__node')?.dataset['id'] ?? activeId;
+  const currentEdgeId = (target: HTMLElement | null): string | undefined => target?.closest<HTMLElement>('.react-flow__edge')?.dataset['id'];
 
   const zoomBy = (kind: 'in' | 'out' | 'reset' | 'fit') => {
     pulseMinimap();
@@ -703,7 +711,7 @@ function Canvas({
     }
     if (modifier && event.shiftKey && isNote && editable && arrowDirection[key]) {
       event.preventDefault();
-      resizeNote(id, arrowDirection[key] as Direction);
+      resizeNote(id, arrowDirection[key]);
       return;
     }
     if (modifier) return;
@@ -750,7 +758,7 @@ function Canvas({
     if (direction) {
       event.preventDefault();
       // The arrow keys act on the item that has focus; with focus on the canvas itself they pan.
-      const focusedItem = target.closest<HTMLElement>('.react-flow__node')?.dataset.id;
+      const focusedItem = target.closest<HTMLElement>('.react-flow__node')?.dataset['id'];
       if (event.shiftKey) {
         if (!editable || !focusedItem) return;
         const moving = selectedIds.includes(focusedItem) ? selectedIds : [focusedItem];
@@ -905,6 +913,7 @@ function Canvas({
       } satisfies CanvasFlowEdge;
     });
     // The handlers read the latest graph through refs; they are rebuilt only when the data they show changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the handlers are not dependencies on purpose (see above)
   }, [graph, intl, editable, catalog.length, detail, activeEdgeId]);
 
   const dangling = useMemo(() => {
@@ -935,7 +944,7 @@ function Canvas({
       connectingFrom,
       actions,
     }),
-    [graph, editable, activeId, detail, labelScale, renamingId, editingNoteId, focusedId, dangling, connectingFrom, actions],
+    [graph, editable, activeId, detail, labelScale, renamingId, editingNoteId, focusedId, dangling, connectingFrom, actions, focusNode],
   );
 
   const empty = graph.nodes.length === 0 && (graph.notes ?? []).length === 0;
@@ -976,18 +985,18 @@ function Canvas({
           onFocus={(event) => {
             const target = event.target as HTMLElement;
             lastFocus.current = target;
-            const id = target.closest<HTMLElement>('.react-flow__node')?.dataset.id;
+            const id = target.closest<HTMLElement>('.react-flow__node')?.dataset['id'];
             if (id) {
               setFocusedId(id);
               if (id !== activeId) setActiveId(id);
             }
-            setFocusedEdgeId(target.closest<HTMLElement>('.react-flow__edge')?.dataset.id);
+            setFocusedEdgeId(target.closest<HTMLElement>('.react-flow__edge')?.dataset['id']);
           }}
           onBlur={(event) => {
             const next = event.relatedTarget as HTMLElement | null;
             // Focus moving into a menu opened from the node's toolbar keeps the toolbar, and the menu, in place.
             if (next?.closest('[role="menu"]')) return;
-            const inside = next?.closest<HTMLElement>('.react-flow__node')?.dataset.id;
+            const inside = next?.closest<HTMLElement>('.react-flow__node')?.dataset['id'];
             setFocusedId((current) => (inside && inside === current ? current : undefined));
             if (!next?.closest('.react-flow__edge')) setFocusedEdgeId(undefined);
           }}

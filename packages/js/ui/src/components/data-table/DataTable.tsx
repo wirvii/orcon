@@ -30,8 +30,8 @@ export interface DataColumn<Row> {
   header: string;
   /** Renders the cell. Return text or a component; use StatusBadge for status. */
   cell: (row: Row) => ReactNode;
-  sortable?: boolean;
-  align?: 'start' | 'end';
+  sortable?: boolean | undefined;
+  align?: 'start' | 'end' | undefined;
 }
 
 export interface DataTableProps<Row> {
@@ -41,20 +41,20 @@ export interface DataTableProps<Row> {
   rows: readonly Row[];
   getRowId: (row: Row) => string;
   /** `ready` shows the rows; `loading` shows placeholder rows; `error` shows a message with a retry. */
-  status?: 'ready' | 'loading' | 'error';
-  sort?: SortState;
+  status?: 'ready' | 'loading' | 'error' | undefined;
+  sort?: SortState | undefined;
   /** Sorting is done by the caller (usually on the server). */
-  onSortChange?: (sort: SortState) => void;
+  onSortChange?: ((sort: SortState) => void) | undefined;
   /** Text for an empty table. Defaults to a generic one; say what to do when you can. */
-  emptyMessage?: ReactNode;
+  emptyMessage?: ReactNode | undefined;
   /** Text for a failed load. */
-  errorMessage?: ReactNode;
-  onRetry?: () => void;
+  errorMessage?: ReactNode | undefined;
+  onRetry?: (() => void) | undefined;
   /** Keep the header visible while the body scrolls. Set a height on the table with `className`, such as `max-h-panel-width`. */
-  stickyHeader?: boolean;
+  stickyHeader?: boolean | undefined;
   /** How many placeholder rows to show while loading. */
-  loadingRows?: number;
-  className?: string;
+  loadingRows?: number | undefined;
+  className?: string | undefined;
 }
 
 /**
@@ -82,7 +82,7 @@ export function DataTable<Row>({
   const toggle = (column: DataColumn<Row>) => {
     if (!onSortChange) return;
     const active = sort?.columnId === column.id;
-    onSortChange({ columnId: column.id, direction: active && sort?.direction === 'ascending' ? 'descending' : 'ascending' });
+    onSortChange({ columnId: column.id, direction: active && sort.direction === 'ascending' ? 'descending' : 'ascending' });
   };
 
   const span = columns.length;
@@ -99,12 +99,12 @@ export function DataTable<Row>({
           <TableRow header>
             {columns.map((column) => {
               const active = sort?.columnId === column.id;
-              const SortIcon = !active ? ChevronsUpDown : sort?.direction === 'ascending' ? ArrowUp : ArrowDown;
+              const SortIcon = !active ? ChevronsUpDown : sort.direction === 'ascending' ? ArrowUp : ArrowDown;
               return (
                 <TableHead
                   key={column.id}
                   sticky={stickyHeader}
-                  aria-sort={column.sortable ? (active ? sort?.direction : 'none') : undefined}
+                  aria-sort={column.sortable ? (active ? sort.direction : 'none') : undefined}
                   className={column.align === 'end' ? 'text-right' : undefined}
                 >
                   {column.sortable ? (

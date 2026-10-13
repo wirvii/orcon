@@ -37,16 +37,22 @@ export interface DataRun {
 export interface PaneData {
   items: readonly DataItem[];
   /** The node the data comes from, for "from HTTP Request". */
-  from?: string;
-  run?: DataRun;
+  from?: string | undefined;
+  run?: DataRun | undefined;
   /** The output is pinned: later runs reuse it. */
-  pinned?: boolean;
+  pinned?: boolean | undefined;
 }
 
 export type DataView = 'table' | 'json' | 'schema';
 
 /** A JSON-like value of an item, with protected values and files recognised. */
 export type JsonLike = unknown;
+
+/** Text for a value that is not a string, number or boolean: a bigint or symbol prints as itself, anything else as JSON. */
+export function plainText(value: unknown): string {
+  if (typeof value === 'bigint' || typeof value === 'symbol') return value.toString();
+  return typeof value === 'function' ? '' : JSON.stringify(value);
+}
 
 /** The text of a value for the clipboard. A protected value is never copied: it becomes a fixed notice. */
 export function visibleValue(value: unknown, hidden = '[hidden]'): unknown {
@@ -66,10 +72,10 @@ export interface SchemaField {
   key: string;
   type: SchemaType;
   /** A short example value, at most 60 characters. Absent for hidden values. */
-  example?: string;
+  example?: string | undefined;
   /** The value is protected: the example is masked. */
-  sensitive?: boolean;
-  children?: SchemaField[];
+  sensitive?: boolean | undefined;
+  children?: SchemaField[] | undefined;
 }
 
 export const EXAMPLE_LIMIT = 60;

@@ -21,8 +21,8 @@ const typeLabels = {
 
 export interface SchemaViewProps {
   items: readonly DataItem[];
-  label?: string;
-  className?: string;
+  label?: string | undefined;
+  className?: string | undefined;
 }
 
 function Field({ field, depth }: { field: SchemaField; depth: number }) {

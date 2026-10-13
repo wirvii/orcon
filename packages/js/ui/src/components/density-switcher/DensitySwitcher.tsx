@@ -19,9 +19,9 @@ const messages = defineMessages({
 
 export interface DensitySwitcherProps {
   /** Controlled value. Without it the switcher reads and sets the DensityProvider density. */
-  value?: Density;
-  onValueChange?: (value: Density) => void;
-  className?: string;
+  value?: Density | undefined;
+  onValueChange?: ((value: Density) => void) | undefined;
+  className?: string | undefined;
 }
 
 /** Chooses comfortable or compact. Row and control heights follow the density tokens. */
