@@ -68,6 +68,9 @@ func ChaosDeps(doc *flow.Document) execution.Deps {
 					out = append(out, p)
 				}
 			}
+			if n.Routing != flow.RoutingInclusive && len(out) > 1 {
+				out = out[:1] // an EXCLUSIVE node answers one port at most
+			}
 			return out
 		}),
 	}

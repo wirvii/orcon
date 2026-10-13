@@ -77,7 +77,7 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 A node has `id`, `name`, `element`, `type` and `parameters` (an object whose string values starting with `=` are expressions). Optional behaviour blocks:
 
 - `routing` for `orcon.if` and `orcon.switch` nodes.
-- `join` `{ mode, data, matchField? }`; `matchField` is required exactly when `data` is `MATCH_FIELD`.
+- `join` `{ mode, data, matchField? }`; `matchField` is required exactly when `data` is `MATCH_FIELD`. Until an owner decision defines how items are paired, only `APPEND` runs: publication reports `MATCH_FIELD` and `MATCH_POSITION` as error `JOIN_DATA` at `join/data` (`flow.JoinDataRunnable`, shared with the engine compiler).
 - `loop` `{ maxIterations, carry? }` on `orcon.loop` nodes only.
 - `multiInstance` `{ sequential, concurrency?, inputCollection?, batchSize, completionCondition? }`.
 - `retry` `{ maxAttempts, initialInterval?, factor?, maxInterval?, respectRetryAfter? }`; `factor` is at least 1.

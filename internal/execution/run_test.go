@@ -98,8 +98,8 @@ func TestNodeErrorStopsTheExecution(t *testing.T) {
 		t.Fatalf("status = %s, want FAILED", res.Status)
 	}
 	f := res.Failure
-	if f == nil || f.Code != execution.CodeNodeError || f.Node != "a" || !errors.Is(f.Cause, executiontest.ErrBoom) {
-		t.Fatalf("failure = %+v, want NodeError at a wrapping the node's error", f)
+	if f == nil || f.Code != "NodeError" || !f.Internal || f.Origin != execution.FailureNode || f.Node != "a" || !errors.Is(f.Cause, executiontest.ErrBoom) {
+		t.Fatalf("failure = %+v, want the internal node failure at a wrapping the node's error", f)
 	}
 	states := executiontest.TokenStates(res)
 	if states[execution.TokenFailed] != 1 || states[execution.TokenCanceled] != 1 {
@@ -321,5 +321,42 @@ func TestSameFlowAndInputGiveTheSameTrace(t *testing.T) {
 	}
 	if diff := cmp.Diff(executiontest.EventTypes(first), executiontest.EventTypes(other)); diff != "" {
 		t.Errorf("the shape of the trace depends on the execution id (-first +other):\n%s", diff)
+	}
+}
+
+func TestNodeErrorCarriesItsCodeAndClass(t *testing.T) {
+	t.Parallel()
+	classified := func(execution.NodeCall) (execution.NodeOutput, error) {
+		return execution.NodeOutput{}, &execution.NodeError{Code: "RateLimited", Class: execution.ClassTransient, Err: executiontest.ErrBoom}
+	}
+	runner := &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"a": classified}}
+	res := executiontest.Run(t, linearFlow(), execution.Deps{Runner: runner}, executiontest.Batch(`{}`))
+	f := res.Failure
+	if res.Status != execution.ExecFailed || f == nil || f.Code != "RateLimited" || f.Class != execution.ClassTransient ||
+		f.Origin != execution.FailureNode || f.Internal || !errors.Is(f.Cause, executiontest.ErrBoom) {
+		t.Fatalf("result = %s %+v, want a node failure with the runner's code and class", res.Status, f)
+	}
+	var last execution.Event
+	for _, e := range res.Events {
+		if e.Type == execution.EventExecutionFailed {
+			last = e
+		}
+	}
+	if last.Detail != "RateLimited" {
+		t.Errorf("execution.failed detail = %q, want the node's code", last.Detail)
+	}
+}
+
+func TestInternalFailureCodesAreNeverEmitted(t *testing.T) {
+	t.Parallel()
+	fail := func(execution.NodeCall) (execution.NodeOutput, error) {
+		return execution.NodeOutput{}, executiontest.ErrBoom
+	}
+	runner := &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"a": fail}}
+	res := executiontest.Run(t, linearFlow(), execution.Deps{Runner: runner}, executiontest.Batch(`{}`))
+	for _, e := range res.Events {
+		if e.Type == execution.EventExecutionFailed && e.Detail != "" {
+			t.Errorf("execution.failed detail = %q, want none for an internal code", e.Detail)
+		}
 	}
 }

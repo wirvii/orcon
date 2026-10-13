@@ -153,7 +153,11 @@ func (s TokenState) Transition(to TokenState) (TokenState, error) {
 
 // IsInitial reports whether a token may be created in this state: runnable, or
 // deferred by sequential branch mode, or already leased by the worker that
-// forked it and keeps one branch (R-REC-01).
+// forked it and keeps one branch (R-REC-01). The leased creation is allowed
+// only in the atomic step of the fork, with the epoch, owner and expiry of the
+// forking worker, counted as leased and not as runnable; in SEQUENTIAL mode
+// only the first child by order is created leased and the others DEFERRED. It
+// equals RUNNABLE then LEASED in one transaction, so it is no new transition.
 func (s TokenState) IsInitial() bool {
 	return s == TokenRunnable || s == TokenDeferred || s == TokenLeased
 }
@@ -199,15 +203,19 @@ const (
 )
 
 // ADR-0009 section 3 lists the states but not the moves between them. The
-// table is derived: a running node ends in any final state, may park on a wait
-// or for a resolution, and returns to RUNNING from both (the RUNNING and
-// WAITING cycle of stepped nodes is the SPEC-006 amendment); a parked node
-// can be canceled. The cuts that implement waits (C8), errors (C7) and
-// suspension may extend the table by an amendment of ADR-0009.
+// table is the closed one of SPEC-001 amendment 9: a running node ends in any
+// final state or parks on a wait or for a resolution; a waiting node runs again
+// (the RUNNING and WAITING cycle of stepped nodes is the SPEC-006 amendment),
+// is canceled, or fails when its deadline passes during a retry delay
+// (ADR-0011 section 5); a suspended node runs again or is canceled; a failed
+// node runs again only when retried in place from the failure (ADR-0011
+// section 4, cut C7). The interpreter of cut C3 uses a subset; later cuts only
+// use rows of this table, and any other move needs an amendment of ADR-0009.
 var nodeExecutionTable = transitions[NodeExecutionState]{
 	NodeRunning:   {NodeWaiting, NodeSucceeded, NodeSucceededWithErrors, NodeFailed, NodeSuspended, NodeCanceled},
-	NodeWaiting:   {NodeRunning, NodeCanceled},
+	NodeWaiting:   {NodeRunning, NodeFailed, NodeCanceled},
 	NodeSuspended: {NodeRunning, NodeCanceled},
+	NodeFailed:    {NodeRunning},
 }
 
 // NodeExecutionStates returns every node execution state, sorted.

@@ -140,19 +140,6 @@ func TestCompileNamesWhatIsNotSupportedYet(t *testing.T) {
 			}, "loop.carry", "C10",
 		},
 		{
-			"match by field", func() *executiontest.Builder {
-				return forkJoin().Modify("j", func(n *flow.Node) {
-					n.Join.Data = flow.JoinDataMatchField
-					n.Join.MatchField = "id"
-				})
-			}, "join.data MATCH_FIELD", "none",
-		},
-		{
-			"match by position", func() *executiontest.Builder {
-				return forkJoin().Modify("j", func(n *flow.Node) { n.Join.Data = flow.JoinDataMatchPosition })
-			}, "join.data MATCH_POSITION", "none",
-		},
-		{
 			"condition on a task edge", func() *executiontest.Builder {
 				return executiontest.NewFlow("cond").Start("s").Task("a").End("e").
 					Edge("s", "a", executiontest.Cond("c")).Edge("a", "e")
@@ -297,5 +284,29 @@ func TestUnsupportedIssueDescribesItsPlace(t *testing.T) {
 		if got := tt.issue.String(); got != tt.want {
 			t.Errorf("String() = %q, want %q", got, tt.want)
 		}
+	}
+}
+
+func TestCompileRejectsJoinDataModesTheEngineCannotRun(t *testing.T) {
+	t.Parallel()
+	for _, data := range []flow.JoinData{flow.JoinDataMatchField, flow.JoinDataMatchPosition} {
+		t.Run(string(data), func(t *testing.T) {
+			t.Parallel()
+			doc := forkJoin().Modify("j", func(n *flow.Node) {
+				n.Join.Data = data
+				if data == flow.JoinDataMatchField {
+					n.Join.MatchField = "id"
+				}
+			}).Doc()
+			// The check lives in flow.Validate, shared with publication, so
+			// Compile reports it as an invalid flow.
+			report := flow.Validate(&doc)
+			if !report.Has(flow.CodeJoinData, flow.SeverityError) {
+				t.Fatalf("Validate() issues = %v, want a %s error", report.Issues, flow.CodeJoinData)
+			}
+			if _, err := execution.Compile(&doc); !errors.Is(err, execution.ErrInvalidFlow) {
+				t.Errorf("Compile() = %v, want ErrInvalidFlow", err)
+			}
+		})
 	}
 }

@@ -21,7 +21,9 @@ type joinStep struct {
 	arrive *int
 	// signal completes the slot's edge.
 	signal *int
-	want   joinOutcome
+	// canceled marks the signal as closing a canceled branch.
+	canceled bool
+	want     joinOutcome
 }
 
 func slot(n int) *int { return &n }
@@ -140,7 +142,7 @@ func TestJoinRules(t *testing.T) {
 				case st.arrive != nil:
 					got = js.arrive(joinArrival{Slot: *st.arrive, Token: TokenID("t")})
 				case st.signal != nil:
-					got = js.signal(*st.signal)
+					got = js.signal(*st.signal, st.canceled)
 				default:
 					continue
 				}
@@ -152,17 +154,45 @@ func TestJoinRules(t *testing.T) {
 	}
 }
 
-func TestJoinRetractReleasesAnEdge(t *testing.T) {
+func TestJoinCanceledEdgesNeverFailAnAllJoin(t *testing.T) {
 	t.Parallel()
-	js := newJoinState(flow.JoinActivated, 2)
-	js.send(0)
-	js.send(1)
-	if got := js.signal(0); got != joinWaiting {
-		t.Fatalf("signal(0) = %d, want waiting", got)
+	tests := []struct {
+		name  string
+		steps []joinStep
+	}{
+		{"a live token and a canceled edge: abandoned, not failed", []joinStep{
+			{send: []int{0}},
+			{arrive: slot(0), want: joinWaiting},
+			{signal: slot(1), canceled: true, want: joinWaiting},
+			{signal: slot(0), want: joinEmpty},
+		}},
+		{"only canceled edges: empty", []joinStep{
+			{signal: slot(0), canceled: true, want: joinWaiting},
+			{signal: slot(1), canceled: true, want: joinEmpty},
+		}},
 	}
-	js.retract(0)
-	if !js.edges[0].complete() {
-		t.Error("edge 0 is not complete after the undelivered token was retracted")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			js := newJoinState(flow.JoinAll, 2)
+			for i, st := range tt.steps {
+				for _, s := range st.send {
+					js.send(s)
+				}
+				var got joinOutcome
+				switch {
+				case st.arrive != nil:
+					got = js.arrive(joinArrival{Slot: *st.arrive, Token: "t"})
+				case st.signal != nil:
+					got = js.signal(*st.signal, st.canceled)
+				default:
+					continue
+				}
+				if got != st.want {
+					t.Fatalf("step %d: outcome = %d, want %d", i, got, st.want)
+				}
+			}
+		})
 	}
 }
 

@@ -289,7 +289,12 @@ func TestLoopEnteredTwiceInTheSameScopeFails(t *testing.T) {
 	if res.Status != execution.ExecFailed {
 		t.Fatalf("status = %s, want FAILED", res.Status)
 	}
-	if f := res.Failure; f == nil || f.Code != execution.CodeUnsupported || f.Node != "L" {
-		t.Errorf("failure = %+v, want Unsupported at loop L", f)
+	if f := res.Failure; f == nil || f.Code != "Unsupported" || !f.Internal || f.Node != "L" {
+		t.Errorf("failure = %+v, want the internal Unsupported failure at loop L", f)
+	}
+	for _, e := range res.Events {
+		if e.Type == execution.EventExecutionFailed && e.Detail != "" {
+			t.Errorf("execution.failed carries detail %q; an internal code is never emitted", e.Detail)
+		}
 	}
 }

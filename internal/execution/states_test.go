@@ -84,8 +84,9 @@ func machines() []machine {
 			allowed: [][2]string{
 				{"RUNNING", "WAITING"}, {"RUNNING", "SUCCEEDED"}, {"RUNNING", "SUCCEEDED_WITH_ERRORS"},
 				{"RUNNING", "FAILED"}, {"RUNNING", "SUSPENDED"}, {"RUNNING", "CANCELED"},
-				{"WAITING", "RUNNING"}, {"WAITING", "CANCELED"},
+				{"WAITING", "RUNNING"}, {"WAITING", "FAILED"}, {"WAITING", "CANCELED"},
 				{"SUSPENDED", "RUNNING"}, {"SUSPENDED", "CANCELED"},
+				{"FAILED", "RUNNING"},
 			},
 			can: func(f, to string) bool {
 				return execution.NodeExecutionState(f).CanTransitionTo(execution.NodeExecutionState(to))

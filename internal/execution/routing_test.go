@@ -6,6 +6,9 @@ package execution_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -77,30 +80,30 @@ func TestItemRoutingSplitsABatchPerItem(t *testing.T) {
 
 func TestItemRoutingModes(t *testing.T) {
 	t.Parallel()
-	input := executiontest.Batch(`{"id":1,"to":["true","false"]}`, `{"id":2,"to":["false"]}`)
+	input := executiontest.Batch(`{"id":1,"to":["true"]}`, `{"id":2,"to":["false"]}`)
 	tests := []struct {
 		name    string
 		routing flow.Routing
 		want    map[string][]string
 	}{
 		{
-			"exclusive keeps the first matched port", flow.RoutingExclusive,
+			"exclusive with one matched port per item", flow.RoutingExclusive,
 			map[string][]string{
-				"et": {`{"id":1,"path":["t"],"to":["true","false"]}`},
+				"et": {`{"id":1,"path":["t"],"to":["true"]}`},
 				"ef": {`{"id":2,"path":["f"],"to":["false"]}`},
 			},
 		},
 		{
 			"inclusive sends an item to every matched port", flow.RoutingInclusive,
 			map[string][]string{
-				"et": {`{"id":1,"path":["t"],"to":["true","false"]}`},
-				"ef": {`{"id":1,"path":["f"],"to":["true","false"]}`, `{"id":2,"path":["f"],"to":["false"]}`},
+				"et": {`{"id":1,"path":["t"],"to":["true"]}`},
+				"ef": {`{"id":2,"path":["f"],"to":["false"]}`},
 			},
 		},
 		{
 			"an unset routing is exclusive", "",
 			map[string][]string{
-				"et": {`{"id":1,"path":["t"],"to":["true","false"]}`},
+				"et": {`{"id":1,"path":["t"],"to":["true"]}`},
 				"ef": {`{"id":2,"path":["f"],"to":["false"]}`},
 			},
 		},
@@ -120,20 +123,115 @@ func TestItemRoutingModes(t *testing.T) {
 	}
 }
 
-func TestItemRoutingSingleItemBehavesLikeAGateway(t *testing.T) {
+func TestInclusiveRoutingSendsAnItemToEveryMatchedPort(t *testing.T) {
 	t.Parallel()
-	// With one item, EXCLUSIVE is a BPMN XOR split and INCLUSIVE an OR split.
-	xor := executiontest.Run(t, routingFlow(flow.RoutingExclusive),
+	res := executiontest.Run(t, routingFlow(flow.RoutingInclusive),
 		execution.Deps{Runner: &executiontest.TraceRunner{}, Router: executiontest.RouterFunc(routeBy)},
-		executiontest.Batch(`{"to":["true","false"]}`))
-	if got := len(xor.Ends); got != 1 {
-		t.Errorf("exclusive routing of one item reached %d ends, want 1", got)
+		executiontest.Batch(`{"id":1,"to":["true","false"]}`, `{"id":2,"to":["false"]}`))
+	want := map[string][]string{
+		"et": {`{"id":1,"path":["t"],"to":["true","false"]}`},
+		"ef": {`{"id":1,"path":["f"],"to":["true","false"]}`, `{"id":2,"path":["f"],"to":["false"]}`},
 	}
-	or := executiontest.Run(t, routingFlow(flow.RoutingInclusive),
-		execution.Deps{Runner: &executiontest.TraceRunner{}, Router: executiontest.RouterFunc(routeBy)},
-		executiontest.Batch(`{"to":["true","false"]}`))
-	if got := len(or.Ends); got != 2 {
-		t.Errorf("inclusive routing of one item reached %d ends, want 2", got)
+	if diff := cmp.Diff(want, endBatches(res)); diff != "" {
+		t.Errorf("batches per end mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// closedEdges lists "edge live" for every edge.closed event, by edge position:
+// the edges of the two flows below are declared in the same order, so their
+// lists compare directly.
+func closedEdges(res execution.Result) []string {
+	var out []string
+	for i := range res.Events {
+		if e := &res.Events[i]; e.Type == execution.EventEdgeClosed {
+			out = append(out, string(e.Edge)+" live="+strconv.FormatBool(e.Live))
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestItemRoutingOfOneItemMatchesTheBPMNGateways(t *testing.T) {
+	t.Parallel()
+	gateways := map[flow.Routing]func(*executiontest.Builder, string) *executiontest.Builder{
+		flow.RoutingExclusive: func(b *executiontest.Builder, id string) *executiontest.Builder { return b.Exclusive(id) },
+		flow.RoutingInclusive: func(b *executiontest.Builder, id string) *executiontest.Builder { return b.Inclusive(id) },
+	}
+	tests := []struct {
+		routing flow.Routing
+		ports   []string // the ports the item matches
+		conds   executiontest.Conditions
+	}{
+		{flow.RoutingExclusive, []string{"true"}, executiontest.Conditions{"t": true, "f": false}},
+		{flow.RoutingExclusive, []string{"false"}, executiontest.Conditions{"t": false, "f": true}},
+		{flow.RoutingExclusive, nil, executiontest.Conditions{"t": false, "f": false}},
+		{flow.RoutingInclusive, []string{"true", "false"}, executiontest.Conditions{"t": true, "f": true}},
+		{flow.RoutingInclusive, []string{"false"}, executiontest.Conditions{"t": false, "f": true}},
+		{flow.RoutingInclusive, nil, executiontest.Conditions{"t": false, "f": false}},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s %v", tt.routing, tt.ports), func(t *testing.T) {
+			t.Parallel()
+			// Item routing node: the unmatched item takes the default edge to d.
+			routed := executiontest.NewFlow("routed").Start("s").If("r", tt.routing).Task("t").Task("f").Task("d").End("e").
+				Edge("s", "r").
+				Edge("r", "t", executiontest.Port("true")).Edge("r", "f", executiontest.Port("false")).
+				Edge("r", "d", executiontest.Port("dflt"), executiontest.Default()).
+				Edge("t", "e").Edge("f", "e").Edge("d", "e")
+			// BPMN gateway with the same verdicts.
+			gate := gateways[tt.routing](executiontest.NewFlow("gate").Start("s"), "r").Task("t").Task("f").Task("d").End("e").
+				Edge("s", "r").
+				Edge("r", "t", executiontest.Cond("t")).Edge("r", "f", executiontest.Cond("f")).
+				Edge("r", "d", executiontest.Default()).
+				Edge("t", "e").Edge("f", "e").Edge("d", "e")
+			item := executiontest.Batch(`{"id":1}`)
+			router := executiontest.RouterFunc(func(*flow.Node, execution.Item) []string { return tt.ports })
+			a := executiontest.Run(t, routed, execution.Deps{Runner: &executiontest.TraceRunner{}, Router: router}, item)
+			b := executiontest.Run(t, gate, execution.Deps{Runner: &executiontest.TraceRunner{}, Conditions: tt.conds}, item)
+			if a.Status != b.Status {
+				t.Fatalf("routing node ends %s, gateway ends %s", a.Status, b.Status)
+			}
+			ran := func(res execution.Result) []string {
+				var out []string
+				for _, n := range []string{"t", "f", "d"} {
+					if executiontest.Executed(res, n) > 0 {
+						out = append(out, n)
+					}
+				}
+				return out
+			}
+			if diff := cmp.Diff(ran(b), ran(a)); diff != "" {
+				t.Errorf("nodes run differ (-gateway +routing):\n%s", diff)
+			}
+			if diff := cmp.Diff(closedEdges(b), closedEdges(a)); diff != "" {
+				t.Errorf("edge closures differ (-gateway +routing):\n%s", diff)
+			}
+			if x, y := executiontest.Count(b, execution.EventTokenForked), executiontest.Count(a, execution.EventTokenForked); x != y {
+				t.Errorf("forks: gateway %d, routing node %d", x, y)
+			}
+		})
+	}
+}
+
+func TestItemRoutingKeepsTheOutputOfAPortWithoutAnEdge(t *testing.T) {
+	t.Parallel()
+	store := execution.NewMemoryPayloads()
+	b := executiontest.NewFlow("edgeless").Start("s").If("r", flow.RoutingExclusive).Task("t").End("e").
+		Edge("s", "r").Edge("r", "t", executiontest.Port("true")).Edge("t", "e")
+	router := executiontest.RouterFunc(func(_ *flow.Node, it execution.Item) []string {
+		if v, _ := it.JSON.Get("id"); v.Kind() == 0 {
+			return nil
+		}
+		return []string{"nowhere"}
+	})
+	before := store.Len()
+	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}, Router: router, Payloads: store}, executiontest.Batch(`{"id":1}`))
+	if res.Status != execution.ExecSucceeded || len(res.Ends) != 0 {
+		t.Fatalf("result = %s with %d ends, want SUCCEEDED where the items stop at the port", res.Status, len(res.Ends))
+	}
+	// Input, the start output and the router's output on the port "nowhere".
+	if got := store.Len() - before; got != 3 {
+		t.Errorf("stored batches = %d, want 3 (input, start output, edgeless port output)", got)
 	}
 }
 
@@ -217,7 +315,14 @@ func TestItemRouterFailures(t *testing.T) {
 			router: routerFunc(func(execution.RouteCall) ([][]string, error) {
 				return nil, executiontest.ErrBoom
 			}),
-			wantCode: execution.CodeNodeError,
+			wantCode: "NodeError",
+		},
+		{
+			name: "the router answers two ports for one item of an EXCLUSIVE node",
+			router: routerFunc(func(execution.RouteCall) ([][]string, error) {
+				return [][]string{{"true", "false"}, {"true"}}, nil
+			}),
+			wantErr: execution.ErrPort,
 		},
 		{
 			name: "the router answers for the wrong number of items",

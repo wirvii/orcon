@@ -68,7 +68,7 @@ func (p Program) Deps() execution.Deps {
 // routeByField sends an item to the ports p0..p(ports-1) its field lists; a
 // listed port that the node does not have is ignored.
 func routeByField(field string, ports int) RouterFunc {
-	return func(_ *flow.Node, it execution.Item) []string {
+	return func(n *flow.Node, it execution.Item) []string {
 		v, _ := it.JSON.Get(field)
 		var out []string
 		for _, s := range v.Items() {
@@ -76,6 +76,9 @@ func routeByField(field string, ports int) RouterFunc {
 			if idx, err := strconv.Atoi(strings.TrimPrefix(str, "p")); err == nil && idx < ports {
 				out = append(out, str)
 			}
+		}
+		if n.Routing != flow.RoutingInclusive && len(out) > 1 {
+			out = out[:1] // an EXCLUSIVE node answers one port at most
 		}
 		return out
 	}

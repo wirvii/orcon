@@ -59,6 +59,9 @@ type nodeState struct {
 	inflight  int
 	signaled  []bool
 	completed bool
+	// canceled is set when a canceled branch fed the node: the signals it sends
+	// when it completes are cancellation signals too.
+	canceled bool
 }
 
 func (ns *nodeState) allSignaled() bool {
@@ -78,6 +81,9 @@ type loopInstance struct {
 	armed   bool
 	closed  bool
 	entered bool
+	// canceled is set when a canceled branch fed the loop: its exit edges close
+	// with cancellation signals.
+	canceled bool
 }
 
 // seqGroup holds the sibling tokens of one fork in SEQUENTIAL branch mode.
@@ -89,10 +95,11 @@ type seqGroup struct {
 	dirty  bool
 }
 
-// signal is a pending completion signal: edge e is complete in scope.
+// signal is a pending completion signal: edge e is complete in scope. A
+// canceled signal closes the edge of a branch that was canceled.
 type signal struct {
-	edge  int
-	scope ScopePath
+	edgeKey
+	canceled bool
 }
 
 // nodeExec is a node execution.
@@ -124,14 +131,17 @@ type run struct {
 	order  []*token
 	queue  []*token
 
-	nodes     map[nodeKey]*nodeState
-	joins     map[nodeKey]*joinState
-	loops     map[nodeKey]*loopInstance
-	edgeLive  map[edgeKey]int
-	forkLive  map[forkKey]int
-	groups    map[NodeExecutionID]*seqGroup
-	nodeExecs map[NodeExecutionID]*nodeExec
-	execOrder []*nodeExec
+	nodes    map[nodeKey]*nodeState
+	joins    map[nodeKey]*joinState
+	loops    map[nodeKey]*loopInstance
+	edgeLive map[edgeKey]int
+	forkLive map[forkKey]int
+	groups   map[NodeExecutionID]*seqGroup
+	// canceledSplits holds the split executions whose branches a discriminator
+	// canceled.
+	canceledSplits map[NodeExecutionID]bool
+	nodeExecs      map[NodeExecutionID]*nodeExec
+	execOrder      []*nodeExec
 
 	signals    []signal
 	dirtyLoops []nodeKey
@@ -148,19 +158,21 @@ func newRun(in *Interpreter, plan *Plan, req Request) *run {
 		payloads = NewMemoryPayloads()
 	}
 	return &run{
-		in:        in,
-		plan:      plan,
-		req:       req,
-		payloads:  payloads,
-		state:     ExecQueued,
-		tokens:    make(map[TokenID]*token),
-		nodes:     make(map[nodeKey]*nodeState),
-		joins:     make(map[nodeKey]*joinState),
-		loops:     make(map[nodeKey]*loopInstance),
-		edgeLive:  make(map[edgeKey]int),
-		forkLive:  make(map[forkKey]int),
-		groups:    make(map[NodeExecutionID]*seqGroup),
-		nodeExecs: make(map[NodeExecutionID]*nodeExec),
+		in:       in,
+		plan:     plan,
+		req:      req,
+		payloads: payloads,
+		state:    ExecQueued,
+		tokens:   make(map[TokenID]*token),
+		nodes:    make(map[nodeKey]*nodeState),
+		joins:    make(map[nodeKey]*joinState),
+		loops:    make(map[nodeKey]*loopInstance),
+		edgeLive: make(map[edgeKey]int),
+		forkLive: make(map[forkKey]int),
+		groups:   make(map[NodeExecutionID]*seqGroup),
+
+		canceledSplits: make(map[NodeExecutionID]bool),
+		nodeExecs:      make(map[NodeExecutionID]*nodeExec),
 	}
 }
 

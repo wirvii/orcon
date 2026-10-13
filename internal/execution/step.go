@@ -181,7 +181,7 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {
-		return nil, r.portFailure(ctx, CodeNodeError, n, "node failed", err)
+		return nil, r.portFailure(ctx, "", n, "node failed", err)
 	}
 	return r.emitPorts(ctx, n, ne, out.Ports)
 }
@@ -218,7 +218,7 @@ func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, input Batc
 	}
 	if len(chosen) == 0 {
 		if n.defaultEdge < 0 {
-			return nil, raise(&Failure{Code: CodeNoPathTaken, Message: "no outgoing edge condition is true and the gateway has no default edge"})
+			return nil, raise(&Failure{Code: CodeNoPathTaken, Origin: FailureEngine, Message: "no outgoing edge condition is true and the gateway has no default edge"})
 		}
 		chosen = append(chosen, n.defaultEdge)
 	}
@@ -231,11 +231,18 @@ func (r *run) portFailure(ctx context.Context, code string, n *planNode, what st
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return fmt.Errorf("execution %s: %w", r.req.Execution, ctxErr)
 	}
+	f := &Failure{Code: code, Origin: FailureEngine, Node: n.node.ID, Message: fmt.Sprintf("%s: %v", what, err), Cause: err}
 	var pe *PanicError
-	if errors.As(err, &pe) {
-		code = CodePanic
+	var ne *NodeError
+	switch {
+	case errors.As(err, &pe):
+		f.Code = CodePanic
+	case code == "" && errors.As(err, &ne):
+		f.Code, f.Class, f.Origin = ne.Code, ne.Class, FailureNode
+	case code == "":
+		f.Code, f.Internal, f.Origin = codeNodeError, true, FailureNode
 	}
-	return raise(&Failure{Code: code, Node: n.node.ID, Message: fmt.Sprintf("%s: %v", what, err), Cause: err})
+	return raise(f)
 }
 
 // emitRouting routes the items of an orcon.if or orcon.switch node (ADR-0010
@@ -249,7 +256,7 @@ func (r *run) emitRouting(ctx context.Context, t *token, n *planNode, ne *nodeEx
 	call := RouteCall{Execution: r.req.Execution, NodeExecution: ne.id, Node: n.node, Scope: t.scope, Items: input}
 	matches, err := guard(func() ([][]string, error) { return r.in.deps.Router.RouteItems(ctx, call) })
 	if err != nil {
-		return nil, r.portFailure(ctx, CodeNodeError, n, "routing failed", err)
+		return nil, r.portFailure(ctx, "", n, "routing failed", err)
 	}
 	if len(matches) != input.Len() {
 		return nil, fmt.Errorf("%w: item router answered for %d items of node %q, which received %d",
@@ -262,10 +269,13 @@ func (r *run) emitRouting(ctx context.Context, t *token, n *planNode, ne *nodeEx
 	var order []string
 	positions := make(map[string][]int)
 	for i, ports := range matches {
-		chosen := r.chosenPorts(n, ports)
+		chosen, err := r.chosenPorts(n, ports)
+		if err != nil {
+			return nil, err
+		}
 		if len(chosen) == 0 {
 			if n.defaultEdge < 0 {
-				return nil, raise(&Failure{Code: CodeNoPathTaken, Message: fmt.Sprintf("item %d matched no port and the node has no default edge", i)})
+				return nil, raise(&Failure{Code: CodeNoPathTaken, Origin: FailureEngine, Message: fmt.Sprintf("item %d matched no port and the node has no default edge", i)})
 			}
 			chosen = []string{defaultPort}
 		}
@@ -283,8 +293,10 @@ func (r *run) emitRouting(ctx context.Context, t *token, n *planNode, ne *nodeEx
 	return r.emitPorts(ctx, n, ne, ports)
 }
 
-// chosenPorts applies the routing mode to the ports an item matched.
-func (r *run) chosenPorts(n *planNode, matched []string) []string {
+// chosenPorts checks the ports an item matched against the routing mode. An
+// EXCLUSIVE node must answer with at most one port; more is a violation of the
+// ItemRouter contract, a programming error and not a failure of the execution.
+func (r *run) chosenPorts(n *planNode, matched []string) ([]string, error) {
 	var chosen []string
 	for _, p := range matched {
 		if !slices.Contains(chosen, p) {
@@ -292,9 +304,9 @@ func (r *run) chosenPorts(n *planNode, matched []string) []string {
 		}
 	}
 	if n.routing == flow.RoutingExclusive && len(chosen) > 1 {
-		chosen = chosen[:1]
+		return nil, fmt.Errorf("%w: the router answered %d ports for one item of EXCLUSIVE node %q", ErrPort, len(chosen), n.node.ID)
 	}
-	return chosen
+	return chosen, nil
 }
 
 // reachEnd completes the token at an end event.
@@ -345,6 +357,10 @@ func (r *run) fail(f *Failure, failing *token) error {
 	if err := r.setExec(ExecFailed); err != nil {
 		return err
 	}
-	r.event(Event{Type: EventExecutionFailed, Node: f.Node, Scope: f.Scope, Detail: f.Code})
+	detail := f.Code
+	if f.Internal {
+		detail = "" // internal codes are never emitted
+	}
+	r.event(Event{Type: EventExecutionFailed, Node: f.Node, Scope: f.Scope, Detail: detail})
 	return nil
 }

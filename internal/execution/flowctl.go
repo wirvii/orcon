@@ -172,10 +172,11 @@ func (r *run) applyJoin(ctx context.Context, key nodeKey, n *planNode, js *joinS
 	case joinFails:
 		r.event(Event{Type: EventJoinFailed, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode)})
 		return r.fail(&Failure{
-			Code: CodeJoinRequirementNotMet, Node: n.node.ID, Scope: key.scope,
+			Code: CodeJoinRequirementNotMet, Origin: FailureEngine, Node: n.node.ID, Scope: key.scope,
 			Message: fmt.Sprintf("an incoming edge of the %s join completed with no live token", js.mode),
 		}, nil)
 	case joinEmpty:
+		r.nodeOf(key).canceled = js.anyCanceled()
 		r.checkComplete(key)
 	case joinWaiting:
 	}
@@ -205,11 +206,19 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 		i, ok := r.plan.index[id]
 		return ok && n.dominators != nil && n.dominators[i]
 	}
+	if r.abandoned(js) {
+		// Every live arrival descends from a split whose branches were
+		// canceled: this join is inside the abandoned region.
+		js.fired, js.empty = false, true
+		r.nodeOf(key).canceled = true
+		r.checkComplete(key)
+		return nil
+	}
 	var canceled []TokenID
-	if js.mode == flow.JoinFirst && trigger != nil {
-		if i := lastDominating(trigger.lineage, dominates); i >= 0 {
+	if js.mode == flow.JoinFirst && trigger != nil && n.splitFor >= 0 {
+		if split, ok := correspondingSplit(trigger.lineage, r.plan.nodes[n.splitFor].node.ID); ok {
 			var err error
-			canceled, err = r.cancelBranches(trigger.lineage[i].SplitNodeExecution, key.node)
+			canceled, err = r.cancelBranches(ctx, split, key.node)
 			if err != nil {
 				return err
 			}
@@ -223,22 +232,72 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 	return nil
 }
 
+// correspondingSplit finds, in the fork lineage of the first live token, the
+// last entry of the split node the plan computed for the join (the nearest
+// split that dominates it): that entry names the split instance to cancel.
+func correspondingSplit(lineage []ForkRef, split flow.NodeID) (NodeExecutionID, bool) {
+	for i := len(lineage) - 1; i >= 0; i-- {
+		if lineage[i].SplitNode == split {
+			return lineage[i].SplitNodeExecution, true
+		}
+	}
+	return "", false
+}
+
+// abandoned reports whether every live arrival of a join descends from a split
+// whose branches a discriminator canceled.
+func (r *run) abandoned(js *joinState) bool {
+	if len(js.arrivals) == 0 || len(r.canceledSplits) == 0 {
+		return false
+	}
+	for _, a := range js.arrivals {
+		if !slices.ContainsFunc(a.Lineage, func(f ForkRef) bool { return r.canceledSplits[f.SplitNodeExecution] }) {
+			return false
+		}
+	}
+	return true
+}
+
 // cancelBranches cancels the tokens descending from a split execution that
 // have not reached the join: the discriminator semantics of ADR-0010
 // section 3. Tokens already at the join are absorbed as later arrivals.
-// Cancellation produces no completion signals: the branches it stops are
-// abandoned, not routed around.
-func (r *run) cancelBranches(split NodeExecutionID, join int) ([]TokenID, error) {
+//
+// Every canceled token closes, with no live token, the edges it still owed
+// (ADR-0010 section 2: one signal per edge and scope), so a branch that also
+// feeds a join outside the block does not leave it waiting. The signals are
+// marked canceled: a join receiving one never fails because of it.
+func (r *run) cancelBranches(ctx context.Context, split NodeExecutionID, join int) ([]TokenID, error) {
+	r.canceledSplits[split] = true
 	var canceled []TokenID
+	var keys []nodeKey
 	for _, c := range r.order {
 		if !c.state.isActive() || c.node == join || !hasSplit(c.lineage, split) {
 			continue
 		}
-		r.retract(c)
+		key := r.retract(c)
+		for _, k := range r.instances(c.scope) {
+			r.loopOf(k).canceled = true // its exit edges close as canceled
+		}
 		if err := r.setToken(c, TokenCanceled); err != nil {
 			return nil, err
 		}
 		canceled = append(canceled, c.id)
+		if !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+	}
+	for _, key := range keys {
+		n := &r.plan.nodes[key.node]
+		if n.join != nil {
+			if js := r.joins[key]; js != nil {
+				if err := r.applyJoin(ctx, key, n, js, js.decide(), nil); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
+		r.nodeOf(key).canceled = true
+		r.checkComplete(key)
 	}
 	return canceled, nil
 }
@@ -248,8 +307,8 @@ func hasSplit(lineage []ForkRef, split NodeExecutionID) bool {
 }
 
 // retract undoes the delivery bookkeeping of a token canceled before it was
-// processed at its node.
-func (r *run) retract(t *token) {
+// processed at its node, and returns the tracker of that node.
+func (r *run) retract(t *token) nodeKey {
 	key := nodeKey{t.node, t.scope}
 	n := &r.plan.nodes[t.node]
 	switch {
@@ -257,10 +316,13 @@ func (r *run) retract(t *token) {
 		r.nodeOf(key).inflight--
 	case t.inEdge < 0 || r.plan.edges[t.inEdge].back:
 	case n.join != nil:
-		r.joinOf(key).retract(r.plan.edges[t.inEdge].slot)
+		edge := &r.joinOf(key).edges[r.plan.edges[t.inEdge].slot]
+		edge.Sent--
+		edge.Canceled = true
 	default:
 		r.nodeOf(key).inflight--
 	}
+	return key
 }
 
 // checkComplete completes the outgoing edges of a node once its input is
@@ -282,22 +344,22 @@ func (r *run) checkComplete(key nodeKey) {
 	}
 	ns.completed = true
 	if n.kind == kindLoop {
-		r.armLoop(key)
+		r.armLoop(key, ns.canceled)
 		return
 	}
-	r.completeOut(n, key.scope)
+	r.completeOut(n, key.scope, ns.canceled)
 }
 
 // completeOut queues the completion signal of every outgoing edge of a node
 // that completed in a scope. Back edges are excluded from completion
 // accounting; exit edges of a loop complete when the loop's instance closes.
-func (r *run) completeOut(n *planNode, scope ScopePath) {
+func (r *run) completeOut(n *planNode, scope ScopePath, canceled bool) {
 	for _, ei := range n.out {
 		e := &r.plan.edges[ei]
 		if e.back || len(e.exits) > 0 {
 			continue
 		}
-		r.signals = append(r.signals, signal{edge: ei, scope: scope})
+		r.signals = append(r.signals, signal{edgeKey: edgeKey{ei, scope}, canceled: canceled})
 	}
 }
 
@@ -336,15 +398,17 @@ func (r *run) applySignal(ctx context.Context, sg signal) error {
 	e := &r.plan.edges[sg.edge]
 	r.event(Event{
 		Type: EventEdgeClosed, Edge: e.edge.ID, Scope: sg.scope, Node: r.nodeID(e.to),
-		Live: r.edgeLive[edgeKey(sg)] > 0,
+		Live: r.edgeLive[sg.edgeKey] > 0,
 	})
 	key := nodeKey{e.to, sg.scope}
 	n := &r.plan.nodes[e.to]
 	if n.join != nil {
 		js := r.joinOf(key)
-		return r.applyJoin(ctx, key, n, js, js.signal(e.slot), nil)
+		return r.applyJoin(ctx, key, n, js, js.signal(e.slot, sg.canceled), nil)
 	}
-	r.nodeOf(key).signaled[e.slot] = true
+	ns := r.nodeOf(key)
+	ns.signaled[e.slot] = true
+	ns.canceled = ns.canceled || sg.canceled
 	r.checkComplete(key)
 	return nil
 }
@@ -392,7 +456,7 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 	inst := r.loopOf(key)
 	if !back {
 		if inst.entered {
-			return nil, r.failLoop(t, n, outer, CodeUnsupported,
+			return nil, r.failLoop(t, n, outer, codeUnsupported,
 				"a second token entered the loop in the same scope; an uncontrolled merge before the loop entry is not supported")
 		}
 		inst.entered = true
@@ -419,17 +483,18 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 	}
 	// The control activates once per iteration, so its edges into the body
 	// complete in the iteration's scope as soon as the token is delivered.
-	r.completeOut(n, scope)
+	r.completeOut(n, scope, false)
 	return kept, nil
 }
 
 func (r *run) failLoop(t *token, n *planNode, scope ScopePath, code, message string) error {
-	return r.fail(&Failure{Code: code, Node: n.node.ID, Scope: scope, Message: message}, t)
+	return r.fail(&Failure{Code: code, Origin: FailureEngine, Internal: code == codeUnsupported, Node: n.node.ID, Scope: scope, Message: message}, t)
 }
 
 // armLoop marks that no more tokens will enter a loop instance.
-func (r *run) armLoop(key nodeKey) {
+func (r *run) armLoop(key nodeKey, canceled bool) {
 	r.loopOf(key).armed = true
+	r.loopOf(key).canceled = canceled
 	r.dirtyLoops = append(r.dirtyLoops, key)
 }
 
@@ -444,6 +509,6 @@ func (r *run) closeLoop(key nodeKey) {
 	}
 	inst.closed = true
 	for _, ei := range r.plan.nodes[key.node].closing {
-		r.signals = append(r.signals, signal{edge: ei, scope: key.scope})
+		r.signals = append(r.signals, signal{edgeKey: edgeKey{ei, key.scope}, canceled: inst.canceled})
 	}
 }

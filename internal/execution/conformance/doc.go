@@ -10,9 +10,10 @@
 //
 // The package has only tests; this file carries its package comment. The suite
 // runs against the in-memory interpreter (cut C3). The -store flag selects the
-// engine under test; the durable stores join it when the storage cuts land
-// and the same flows run unchanged on SQLite and PostgreSQL. A store other
-// than "memory" skips the suite with that reason until then.
+// engine under test (memory, sqlite, postgres or both); a store that is not
+// wired yet makes the suite fail, never skip, so a criterion command cannot
+// pass without running anything. The durable stores join when the storage cuts
+// land and the same flows run unchanged on SQLite and PostgreSQL.
 //
 // The pattern matrix lives in patterns_test.go. Patterns whose elements belong
 // to a later cut are listed there with the cut that provides them.

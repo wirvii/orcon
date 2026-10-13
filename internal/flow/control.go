@@ -22,7 +22,29 @@ func (v *validator) control(g *graph) {
 	v.loops()
 	v.waitTimeouts(g)
 	v.splitsAndJoins(g)
+	v.joinData()
 	v.boundaries(g)
+}
+
+// CodeJoinData marks a join data mode the engine cannot run yet.
+const CodeJoinData = "JOIN_DATA"
+
+// JoinDataRunnable reports whether the engine can combine the inputs of a join
+// in the data mode. ADR-0010 section 3 names MATCH_FIELD and MATCH_POSITION
+// but does not say how items are paired, so only APPEND runs until an owner
+// decision defines the others. Publication validation and the engine compiler
+// both call this one check, so no published flow fails at run time on it.
+func JoinDataRunnable(mode JoinData) bool { return mode == JoinDataAppend }
+
+// joinData rejects the join data modes the engine cannot run.
+func (v *validator) joinData() {
+	for i := range v.doc.Nodes {
+		n := &v.doc.Nodes[i]
+		if n.Join != nil && !JoinDataRunnable(n.Join.Data) {
+			v.r.errorf(CodeJoinData, ptr("nodes", i, "join", "data"),
+				"join data mode %s of node %q is not defined yet; only %s is supported", n.Join.Data, n.ID, JoinDataAppend)
+		}
+	}
 }
 
 // elementShapes checks the edge counts that define the BPMN element classes.

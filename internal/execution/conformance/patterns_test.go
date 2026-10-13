@@ -16,24 +16,34 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 )
 
-// storeFlag selects the engine under test. Only the in-memory interpreter
-// exists so far; the durable stores arrive with cuts C2 and C4.
-var storeFlag = flag.String("store", "memory", "engine under test: memory (sqlite, postgres and both arrive with the storage cuts)")
+// storeFlag selects the engine under test, like the -store of the other
+// conformance criteria. Only the in-memory interpreter exists so far; the
+// durable stores arrive with cuts C2 and C4.
+var storeFlag = flag.String("store", "memory", "engine under test: memory, sqlite, postgres or both")
 
-// requireStore skips the calling test when the selected store is not the
-// in-memory interpreter, with the reason.
+// requireStore fails the calling test when the selected store is not wired.
+// It never skips: a skipped suite exits 0 without running anything, and the
+// command of criterion E-CF-1 would then look satisfied.
 func requireStore(t *testing.T) {
 	t.Helper()
-	if s := *storeFlag; s != "memory" {
-		t.Skipf("store %q: the durable stores arrive with cuts C2 and C4; this suite runs the in-memory interpreter only", s)
+	switch s := *storeFlag; s {
+	case "memory":
+	case "sqlite", "postgres", "both":
+		t.Fatalf("store %s: not wired until cut C4", s)
+	default:
+		t.Fatalf("store %q: want memory, sqlite, postgres or both", s)
 	}
 }
 
 // Status of a pattern in the matrix.
 const (
 	supported   = "supported"
-	later       = "later"
 	unsupported = "unsupported"
+	// The later status is an internal development status for a pattern a later cut or an
+	// owner decision completes. ADR-0019 publishes only supported and
+	// unsupported(reason), so the generation of the published matrix (cut C16)
+	// must fail while any row is still later.
+	later = "later"
 )
 
 // pattern is one row of the Workflow Control-Flow Patterns matrix.
@@ -74,9 +84,11 @@ func sorted(in []string) []string {
 
 func one() execution.Batch { return executiontest.Batch(`{"id":1}`) }
 
-// matrix lists WCP 1-43. ADR-0019 section 1 requires the minimum set
-// 1-14, 16, 19-22, 24-26, 28, 29, 33-35, 37, 41-43 for release; the rows of
-// the minimum set that are not supported yet name the cut that completes them.
+// minimumSet is the set of patterns ADR-0019 section 1 requires for release.
+var minimumSet = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 19, 20, 21, 22, 24, 25, 26, 28, 29, 33, 34, 35, 37, 41, 42, 43}
+
+// matrix lists WCP 1-43. The rows of the minimum set that are not supported
+// yet name the cut or decision that completes them.
 func matrix() []pattern {
 	return []pattern{
 		{1, "Sequence", supported, "task chain", wcp01Sequence},
@@ -87,7 +99,7 @@ func matrix() []pattern {
 		{6, "Multi-Choice", supported, "inclusiveGateway", wcp06MultiChoice},
 		{7, "Structured Synchronizing Merge", supported, "join ACTIVATED after an inclusive gateway", wcp07StructuredSynchronizingMerge},
 		{8, "Multi-Merge", supported, "uncontrolled merge after a parallel split", wcp08MultiMerge},
-		{9, "Structured Discriminator", supported, "join FIRST; the remaining branches are canceled (the form of WCP 29)", wcp09StructuredDiscriminator},
+		{9, "Structured Discriminator", later, "Enmienda 9 B.2: the remaining branches must be allowed to finish; join FIRST cancels them (WCP 29)", nil},
 		{10, "Arbitrary Cycles", supported, "cycles through an orcon.loop control, which may be left from several places of the body", wcp10ArbitraryCycles},
 		{11, "Implicit Termination", supported, "the execution ends when no live token is left", wcp11ImplicitTermination},
 		{12, "Multiple Instances without Synchronization", later, "cut C9", nil},
@@ -106,7 +118,7 @@ func matrix() []pattern {
 		{25, "Cancel Region", later, "cut C7 (cancellation)", nil},
 		{26, "Cancel Multiple Instance Activity", later, "cut C9", nil},
 		{27, "Complete Multiple Instance Activity", later, "cut C9 (completionCondition)", nil},
-		{28, "Blocking Discriminator", unsupported, "ADR-0010 defines the canceling discriminator only; a discriminator that resets after all branches is not defined", nil},
+		{28, "Blocking Discriminator", later, "Enmienda 9 B.2: waits for the owner decision on a discriminator that lets the other branches finish", nil},
 		{29, "Canceling Discriminator", supported, "join FIRST", wcp29CancelingDiscriminator},
 		{30, "Structured Partial Join", unsupported, "joins fire on all, any live or the first; N-of-M joins are not defined", nil},
 		{31, "Blocking Partial Join", unsupported, "N-of-M joins are not defined", nil},
@@ -122,6 +134,21 @@ func matrix() []pattern {
 		{41, "Thread Merge", supported, "join ALL merging the threads of one branch into one", wcp41ThreadMerge},
 		{42, "Thread Split", supported, "parallel split inside a branch", wcp42ThreadSplit},
 		{43, "Explicit Termination", later, "cut C7 (terminate end event)", nil},
+	}
+}
+
+// TestMinimumSetNeverUnsupported keeps the release set honest: a row of the
+// ADR-0019 minimum set may be supported or later, never unsupported.
+func TestMinimumSetNeverUnsupported(t *testing.T) {
+	t.Parallel()
+	byID := make(map[int]pattern)
+	for _, p := range matrix() {
+		byID[p.id] = p
+	}
+	for _, id := range minimumSet {
+		if p := byID[id]; p.status == unsupported {
+			t.Errorf("WCP %d (%s) is in the release minimum set and is marked unsupported: %s", id, p.name, p.note)
+		}
 	}
 }
 
@@ -157,6 +184,7 @@ func TestPatternMatrixIsComplete(t *testing.T) {
 // supported yet is reported as skipped with its status and reason.
 func TestWorkflowPatterns(t *testing.T) {
 	t.Parallel()
+	requireStore(t)
 	for _, p := range matrix() {
 		t.Run(fmt.Sprintf("WCP%02d_%s", p.id, p.name), func(t *testing.T) {
 			t.Parallel()
@@ -304,6 +332,7 @@ func wcp09StructuredDiscriminator(t *testing.T) {
 
 func wcp29CancelingDiscriminator(t *testing.T) {
 	t.Helper()
+	wcp09StructuredDiscriminator(t) // a second test of the same join: one continuation
 	runner := &executiontest.TraceRunner{}
 	res := runFlow(t, syncFlow(flow.JoinFirst), execution.Deps{Runner: runner}, one())
 	if diff := cmp.Diff([]string{"a", "after"}, tasks(runner)); diff != "" {

@@ -35,6 +35,7 @@ var (
 
 // Failure codes. Engine-raised codes are identifiers, not enumerated values,
 // so they keep their CamelCase form (ADR-0009 section 9, ADR-0011 section 1).
+// The list is closed: another code needs an amendment of ADR-0011 section 1.
 const (
 	// CodeNoPathTaken is raised by an exclusive or inclusive split, or an item
 	// that matched no port, when nothing is chosen and there is no default.
@@ -50,14 +51,58 @@ const (
 	// CodePanic is raised when a port implementation panics; the interpreter
 	// recovers at the port boundary (go-style.md GS-E6).
 	CodePanic = "Panic"
-	// CodeNodeError is raised when a node fails. Error classes, retries and
-	// error routing belong to the errors cut (ADR-0011, C7); until then every
-	// node failure stops the execution under this provisional code.
-	CodeNodeError = "NodeError"
-	// CodeUnsupported is raised when the data of a run reaches a situation the
-	// interpreter does not support, for example two tokens entering the same
-	// loop in one scope.
-	CodeUnsupported = "Unsupported"
+)
+
+// Codes of failures that exist only inside this in-memory interpreter. They are
+// not in the closed list above: a failure carrying one reports Internal, and
+// it is never emitted in an event nor persisted.
+const (
+	// The code NodeError marks the failure of a node whose runner returned an error
+	// that carries no code of its own.
+	codeNodeError = "NodeError"
+	// The code Unsupported marks the one situation of a run the interpreter cannot
+	// handle: two tokens entering the same loop in the same scope.
+	codeUnsupported = "Unsupported"
+)
+
+// ErrorClass is the class a node type gives its errors (ADR-0011 section 1).
+type ErrorClass string
+
+// Error classes.
+const (
+	// ClassTransient marks an error worth retrying.
+	ClassTransient ErrorClass = "TRANSIENT"
+	// ClassPermanent marks an error retrying does not fix.
+	ClassPermanent ErrorClass = "PERMANENT"
+	// ClassUncertain marks a write whose outcome is unknown.
+	ClassUncertain ErrorClass = "UNCERTAIN"
+)
+
+// NodeError is the error a [NodeRunner] returns to give a failure the code and
+// class its node type's classifier assigned (ADR-0011 section 1). Any other
+// error a runner returns fails the node as an internal failure.
+type NodeError struct {
+	// Code identifies the error, for example a connector error code.
+	Code  string
+	Class ErrorClass
+	Err   error
+}
+
+// Error implements error.
+func (e *NodeError) Error() string { return fmt.Sprintf("%s: %v", e.Code, e.Err) }
+
+// Unwrap returns the underlying error.
+func (e *NodeError) Unwrap() error { return e.Err }
+
+// FailureOrigin tells whether the engine or a node raised a failure.
+type FailureOrigin string
+
+// Failure origins.
+const (
+	// FailureEngine marks a failure raised by the engine itself.
+	FailureEngine FailureOrigin = "ENGINE"
+	// FailureNode marks a failure returned by a node.
+	FailureNode FailureOrigin = "NODE"
 )
 
 // UnsupportedIssue is one feature of a flow the interpreter cannot run yet.
@@ -115,8 +160,16 @@ func (e *PanicError) Error() string { return fmt.Sprintf("panic: %v", e.Value) }
 
 // Failure describes why an execution ended in FAILED.
 type Failure struct {
-	// Code is one of the Code constants.
+	// Code is one of the Code constants for an engine failure, or the code the
+	// node's runner gave for a node failure.
 	Code string
+	// Origin says whether the engine or a node raised the failure.
+	Origin FailureOrigin
+	// Class is the error class of a node failure, when the runner gave one.
+	Class ErrorClass
+	// Internal marks a failure with a code outside the closed list of
+	// ADR-0011 section 1. It is never emitted in an event nor persisted.
+	Internal bool
 	// Node is the node whose execution failed, when there is one.
 	Node flow.NodeID
 	// Scope is the scope the failure happened in.

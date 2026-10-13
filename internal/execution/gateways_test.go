@@ -240,7 +240,7 @@ func TestDeadPathElimination(t *testing.T) {
 	}
 }
 
-func TestAllJoinFailsWhenABranchIsNotTaken(t *testing.T) {
+func TestJoinAllMixedFails(t *testing.T) {
 	t.Parallel()
 	b := executiontest.NewFlow("all-fails").
 		Start("s").Exclusive("x").Task("a").Task("b").Parallel("j").Task("after").End("e").
@@ -458,21 +458,94 @@ func TestMultipleStartEventsRunTheChosenOne(t *testing.T) {
 	}
 }
 
-func TestAllJoinOnADeadPathCompletesWithZeroTokens(t *testing.T) {
+func TestJoinAllDeadPathPropagates(t *testing.T) {
 	t.Parallel()
 	// The AND block lies on the branch the exclusive choice did not take. Its
-	// ALL join sees no live token on any edge, so it is dead and passes the
-	// dead path on instead of failing.
+	// ALL join sees no live token on any edge, so it is on a dead path: it does
+	// not fire, does not fail, has no node execution, and completes its outgoing
+	// edges with no live token (amendment 9, A.1).
 	b := executiontest.NewFlow("dead-and").
-		Start("s").Exclusive("x").Task("live").Parallel("p").Task("a").Task("b").Parallel("and").Task("m").End("e").
+		Start("s").Exclusive("x").Task("live").Parallel("p").Task("a").Task("b").Parallel("and").Task("tail").Task("m").End("e").
 		Join("and", flow.JoinAll).
 		Edge("s", "x").Edge("x", "live", executiontest.Cond("go")).Edge("x", "p", executiontest.Default()).
-		Edge("p", "a").Edge("p", "b").Edge("a", "and").Edge("b", "and").Edge("and", "m").Edge("live", "m").Edge("m", "e")
+		Edge("p", "a").Edge("p", "b").Edge("a", "and").Edge("b", "and").Edge("and", "tail").Edge("tail", "m").
+		Edge("live", "m").Edge("m", "e")
 	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}, Conditions: executiontest.Conditions{"go": true}}, executiontest.Batch(`{}`))
 	if res.Status != execution.ExecSucceeded {
 		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
 	}
 	if diff := cmp.Diff([]string{"end:live>m"}, executiontest.Paths(res)); diff != "" {
 		t.Errorf("end paths mismatch (-want +got):\n%s", diff)
+	}
+	for _, node := range []string{"p", "a", "b", "and", "tail"} {
+		if got := executiontest.Executed(res, node); got != 0 {
+			t.Errorf("node %s on the dead path has %d node executions, want none", node, got)
+		}
+	}
+	if executiontest.Count(res, execution.EventJoinFired)+executiontest.Count(res, execution.EventJoinFailed) != 0 {
+		t.Error("the dead join emitted join.fired or join.failed")
+	}
+	doc := b.Doc()
+	ids := map[flow.EdgeID]string{}
+	for _, e := range doc.Edges {
+		ids[e.ID] = string(e.From.Node) + "->" + string(e.To)
+	}
+	live := map[string]bool{}
+	for _, e := range res.Events {
+		if e.Type == execution.EventEdgeClosed {
+			live[ids[e.Edge]] = e.Live
+		}
+	}
+	for _, edge := range []string{"and->tail", "tail->m", "a->and", "b->and"} {
+		if v, ok := live[edge]; !ok || v {
+			t.Errorf("edge %s closed live = %v (closed %v), want closed with no live token", edge, v, ok)
+		}
+	}
+}
+
+func TestDiscriminatorCanceledBranchClosesEdges(t *testing.T) {
+	t.Parallel()
+	// Branch b is canceled when a wins the discriminator j, but b also feeds the
+	// ACTIVATED join x outside the block. Cancellation must close b's edges with
+	// no live token, so x completes and the execution ends.
+	b := executiontest.NewFlow("cancel-closes").
+		Start("s").Parallel("p").Task("a").Task("b").Parallel("j").Task("after").Parallel("x").Task("done").End("e").
+		Join("j", flow.JoinFirst).Join("x", flow.JoinActivated).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "j").Edge("b", "j").Edge("b", "x").
+		Edge("j", "after").Edge("after", "x").Chain("x", "done", "e")
+	runner := &executiontest.TraceRunner{}
+	res := executiontest.Run(t, b, execution.Deps{Runner: runner}, executiontest.Batch(`{}`))
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
+	}
+	if got := executiontest.Executed(res, "b"); got != 0 {
+		t.Errorf("canceled branch b ran %d times, want 0", got)
+	}
+	if got := executiontest.Executed(res, "x"); got != 1 {
+		t.Errorf("the external join x ran %d times, want 1: it must not wait for the canceled branch", got)
+	}
+	if diff := cmp.Diff([]string{"end:a>after>done"}, executiontest.Paths(res)); diff != "" {
+		t.Errorf("end paths mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestDiscriminatorCancelsOnlyTheNearestDominatingSplit(t *testing.T) {
+	t.Parallel()
+	// The split is fixed at Compile time as the nearest dominating split from
+	// which the join is reachable through two branches (amendment 9, A.4).
+	b := executiontest.NewFlow("nearest").
+		Start("s").Parallel("outer").Parallel("inner").Task("a").Task("b").Task("c").Parallel("j").End("e").End("e2").
+		Join("j", flow.JoinFirst).
+		Chain("s", "outer").Edge("outer", "inner").Edge("outer", "c").
+		Edge("inner", "a").Edge("inner", "b").Edge("a", "j").Edge("b", "j").Edge("j", "e").Edge("c", "e2")
+	runner := &executiontest.TraceRunner{}
+	res := executiontest.Run(t, b, execution.Deps{Runner: runner}, executiontest.Batch(`{}`))
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
+	}
+	got := calls(runner)
+	slices.Sort(got)
+	if diff := cmp.Diff([]string{"a", "c"}, got); diff != "" {
+		t.Errorf("activities mismatch (-want +got): only b, the other branch of the inner split, is canceled\n%s", diff)
 	}
 }

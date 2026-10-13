@@ -92,7 +92,7 @@ type NodeOutput struct {
 // NodeRunner runs the activity nodes: the element classes task, serviceTask,
 // scriptTask and sendTask. The interpreter itself runs the control nodes
 // (events, gateways, item routing, loop control). A returned error fails the
-// execution with [CodeNodeError] until the errors cut adds error routing.
+// execution with the code and class of a [*NodeError] if the runner returns one, until the errors cut adds error routing.
 type NodeRunner interface {
 	Execute(ctx context.Context, call NodeCall) (NodeOutput, error)
 }

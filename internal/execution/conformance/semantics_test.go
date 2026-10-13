@@ -164,20 +164,20 @@ func TestItemRoutingSendsEachItemWhereItBelongs(t *testing.T) {
 			Edge("s", "r").Edge("r", "t", executiontest.Port("true")).Edge("r", "f", executiontest.Port("false")).
 			Edge("t", "et").Edge("f", "ef")
 	}
-	input := executiontest.Batch(`{"id":1,"to":["true"]}`, `{"id":2,"to":["false"]}`, `{"id":3,"to":["true","false"]}`)
 	tests := []struct {
 		routing flow.Routing
+		input   execution.Batch
 		wantT   int
 		wantF   int
 	}{
-		{flow.RoutingExclusive, 2, 1},
-		{flow.RoutingInclusive, 2, 2},
+		{flow.RoutingExclusive, executiontest.Batch(`{"id":1,"to":["true"]}`, `{"id":2,"to":["false"]}`, `{"id":3,"to":["true"]}`), 2, 1},
+		{flow.RoutingInclusive, executiontest.Batch(`{"id":1,"to":["true"]}`, `{"id":2,"to":["false"]}`, `{"id":3,"to":["true","false"]}`), 2, 2},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.routing), func(t *testing.T) {
 			t.Parallel()
 			requireStore(t)
-			res := executiontest.Run(t, build(tt.routing), execution.Deps{Runner: &executiontest.TraceRunner{}, Router: executiontest.RouterFunc(route)}, input)
+			res := executiontest.Run(t, build(tt.routing), execution.Deps{Runner: &executiontest.TraceRunner{}, Router: executiontest.RouterFunc(route)}, tt.input)
 			got := map[string]int{}
 			for _, end := range res.Ends {
 				got[string(end.Node)] += end.Batch.Len()

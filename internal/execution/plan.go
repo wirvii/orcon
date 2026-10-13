@@ -49,6 +49,11 @@ type planNode struct {
 	closing []int
 	// dominators marks, for a join, the nodes that dominate it.
 	dominators []bool
+	// splitFor is, for a FIRST join, the split node whose branches the join
+	// discriminates: the nearest dominating node from which the join is
+	// reachable through at least two of its outgoing edges. It is -1 when there
+	// is none, and then the join cancels nothing.
+	splitFor int
 	// nesting is the number of loops whose body contains the node.
 	nesting int
 }
@@ -173,6 +178,7 @@ func (c *compiler) nodes(nodes []flow.Node) {
 		pn := &p.nodes[i]
 		pn.node = n
 		pn.defaultEdge = -1
+		pn.splitFor = -1
 		pn.kind = c.kindOf(n)
 		c.features(n, pn)
 		switch pn.kind {
@@ -268,15 +274,13 @@ func (c *compiler) features(n *flow.Node, pn *planNode) {
 }
 
 // join reads the join block of a node. Validation guarantees the mode and
-// data values are in their closed sets and that the node has at least two
-// incoming edges, so a start event or a loop control (one entry edge) never
-// carries one.
+// data values are in their closed sets, that the data mode is runnable and that
+// the node has at least two incoming edges, so a start event or a loop control
+// (one entry edge) never carries one.
 func (c *compiler) join(n *flow.Node, pn *planNode) {
-	j := n.Join
-	if j.Data != flow.JoinDataAppend {
-		c.unsupported(n.ID, "", "join.data "+string(j.Data), cutUnspecified)
-	}
-	pn.join = &joinSpec{mode: j.Mode}
+	// Validation already rejected the data modes the engine cannot run
+	// (flow.JoinDataRunnable), so APPEND is the only one left.
+	pn.join = &joinSpec{mode: n.Join.Mode}
 }
 
 func (c *compiler) edges(edges []flow.Edge) {
@@ -500,6 +504,9 @@ func (c *compiler) dominators() {
 			dom[x] = true
 		}
 		p.nodes[i].dominators = dom
+		if p.nodes[i].join.mode == flow.JoinFirst {
+			p.nodes[i].splitFor = nearestSplit(p, idom, i)
+		}
 	}
 }
 
@@ -598,4 +605,34 @@ func reversePostorder(succ [][]int, root int) []int {
 	}
 	slices.Reverse(post)
 	return post
+}
+
+// nearestSplit returns the nearest proper dominator of the join from which the
+// join is reachable through at least two outgoing forward edges, or -1. The
+// walk follows the immediate dominators, so the answer is computed once per
+// plan and does not depend on the tokens of a run.
+func nearestSplit(p *Plan, idom []int, join int) int {
+	succ := make([][]int, len(p.nodes))
+	for _, e := range p.edges {
+		if !e.back {
+			succ[e.from] = append(succ[e.from], e.to)
+		}
+	}
+	root := len(p.nodes)
+	for x := idom[join]; x >= 0 && x != root; x = idom[x] {
+		branches := 0
+		for _, ei := range p.nodes[x].out {
+			e := &p.edges[ei]
+			if e.back {
+				continue
+			}
+			if e.to == join || reach([]int{e.to}, succ, -1)[join] {
+				branches++
+			}
+		}
+		if branches >= 2 {
+			return x
+		}
+	}
+	return -1
 }

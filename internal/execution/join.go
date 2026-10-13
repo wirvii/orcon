@@ -42,6 +42,10 @@ type joinEdge struct {
 	Arrived int
 	// Signaled is set once the edge's completion signal was delivered.
 	Signaled bool
+	// Canceled is set when the edge completed because the branch feeding it was
+	// canceled, not because it was routed around. A canceled edge never makes
+	// an ALL join fail.
+	Canceled bool
 }
 
 // complete reports whether the edge is complete: the signal came and every
@@ -81,9 +85,6 @@ func (j *joinState) settled() bool { return j.fired || j.failed || j.empty }
 // send records a live token delivered to the join on a slot.
 func (j *joinState) send(slot int) { j.edges[slot].Sent++ }
 
-// retract undoes a delivery whose token was canceled before it arrived.
-func (j *joinState) retract(slot int) { j.edges[slot].Sent-- }
-
 // arrive absorbs a token and returns what the join decides.
 func (j *joinState) arrive(a joinArrival) joinOutcome {
 	j.edges[a.Slot].Arrived++
@@ -92,10 +93,21 @@ func (j *joinState) arrive(a joinArrival) joinOutcome {
 }
 
 // signal records the completion signal of an incoming edge and returns what
-// the join decides.
-func (j *joinState) signal(slot int) joinOutcome {
+// the join decides. A canceled signal closes the edge of a branch that was
+// canceled.
+func (j *joinState) signal(slot int, canceled bool) joinOutcome {
 	j.edges[slot].Signaled = true
+	j.edges[slot].Canceled = j.edges[slot].Canceled || canceled
 	return j.decide()
+}
+
+func (j *joinState) anyCanceled() bool {
+	for _, e := range j.edges {
+		if e.Canceled {
+			return true
+		}
+	}
+	return false
 }
 
 // decide applies the firing rules of ADR-0010 section 3 and records the
@@ -124,7 +136,7 @@ func (j *joinState) rule() joinOutcome {
 			allComplete = false
 		}
 		anyLive = anyLive || e.Sent > 0
-		anyDead = anyDead || (e.complete() && e.Arrived == 0)
+		anyDead = anyDead || (e.complete() && e.Arrived == 0 && !e.Canceled)
 	}
 	switch j.mode {
 	case flow.JoinAll:
@@ -139,7 +151,9 @@ func (j *joinState) rule() joinOutcome {
 			return joinFails
 		}
 		if allComplete {
-			if anyLive {
+			// A canceled branch among the inputs means the join belongs to an
+			// abandoned region (or lost an input it needed): it does not fire.
+			if anyLive && !j.anyCanceled() {
 				return joinFires
 			}
 			return joinEmpty
