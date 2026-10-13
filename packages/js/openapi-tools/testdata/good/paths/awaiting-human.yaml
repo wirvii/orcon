@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: view
+parameters:
+  - $ref: '../openapi.yaml#/components/parameters/OrgId'
+get:
+  operationId: listAwaitingHuman
+  summary: List the items that wait for a person
+  description: >-
+    Returns the executions of the organization that wait for a person, newest first. Use it as
+    an inbox; the list covers every project the caller can read.
+  tags: [attention]
+  x-orcon-permission: execution:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - unauthenticated
+    - forbidden
+    - not-found
+    - validation-failed
+    - invalid-page-token
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: attention list
+  x-orcon-mcp:
+    level: read
+    tool: list_awaiting_human
+    description: List the executions that wait for a person.
+  x-orcon-examples:
+    - name: listInbox
+      scenario: org-with-waiting-execution
+      request:
+        pathParams:
+          orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+      response:
+        status: 200
+        body: listInbox
+  parameters:
+    - $ref: '../openapi.yaml#/components/parameters/Limit'
+    - $ref: '../openapi.yaml#/components/parameters/PageToken'
+  responses:
+    '200':
+      description: One page of attention items.
+      headers:
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+        RateLimit:
+          $ref: '../openapi.yaml#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '../openapi.yaml#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/AwaitingHumanList'
+          examples:
+            listInbox:
+              summary: One raised item
+              value:
+                items:
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a73
+                    executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                    state: RAISED
+                    raisedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '403':
+      $ref: '../openapi.yaml#/components/responses/Forbidden'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/NotFound'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

@@ -1,0 +1,562 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The good document of the plugin self-tests: a small API that follows every rule of the
+# orcon-api rulebook (collection, item, singleton, action, view, SSE stream, long-running
+# operation, event, protocol endpoint), split across files like the real contract. It must
+# lint with zero problems. The planted cases in ../bad/ are generated from it by
+# test/support/mutations.mjs.
+openapi: 3.1.0
+info:
+  title: Orcon API test fixture
+  version: 0.0.0
+  summary: A miniature contract that satisfies the whole rulebook.
+  description: Fixture for the orcon lint plugin. It is not the Orcon API.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+tags:
+  - name: flows
+    description: Flows, their drafts and their published versions.
+  - name: projects
+    description: Projects that own flows.
+  - name: operations
+    description: Long-running operations started by other requests.
+  - name: events
+    description: Event streams and the events they carry.
+  - name: attention
+    description: Items that wait for a person.
+  - name: protocol
+    description: Protocol endpoints that follow an external standard instead of the API conventions.
+paths:
+  /projects/{projectId}/flows:
+    $ref: ./paths/project-flows.yaml
+  /flows/{flowId}:
+    $ref: ./paths/flow.yaml
+  /flows/{flowId}/draft:
+    $ref: ./paths/flow-draft.yaml
+  /flows/{flowId}/publish:
+    $ref: ./paths/flow-publish.yaml
+  /projects/{projectId}/sync:
+    $ref: ./paths/project-sync.yaml
+  /operations/{operationId}:
+    $ref: ./paths/operation.yaml
+  /orgs/{orgId}/awaiting-human:
+    $ref: ./paths/awaiting-human.yaml
+  /events/stream:
+    $ref: ./paths/events-stream.yaml
+  /oauth/token:
+    $ref: ./paths/oauth-token.yaml
+webhooks:
+  flow.published:
+    $ref: ./paths/webhook-flow-published.yaml
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: An API key, service account token or session token.
+  parameters:
+    FlowId:
+      name: flowId
+      in: path
+      required: true
+      description: Id of the flow.
+      schema:
+        type: string
+        format: uuid
+        examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      description: Id of the project.
+      schema:
+        type: string
+        format: uuid
+        examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70]
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      description: Id of the organization.
+      schema:
+        type: string
+        format: uuid
+        examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71]
+    OperationId:
+      name: operationId
+      in: path
+      required: true
+      description: Id of the long-running operation.
+      schema:
+        type: string
+        format: uuid
+        examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72]
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag of the representation the change is based on.
+      schema:
+        type: string
+        maxLength: 255
+        examples: ['"7"']
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Client key that makes a retried request return the first response.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: '^[\x21-\x7E]+$'
+        examples: [publish-example-1]
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client key that makes a retried request return the first response.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: '^[\x21-\x7E]+$'
+        examples: [sync-example-1]
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items in the page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+        examples: [50]
+    PageToken:
+      name: pageToken
+      in: query
+      required: false
+      description: Opaque token from nextPageToken of the previous page.
+      schema:
+        type: string
+        maxLength: 1024
+        examples: [example-page-token-2]
+    LastEventId:
+      name: Last-Event-ID
+      in: header
+      required: false
+      description: Id of the last event received; the stream resumes after it.
+      schema:
+        type: string
+        maxLength: 255
+        examples: ['12345']
+  headers:
+    ETag:
+      description: Strong entity tag of the returned representation.
+      schema:
+        type: string
+        examples: ['"8"']
+    Location:
+      description: Absolute path of the created resource or of the operation that tracks the work.
+      schema:
+        type: string
+        maxLength: 2048
+        examples: [/api/v1/operations/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72]
+    OrconRequestId:
+      description: Id of the request, also present in logs and problem documents.
+      schema:
+        type: string
+        format: uuid
+        examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a62]
+    RateLimit:
+      description: Remaining quota of the rate class in the current window.
+      schema:
+        type: string
+        examples: ['"write";r=118;t=42']
+    RateLimitPolicy:
+      description: Quota policy of the rate class.
+      schema:
+        type: string
+        examples: ['"write";q=120;w=60']
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+        minimum: 0
+        examples: [30]
+  schemas:
+    Problem:
+      $ref: ./schemas/problem.yaml#/Problem
+    ProblemFieldError:
+      $ref: ./schemas/problem.yaml#/ProblemFieldError
+    ProblemCode:
+      $ref: ./schemas/problem.yaml#/ProblemCode
+    Flow:
+      type: object
+      description: A flow of a project.
+      required: [id, projectId, name, status, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Id of the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        projectId:
+          type: string
+          format: uuid
+          description: Id of the project that owns the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70]
+        name:
+          type: string
+          description: Display name of the flow.
+          examples: [Sync CRM contacts]
+        status:
+          type: string
+          description: Activation status of the flow.
+          enum: [ACTIVE, INACTIVE]
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the flow last changed, in UTC.
+          examples: ['2026-10-12T15:04:05Z']
+    FlowList:
+      type: object
+      description: One page of flows.
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: The flows of this page.
+          items:
+            $ref: '#/components/schemas/Flow'
+        nextPageToken:
+          type: string
+          description: Token for the next page; absent on the last page.
+          examples: [example-page-token-2]
+    CreateFlowRequest:
+      type: object
+      description: Fields of a new flow.
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          description: Display name of the flow.
+          examples: [Sync CRM contacts]
+        status:
+          type: string
+          description: Initial activation status; defaults to INACTIVE.
+          enum: [ACTIVE, INACTIVE]
+    UpdateFlowRequest:
+      type: object
+      description: Fields of a flow to change (JSON Merge Patch).
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          description: New display name of the flow.
+          examples: [Sync CRM contacts and companies]
+    FlowDraft:
+      type: object
+      description: The editable draft of a flow.
+      required: [flowId, revision, document, updatedAt]
+      properties:
+        flowId:
+          type: string
+          format: uuid
+          description: Id of the flow the draft belongs to.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        revision:
+          type: integer
+          minimum: 1
+          description: Revision number of the draft.
+          examples: [7]
+        document:
+          $ref: ./schemas/flow-document.yaml
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the draft last changed, in UTC.
+          examples: ['2026-10-12T15:04:05Z']
+    PublishFlowRequest:
+      type: object
+      description: Options for publishing a flow draft.
+      additionalProperties: false
+      properties:
+        note:
+          type: string
+          maxLength: 500
+          description: Release note stored with the version.
+          examples: [Retry the CRM step on rate limits]
+    FlowVersion:
+      type: object
+      description: An immutable published version of a flow.
+      required: [flowId, version, publishedAt, publishedByPrincipalId]
+      properties:
+        flowId:
+          type: string
+          format: uuid
+          description: Id of the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        version:
+          type: integer
+          minimum: 1
+          description: Version number.
+          examples: [8]
+        note:
+          type: string
+          description: Release note given at publication.
+          examples: [Retry the CRM step on rate limits]
+        publishedAt:
+          type: string
+          format: date-time
+          description: When the version was published, in UTC.
+          x-orcon-volatile: true
+          examples: ['2026-10-12T15:04:05Z']
+        publishedByPrincipalId:
+          type: string
+          format: uuid
+          description: Id of the user or service account that published the version.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61]
+    Operation:
+      type: object
+      description: Work that continues in the background after the request that started it.
+      required: [id, kind, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Id of the operation.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72]
+        kind:
+          type: string
+          description: Kind of work, as declared by the operation that started it.
+          enum: [GIT_SYNC]
+        status:
+          type: string
+          description: Progress of the operation.
+          enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELED]
+        failureSummary:
+          type: string
+          description: Sanitized reason the operation failed; present only when it failed.
+          examples: [The repository rejected the credentials.]
+        createdAt:
+          type: string
+          format: date-time
+          description: When the operation was accepted, in UTC.
+          x-orcon-volatile: true
+          examples: ['2026-10-12T15:04:05Z']
+    AwaitingHumanItem:
+      type: object
+      description: An execution step that waits for a person.
+      required: [id, executionId, state, raisedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Id of the attention item.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a73]
+        executionId:
+          type: string
+          format: uuid
+          description: Id of the execution that is waiting.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64]
+        state:
+          type: string
+          description: State of the attention item.
+          enum: [RAISED, ACKNOWLEDGED]
+        raisedAt:
+          type: string
+          format: date-time
+          description: When the execution started to wait, in UTC.
+          examples: ['2026-10-12T15:04:05Z']
+    AwaitingHumanList:
+      type: object
+      description: One page of attention items.
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: The attention items of this page.
+          items:
+            $ref: '#/components/schemas/AwaitingHumanItem'
+        nextPageToken:
+          type: string
+          description: Token for the next page; absent on the last page.
+          examples: [example-page-token-2]
+    TokenRequest:
+      type: object
+      description: OAuth token request (RFC 6749 form fields).
+      additionalProperties: false
+      required: [grant_type]
+      properties:
+        grant_type:
+          type: string
+          description: OAuth grant type.
+          enum: [client_credentials]
+          x-orcon-enum-kind: identifier
+    TokenResponse:
+      type: object
+      description: OAuth token response (RFC 6749 fields).
+      required: [access_token, token_type]
+      properties:
+        access_token:
+          type: string
+          description: The issued access token.
+          examples: [example-secret-1]
+        token_type:
+          type: string
+          description: Type of the token.
+          enum: [Bearer]
+          x-orcon-enum-kind: identifier
+    CloudEvent:
+      type: object
+      description: CloudEvents 1.0 attributes in structured JSON form.
+      required: [specversion, id, source, type, time]
+      properties:
+        specversion:
+          type: string
+          description: CloudEvents version.
+          enum: ['1.0']
+          x-orcon-enum-kind: identifier
+        id:
+          type: string
+          format: uuid
+          description: Id of the event; consumers deduplicate by it.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a65]
+        source:
+          type: string
+          description: Path of the resource the event is about.
+          maxLength: 2048
+          examples: [/api/v1/flows/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        type:
+          type: string
+          description: Versioned event type, dev.orcon.<area>.<event>.v<N>.
+          maxLength: 255
+          examples: [dev.orcon.flow.published.v1]
+        time:
+          type: string
+          format: date-time
+          description: When the change happened, in UTC.
+          examples: ['2026-10-12T15:04:05Z']
+        datacontenttype:
+          type: string
+          description: Media type of data.
+          enum: [application/json]
+          x-orcon-enum-kind: identifier
+    FlowPublishedEvent:
+      description: A flow.published event in CloudEvents structured JSON form.
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/FlowPublishedData'
+    FlowPublishedData:
+      type: object
+      description: Payload of the flow.published event.
+      required: [flowId, projectId, version, publishedByPrincipalId]
+      properties:
+        flowId:
+          type: string
+          format: uuid
+          description: Id of the flow that was published.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        projectId:
+          type: string
+          format: uuid
+          description: Id of the project that owns the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70]
+        version:
+          type: integer
+          minimum: 1
+          description: Number of the version created by the publication.
+          examples: [8]
+        publishedByPrincipalId:
+          type: string
+          format: uuid
+          description: Id of the user or service account that published the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61]
+  responses:
+    ValidationFailed:
+      description: A parameter or the body is invalid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthenticated:
+      description: No valid credential was sent.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The caller lacks the required permission.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The resource does not exist or is not visible to the caller.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: The resource state does not allow the operation, or an identical request is still running.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: If-Match does not match the current ETag.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: The body exceeds the size limit.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyReused:
+      description: The idempotency key was used with a different request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionRequired:
+      description: If-Match is missing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimited:
+      description: The rate class quota is exhausted.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: An unexpected server error happened.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

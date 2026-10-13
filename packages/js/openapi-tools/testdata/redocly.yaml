@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The lint configuration of the self-tests: the package configuration with the permission
+# catalog of the fixtures instead of internal/authz/permissions.yaml.
+extends:
+  - ../redocly.yaml
+
+rules:
+  orcon/permission:
+    severity: error
+    permissionsFile: testdata/permissions.yaml
