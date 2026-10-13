@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Orcon design system
 
 The Orcon design system is the shared set of design tokens, themed components, canvas visual language, content and i18n rules, and accessibility requirements that every Orcon web UI surface follows. It covers the embedded editor in `apps/web` and the shared packages under `packages/js` (`@orcon/tokens`, `@orcon/ui`, `@orcon/lint-config`).
@@ -127,9 +128,9 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | SchemaView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | S1 Shell and welcome/onboarding | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S2 Flow list | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
-| S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Reopened by the style A decision (SPEC-007 Enmienda 1) |
+| S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Reopened by the style A decision (SPEC-007 Amendment 1) |
 | S4 Execution list | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
-| S5 Execution detail, with the style A canvas | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Canvas reopened by the style A decision (SPEC-007 Enmienda 1) |
+| S5 Execution detail, with the style A canvas | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Canvas reopened by the style A decision (SPEC-007 Amendment 1) |
 | S6 Human attention inbox and notifications panel | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S7 Approval page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S8 Empty states, 404 and error page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |

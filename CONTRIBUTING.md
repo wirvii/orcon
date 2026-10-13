@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Contributing to Orcon
 
 Thank you for helping build Orcon. Issues, design discussions and pull requests are welcome. Every contribution is licensed under the [Apache License 2.0](LICENSE), and everyone who takes part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -45,6 +46,10 @@ Read [docs/engineering/connectors.md](docs/engineering/connectors.md) before wri
 ## Public API
 
 Read [docs/engineering/api.md](docs/engineering/api.md) before changing the OpenAPI contract in `packages/openapi/`. The complete API design rulebook lives in `.agents/skills/orcon-api/references/` and is packaged as the `orcon-api` mneme skill; start from its templates in `.agents/skills/orcon-api/assets/templates/` and paste `.agents/skills/orcon-api/assets/pr-api-checklist.md` into the pull request.
+
+## Database schema and SQL
+
+Read [docs/engineering/db.md](docs/engineering/db.md) before changing a table, a migration or a SQL query. The complete database rulebook lives in `.agents/skills/orcon-db/references/` and is packaged as the `orcon-db` mneme skill. Run `make db-check` while iterating, and `make check` plus `make test-postgres` (needs a container runtime) before opening a pull request; paste `.agents/skills/orcon-db/assets/pr-db-checklist.md` into its description.
 
 ## Web application code
 

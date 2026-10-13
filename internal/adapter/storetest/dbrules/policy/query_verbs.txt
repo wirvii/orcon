@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Verbs a sqlc query name may start with (naming.md NM-14).
+# Format: <Verb>  # meaning
+Get  # read one row by key
+List  # read a bounded page of rows
+Count  # count rows
+Exists  # test whether a row exists
+Create  # insert a new entity
+Insert  # insert a row of a log or association
+Update  # change columns of a row
+Upsert  # insert or update by key
+Delete  # remove rows
+Purge  # remove rows through retention
+Restore  # undo a soft delete
+Claim  # take work under a lease
+Renew  # extend a lease
+Release  # give up a lease
+Resolve  # look up through an engine function
+Mark  # set a state or flag
+Lock  # take a row lock
+Append  # add to an ordered log

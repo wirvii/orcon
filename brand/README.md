@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Orcon brand — approved visual direction
 
 **Status:** The two original concept boards approved by the product owner are the **visual source of truth**. The simplified replacement SVGs formerly committed under brand/logos and brand/mascot were inaccurate and have been deleted.
@@ -36,6 +37,20 @@ This palette takes precedence over earlier speculative palettes. The approved bo
 - Art style: polished semi-3D illustrative character, nuanced lighting and texture; **not** flat primitive vector art.
 - UI: midnight navy/graphite with green-teal execution highlights; light surfaces for secondary layouts. Accessible, restrained, readable.
 - Working tagline: **Build. Orchestrate. Execute. Your way.**
+
+## Derived exports
+
+Raster crops of the approved primary board, committed under [`exports/`](exports/). The root README and the documentation landing pages use them.
+
+| File | Source region of the primary board | Use |
+| --- | --- | --- |
+| [`exports/orcon-banner.png`](exports/orcon-banner.png) | Wordmark, symbol and descriptor, with the orc engineer at the laptop | Banner at the top of the root README |
+| [`exports/mascot-at-work.png`](exports/mascot-at-work.png) | Orc engineer at the laptop in front of the flow diagram | Large mascot image in the root README |
+| [`exports/mascot-crossed-arms.png`](exports/mascot-crossed-arms.png) | Orc engineer with crossed arms | Small mascot on documentation landing pages |
+| [`exports/mascot-expressions.png`](exports/mascot-expressions.png) | Facial expressions panel | Reference for the mascot expressions |
+| [`exports/wordmark-dark.png`](exports/wordmark-dark.png) | Wordmark on the dark background | Wordmark for dark surfaces |
+
+Exports are crops of the approved board, never redrawn. To add one, crop the board again and list the new file in this table.
 
 ## Required brand assets
 - ~~Original approved concept board PNG/JPEG files, tracked in repo.~~ Done (`brand/reference/`).
