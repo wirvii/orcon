@@ -29,6 +29,8 @@ Given (BL-005): the CLI covers the full public API and is built on it. P3 needs 
 - Every operation declares `x-orcon-cli`: `{ command }`, or `{ none: { category, reason } }` with `category` ∈ `protocol` (OAuth and provider endpoints), `ingress` (provider callbacks), `interactive-session-only` (e.g. `confirmations/{confirmationId}/approve`, which only a person in an interactive session may call).
 - CI test: every stable/beta `operationId` maps to a command or carries an exemption with an allowed category and a reason.
 
+Generated commands `flows test-runs create|list|get`, `executions effect-previews list|get`, `flows pins list|create|get|replace|delete`, `executions flow get`, `n8n convert-fragment`, `node-types list`. Exemptions with category `interactive-session-only`: `continueEffectPreview` (sending a gated external effect needs a person) and the five editing-session operations (presence of a person in the editor).
+
 ### 4. Output and exit codes
 `-o table|json|yaml` (table on a terminal, json otherwise); no colour off-terminal or with `NO_COLOR`. Exit codes: 0 success, 1 generic error, 2 usage, 3 not found, 4 conflict or precondition failed, 5 validation failed, 6 permission denied or unauthenticated, 7 rate limited, 8 timeout. Errors print problem `code`, `detail` and `requestId`. Mutating commands send `Idempotency-Key` automatically.
 
@@ -42,3 +44,8 @@ Everything scriptable through one tool; one download for CI; the CLI can do noth
 
 ## Alternatives considered
 Separate CLI binary/repository (duplicates validation and versioning); CLI talking to the database (bypasses authorization and audit); requiring a command for every operation (forces meaningless commands for protocol endpoints and web-only approvals).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-014 (Amendment 5, carried by SPEC-005).** §3 gains generated commands and `interactive-session-only` exemptions. Additive only (ADR-0054 §3): no existing operation, field, permission, MCP level or tool changes; semantics of test runs, pinned data and effect confirmation: ADR-0082 (SPEC-014).
