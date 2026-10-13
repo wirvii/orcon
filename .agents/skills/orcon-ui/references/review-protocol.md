@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Review protocol
 
-Status: Proposed — pending owner approval | Version: 1.0 | Source: SPEC-007
+Status: Accepted | Version: 1.1.0 | Source: SPEC-007
 
 How a UI change is reviewed visually before the owner sees it, and how the owner gate works. The rules being checked live in [foundations.md](foundations.md), [components.md](components.md) and [canvas.md](canvas.md); this document only describes the procedure.
 

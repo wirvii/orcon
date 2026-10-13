@@ -43,7 +43,7 @@ The brand mark and the mascot are shown as neutral placeholders (an empty outlin
 
 ## Rule status
 
-All normative references are `Proposed — pending owner approval`. They become `Accepted` only after every row in the table below is `Approved` by the owner. Until then, product screens must not rely on the design system as an accepted source (see [`docs/engineering/implementation-contract.md`](../engineering/implementation-contract.md)).
+All normative references are `Accepted` (version 1.1.0): the owner approved every row of the table below on 2026-10-13. Product screens may rely on it as an accepted source (see [`docs/engineering/implementation-contract.md`](../engineering/implementation-contract.md)); changes to an approved visual baseline return the item to `Pending`.
 
 ## Owner review status
 
@@ -51,56 +51,56 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 
 | Item | Kind | Status | Date | Reviewed Storybook commit | Screenshots | Notes |
 |---|---|---|---|---|---|---|
-| Button | Base component | Pending | — | — | — | — |
-| IconButton | Base component | Pending | — | — | — | — |
-| Link | Base component | Pending | — | — | — | — |
-| Input | Base component | Pending | — | — | — | — |
-| Textarea | Base component | Pending | — | — | — | — |
-| Select | Base component | Pending | — | — | — | — |
-| Combobox | Base component | Pending | — | — | — | — |
-| Checkbox | Base component | Pending | — | — | — | — |
-| RadioGroup | Base component | Pending | — | — | — | — |
-| Switch | Base component | Pending | — | — | — | — |
-| FormField | Base component | Pending | — | — | — | — |
-| ErrorSummary | Base component | Pending | — | — | — | — |
-| Tooltip | Base component | Pending | — | — | — | — |
-| Popover | Base component | Pending | — | — | — | — |
-| DropdownMenu | Base component | Pending | — | — | — | — |
-| Dialog | Base component | Pending | — | — | — | — |
-| AlertDialog | Base component | Pending | — | — | — | — |
-| Sheet/Drawer | Base component | Pending | — | — | — | — |
-| Tabs | Base component | Pending | — | — | — | — |
-| Breadcrumb | Base component | Pending | — | — | — | — |
-| Table + DataTable | Base component | Pending | — | — | — | — |
-| Pagination | Base component | Pending | — | — | — | — |
-| Badge | Base component | Pending | — | — | — | — |
-| StatusBadge | Base component | Pending | — | — | — | — |
-| Toast | Base component | Pending | — | — | — | — |
-| Banner | Base component | Pending | — | — | — | — |
-| ProblemAlert | Base component | Pending | — | — | — | — |
-| Skeleton | Base component | Pending | — | — | — | — |
-| Spinner | Base component | Pending | — | — | — | — |
-| EmptyState | Base component | Pending | — | — | — | — |
-| ErrorBoundary fallback | Base component | Pending | — | — | — | — |
-| Avatar | Base component | Pending | — | — | — | — |
-| Kbd | Base component | Pending | — | — | — | — |
-| CodeBlock | Base component | Pending | — | — | — | — |
-| DateTime/RelativeTime/NumberFormat | Base component | Pending | — | — | — | — |
-| RedactedValue | Base component | Pending | — | — | — | — |
-| CommandPalette | Base component | Pending | — | — | — | — |
-| Separator | Base component | Pending | — | — | — | — |
-| ScrollArea | Base component | Pending | — | — | — | — |
-| ConnectorIcon | Base component | Pending | — | — | — | — |
-| BrandMark (placeholder) | Base component | Pending | — | — | — | Neutral placeholder; final asset reviewed with the brand assets backlog item |
-| Mascot (placeholder) | Base component | Pending | — | — | — | Neutral placeholder; final asset reviewed with the brand assets backlog item |
-| AppShell | Base component | Pending | — | — | — | — |
-| TopBar | Base component | Pending | — | — | — | — |
-| NavItem | Base component | Pending | — | — | — | — |
-| NotificationBell | Base component | Pending | — | — | — | — |
-| AttentionInboxItem | Base component | Pending | — | — | — | — |
-| ThemeSwitcher | Base component | Pending | — | — | — | — |
-| DensitySwitcher | Base component | Pending | — | — | — | — |
-| LocaleSwitcher | Base component | Pending | — | — | — | — |
+| Button | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| IconButton | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Link | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Input | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Textarea | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Select | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Combobox | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Checkbox | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| RadioGroup | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Switch | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| FormField | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ErrorSummary | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Tooltip | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Popover | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| DropdownMenu | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Dialog | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| AlertDialog | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Sheet/Drawer | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Tabs | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Breadcrumb | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Table + DataTable | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Pagination | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Badge | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| StatusBadge | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Toast | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Banner | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ProblemAlert | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Skeleton | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Spinner | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| EmptyState | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ErrorBoundary fallback | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Avatar | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Kbd | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| CodeBlock | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| DateTime/RelativeTime/NumberFormat | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| RedactedValue | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| CommandPalette | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| Separator | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ScrollArea | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ConnectorIcon | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| BrandMark (placeholder) | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). Neutral placeholder; final asset reviewed with the brand assets backlog item |
+| Mascot (placeholder) | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). Neutral placeholder; final asset reviewed with the brand assets backlog item |
+| AppShell | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| TopBar | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| NavItem | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| NotificationBell | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| AttentionInboxItem | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ThemeSwitcher | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| DensitySwitcher | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| LocaleSwitcher | Base component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | CanvasNode | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | NodeStatusBadge | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | NodeStatusChip | Canvas primitive (style A) | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
@@ -125,15 +125,15 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | DataTableView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | JsonTreeView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
 | SchemaView | Editor component | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. |
-| S1 Shell and welcome/onboarding | Screen template | Pending | — | — | — | — |
-| S2 Flow list | Screen template | Pending | — | — | — | — |
+| S1 Shell and welcome/onboarding | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| S2 Flow list | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Reopened by the style A decision (SPEC-007 Enmienda 1) |
-| S4 Execution list | Screen template | Pending | — | — | — | — |
+| S4 Execution list | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S5 Execution detail, with the style A canvas | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner after the style A visual review (SPEC-007 E-GATE-2), light and dark. Canvas reopened by the style A decision (SPEC-007 Enmienda 1) |
-| S6 Human attention inbox and notifications panel | Screen template | Pending | — | — | — | — |
-| S7 Approval page | Screen template | Pending | — | — | — | — |
-| S8 Empty states, 404 and error page | Screen template | Pending | — | — | — | — |
-| S9 Settings › Appearance and language | Screen template | Pending | — | — | — | — |
+| S6 Human attention inbox and notifications panel | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| S7 Approval page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| S8 Empty states, 404 and error page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| S9 Settings › Appearance and language | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 
 ## Editor parity review
 

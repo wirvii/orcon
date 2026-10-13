@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Foundations
 
-Status: Proposed — pending owner approval | Version: 1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Visual values (colors, sizes, durations) live only in this file, [tokens.md](tokens.md), [canvas.md](canvas.md) and the generated [contrast-report.md](contrast-report.md). Code never uses these values directly: it uses the tokens that carry them ([tokens.md#usage-in-code](tokens.md#usage-in-code)).
 

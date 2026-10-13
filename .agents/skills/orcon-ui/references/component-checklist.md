@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Component checklist
 
-Status: Proposed — pending owner approval | Version: 1.0 | Source: SPEC-007
+Status: Accepted | Version: 1.1.0 | Source: SPEC-007
 
 Step-by-step procedure for every new or changed component in `@orcon/ui` (including canvas primitives). Copy the checklist into the pull request and tick each item. Each step links to the rule that governs it.
 

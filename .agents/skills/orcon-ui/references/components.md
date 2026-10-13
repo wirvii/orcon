@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Components
 
-Status: Proposed — pending owner approval | Version: 1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Components live in `@orcon/ui` (`packages/js/ui`). Values are never written here; they come from tokens ([tokens.md](tokens.md)).
 

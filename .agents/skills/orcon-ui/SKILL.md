@@ -4,7 +4,7 @@ description: Builds and reviews Orcon web UI (apps/web, packages/js) with the Or
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with pnpm 9 and Node 22.
 metadata:
-  version: 1.0.1
+  version: 1.1.0
   pinned: true
   owner: wirvii
 ---
@@ -15,7 +15,7 @@ metadata:
 
 Step-and-check list for building Orcon UI. The rules live in `references/`; this file tells you which apply and how to prove you followed them. Read the referenced sections before you write code; never work from memory.
 
-The rules are `Proposed — pending owner approval` until the owner approves every base component and screen template ([owner gate](references/review-protocol.md#owner-gate)).
+The rules are `Accepted`: the owner approved every base component and screen template on 2026-10-13 ([owner gate](references/review-protocol.md#owner-gate)).
 
 ## When To Use
 

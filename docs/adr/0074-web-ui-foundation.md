@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0074: Web UI foundation
 
-Status: Proposed
+Status: Accepted
 Date: 2026-10-12
 Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
