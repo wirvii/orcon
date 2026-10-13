@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Provenance
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines where the owner's provenance rule applies in the contribution workflow. The check itself, its term list and its exempt paths are defined by the `orcon-go` skill (`references/tooling.md`) and are not repeated here. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`PV-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 

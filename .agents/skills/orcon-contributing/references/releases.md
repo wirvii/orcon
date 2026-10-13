@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Releases
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how Orcon versions are chosen, and how a release is decided, tagged, built, signed and verified, and what happens when a release fails. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`RL-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 

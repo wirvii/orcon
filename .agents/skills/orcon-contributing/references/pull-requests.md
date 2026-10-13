@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Pull requests
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how a pull request is titled, described, sized and scoped, and which skill checklists it carries. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`PR-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 

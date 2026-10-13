@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Verifying an Orcon release
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 Every Orcon release can be checked without trusting the project's servers or its maintainers. The release workflow signs each artifact with a short-lived certificate tied to the workflow's identity, and publishes build provenance that says which repository, commit and workflow produced it. This page shows how to check a release yourself. The decision behind it is ADR 0081.
 

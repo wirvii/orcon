@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0081: Contribution workflow and signed releases
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # GitHub settings
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document lists the repository settings and rulesets the owner applies on GitHub, the change to make when a second maintainer joins, and how both are audited. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`GH-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Specs and pull requests
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how maintainer work tracked in mneme (backlog items, specs, slices and QA reports) maps to branches and pull requests. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`SD-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 

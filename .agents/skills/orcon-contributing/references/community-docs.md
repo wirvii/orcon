@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Community documents
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines the community files of the repository (contributing guide, security policy, code of conduct, pull request and issue templates) and how they are written. It is part of the `orcon-contributing` rulebook; the decision behind it is ADR 0081. Rule IDs (`CD-…`) are stable. The check that enforces a rule, when one exists, is named in brackets. Precedence: accepted ADRs (ADR 0081) > accepted `orcon-go` rules > this rulebook > reviewer preference.
 
