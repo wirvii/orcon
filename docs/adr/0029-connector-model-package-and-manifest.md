@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0029 — Connector model, package format, manifest and operation safety contract
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-003.
 
@@ -110,3 +110,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-004.** §6: connector grants are approved per organisation by holders of `connector:approve`; installing packages is instance-level (`instance:connectors`). The credential handle carries `allowedHosts` (ADR-0043 §4); OAuth refresh follows ADR-0045.
 - **SPEC-006.** §9: the semantics of `ai.tool` and of `kind` `MODEL | EMBEDDING | RERANKER | VECTOR_STORE | MEMORY` are defined by ADR-0061, ADR-0065, ADR-0064 and ADR-0066 (manifest values in UPPER_SNAKE).
+- **SPEC-014 (2026-10-13).** §4: an action operation exposes an example output in the node-type view of the API (`exampleOutput`, ADR-0052 §7) when the package's recorded tests (`tests/*.json`, `orcon/cassette@1`, ADR-0079 §3) contain a cassette marked `example: true` for that operation. The catalog extracts it at installation from that cassette's expected result, already scrubbed by the recording tool, and stores it with the installed version. It is never fetched from the network, is not a manifest field and never contains credential values. An operation without such a cassette has no example output.
