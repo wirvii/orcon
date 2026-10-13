@@ -28,7 +28,7 @@ export interface AiBlockProps {
   kind: AiBlockKind;
   /** The block is configured. An unset block is a dashed circle with a plus. */
   set?: boolean;
-  /** What is configured ("Claude", "Window memory"), for the accessible name. */
+  /** What is configured ("Chat model", "Window memory"), for the accessible name. */
   detail?: string;
   tabbable?: boolean;
   /** Opens the Agent tab of the node details view. */
