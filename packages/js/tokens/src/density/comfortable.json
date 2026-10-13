@@ -12,12 +12,6 @@
     },
     "connector-icon-safe": {
       "$value": "20px"
-    },
-    "node-width": {
-      "$value": "240px"
-    },
-    "control-node-height": {
-      "$value": "40px"
     }
   },
   "space": {

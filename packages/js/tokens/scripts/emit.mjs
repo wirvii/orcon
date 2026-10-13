@@ -17,7 +17,7 @@ const declare = (token, indent = '  ') => `${indent}${token.cssName}: ${token.cs
 const block = (selector, lines, indent = '') =>
   `${indent}${selector} {\n${lines.map((l) => `${indent}${l}`).join('\n')}\n${indent}}`;
 
-const isDuration = (token) => token.path[0] === 'duration';
+const isDuration = (token) => token.path[0] === 'duration' || (token.path[0] === 'motion' && token.type === 'duration');
 
 /** Theme-specific declarations for one theme. */
 function themeLines(tokens) {
@@ -155,8 +155,6 @@ export function emitTailwindTheme(model) {
     'space.gap': 'density',
     'size.connector-icon': 'connector-icon',
     'size.connector-icon-safe': 'connector-icon-safe',
-    'size.node-width': 'node-width',
-    'size.control-node-height': 'control-node',
   };
   for (const t of densities.comfortable) add(`--spacing-${sizeAlias[t.key]}`, v(t));
   for (const t of scales.filter((x) => x.path[0] === 'size' && x.path[1] === 'icon')) {
@@ -165,6 +163,10 @@ export function emitTailwindTheme(model) {
   const target = scales.find((x) => x.key === 'size.target-min');
   add('--spacing-target', v(target));
   add('--spacing-port', v(scales.find((x) => x.key === 'size.port')));
+  // Canvas and editor geometry: `canvas.node-size` is the utility suffix `canvas-node`.
+  for (const t of scales.filter((x) => (x.path[0] === 'canvas' || x.path[0] === 'editor') && x.type === 'dimension')) {
+    add(`--spacing-${t.path[0]}-${t.path[1].replace(/-size$/, '')}`, v(t));
+  }
 
   lines.push('', '  /* Radius and elevation */');
   for (const t of scales.filter((x) => x.path[0] === 'radius')) add(`--radius-${t.path[1]}`, v(t));

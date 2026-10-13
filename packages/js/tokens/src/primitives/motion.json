@@ -37,5 +37,22 @@
         1
       ]
     }
+  },
+  "motion": {
+    "loop": {
+      "$type": "duration",
+      "ring": {
+        "$value": "1300ms",
+        "$description": "One sweep of the run ring of a running node."
+      },
+      "spin": {
+        "$value": "1000ms",
+        "$description": "One turn of the running spinner."
+      },
+      "edge": {
+        "$value": "800ms",
+        "$description": "One cycle of the flow animation of a running edge."
+      }
+    }
   }
 }

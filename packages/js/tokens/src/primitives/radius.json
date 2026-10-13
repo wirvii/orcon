@@ -13,6 +13,10 @@
     "xl": {
       "$value": "16px"
     },
+    "2xl": {
+      "$value": "18px",
+      "$description": "Radius of canvas node tiles only."
+    },
     "full": {
       "$value": "9999px"
     }

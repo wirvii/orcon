@@ -117,7 +117,7 @@ Rules:
 1. Every foreground/background combination used by a component is declared in `src/pairs.json` as `{ fg, bg, kind, min, reason? }` with `kind` one of `text`, `ui`, `decorative`, `disabled-exempt`.
 2. Minimums: `text` ≥ 4.5:1; `ui` ≥ 3:1. The large-text reduction is not used in V1. `decorative` and `disabled-exempt` pairs MUST carry a `reason`.
 3. Ratios use the WCAG 2.x relative luminance formula and are computed for both themes by `test/contrast.test.ts`. A minimum MUST NEVER be lowered to make a test pass.
-4. Current certified set: 71 pairs per theme, 0 failures. The authoritative, generated list is [contrast-report.md](contrast-report.md). Summary:
+4. Current certified set: 105 pairs per theme, 0 failures (71 base pairs plus the 34 canvas pairs of [#canvas-tokens](#canvas-tokens)). The authoritative, generated list is [contrast-report.md](contrast-report.md). Summary:
 
 | Foreground | Background | Kind | Min | Light | Dark |
 |---|---|---|---|---|---|

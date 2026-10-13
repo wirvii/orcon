@@ -20,8 +20,8 @@ describe('declared pairs', () => {
     expect(evaluatePairs(pairs, colorValues(theme))).toEqual([]);
   });
 
-  it('certifies 71 text and UI pairs per theme', () => {
-    expect(certified).toHaveLength(71);
+  it('certifies 105 text and UI pairs per theme', () => {
+    expect(certified).toHaveLength(105);
   });
 
   it('keeps the policy minimums', () => {
@@ -79,8 +79,11 @@ describe('contrast report', () => {
   it('is written from the declared pairs', () => {
     const light = colorValues('light');
     const dark = colorValues('dark');
+    // A translucent color (8 digits) has no single ratio; its pair is decorative and shows a dash.
     const fmt = (values: Record<string, string>, pair: Pair) =>
-      ratio(values[pair.fg] as string, values[pair.bg] as string).toFixed(2);
+      /^#[0-9a-f]{6}$/i.test(values[pair.fg] as string) && /^#[0-9a-f]{6}$/i.test(values[pair.bg] as string)
+        ? ratio(values[pair.fg] as string, values[pair.bg] as string).toFixed(2)
+        : '-';
     const rows = pairs.map((pair) => {
       const min = pair.kind === 'text' || pair.kind === 'ui' ? pair.min?.toFixed(1) : '-';
       const result = pair.kind === 'text' || pair.kind === 'ui' ? 'pass' : `exempt: ${pair.reason}`;

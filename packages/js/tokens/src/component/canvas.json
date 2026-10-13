@@ -1,13 +1,9 @@
 {
   "component": {
-    "node-card": {
-      "width": {
-        "$type": "dimension",
-        "$value": "{size.node-width}"
-      },
+    "node-tile": {
       "bg": {
         "$type": "color",
-        "$value": "{surface.default}"
+        "$value": "{canvas.node.bg}"
       },
       "border": {
         "$type": "color",
@@ -16,20 +12,6 @@
       "shadow": {
         "$type": "shadow",
         "$value": "{elevation.sm}"
-      }
-    },
-    "control-node": {
-      "height": {
-        "$type": "dimension",
-        "$value": "{size.control-node-height}"
-      },
-      "bg": {
-        "$type": "color",
-        "$value": "{surface.default}"
-      },
-      "border": {
-        "$type": "color",
-        "$value": "{canvas.node.border}"
       }
     }
   }

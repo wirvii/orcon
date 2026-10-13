@@ -165,6 +165,82 @@
     "node": {
       "border": {
         "$value": "{color.slate.700}"
+      },
+      "bg": {
+        "$value": "{color.slate.900}"
+      }
+    },
+    "marquee": {
+      "bg": {
+        "$value": "{color.alpha.green-500-15}"
+      }
+    },
+    "sticky": {
+      "1": {
+        "bg": {
+          "$value": "{color.cyan.950}"
+        },
+        "border": {
+          "$value": "{color.cyan.400}"
+        },
+        "accent": {
+          "$value": "{color.cyan.400}"
+        }
+      },
+      "2": {
+        "bg": {
+          "$value": "{color.green.950}"
+        },
+        "border": {
+          "$value": "{color.green.400}"
+        },
+        "accent": {
+          "$value": "{color.green.400}"
+        }
+      },
+      "3": {
+        "bg": {
+          "$value": "{color.slate.800}"
+        },
+        "border": {
+          "$value": "{color.slate.400}"
+        },
+        "accent": {
+          "$value": "{color.slate.400}"
+        }
+      },
+      "4": {
+        "bg": {
+          "$value": "{color.slate.900}"
+        },
+        "border": {
+          "$value": "{color.slate.400}"
+        },
+        "accent": {
+          "$value": "{color.slate.400}"
+        }
+      },
+      "5": {
+        "bg": {
+          "$value": "{color.cyan.900}"
+        },
+        "border": {
+          "$value": "{color.cyan.300}"
+        },
+        "accent": {
+          "$value": "{color.cyan.300}"
+        }
+      },
+      "6": {
+        "bg": {
+          "$value": "{color.green.900}"
+        },
+        "border": {
+          "$value": "{color.green.300}"
+        },
+        "accent": {
+          "$value": "{color.green.300}"
+        }
       }
     }
   },

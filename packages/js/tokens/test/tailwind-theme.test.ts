@@ -43,7 +43,7 @@ describe('generated Tailwind theme', () => {
   });
 
   it('generates nothing for the default palette, off-scale spacing or default radius', async () => {
-    const out = await css(['bg-red-500', 'text-slate-600', 'bg-white', 'p-7', 'rounded-2xl', 'shadow-xl']);
-    expect(out).not.toMatch(/\.(bg-red-500|text-slate-600|bg-white|p-7|rounded-2xl|shadow-xl)/);
+    const out = await css(['bg-red-500', 'text-slate-600', 'bg-white', 'p-7', 'rounded-3xl', 'shadow-xl']);
+    expect(out).not.toMatch(/\.(bg-red-500|text-slate-600|bg-white|p-7|rounded-3xl|shadow-xl)/);
   });
 });

@@ -221,6 +221,17 @@
     },
     "black": {
       "$value": "#000000"
+    },
+    "alpha": {
+      "$type": "color",
+      "green-600-10": {
+        "$value": "#16A34A1A",
+        "$description": "Brand green at 10 % opacity: canvas marquee fill in the light theme."
+      },
+      "green-500-15": {
+        "$value": "#22C55E26",
+        "$description": "Brand green at 15 % opacity: canvas marquee fill in the dark theme."
+      }
     }
   }
 }
