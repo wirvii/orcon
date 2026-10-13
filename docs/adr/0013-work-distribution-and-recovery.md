@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0013 — Work distribution, leases with fencing, outbox and crash recovery
 
 Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12

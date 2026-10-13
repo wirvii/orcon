@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Public event catalog
 
 Status: **Accepted** | Source: ADR-0055 §1–§2 (accepted 2026-10-12 via SPEC-005), with the types added by SPEC-006

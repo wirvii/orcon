@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0063 — Model output streaming: ephemeral token channel, durable final response
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: `ai_stream_chunk` carries `org_id`, ADR-0077)

@@ -9,6 +9,7 @@ sourceHash: 58ea90d52cc9254ee811e06a06baa9e9eef31a390dc2a5b752b6e4f697ef2edf
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Actualización y vuelta atrás
 
 > Esta página describe un comportamiento especificado por el ADR 0083 que aún no está implementado. El corte que entregue `orcon store schema` quitará esta nota.

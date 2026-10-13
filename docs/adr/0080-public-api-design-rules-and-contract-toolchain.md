@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR 0080: Public API design rules and contract toolchain
 
 Status: Accepted | Amended: 2026-10-13 (SPEC-012 Amendment 2)

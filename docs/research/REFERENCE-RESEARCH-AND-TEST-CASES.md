@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Orcon — Research and Design Reference Appendix
 
 **Status:** research notes and proposed requirements, not accepted implementation contracts. **Research snapshot:** October 2026. Verify current upstream versions before implementing.

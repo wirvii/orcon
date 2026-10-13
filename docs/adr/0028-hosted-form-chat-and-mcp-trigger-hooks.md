@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0028 — Hosted form trigger and chat/MCP trigger hook points
 
 Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
