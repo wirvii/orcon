@@ -21,21 +21,21 @@ Every target that can be measured in this cut is met. Scenario S1 of the D20 gat
 | Target | Required | Measured | Status |
 |---|---|---|---|
 | Fast path coverage (usage-weighted) | >= 70 % | 81.0 % | PASS |
-| Warm sandbox p99, median-complexity expressions without Luxon | <= 200µs | 55.459µs | PASS |
-| Warm sandbox p99, median-complexity expressions with Luxon | <= 500µs | 236.458µs | PASS |
+| Warm sandbox p99, median-complexity expressions without Luxon | <= 200µs | 63µs | PASS |
+| Warm sandbox p99, median-complexity expressions with Luxon | <= 500µs | 250.958µs | PASS |
 | D20 scenario S1 | passes | the benchmark harness of cut C16 does not exist yet; the sandbox can only be reversed on this ground when it does | PENDING |
-| Warm sandbox p99, median-complexity expressions without Luxon, hard limit (comparison only) | <= 200µs | 178.709µs | PASS |
-| Warm sandbox p99, median-complexity expressions with Luxon, hard limit (comparison only) | <= 500µs | 829.75µs | FAIL |
-| Warm sandbox p99, median-complexity expressions without Luxon, cooperative limit (comparison only) | <= 200µs | 46.25µs | PASS |
-| Warm sandbox p99, median-complexity expressions with Luxon, cooperative limit (comparison only) | <= 500µs | 219.167µs | PASS |
-| &nbsp;&nbsp;combined band, cooperative limit with abandon (no target) | | 218.0 µs | |
-| &nbsp;&nbsp;combined band, hard limit (no target) | | 761.8 µs | |
-| &nbsp;&nbsp;combined band, cooperative limit (no target) | | 208.2 µs | |
+| Warm sandbox p99, median-complexity expressions without Luxon, hard limit (comparison only) | <= 200µs | 197.833µs | PASS |
+| Warm sandbox p99, median-complexity expressions with Luxon, hard limit (comparison only) | <= 500µs | 854.125µs | FAIL |
+| Warm sandbox p99, median-complexity expressions without Luxon, cooperative limit (comparison only) | <= 200µs | 50.625µs | PASS |
+| Warm sandbox p99, median-complexity expressions with Luxon, cooperative limit (comparison only) | <= 500µs | 241.292µs | PASS |
+| &nbsp;&nbsp;combined band, cooperative limit with abandon (no target) | | 233.3 µs | |
+| &nbsp;&nbsp;combined band, hard limit (no target) | | 800.0 µs | |
+| &nbsp;&nbsp;combined band, cooperative limit (no target) | | 225.5 µs | |
 | Expressions that run unchanged (E-EXPR-3) | >= 95 % | 93.67 % (usage-weighted 94.68 %); 98.89 % (98.61 %) leaving out identifiers owned by later specifications | see below |
 
 ## Environment
 
-- Date: 2026-10-13; commit `c04de8a`; go1.26.2
+- Date: 2026-10-13; commit `0f867bc`; go1.26.2
 - Hardware: Apple M2 Max,Darwin arm64 (darwin/arm64, 12 logical CPUs). This is a development machine, not ORCON-REF-1: absolute latencies on the reference hardware (performance.md PERF-4) will differ; the ratios between paths and modes and the pass/fail of the targets are what this report establishes.
 - Runtime: QuickJS-ng 0.17.0, Luxon 3.7.2, wazero v1.11.0 (wazero compiler mode where the platform supports it).
 
@@ -45,17 +45,17 @@ The production stop of expression evaluations (ADR-0018 section 3 as amended by 
 
 ### Latency
 
-Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 216.7 µs, 218.0 µs, 223.0 µs. Without Luxon, per run: 55.9 µs, 53.5 µs, 55.5 µs; with Luxon, per run: 228.6 µs, 236.5 µs, 249.2 µs. The figures judged against the targets are the medians of these.
+Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 232.0 µs, 233.3 µs, 243.6 µs. Without Luxon, per run: 64.8 µs, 59.6 µs, 63.0 µs; with Luxon, per run: 249.4 µs, 251.0 µs, 278.2 µs. The figures judged against the targets are the medians of these.
 
 | Path | Samples | Mean | p50 | p90 | p99 | Max |
 |---|---|---|---|---|---|---|
-| Fast path (all fast cases) | 18000 | 511 ns | 458 ns | 792 ns | 875 ns | 18.3 µs |
-| Warm sandbox (all sandbox cases) | 38000 | 55.0 µs | 35.7 µs | 180.5 µs | 215.0 µs | 573.2 µs |
-| Warm sandbox, median complexity (nodes 2..8) | 24000 | 65.3 µs | 33.8 µs | 185.6 µs | 218.0 µs | 573.2 µs |
-| &nbsp;&nbsp;of which without Luxon | 18000 | 33.3 µs | 31.3 µs | 45.6 µs | 53.5 µs | 226.4 µs |
-| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 161.4 µs | 182.0 µs | 212.1 µs | 236.5 µs | 573.2 µs |
-| Cold: first evaluation of a new session (opens a runtime) | 50 | 454.9 µs | 359.1 µs | 675.2 µs | 916.2 µs | 916.2 µs |
-| Runtime creation alone | 50 | 346.1 µs | 346.8 µs | 449.8 µs | 529.1 µs | 529.1 µs |
+| Fast path (all fast cases) | 18000 | 514 ns | 458 ns | 833 ns | 875 ns | 18.6 µs |
+| Warm sandbox (all sandbox cases) | 38000 | 59.8 µs | 39.0 µs | 191.7 µs | 229.8 µs | 585.0 µs |
+| Warm sandbox, median complexity (nodes 2..8) | 24000 | 70.7 µs | 37.8 µs | 199.2 µs | 233.3 µs | 585.0 µs |
+| &nbsp;&nbsp;of which without Luxon | 18000 | 36.9 µs | 34.6 µs | 50.2 µs | 59.6 µs | 349.1 µs |
+| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 172.2 µs | 193.6 µs | 225.8 µs | 251.0 µs | 585.0 µs |
+| Cold: first evaluation of a new session (opens a runtime) | 50 | 457.2 µs | 402.2 µs | 610.0 µs | 1.00 ms | 1.00 ms |
+| Runtime creation alone | 50 | 363.0 µs | 335.2 µs | 499.3 µs | 956.0 µs | 956.0 µs |
 
 Cold start restores a memory snapshot taken after the prelude (Luxon, the runtime scripts, the extension methods) loaded once per configuration, instead of running the prelude again; building that snapshot is a one-time cost per process.
 
@@ -65,97 +65,135 @@ Median complexity is the median number of expression nodes of a code segment of 
 
 | Case | Path | Nodes | Mean | p50 | p99 |
 |---|---|---|---|---|---|
-| member | fast | 2 | 205 ns | 208 ns | 250 ns |
-| deep member | fast | 4 | 456 ns | 458 ns | 500 ns |
-| other node | fast | 6 | 438 ns | 417 ns | 500 ns |
-| arithmetic | fast | 5 | 623 ns | 625 ns | 708 ns |
-| conditional | fast | 7 | 422 ns | 417 ns | 542 ns |
-| text template | fast | 6 | 737 ns | 709 ns | 958 ns |
-| first input | fast | 5 | 378 ns | 375 ns | 417 ns |
-| logical | fast | 7 | 495 ns | 500 ns | 542 ns |
-| list index | fast | 12 | 842 ns | 834 ns | 917 ns |
-| string method | sandbox | 4 | 27.6 µs | 27.2 µs | 36.1 µs |
-| array join | sandbox | 5 | 29.2 µs | 28.6 µs | 39.7 µs |
-| map and reduce | sandbox | 17 | 39.5 µs | 38.6 µs | 55.4 µs |
-| filter and length | sandbox | 10 | 36.7 µs | 35.9 µs | 50.0 µs |
-| date format | sandbox | 4 | 88.1 µs | 87.5 µs | 97.6 µs |
-| date arithmetic | sandbox | 7 | 183.8 µs | 182.0 µs | 202.6 µs |
-| date parse | sandbox | 8 | 212.2 µs | 209.2 µs | 264.5 µs |
-| json stringify | sandbox | 5 | 33.5 µs | 32.3 µs | 47.0 µs |
-| text cleanup | sandbox | 12 | 40.0 µs | 38.8 µs | 50.8 µs |
-| email check | sandbox | 7 | 28.7 µs | 28.3 µs | 37.1 µs |
-| object keys | sandbox | 6 | 29.9 µs | 29.1 µs | 40.0 µs |
-| extension pluck | sandbox | 8 | 38.0 µs | 37.0 µs | 48.3 µs |
-| extension title case | sandbox | 4 | 35.1 µs | 34.2 µs | 47.8 µs |
-| all items of a node | sandbox | 14 | 47.5 µs | 46.4 µs | 57.0 µs |
-| sort | sandbox | 15 | 30.3 µs | 29.3 µs | 37.5 µs |
-| jmespath | sandbox | 5 | 48.6 µs | 47.8 µs | 59.6 µs |
-| number format | sandbox | 10 | 29.0 µs | 27.9 µs | 40.4 µs |
-| date from timestamp | sandbox | 6 | 28.9 µs | 27.8 µs | 39.8 µs |
-| string pipeline | sandbox | 13 | 37.8 µs | 36.9 µs | 50.4 µs |
+| member | fast | 2 | 204 ns | 208 ns | 250 ns |
+| deep member | fast | 4 | 467 ns | 458 ns | 500 ns |
+| other node | fast | 6 | 449 ns | 417 ns | 500 ns |
+| arithmetic | fast | 5 | 632 ns | 625 ns | 667 ns |
+| conditional | fast | 7 | 413 ns | 417 ns | 500 ns |
+| text template | fast | 6 | 746 ns | 709 ns | 917 ns |
+| first input | fast | 5 | 384 ns | 375 ns | 459 ns |
+| logical | fast | 7 | 486 ns | 500 ns | 542 ns |
+| list index | fast | 12 | 844 ns | 834 ns | 917 ns |
+| string method | sandbox | 4 | 31.2 µs | 30.5 µs | 45.7 µs |
+| array join | sandbox | 5 | 33.6 µs | 32.6 µs | 50.4 µs |
+| map and reduce | sandbox | 17 | 43.7 µs | 41.8 µs | 62.2 µs |
+| filter and length | sandbox | 10 | 41.4 µs | 39.5 µs | 57.2 µs |
+| date format | sandbox | 4 | 95.5 µs | 94.6 µs | 109.4 µs |
+| date arithmetic | sandbox | 7 | 196.8 µs | 193.6 µs | 235.2 µs |
+| date parse | sandbox | 8 | 224.4 µs | 221.5 µs | 266.8 µs |
+| json stringify | sandbox | 5 | 36.8 µs | 34.6 µs | 53.3 µs |
+| text cleanup | sandbox | 12 | 43.1 µs | 41.3 µs | 56.9 µs |
+| email check | sandbox | 7 | 34.2 µs | 32.0 µs | 54.7 µs |
+| object keys | sandbox | 6 | 32.7 µs | 31.1 µs | 49.0 µs |
+| extension pluck | sandbox | 8 | 41.9 µs | 39.8 µs | 55.2 µs |
+| extension title case | sandbox | 4 | 38.0 µs | 36.6 µs | 51.2 µs |
+| all items of a node | sandbox | 14 | 53.0 µs | 51.7 µs | 68.1 µs |
+| sort | sandbox | 15 | 35.1 µs | 33.5 µs | 47.6 µs |
+| jmespath | sandbox | 5 | 52.8 µs | 51.4 µs | 64.9 µs |
+| number format | sandbox | 10 | 31.3 µs | 30.6 µs | 41.8 µs |
+| date from timestamp | sandbox | 6 | 31.1 µs | 30.4 µs | 41.2 µs |
+| string pipeline | sandbox | 13 | 40.2 µs | 38.9 µs | 51.1 µs |
 
 ### Instance cost and memory
 
-- Creating a runtime from the snapshot: mean 346.1 µs, p99 529.1 µs.
+- Creating a runtime from the snapshot: mean 363.0 µs, p99 956.0 µs.
 - WebAssembly linear memory of a new runtime: 2.25 MiB (the per-expression cap is 64 MiB; memory is allocated on demand).
 - JavaScript heap in use after loading the prelude: 0.82 MiB.
 - Growth of the Go heap per open runtime: 2.84 MiB.
-- Throughput of one session on one core: 37078 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 256444 evaluations/s in total (32056 per session).
+- Throughput of one session on one core: 31878 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 267034 evaluations/s in total (33379 per session).
 
 ### Answering at the deadline
 
-Each function below is made to run far past a 50.00 ms deadline on a runtime that already served a request. "Caller wait" is how long after the deadline the caller got its `ErrTimeout`; "call ran on" is how long the abandoned call kept running before its next poll of the interrupt handler stopped it and its runtime was closed. The largest caller wait was 6.08 ms and the largest overshoot 58.71 ms (the tests hold them to 5 ms and 100 ms: `TestSandboxIsolationAbandon`).
+Each function below is made to run far past a 50.00 ms deadline on a runtime that already served a request. "Caller wait" is how long after the deadline the caller got its `ErrTimeout`; "call ran on" is how long the abandoned call kept running before its next poll of the interrupt handler stopped it and its runtime was closed. The largest caller wait was 1.91 ms and the largest overshoot 31.27 ms (the tests hold them to 5 ms and 100 ms: `TestSandboxIsolationAbandon`).
 
-| Function | Caller wait past the deadline | Call ran on, before the patch of section C | Call ran on, now (max) | Call ran on, now (p99) |
-|---|---|---|---|---|
-| indexOf | 2.04 ms | 4.09 ms | 6.41 ms | 6.41 ms |
-| lastIndexOf | 2.03 ms | 425.0 µs | 399.8 µs | 399.8 µs |
-| includes | 2.02 ms | 5.98 ms | 5.83 ms | 5.83 ms |
-| replaceAll | 2.05 ms | 353.0 µs | 402.2 µs | 402.2 µs |
-| replace with a pattern | 2.04 ms | 9.97 ms | 7.49 ms | 7.49 ms |
-| split | 2.07 ms | 9.01 ms | 8.83 ms | 8.83 ms |
-| repeat | 2.06 ms | 365.0 µs | 435.5 µs | 435.5 µs |
-| padStart | 2.06 ms | 397.0 µs | 427.9 µs | 427.9 µs |
-| JSON.parse | 2.05 ms | 2.46 ms | 1.99 ms | 1.99 ms |
-| JSON.stringify | 2.05 ms | 8.50 ms | 8.35 ms | 8.35 ms |
-| JSON.stringify nested | 2.05 ms | 7.36 ms | 144.8 µs | 144.8 µs |
-| join | 2.05 ms | 41.66 ms | 17.38 ms | 17.38 ms |
-| concat | 2.04 ms | 17.09 ms | 16.64 ms | 16.64 ms |
-| flat | 2.05 ms | 22.26 ms | 17.03 ms | 17.03 ms |
-| toUpperCase | 2.05 ms | 465.0 µs | 480.4 µs | 480.4 µs |
-| encodeURIComponent | 2.04 ms | 581.0 µs | 505.7 µs | 505.7 µs |
-| loop | 2.05 ms | 82.0 µs | 117.7 µs | 117.7 µs |
-| unshift in a loop | 2.05 ms | 21.65 s | 29.99 ms | 29.99 ms |
-| string comparison in a loop | 2.04 ms | 8.56 s | 5.64 ms | 5.64 ms |
-| copyWithin in a loop | 2.05 ms | 11.52 s | 29.73 ms | 29.73 ms |
-| array spread in a loop | 2.06 ms | 2.47 s | 1.10 ms | 1.10 ms |
-| Object.keys in a loop | 2.05 ms | 4.52 s | 418.0 µs | 418.0 µs |
-| trim | 2.04 ms | 137.00 ms | 58.71 ms | 58.71 ms |
-| escape | 2.04 ms | 247.00 ms | 828.6 µs | 828.6 µs |
-| Array.from | 2.03 ms | 220.00 ms | 8.00 ms | 8.00 ms |
-| BigInt multiplication | 2.05 ms | not measured | 123.0 µs | 123.0 µs |
-| BigInt multiplication in a loop | 2.02 ms | not measured | 125.5 µs | 125.5 µs |
-| BigInt division in a loop | 2.03 ms | not measured | 196.2 µs | 196.2 µs |
-| includes inside filter | 2.02 ms | 1.19 s | 517.0 µs | 517.0 µs |
+| Function | Caller wait past the deadline | Call ran on, before the patch of section C | Call ran on, now (max) | Call ran on, now (p99) | Longest without a host call |
+|---|---|---|---|---|---|
+| indexOf | 754.3 µs | 4.09 ms | 531.8 µs | 531.8 µs | 3.18 ms |
+| lastIndexOf | 538.2 µs | 425.0 µs | 451.0 µs | 451.0 µs | 2.04 ms |
+| includes | 766.2 µs | 5.98 ms | 0 ns | 0 ns | 704.6 µs |
+| replaceAll | 527.0 µs | 353.0 µs | 0 ns | 0 ns | 605.3 µs |
+| replace with a pattern | 1.04 ms | 9.97 ms | 9.71 ms | 9.71 ms | 1.94 ms |
+| split | 1.05 ms | 9.01 ms | 15.88 ms | 15.88 ms | 5.03 ms |
+| repeat | 593.9 µs | 365.0 µs | 0 ns | 0 ns | 794.0 µs |
+| padStart | 517.5 µs | 397.0 µs | 0 ns | 0 ns | 285.7 µs |
+| JSON.parse | 230.5 µs | 2.46 ms | 0 ns | 0 ns | 548.3 µs |
+| JSON.stringify | 1.05 ms | 8.50 ms | 19.14 ms | 19.14 ms | 4.04 ms |
+| JSON.stringify nested | 137.5 µs | 7.36 ms | 0 ns | 0 ns | 468.2 µs |
+| join | 1.05 ms | 41.66 ms | 29.14 ms | 29.14 ms | 2.92 ms |
+| concat | 1.06 ms | 17.09 ms | 20.60 ms | 20.60 ms | 1.67 ms |
+| flat | 1.04 ms | 22.26 ms | 31.27 ms | 31.27 ms | 3.04 ms |
+| toUpperCase | 524.5 µs | 465.0 µs | 0 ns | 0 ns | 292.3 µs |
+| encodeURIComponent | 549.7 µs | 581.0 µs | 533.7 µs | 533.7 µs | 1.89 ms |
+| loop | 104.9 µs | 82.0 µs | 0 ns | 0 ns | 81.1 µs |
+| unshift in a loop | 1.05 ms | 21.65 s | 28.42 ms | 28.42 ms | 3.78 ms |
+| string comparison in a loop | 1.05 ms | 8.56 s | 3.23 ms | 3.23 ms | 503.4 µs |
+| copyWithin in a loop | 1.05 ms | 11.52 s | 26.36 ms | 26.36 ms | 3.66 ms |
+| array spread in a loop | 1.05 ms | 2.47 s | 13.80 ms | 13.80 ms | 1.29 ms |
+| Object.keys in a loop | 1.04 ms | 4.52 s | 4.93 ms | 4.93 ms | 1.18 ms |
+| trim | 596.2 µs | 137.00 ms | 245.8 µs | 245.8 µs | 253.1 µs |
+| escape | 746.1 µs | 247.00 ms | 421.1 µs | 421.1 µs | 432.9 µs |
+| Array.from | 1.04 ms | 220.00 ms | 9.35 ms | 9.35 ms | 1.37 ms |
+| BigInt multiplication | 131.4 µs | not measured | 0 ns | 0 ns | 149.6 µs |
+| BigInt multiplication in a loop | 130.4 µs | not measured | 0 ns | 0 ns | 170.8 µs |
+| BigInt division in a loop | 216.5 µs | not measured | 0 ns | 0 ns | 225.2 µs |
+| includes inside filter | 589.4 µs | 1.19 s | 77.5 µs | 77.5 µs | 556.7 µs |
 
 #### Every native function of the guest
 
-`TestSandboxIsolationBuiltinInventory` classifies the 522 native functions reachable from the global object; the 207 covered ones are each driven past the deadline as one large call and inside a loop of calls (`TestSandboxIsolationAbandonNatives`, 334 runs). The abandoned call ran on for at most 41.59 ms after its caller left (p99 28.03 ms); 0 runs were above 100 ms.
+`TestSandboxIsolationBuiltinInventory` classifies the 522 native functions reachable from the global object; the 207 covered ones are each driven past the deadline as one large call and inside a loop of calls (`TestSandboxIsolationAbandonNatives`, 345 runs). The abandoned call ran on for at most 27.95 ms after its caller left (p99 23.67 ms); 0 runs were above 100 ms.
 
 | Slowest to stop | Call ran on |
 |---|---|
-| String.prototype.startsWith (loop) | 41.59 ms |
-| String.prototype.endsWith (loop) | 41.34 ms |
-| String.prototype.matchAll (loop) | 28.18 ms |
-| RegExp.prototype.[Symbol.matchAll] (loop) | 28.03 ms |
-| RegExp.prototype.[Symbol.matchAll] (single) | 26.11 ms |
-| String.prototype.matchAll (single) | 25.37 ms |
-| Array.prototype.splice (single) | 22.17 ms |
-| String.prototype.[Symbol.iterator] (loop) | 20.67 ms |
-| %TypedArray%.prototype.toSorted (loop) | 20.24 ms |
-| JSON.stringify (loop) | 18.90 ms |
+| Uint8Array.fromBase64 (loop) | 27.95 ms |
+| Uint8Array.prototype.setFromBase64 (loop) | 26.39 ms |
+| Array.prototype.toSorted (single) | 24.39 ms |
+| %TypedArray%.prototype.toSorted (loop) | 23.67 ms |
+| Array.prototype.concat (loop) | 22.80 ms |
+| %TypedArray%.prototype.sort (loop) | 20.40 ms |
+| Array.prototype.splice (single) | 20.37 ms |
+| String.prototype.endsWith (loop) | 19.79 ms |
+| String.prototype.startsWith (loop) | 19.10 ms |
+| RegExp.prototype.[Symbol.matchAll] (loop) | 18.95 ms |
 
-Goroutine cost per call, against the same call without the goroutine: +4379 ns, +5.0 allocations, +360 bytes. A call that does not reach its deadline pays only this; an abandoned call also costs its runtime, which is closed when the call ends and never reused, so the next call opens a new one (see the cold open above).
+The guest returns to the host at least every millisecond of native work, so that Go can run a timer or stop the world; the longest it went without doing so over these runs was 6.92 ms (p99 3.86 ms). The tests hold the cases of the first table to 2 ms and the natives to 5 ms.
+
+| Longest without a host call | Stretch |
+|---|---|
+| Array.prototype.toSorted (single) | 6.92 ms |
+| %TypedArray%.prototype.copyWithin (loop) | 4.64 ms |
+| String.prototype.[Symbol.iterator] (loop) | 4.51 ms |
+| Array.prototype.sort (single) | 3.86 ms |
+| String.prototype.[Symbol.iterator] (single) | 3.79 ms |
+| ArrayBuffer.prototype.transferToImmutable (loop) | 3.74 ms |
+| %TypedArray%.prototype.map (single) | 3.65 ms |
+| Uint8Array.prototype.toBase64 (loop) | 3.51 ms |
+| btoa (loop) | 3.46 ms |
+| String.prototype.matchAll (single) | 3.27 ms |
+
+Goroutine cost per call, against the same call without the goroutine: +5434 ns, +5.0 allocations, +392 bytes. A call that does not reach its deadline pays only this; an abandoned call also costs its runtime, which is closed when the call ends and never reused, so the next call opens a new one (see the cold open above).
+
+### Under load
+
+At most GOMAXPROCS - 1 calls run guest code at once (configurable with `--expr-sandbox-slots`), and an abandoned call keeps its slot until its guest returns, so the process always has a scheduler slot for timers and requests. Waiting for a slot does not use the deadline of the expression; a call that waits longer than the slot-wait limit (1 s by default) fails with `ErrSandboxSaturated`.
+
+Throughput of trivial warm calls, one goroutine per processor, 400 ms per row. "Slot wait" is the wait of each call for a slot, the calls that found one free included.
+
+| GOMAXPROCS | Slots | Calls per second | Slot wait p50 | Slot wait p99 |
+|---|---|---|---|---|
+| 2 | 1 | 46784 | 21.4 µs | 34.5 µs |
+| 2 | 2 | 115634 | 0 ns | 0 ns |
+| 4 | 3 | 141483 | 6.8 µs | 23.1 µs |
+| 4 | 4 | 228479 | 0 ns | 0 ns |
+| 8 | 7 | 266863 | 0 ns | 33.0 µs |
+| 8 | 8 | 399430 | 0 ns | 0 ns |
+
+Hostile calls: 2 x slots + 2 calls that run for seconds unstopped, started together, with a deadline of 100 ms, at most 2 abandoned calls, a slot wait of 50 ms, the garbage collector running in a loop and a heartbeat of 1 ms. "Held" is the longest wait of a call that had a slot and "refused" of one that did not; the heartbeat is how late the 1 ms timer ran at worst. The tests hold the held wait to the deadline plus 5 ms, the refused wait to the slot wait plus 5 ms, and the heartbeat and the pauses to 5 ms (`TestAbandonUnderLoad`).
+
+| GOMAXPROCS | Slots | Calls | Held | Refused | Held wait (max) | Refused wait (max) | Heartbeat late (max) | GC pause (max) |
+|---|---|---|---|---|---|---|---|---|
+| 2 | 1 | 4 | 1 | 3 | 100.29 ms | 50.12 ms | 1.96 ms | 1.57 ms |
+| 4 | 3 | 8 | 3 | 5 | 100.13 ms | 50.31 ms | 2.50 ms | 655.4 µs |
+| 4 | 1 | 4 | 1 | 3 | 100.10 ms | 50.24 ms | 1.84 ms | 1.57 ms |
 
 ## Mode 2: hard limit
 
@@ -163,17 +201,17 @@ Measured for comparison only; not a production mode for expressions. The deadlin
 
 ### Latency
 
-Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 753.2 µs, 761.8 µs, 778.9 µs. Without Luxon, per run: 178.7 µs, 179.8 µs, 178.5 µs; with Luxon, per run: 824.9 µs, 829.8 µs, 905.2 µs. The figures judged against the targets are the medians of these.
+Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 774.0 µs, 800.0 µs, 817.8 µs. Without Luxon, per run: 186.2 µs, 197.8 µs, 199.1 µs; with Luxon, per run: 837.6 µs, 854.1 µs, 887.6 µs. The figures judged against the targets are the medians of these.
 
 | Path | Samples | Mean | p50 | p90 | p99 | Max |
 |---|---|---|---|---|---|---|
-| Fast path (all fast cases) | 18000 | 534 ns | 458 ns | 833 ns | 875 ns | 34.0 µs |
-| Warm sandbox (all sandbox cases) | 38000 | 174.4 µs | 100.9 µs | 683.2 µs | 745.7 µs | 1.15 ms |
-| Warm sandbox, median complexity (nodes 2..8) | 24000 | 214.9 µs | 91.9 µs | 706.0 µs | 761.8 µs | 1.15 ms |
-| &nbsp;&nbsp;of which without Luxon | 18000 | 92.6 µs | 80.0 µs | 163.6 µs | 179.8 µs | 443.9 µs |
-| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 581.7 µs | 694.0 µs | 733.5 µs | 829.8 µs | 1.15 ms |
-| Cold: first evaluation of a new session (opens a runtime) | 50 | 665.2 µs | 540.9 µs | 945.4 µs | 1.28 ms | 1.28 ms |
-| Runtime creation alone | 50 | 374.8 µs | 337.3 µs | 630.7 µs | 732.0 µs | 732.0 µs |
+| Fast path (all fast cases) | 18000 | 485 ns | 417 ns | 750 ns | 833 ns | 7.2 µs |
+| Warm sandbox (all sandbox cases) | 38000 | 184.6 µs | 110.3 µs | 697.1 µs | 777.4 µs | 1.44 ms |
+| Warm sandbox, median complexity (nodes 2..8) | 24000 | 224.9 µs | 98.5 µs | 721.4 µs | 800.0 µs | 1.44 ms |
+| &nbsp;&nbsp;of which without Luxon | 18000 | 99.4 µs | 85.1 µs | 171.1 µs | 197.8 µs | 1.44 ms |
+| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 601.5 µs | 707.0 µs | 760.7 µs | 854.1 µs | 1.05 ms |
+| Cold: first evaluation of a new session (opens a runtime) | 50 | 633.6 µs | 532.6 µs | 836.9 µs | 1.08 ms | 1.08 ms |
+| Runtime creation alone | 50 | 335.5 µs | 323.7 µs | 450.8 µs | 516.4 µs | 516.4 µs |
 
 Cold start restores a memory snapshot taken after the prelude (Luxon, the runtime scripts, the extension methods) loaded once per configuration, instead of running the prelude again; building that snapshot is a one-time cost per process.
 
@@ -183,42 +221,42 @@ Median complexity is the median number of expression nodes of a code segment of 
 
 | Case | Path | Nodes | Mean | p50 | p99 |
 |---|---|---|---|---|---|
-| member | fast | 2 | 202 ns | 208 ns | 250 ns |
-| deep member | fast | 4 | 482 ns | 458 ns | 500 ns |
-| other node | fast | 6 | 456 ns | 417 ns | 542 ns |
-| arithmetic | fast | 5 | 636 ns | 625 ns | 708 ns |
-| conditional | fast | 7 | 421 ns | 417 ns | 459 ns |
-| text template | fast | 6 | 756 ns | 709 ns | 1.0 µs |
-| first input | fast | 5 | 414 ns | 375 ns | 500 ns |
-| logical | fast | 7 | 506 ns | 500 ns | 542 ns |
-| list index | fast | 12 | 937 ns | 834 ns | 5.0 µs |
-| string method | sandbox | 4 | 71.6 µs | 70.8 µs | 88.5 µs |
-| array join | sandbox | 5 | 74.1 µs | 72.2 µs | 91.8 µs |
-| map and reduce | sandbox | 17 | 110.2 µs | 108.2 µs | 136.1 µs |
-| filter and length | sandbox | 10 | 103.2 µs | 101.1 µs | 127.2 µs |
-| date format | sandbox | 4 | 315.1 µs | 311.9 µs | 370.2 µs |
-| date arithmetic | sandbox | 7 | 702.1 µs | 694.0 µs | 826.6 µs |
-| date parse | sandbox | 8 | 728.0 µs | 719.1 µs | 853.7 µs |
-| json stringify | sandbox | 5 | 82.6 µs | 80.7 µs | 102.9 µs |
-| text cleanup | sandbox | 12 | 112.2 µs | 109.5 µs | 138.4 µs |
-| email check | sandbox | 7 | 78.3 µs | 76.4 µs | 101.0 µs |
-| object keys | sandbox | 6 | 76.7 µs | 74.9 µs | 91.8 µs |
-| extension pluck | sandbox | 8 | 106.2 µs | 103.7 µs | 129.3 µs |
-| extension title case | sandbox | 4 | 95.5 µs | 93.4 µs | 115.3 µs |
-| all items of a node | sandbox | 14 | 137.9 µs | 136.0 µs | 163.9 µs |
-| sort | sandbox | 15 | 87.0 µs | 85.4 µs | 113.7 µs |
-| jmespath | sandbox | 5 | 169.5 µs | 167.0 µs | 198.2 µs |
-| number format | sandbox | 10 | 79.1 µs | 77.5 µs | 96.0 µs |
-| date from timestamp | sandbox | 6 | 79.2 µs | 77.8 µs | 96.1 µs |
-| string pipeline | sandbox | 13 | 104.2 µs | 102.0 µs | 125.9 µs |
+| member | fast | 2 | 204 ns | 208 ns | 250 ns |
+| deep member | fast | 4 | 424 ns | 417 ns | 500 ns |
+| other node | fast | 6 | 438 ns | 417 ns | 500 ns |
+| arithmetic | fast | 5 | 625 ns | 625 ns | 667 ns |
+| conditional | fast | 7 | 345 ns | 334 ns | 416 ns |
+| text template | fast | 6 | 755 ns | 709 ns | 1.3 µs |
+| first input | fast | 5 | 381 ns | 375 ns | 417 ns |
+| logical | fast | 7 | 428 ns | 417 ns | 541 ns |
+| list index | fast | 12 | 765 ns | 750 ns | 834 ns |
+| string method | sandbox | 4 | 75.9 µs | 74.4 µs | 96.9 µs |
+| array join | sandbox | 5 | 79.6 µs | 78.6 µs | 98.4 µs |
+| map and reduce | sandbox | 17 | 124.1 µs | 122.0 µs | 171.7 µs |
+| filter and length | sandbox | 10 | 113.6 µs | 111.9 µs | 139.5 µs |
+| date format | sandbox | 4 | 336.3 µs | 331.6 µs | 409.0 µs |
+| date arithmetic | sandbox | 7 | 716.1 µs | 707.0 µs | 836.1 µs |
+| date parse | sandbox | 8 | 752.1 µs | 740.2 µs | 880.1 µs |
+| json stringify | sandbox | 5 | 88.4 µs | 86.2 µs | 109.0 µs |
+| text cleanup | sandbox | 12 | 121.2 µs | 118.2 µs | 152.3 µs |
+| email check | sandbox | 7 | 81.9 µs | 80.3 µs | 110.1 µs |
+| object keys | sandbox | 6 | 80.1 µs | 79.1 µs | 102.9 µs |
+| extension pluck | sandbox | 8 | 115.3 µs | 113.2 µs | 148.4 µs |
+| extension title case | sandbox | 4 | 102.1 µs | 100.2 µs | 131.3 µs |
+| all items of a node | sandbox | 14 | 149.1 µs | 145.6 µs | 199.8 µs |
+| sort | sandbox | 15 | 98.2 µs | 93.6 µs | 145.9 µs |
+| jmespath | sandbox | 5 | 179.6 µs | 176.0 µs | 222.1 µs |
+| number format | sandbox | 10 | 87.5 µs | 85.2 µs | 114.0 µs |
+| date from timestamp | sandbox | 6 | 91.8 µs | 84.1 µs | 251.9 µs |
+| string pipeline | sandbox | 13 | 114.1 µs | 111.8 µs | 149.5 µs |
 
 ### Instance cost and memory
 
-- Creating a runtime from the snapshot: mean 374.8 µs, p99 732.0 µs.
+- Creating a runtime from the snapshot: mean 335.5 µs, p99 516.4 µs.
 - WebAssembly linear memory of a new runtime: 2.25 MiB (the per-expression cap is 64 MiB; memory is allocated on demand).
 - JavaScript heap in use after loading the prelude: 0.82 MiB.
 - Growth of the Go heap per open runtime: 2.84 MiB.
-- Throughput of one session on one core: 14038 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 99998 evaluations/s in total (12500 per session).
+- Throughput of one session on one core: 12646 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 94416 evaluations/s in total (11802 per session).
 
 ## Mode 3: cooperative limit
 
@@ -226,17 +264,17 @@ Measured for comparison only. The cooperative stop of the production mode withou
 
 ### Latency
 
-Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 206.5 µs, 208.2 µs, 212.0 µs. Without Luxon, per run: 47.9 µs, 45.5 µs, 46.2 µs; with Luxon, per run: 212.8 µs, 219.2 µs, 229.8 µs. The figures judged against the targets are the medians of these.
+Each case is evaluated 2000 times after 300 untimed warm-up evaluations, one session, one goroutine. Times include building the request, the call into the sandbox and decoding the answer. A "warm" sandbox is a runtime that already served requests. The suite ran 3 times; the tables show the run with the median p99 of the median-complexity band. That p99 in every run: 223.6 µs, 225.5 µs, 225.7 µs. Without Luxon, per run: 51.0 µs, 47.6 µs, 50.6 µs; with Luxon, per run: 238.9 µs, 241.3 µs, 245.8 µs. The figures judged against the targets are the medians of these.
 
 | Path | Samples | Mean | p50 | p90 | p99 | Max |
 |---|---|---|---|---|---|---|
-| Fast path (all fast cases) | 18000 | 484 ns | 417 ns | 750 ns | 792 ns | 21.0 µs |
-| Warm sandbox (all sandbox cases) | 38000 | 49.3 µs | 30.5 µs | 177.2 µs | 205.8 µs | 461.4 µs |
-| Warm sandbox, median complexity (nodes 2..8) | 24000 | 59.8 µs | 28.7 µs | 181.0 µs | 208.2 µs | 461.4 µs |
-| &nbsp;&nbsp;of which without Luxon | 18000 | 27.6 µs | 24.4 µs | 41.5 µs | 45.5 µs | 266.4 µs |
-| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 156.2 µs | 178.2 µs | 204.1 µs | 219.2 µs | 461.4 µs |
-| Cold: first evaluation of a new session (opens a runtime) | 50 | 500.7 µs | 466.5 µs | 713.1 µs | 1.03 ms | 1.03 ms |
-| Runtime creation alone | 50 | 362.6 µs | 358.8 µs | 537.6 µs | 707.8 µs | 707.8 µs |
+| Fast path (all fast cases) | 18000 | 484 ns | 417 ns | 750 ns | 792 ns | 18.9 µs |
+| Warm sandbox (all sandbox cases) | 38000 | 53.0 µs | 32.8 µs | 187.4 µs | 220.6 µs | 710.7 µs |
+| Warm sandbox, median complexity (nodes 2..8) | 24000 | 64.2 µs | 30.8 µs | 191.4 µs | 225.5 µs | 710.7 µs |
+| &nbsp;&nbsp;of which without Luxon | 18000 | 29.9 µs | 27.7 µs | 44.5 µs | 47.6 µs | 307.7 µs |
+| &nbsp;&nbsp;of which running Luxon (dates) | 6000 | 167.0 µs | 188.9 µs | 216.6 µs | 241.3 µs | 710.7 µs |
+| Cold: first evaluation of a new session (opens a runtime) | 50 | 497.4 µs | 405.8 µs | 757.2 µs | 997.8 µs | 997.8 µs |
+| Runtime creation alone | 50 | 352.2 µs | 340.9 µs | 506.2 µs | 656.4 µs | 656.4 µs |
 
 Cold start restores a memory snapshot taken after the prelude (Luxon, the runtime scripts, the extension methods) loaded once per configuration, instead of running the prelude again; building that snapshot is a one-time cost per process.
 
@@ -246,42 +284,42 @@ Median complexity is the median number of expression nodes of a code segment of 
 
 | Case | Path | Nodes | Mean | p50 | p99 |
 |---|---|---|---|---|---|
-| member | fast | 2 | 202 ns | 208 ns | 250 ns |
-| deep member | fast | 4 | 425 ns | 417 ns | 500 ns |
-| other node | fast | 6 | 425 ns | 417 ns | 500 ns |
-| arithmetic | fast | 5 | 618 ns | 625 ns | 708 ns |
-| conditional | fast | 7 | 351 ns | 334 ns | 458 ns |
-| text template | fast | 6 | 759 ns | 709 ns | 1.0 µs |
-| first input | fast | 5 | 382 ns | 375 ns | 417 ns |
-| logical | fast | 7 | 426 ns | 417 ns | 500 ns |
+| member | fast | 2 | 210 ns | 208 ns | 250 ns |
+| deep member | fast | 4 | 421 ns | 417 ns | 459 ns |
+| other node | fast | 6 | 433 ns | 417 ns | 500 ns |
+| arithmetic | fast | 5 | 625 ns | 625 ns | 791 ns |
+| conditional | fast | 7 | 345 ns | 334 ns | 416 ns |
+| text template | fast | 6 | 748 ns | 709 ns | 916 ns |
+| first input | fast | 5 | 383 ns | 375 ns | 417 ns |
+| logical | fast | 7 | 422 ns | 417 ns | 459 ns |
 | list index | fast | 12 | 766 ns | 750 ns | 834 ns |
-| string method | sandbox | 4 | 22.2 µs | 21.4 µs | 32.3 µs |
-| array join | sandbox | 5 | 23.7 µs | 23.1 µs | 30.9 µs |
-| map and reduce | sandbox | 17 | 32.3 µs | 31.4 µs | 42.5 µs |
-| filter and length | sandbox | 10 | 31.1 µs | 29.8 µs | 41.2 µs |
-| date format | sandbox | 4 | 83.8 µs | 82.2 µs | 99.5 µs |
-| date arithmetic | sandbox | 7 | 180.2 µs | 178.2 µs | 203.6 µs |
-| date parse | sandbox | 8 | 204.4 µs | 202.4 µs | 233.6 µs |
-| json stringify | sandbox | 5 | 26.9 µs | 26.3 µs | 34.6 µs |
-| text cleanup | sandbox | 12 | 32.7 µs | 32.2 µs | 38.3 µs |
-| email check | sandbox | 7 | 23.0 µs | 22.5 µs | 28.4 µs |
-| object keys | sandbox | 6 | 23.4 µs | 23.0 µs | 28.1 µs |
-| extension pluck | sandbox | 8 | 31.8 µs | 31.0 µs | 43.0 µs |
-| extension title case | sandbox | 4 | 30.3 µs | 29.2 µs | 45.0 µs |
-| all items of a node | sandbox | 14 | 41.1 µs | 39.8 µs | 49.3 µs |
-| sort | sandbox | 15 | 25.9 µs | 25.1 µs | 33.0 µs |
-| jmespath | sandbox | 5 | 42.8 µs | 42.1 µs | 49.5 µs |
-| number format | sandbox | 10 | 24.2 µs | 23.5 µs | 29.6 µs |
-| date from timestamp | sandbox | 6 | 24.4 µs | 23.7 µs | 30.4 µs |
-| string pipeline | sandbox | 13 | 31.9 µs | 31.1 µs | 38.9 µs |
+| string method | sandbox | 4 | 24.5 µs | 23.3 µs | 33.2 µs |
+| array join | sandbox | 5 | 26.6 µs | 25.9 µs | 34.2 µs |
+| map and reduce | sandbox | 17 | 36.0 µs | 34.8 µs | 49.5 µs |
+| filter and length | sandbox | 10 | 33.7 µs | 32.5 µs | 46.9 µs |
+| date format | sandbox | 4 | 93.2 µs | 90.3 µs | 124.0 µs |
+| date arithmetic | sandbox | 7 | 190.4 µs | 188.9 µs | 208.3 µs |
+| date parse | sandbox | 8 | 217.3 µs | 214.1 µs | 259.8 µs |
+| json stringify | sandbox | 5 | 29.4 µs | 28.2 µs | 42.0 µs |
+| text cleanup | sandbox | 12 | 36.2 µs | 35.0 µs | 47.1 µs |
+| email check | sandbox | 7 | 24.8 µs | 24.0 µs | 34.5 µs |
+| object keys | sandbox | 6 | 25.6 µs | 24.8 µs | 32.5 µs |
+| extension pluck | sandbox | 8 | 34.4 µs | 33.6 µs | 43.3 µs |
+| extension title case | sandbox | 4 | 31.8 µs | 31.0 µs | 39.2 µs |
+| all items of a node | sandbox | 14 | 43.4 µs | 42.8 µs | 52.1 µs |
+| sort | sandbox | 15 | 28.3 µs | 27.6 µs | 35.1 µs |
+| jmespath | sandbox | 5 | 45.6 µs | 45.0 µs | 54.4 µs |
+| number format | sandbox | 10 | 26.3 µs | 25.4 µs | 37.8 µs |
+| date from timestamp | sandbox | 6 | 26.3 µs | 25.2 µs | 38.5 µs |
+| string pipeline | sandbox | 13 | 34.2 µs | 33.2 µs | 46.5 µs |
 
 ### Instance cost and memory
 
-- Creating a runtime from the snapshot: mean 362.6 µs, p99 707.8 µs.
+- Creating a runtime from the snapshot: mean 352.2 µs, p99 656.4 µs.
 - WebAssembly linear memory of a new runtime: 2.25 MiB (the per-expression cap is 64 MiB; memory is allocated on demand).
 - JavaScript heap in use after loading the prelude: 0.82 MiB.
 - Growth of the Go heap per open runtime: 2.84 MiB.
-- Throughput of one session on one core: 43562 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 280302 evaluations/s in total (35038 per session).
+- Throughput of one session on one core: 40176 evaluations/s (a median-complexity sandbox case); 8 sessions in parallel: 302400 evaluations/s in total (37800 per session).
 
 ## Compatibility with the public template corpus (E-EXPR-3)
 
@@ -326,9 +364,9 @@ Reasons an expression does not run unchanged (an expression can have several):
 
 ## Reading the result
 
-- cooperative limit with abandon: median-complexity expressions without Luxon have a p99 of 55.5 µs (meets the 200µs target); expressions that run Luxon, 236.5 µs (meets the 500µs target).
-- hard limit: median-complexity expressions without Luxon have a p99 of 178.7 µs (meets the 200µs target); expressions that run Luxon, 829.8 µs (misses the 500µs target).
-- cooperative limit: median-complexity expressions without Luxon have a p99 of 46.2 µs (meets the 200µs target); expressions that run Luxon, 219.2 µs (meets the 500µs target).
+- cooperative limit with abandon: median-complexity expressions without Luxon have a p99 of 63.0 µs (meets the 200µs target); expressions that run Luxon, 251.0 µs (meets the 500µs target).
+- hard limit: median-complexity expressions without Luxon have a p99 of 197.8 µs (meets the 200µs target); expressions that run Luxon, 854.1 µs (misses the 500µs target).
+- cooperative limit: median-complexity expressions without Luxon have a p99 of 50.6 µs (meets the 200µs target); expressions that run Luxon, 241.3 µs (meets the 500µs target).
 - "Runs Luxon" means the analysis of the expression names `DateTime`, `Duration`, `Interval`, `$now`, `$today`, a date extension method (`beginningOf`, `diffTo`, `endOfMonth`, `extract`, `format`, `isDst`, `isInLast`, `isWeekend`, `minus`, `plus`) or `toDateTime` (SPEC-001 amendment 10, B.2). The classifier of this harness uses exactly that list, by name: a call to `format`, `plus` or `minus` on a value that is not a date counts as running Luxon here, which can only move a case into the band with the looser target.
 - Luxon is used by 3.4 % of the code segments of the corpus (2.7 % weighted by views) and by 16.8 % of the segments that need the sandbox. It is a large library that the interpreter runs operation by operation, so a single date operation costs tens to hundreds of microseconds however fast the call into the sandbox is.
 - The cost of the time limit is the difference between the modes: wazero's close-on-context-done adds a check to every function and loop of the module, and the interpreter runs several times slower with it.
@@ -344,9 +382,9 @@ The patch of section C charges the interrupt counter in the allocator, in string
 
 | Band | Before | After | Target |
 |---|---|---|---|
-| Without Luxon | 56.9 µs | 55.5 µs | <= 200µs |
-| With Luxon | 236.6 µs | 236.5 µs | <= 500µs |
-| Combined | 217.9 µs | 218.0 µs | no target |
+| Without Luxon | 56.9 µs | 63.0 µs | <= 200µs |
+| With Luxon | 236.6 µs | 251.0 µs | <= 500µs |
+| Combined | 217.9 µs | 233.3 µs | no target |
 
 ## Isolation and determinism
 

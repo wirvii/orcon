@@ -68,6 +68,35 @@ type ModeResult struct {
 	// Abandon holds what only the mode that answers at the deadline measures;
 	// nil for the others.
 	Abandon *AbandonResult
+	// Load is the measurement under load (SPEC-001 amendment 10, section D);
+	// nil for the modes without execution slots.
+	Load *LoadResult
+}
+
+// LoadResult is the behavior of the execution slots (amendment 10, D-3.3).
+type LoadResult struct {
+	// Throughput has one row per processor count and slot count.
+	Throughput []LoadRow
+	// Hostile has one row per configuration of the hostile-call run.
+	Hostile []HostileRow
+}
+
+// LoadRow is the throughput of trivial warm calls, one goroutine per
+// processor, with a number of slots.
+type LoadRow struct {
+	Procs, Slots int
+	CallsPerSec  float64
+	// WaitP50 and WaitP99 are the percentiles of the wait for a slot over all
+	// the calls, the ones that did not wait included.
+	WaitP50, WaitP99 time.Duration
+}
+
+// HostileRow is a run of 2*slots+2 hostile calls with the garbage collector
+// running all the time.
+type HostileRow struct {
+	Procs, Slots, Calls, Holders, Refused int
+	HeldMax, RefusedMax                   time.Duration
+	Heartbeat, GCPause                    time.Duration
 }
 
 // AbandonResult is the cost and the limits of answering at the deadline by
@@ -102,6 +131,11 @@ type NativeSummary struct {
 	Over int
 	// Worst lists the slowest cases to stop, longest first.
 	Worst []AbandonRow
+	// StretchMax and StretchP99 are the longest and the 99th percentile of the
+	// longest stretch without a host call, over the cases; WorstStretch lists
+	// the cases with the longest, longest first (Overshoot holds the stretch).
+	StretchMax, StretchP99 time.Duration
+	WorstStretch           []AbandonRow
 }
 
 // Previous is the measurement before the patch of section C, kept to show what
@@ -121,6 +155,8 @@ type AbandonRow struct {
 	// the caller stopped waiting, over the runs; Before is the same measure
 	// before the patch of section C (zero when it was not measured).
 	Wait, Overshoot, P99, Before time.Duration
+	// Stretch is the longest the guest went without calling the host.
+	Stretch time.Duration
 }
 
 // medianOf returns the median of runs, or fallback when there are none.
@@ -295,6 +331,9 @@ func (m *Measurements) Markdown() string {
 		if mode.Abandon != nil {
 			writeAbandon(&b, heading, mode.Abandon)
 		}
+		if mode.Load != nil {
+			writeLoad(&b, heading, mode.Load)
+		}
 	}
 
 	if m.Compat.Expressions > 0 {
@@ -359,13 +398,13 @@ func writeAbandon(b *strings.Builder, heading string, a *AbandonResult) {
 	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
 	w("%s Answering at the deadline\n\n", heading)
 	w("Each function below is made to run far past a %s deadline on a runtime that already served a request. \"Caller wait\" is how long after the deadline the caller got its `ErrTimeout`; \"call ran on\" is how long the abandoned call kept running before its next poll of the interrupt handler stopped it and its runtime was closed. The largest caller wait was %s and the largest overshoot %s (the tests hold them to 5 ms and 100 ms: `TestSandboxIsolationAbandon`).\n\n", dur(a.Deadline), dur(a.CallerSlack), dur(a.MaxOvershoot))
-	w("| Function | Caller wait past the deadline | Call ran on, before the patch of section C | Call ran on, now (max) | Call ran on, now (p99) |\n|---|---|---|---|---|\n")
+	w("| Function | Caller wait past the deadline | Call ran on, before the patch of section C | Call ran on, now (max) | Call ran on, now (p99) | Longest without a host call |\n|---|---|---|---|---|---|\n")
 	for _, r := range a.Functions {
 		before := "not measured"
 		if r.Before > 0 {
 			before = dur(r.Before)
 		}
-		w("| %s | %s | %s | %s | %s |\n", r.Name, dur(r.Wait), before, dur(r.Overshoot), dur(r.P99))
+		w("| %s | %s | %s | %s | %s | %s |\n", r.Name, dur(r.Wait), before, dur(r.Overshoot), dur(r.P99), dur(r.Stretch))
 	}
 	if n := a.Natives; n.Cases > 0 {
 		w("\n%s Every native function of the guest\n\n", heading+"#")
@@ -374,8 +413,31 @@ func writeAbandon(b *strings.Builder, heading string, a *AbandonResult) {
 		for _, r := range n.Worst {
 			w("| %s | %s |\n", r.Name, dur(r.Overshoot))
 		}
+		w("\nThe guest returns to the host at least every millisecond of native work, so that Go can run a timer or stop the world; the longest it went without doing so over these runs was %s (p99 %s). The tests hold the cases of the first table to 2 ms and the natives to 5 ms.\n\n", dur(n.StretchMax), dur(n.StretchP99))
+		w("| Longest without a host call | Stretch |\n|---|---|\n")
+		for _, r := range n.WorstStretch {
+			w("| %s | %s |\n", r.Name, dur(r.Overshoot))
+		}
 	}
 	w("\nGoroutine cost per call, against the same call without the goroutine: %+.0f ns, %+.1f allocations, %+.0f bytes. A call that does not reach its deadline pays only this; an abandoned call also costs its runtime, which is closed when the call ends and never reused, so the next call opens a new one (see the cold open above).\n\n", a.ExtraNs, a.ExtraAllocs, a.ExtraBytes)
+}
+
+// writeLoad renders the behavior of the execution slots.
+func writeLoad(b *strings.Builder, heading string, l *LoadResult) {
+	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
+	w("%s Under load\n\n", heading)
+	w("At most GOMAXPROCS - 1 calls run guest code at once (configurable with `--expr-sandbox-slots`), and an abandoned call keeps its slot until its guest returns, so the process always has a scheduler slot for timers and requests. Waiting for a slot does not use the deadline of the expression; a call that waits longer than the slot-wait limit (1 s by default) fails with `ErrSandboxSaturated`.\n\n")
+	w("Throughput of trivial warm calls, one goroutine per processor, 400 ms per row. \"Slot wait\" is the wait of each call for a slot, the calls that found one free included.\n\n")
+	w("| GOMAXPROCS | Slots | Calls per second | Slot wait p50 | Slot wait p99 |\n|---|---|---|---|---|\n")
+	for _, r := range l.Throughput {
+		w("| %d | %d | %.0f | %s | %s |\n", r.Procs, r.Slots, r.CallsPerSec, dur(r.WaitP50), dur(r.WaitP99))
+	}
+	w("\nHostile calls: 2 x slots + 2 calls that run for seconds unstopped, started together, with a deadline of 100 ms, at most 2 abandoned calls, a slot wait of 50 ms, the garbage collector running in a loop and a heartbeat of 1 ms. \"Held\" is the longest wait of a call that had a slot and \"refused\" of one that did not; the heartbeat is how late the 1 ms timer ran at worst. The tests hold the held wait to the deadline plus 5 ms, the refused wait to the slot wait plus 5 ms, and the heartbeat and the pauses to 5 ms (`TestAbandonUnderLoad`).\n\n")
+	w("| GOMAXPROCS | Slots | Calls | Held | Refused | Held wait (max) | Refused wait (max) | Heartbeat late (max) | GC pause (max) |\n|---|---|---|---|---|---|---|---|---|\n")
+	for _, r := range l.Hostile {
+		w("| %d | %d | %d | %d | %d | %s | %s | %s | %s |\n", r.Procs, r.Slots, r.Calls, r.Holders, r.Refused, dur(r.HeldMax), dur(r.RefusedMax), dur(r.Heartbeat), dur(r.GCPause))
+	}
+	w("\n")
 }
 
 // writePrevious compares the production stop with its measurement before the
