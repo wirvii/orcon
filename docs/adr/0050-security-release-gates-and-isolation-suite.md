@@ -25,7 +25,7 @@ S3 requires adversarial cross-organization tests on every subsystem on both stor
 | FI-30 | `kill -9` during MK rotation | restart resumes; every OK unwraps; no credential unreadable |
 | FI-31 | `kill -9` during OK rotation re-wrap | resumes; old version retired only after all DEKs moved |
 | FI-32 | wrong MK at startup | process exits before any write; clear message |
-| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `NEEDS_REAUTH`                                                    (0019 línea 47; 0050 línea 28) only if the provider rotated the token |
+| FI-33 | OAuth refresh holder killed before provider call / after provider response | single refresh at a time; second case yields `NEEDS_REAUTH` only if the provider rotated the token |
 | FI-34 | three processes need the same expired token concurrently | exactly one token-endpoint call (mock provider counts) |
 | FI-35 | audit sealer killed mid-seal | no gaps, no duplicates; verification passes |
 | FI-36 | direct DB update/delete/reorder of audit rows | verification detects and alerts within the next run |
