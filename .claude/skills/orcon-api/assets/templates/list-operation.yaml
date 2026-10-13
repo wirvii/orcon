@@ -1,0 +1,125 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Template: one collection list operation with cursor pagination, typed filters and a sort allowlist.
+# Copy into packages/openapi/v1/paths/<resource>.yaml, replace the flow example with your
+# resource, then run `make api-lint`. Rules: references/pagination.md, references/responses.md.
+/projects/{projectId}/flows:
+  x-orcon-resource: collection
+  parameters:
+    - $ref: '#/components/parameters/ProjectId'
+  get:
+    operationId: listFlows
+    summary: List the flows of a project
+    description: >-
+      Returns the flows of one project, one page at a time, ordered by the sort expression.
+      Use the filters to narrow the list and pass nextPageToken back as pageToken to read the
+      next page; the list never includes flows of other projects.
+    tags: [flows]
+    x-orcon-permission: flow:read
+    x-orcon-rate-class: read
+    x-orcon-stability: stable
+    x-orcon-audit: none
+    x-orcon-problems:
+      - unauthenticated
+      - forbidden
+      - not-found
+      - validation-failed
+      - invalid-page-token
+      - rate-limited
+      - internal-error
+    x-orcon-cli:
+      command: flows list
+    x-orcon-mcp:
+      level: read
+      tool: search_flows
+      description: Search the flows of a project by name prefix, status or tag.
+    x-orcon-examples:
+      - name: firstPageOfFlows
+        scenario: project-with-three-flows
+        request:
+          pathParams:
+            projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+          query:
+            limit: 2
+            sort: -updatedAt
+        response:
+          status: 200
+          body: firstPageOfFlows
+    parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/PageToken'
+      - name: sort
+        in: query
+        required: false
+        description: Sort expression; a leading minus sorts in descending order.
+        x-orcon-sort-default: -updatedAt
+        schema:
+          type: string
+          enum: [name, -name, updatedAt, -updatedAt]
+          x-orcon-enum-kind: identifier
+          default: -updatedAt
+      - name: status
+        in: query
+        required: false
+        description: Return only flows in this activation status.
+        schema:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+      - name: tag
+        in: query
+        required: false
+        description: Return only flows that carry this tag.
+        schema:
+          type: string
+          maxLength: 64
+          examples: [billing]
+      - name: q
+        in: query
+        required: false
+        description: Return only flows whose name starts with this text (case-insensitive).
+        schema:
+          type: string
+          maxLength: 200
+          examples: [Sync]
+    responses:
+      '200':
+        description: One page of flows.
+        headers:
+          Orcon-Request-Id:
+            $ref: '#/components/headers/OrconRequestId'
+          RateLimit:
+            $ref: '#/components/headers/RateLimit'
+          RateLimit-Policy:
+            $ref: '#/components/headers/RateLimitPolicy'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowList'
+            examples:
+              firstPageOfFlows:
+                summary: Two flows and a token for the next page
+                value:
+                  items:
+                    - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                      projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                      name: Sync CRM contacts
+                      status: ACTIVE
+                      updatedAt: '2026-10-12T15:04:05Z'
+                    - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63
+                      projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                      name: Nightly invoice export
+                      status: INACTIVE
+                      updatedAt: '2026-10-11T09:30:00Z'
+                  nextPageToken: example-page-token-2
+      '400':
+        $ref: '#/components/responses/ValidationFailed'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '429':
+        $ref: '#/components/responses/RateLimited'
+      '500':
+        $ref: '#/components/responses/InternalError'

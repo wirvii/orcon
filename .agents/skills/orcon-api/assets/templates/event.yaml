@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Template: one public event type, described in the OpenAPI webhooks section.
+# Copy the webhooks entry into the contract's webhooks section and the payload schema into
+# components/schemas, replace the flow.published example with your event, then run
+# `make api-lint`. Rules: references/events.md, references/extensions.md.
+webhooks:
+  flow.published:
+    post:
+      operationId: flowPublishedEvent
+      summary: Receive a flow published event
+      description: >-
+        Sent when a new version of a flow is published from its draft. The payload is thin: it
+        carries the ids, the version and the publishing principal, never the flow document;
+        fetch the version through the API when you need its content.
+      tags: [flows]
+      x-orcon-event:
+        type: flow.published
+        cloudEventsType: dev.orcon.flow.published.v1
+        permission: flow:read
+        stability: stable
+        since: 1.0.0
+      x-orcon-stability: stable
+      requestBody:
+        required: true
+        description: The event in CloudEvents structured JSON form.
+        content:
+          application/cloudevents+json:
+            schema:
+              $ref: '#/components/schemas/FlowPublishedEvent'
+            examples:
+              flowPublished:
+                summary: Version 8 of a flow was published
+                value:
+                  specversion: '1.0'
+                  id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a65
+                  source: /api/v1/flows/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                  type: dev.orcon.flow.published.v1
+                  time: '2026-10-12T15:04:05Z'
+                  datacontenttype: application/json
+                  data:
+                    flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    version: 8
+                    publishedByPrincipalId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+      responses:
+        '204':
+          description: The receiver accepted the event; any 2xx status is accepted.
+components:
+  schemas:
+    FlowPublishedEvent:
+      description: A flow.published event in CloudEvents structured JSON form.
+      allOf:
+        - $ref: '#/components/schemas/CloudEvent'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/FlowPublishedData'
+    FlowPublishedData:
+      type: object
+      description: Payload of the flow.published event.
+      required: [flowId, projectId, version, publishedByPrincipalId]
+      properties:
+        flowId:
+          type: string
+          format: uuid
+          description: Id of the flow that was published.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60]
+        projectId:
+          type: string
+          format: uuid
+          description: Id of the project that owns the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70]
+        version:
+          type: integer
+          minimum: 1
+          description: Number of the version created by the publication.
+          examples: [8]
+        publishedByPrincipalId:
+          type: string
+          format: uuid
+          description: Id of the user or service account that published the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61]
