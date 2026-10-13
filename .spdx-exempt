@@ -10,6 +10,7 @@
 # Formats without comment syntax, or whose bytes are significant.
 LICENSE  # canonical license text, must stay byte-identical
 **/go.sum  # generated checksum list; comments are not allowed
+go.work.sum  # generated checksum list; comments are not allowed
 **/package.json  # JSON has no comment syntax
 turbo.json  # JSON has no comment syntax
 pnpm-lock.yaml  # generated lock file
@@ -23,3 +24,4 @@ internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON dat
 internal/expr/prelude/luxon.min.js  # Luxon 3.7.2 (MIT), vendored byte for byte and unmodified; its licence is in internal/expr/prelude/LICENSE.luxon
 internal/expr/prelude/LICENSE.luxon  # licence text of Luxon, must stay byte-identical
 internal/adapter/wazero/assets/LICENSE.quickjs  # licence text of QuickJS-ng, must stay byte-identical
+internal/adapter/wazero/assets/orcon_qjs.c  # C source whose SPDX header is in a block comment, which spdxcheck does not read
