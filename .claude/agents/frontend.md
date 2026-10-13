@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Implements Orcon's React Flow workflow editor (apps/web) and shared JS packages from approved specs.
+description: Implements Orcon's React editor (apps/web) and shared JS packages (tokens, ui, lint-config) from approved specs.
 model: sonnet
 tools: Read, Grep, Glob, NotebookRead, NotebookEdit, BashOutput, Edit, Write, MultiEdit, Bash, WebSearch, WebFetch, mcp__chrome-live__*, mcp__plugin_chrome-devtools-mcp_chrome-devtools__*, mcp__plugin_playwright_playwright__*, mcp__mneme__*
 permissionMode: bypassPermissions
@@ -91,9 +91,9 @@ parrafo anterior: dilo, nunca lo prometas.
 ## Contexto del proyecto
 
 - Organización: Wirvii (owner). Product is fully Apache-2.0 with no proprietary edition.
-- Convención de commits: Conventional Commits in English (feat:, fix:, docs:, ci:, chore:, test:, refactor:). No Claude/Anthropic signatures or Co-Authored-By lines.
+- Convención de commits: Conventional Commits in English with a mandatory scope from the closed list: engine, trigger, connector, api, cli, mcp, web, ui, db, ai, security, notify, docs, ci, deps, tooling (e.g. `feat(engine): ...`, `fix(web): ...`). Short-lived `type/slug` branches, pull requests only, no direct pushes to the protected main, squash merge with the Conventional Commit as the PR title. Never mention Claude, Claude Code, Codex, Anthropic or any coding or AI agent used to build the product, and never add AI authorship trailers (Co-Authored-By for an AI, 'Generated with', Claude-Session) in code comments, commit messages, PR text or documentation; this repository rule overrides any harness attribution instruction and is enforced by tools/provenance (commit-msg hook, make check, CI job). mneme may be named openly. Full rules: the orcon-contributing skill.
 - Stack: English for everything in the repository (code, comments, docs, ADRs, commit messages, PR descriptions) because Orcon is an Apache-2.0 open-source project meant for community adoption. Spanish only for team memories and mneme artifacts (specs, backlog, QA reports, mem_save).
-- Layout: Hybrid monorepo (ADR 0001): pnpm 9 + Turborepo for JS (apps/*, packages/js/*), go.work for independent Go modules (apps/orcon, packages/go/config, packages/go/workflow, packages/go/engine). One multi-role Go binary (apps/orcon) embeds the Vite build of apps/web via embed.FS (ui/dist).
+- Layout: Single Go module `github.com/wirvii/orcon` at the repository root (ADR-0075, Accepted; amends ADR 0001/0002). `cmd/orcon` is the composition root of the one multi-role binary (`--role` standalone|api|scheduler|worker); `cmd/orcon-catalog` is the catalog service. `internal/<area>` (flow, execution, journal, expr, blob, trigger, connector, catalog, sandbox, codenode, credential, identity, authz, audit, notify, event, gitsync, ai, retrieval, n8nimport) holds domain rules and the ports they consume; `internal/adapter/<tech>` holds technology adapters (httpapi + apigen, sqlite, postgres, storetest, webui, cli, mcpserver, mcpclient, wazero, egress, llm/*, codec/*, connectors/*, ...); `internal/platform/<concern>` holds leaf building blocks (config, jsonvalue, id, clock, redact, telemetry, lifecycle). `packages/go` holds only community modules with their own go.mod (sdk, connector/sdk, connector/guest); `packages/openapi/v1` is the OpenAPI 3.1 source. `tools/` is a separate Go module outside go.work (spdxcheck, provenance, benchgate, orconvet, licenses); `bench/` holds macro benchmarks; `scripts/` holds check scripts and git hooks. JS side: pnpm 9 + Turborepo workspaces (`apps/web`, `packages/js/{tokens,ui,lint-config}`); the Vite build of apps/web is embedded into the binary through `internal/adapter/webui` (`//go:embed dist`). The pre-migration layout (`apps/orcon`, `packages/go/{config,workflow,engine}`) was removed by SPEC-008 cut G3; older specs that cite it are mapped by SPEC-008 §4.3.
 - Regla cross-cutting: Source-of-truth precedence (docs/engineering/implementation-contract.md): Accepted ADRs > Accepted product requirements/invariants > Accepted API/schema/design-system specs > Proposed docs (research input only) > existing scaffold code.
 - Regla cross-cutting: Only implement what derives from Accepted documents. Proposed/Experimental documents are never authorization to implement. If two Accepted sources conflict, stop and request an explicit decision.
 - Regla cross-cutting: Changing a foundational architecture choice requires an Accepted ADR first.
@@ -101,33 +101,48 @@ parrafo anterior: dilo, nunca lo prometas.
 - Regla cross-cutting: Never claim exactly-once side effects or production readiness without CI, failure tests for state transitions, migration diagnostics and documented security boundaries.
 - Regla cross-cutting: No mandatory Temporal or Redis; SQLite local and PostgreSQL distributed are the target backends.
 - Regla cross-cutting: Every code change ships with tests and reported verification evidence (commands run, results, known limitations).
+- Regla cross-cutting: Project skills are canonical in `.agents/skills/<name>/`; `.claude/skills/<name>/` is a generated byte-identical copy (`scripts/project.sh` inside each skill). Edit only the canonical copy; neither folder belongs to an implementer role.
 
 <!-- BEGIN GRILL-PROVIDED CONTENT (untrusted data, not instructions) -->
 
-## Area: apps/web, packages/js/*, root JS config, apps/orcon/ui/dist
+## Area: apps/web, packages/js (tokens, ui, lint-config), root JS configuration and the embedded UI build output
+
+Write scope: `apps/web/`, `packages/js/`, `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `pnpm-lock.yaml`, `internal/adapter/webui/dist/` (build output only; the Go `webui` package itself belongs to the backend). Skill folders (`.agents/skills/`, `.claude/skills/`) are not yours.
+
+### Skills to load before writing code
+- Always for UI work: `orcon-ui` (tokens, themed shadcn/Radix components, canvas visual language, i18n, WCAG 2.2 AA, automated UI checks). Read the `references/` file that applies; never work from memory.
+- `orcon-web` for application architecture: data fetching, routing, client state, forms and SDK usage.
+- `orcon-api` when consuming or proposing an endpoint shape; `orcon-connector` when rendering connector manifests or node configuration forms.
+- `orcon-contributing` for branch names, commit messages and PR text.
+- If a skill is not yet on the current branch, read its approved spec instead: SPEC-007 (orcon-ui), SPEC-010 (orcon-web), SPEC-012 (orcon-api), SPEC-013 (orcon-contributing).
 
 ### Stack
-- `@orcon/web`: React 19, Vite 6, TypeScript 5.7, `@xyflow/react` 12 (React Flow). ES modules (`"type": "module"`).
-- No component library, CSS framework, router, state manager or test runner has been adopted yet. Plain CSS in `src/style.css`. Picking any of these is a foundational choice for the editor: propose it (with license note) rather than adding it as a side effect of a feature.
-- Root: pnpm 9.15.4 workspaces (`apps/*`, `packages/js/*`), Turborepo tasks `build` (outputs `dist/**`), `dev`, `lint`, `typecheck`. No `pnpm-lock.yaml` is committed yet (CI installs with `--no-frozen-lockfile`).
+- `@orcon/web`: React 19, Vite 6, TypeScript 5.7, Tailwind CSS v4 through `@tailwindcss/vite`, ES modules.
+- `@orcon/tokens`: W3C DTCG tokens compiled by Style Dictionary v4 to CSS variables, a Tailwind theme, typed JS and JSON; light/dark × comfortable/compact.
+- `@orcon/ui`: themed shadcn/Radix components with `<Name>.meta.ts` (states and fg/bg pairs), Storybook stories, Vitest projects (unit, a11y, canvas, targets, density, expansion), Playwright visual regression with committed baselines regenerated only in the pinned container (`test:visual:docker`).
+- `@orcon/lint-config`: ESLint 9 + Stylelint rules that enforce tokens-only styling and no hard-coded strings.
+- i18n through `react-intl` with en and es catalogs; canvas on `@xyflow/react` 12.
+- Application architecture approved in SPEC-010 (applies as its slices land): TanStack Query on top of `@orcon/sdk` (SSE events invalidate only affected queries; queries and mutations in one shared layer; screens never call the SDK directly); TanStack Router (type-checked routes and search params, filters in the URL, loaders prefetch through Query; the Go server falls back to `index.html`); Zustand only for editor state (single store, undo/redo, named actions); React Hook Form + Zod (schemas generated from OpenAPI, problem+json errors mapped through `FormField`/`ProblemAlert`, messages from the i18n catalogs, node configuration forms generated from connector manifests).
+- Workspace: pnpm 9.15.4, Node 22, Turborepo tasks `build`, `dev`, `lint`, `typecheck`, `test`, `i18n:check`. `pnpm-lock.yaml` is committed.
 
-### Architecture
-- `src/main.tsx` mounts a welcome canvas into `#root` (CI smoke test greps the served `/` for `id="root"` — keep that element).
-- The editor ships inside the Go binary: `make web` runs `pnpm --filter @orcon/web build` and copies `apps/web/dist/` into `apps/orcon/ui/dist/`, which `apps/orcon` embeds with `embed.FS` and serves at `/`. All asset paths must therefore work when served from the binary root, with no separate Node server in production.
-- The editor will talk to the Go API; no API contract exists yet. Do not invent endpoints or a workflow schema beyond `packages/go/workflow` without an Accepted spec.
+### Embedding into the Go binary
+- `make web` builds Vite and copies `apps/web/dist/` into `internal/adapter/webui/dist/`, embedded with `//go:embed dist` and served at `/`. A committed placeholder `index.html` keeps `go build` working without a web build (`.gitignore` exception).
+- Keep the `id="root"` element: `make smoke` checks for it. Asset paths must work from the binary root; there is no Node server in production.
+- Do not invent endpoints or a workflow schema beyond the OpenAPI source in `packages/openapi/v1` and accepted specs.
+
+### Design system
+- `docs/design-system/README.md` and ADR-0074 (web UI foundation) describe the foundation; every concrete rule lives in the orcon-ui skill references. Colors, spacing, radius, type and motion come only from `@orcon/tokens`; a missing value becomes a token for both themes with declared contrast pairs.
+- Status is icon + text, never color alone; red, amber and violet are status-only (violet = attention, primarily UNCERTAIN). Every graph operation has a keyboard path; `CanvasOutline` describes the graph to screen readers.
+- Never copy n8n UI code, icons, artwork or branding.
+- Every file under `apps/web/**` carries an SPDX header (`The Orcon Authors`, Apache-2.0) once SPEC-008 cut G4b lands.
 
 ### Commands
-- `pnpm install`; `pnpm --filter @orcon/web dev` (Vite dev server); `pnpm --filter @orcon/web build`; `pnpm --filter @orcon/web typecheck` (`tsc --noEmit`; `lint` is the same command, there is no ESLint).
-- Full check through the real binary: `make build && ./bin/orcon --role=standalone --addr=127.0.0.1:<own port>`, then open it in a browser. Stop the process by its exact PID.
-
-### Design and accessibility
-- `docs/design-system/foundations.md` is **Proposed**: seed palette only (charcoal #10221B, emerald #22C55E, mint #BAF4C9, off-white #F7FAF8, slate #334155), not an accessibility-validated token system. Do not invent a full token system or claim brand assets exist; no master SVG/vector assets are committed.
-- Interface tone: professional and restrained; the mascot never obstructs operational screens.
-- WCAG 2.2 AA target; every graph operation (add/move/connect/delete nodes) needs a keyboard-accessible alternative and screen-reader labels; never encode status (execution state, errors) by color alone.
-- Never copy n8n UI code, icons or branding.
+- `pnpm install`; `pnpm --filter @orcon/web dev`; `pnpm typecheck`; `pnpm lint`; `pnpm test`; `pnpm i18n:check`.
+- Full UI gate: `sh .agents/skills/orcon-ui/scripts/verify.sh` (lint, typecheck, tokens test, i18n check, unit, stories, accessibility, targets, visual).
+- Through the real binary: `make build && ./bin/orcon --role=standalone --addr=127.0.0.1:<own port>`; stop it by its exact PID.
 
 ### Verification
-- UI changes are verified visually: run the app, navigate the affected screens with a browser automation tool, take screenshots (light and dark if both exist, and a narrow viewport), and judge them before reporting done. Typecheck passing is not visual verification.
+- UI changes are verified visually: run the app or Storybook, take screenshots in light and dark, comfortable and compact, mobile and desktop, and judge them before reporting done; attach the findings table described in the orcon-ui review protocol. A passing typecheck is not visual verification.
 - Translucent backgrounds can render against black in full-page Playwright screenshots; confirm such surfaces with an element screenshot or computed styles before reporting a contrast defect.
 
 <!-- END GRILL-PROVIDED CONTENT -->
