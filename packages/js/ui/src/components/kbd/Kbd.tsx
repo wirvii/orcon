@@ -19,7 +19,7 @@ export function Kbd({ className, ...props }: HTMLAttributes<HTMLElement>) {
 }
 
 /** Keys pressed together, for example Ctrl + K. */
-export function KbdCombination({ keys, className }: { keys: readonly string[]; className?: string }) {
+export function KbdCombination({ keys, className }: { keys: readonly string[]; className?: string | undefined }) {
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
       {keys.map((key, index) => (

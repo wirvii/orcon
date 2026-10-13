@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl';
 import { RedactedValue } from '../../components/redacted-value/RedactedValue';
 import { cn } from '../../lib/cn';
 import { editorMessages } from '../messages';
-import { columnsOf, isBinary, isProtected, visibleValue, type DataItem, type ProtectedValue } from '../model';
+import { columnsOf, isBinary, isProtected, plainText, visibleValue, type DataItem, type ProtectedValue } from '../model';
 
 /** Above this many items only the rows in view are rendered. */
 export const VIRTUALIZE_ROWS = 100;
@@ -20,8 +20,8 @@ const NULL = String(null);
 export interface DataTableViewProps {
   items: readonly DataItem[];
   /** Accessible name of the scrollable region. */
-  label?: string;
-  className?: string;
+  label?: string | undefined;
+  className?: string | undefined;
 }
 
 /** A protected value: the permission notice, a masked secret, or the history notice. It is never blank and never the real value. */
@@ -81,7 +81,7 @@ function Cell({ name, value }: { name: string; value: unknown }) {
       </span>
     );
   }
-  return <span>{String(value)}</span>;
+  return <span>{plainText(value)}</span>;
 }
 
 /** The row height of the table, from the density token, so windowing matches the rendered rows. */

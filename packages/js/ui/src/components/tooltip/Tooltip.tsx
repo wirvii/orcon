@@ -11,10 +11,10 @@ export interface TooltipProps {
   content: ReactNode;
   /** The element that triggers the tooltip. It must be focusable, so keyboard users get the tooltip too. */
   children: ReactElement;
-  side?: ComponentProps<typeof TooltipPrimitive.Content>['side'];
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  side?: ComponentProps<typeof TooltipPrimitive.Content>['side'] | undefined;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
 }
 
 /** A hint shown on hover and on keyboard focus. Touch users do not get it, so never hide required information here. */

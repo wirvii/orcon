@@ -37,30 +37,30 @@ const AI_BLOCK_OFFSET = 84;
 
 export interface CanvasNodeProps {
   node: GraphNode;
-  selected?: boolean;
+  selected?: boolean | undefined;
   /** Ports are live React Flow handles. True inside the canvas. */
-  live?: boolean;
+  live?: boolean | undefined;
   /** The canvas can be edited: toolbar, plus buttons and stubs are offered. False in read-only mode. */
-  editable?: boolean;
+  editable?: boolean | undefined;
   /** Reachable with Tab: only the node that holds the roving tab stop. */
-  tabbable?: boolean;
+  tabbable?: boolean | undefined;
   /** The node has keyboard focus. Shows the toolbar like hover does. */
-  focused?: boolean;
+  focused?: boolean | undefined;
   /** Show the toolbar whatever the pointer does (stories). */
-  forceToolbar?: boolean;
-  detail?: DetailLevel;
+  forceToolbar?: boolean | undefined;
+  detail?: DetailLevel | undefined;
   /** Counter-scale of the label at low zoom. */
-  labelScale?: number;
+  labelScale?: number | undefined;
   /** Outputs that have no connection yet: they show the dashed stub. */
-  dangling?: readonly string[];
+  dangling?: readonly string[] | undefined;
   /** Inputs that cannot receive the connection being dragged, with the reason. */
-  invalidInputs?: Readonly<Record<string, string>>;
+  invalidInputs?: Readonly<Record<string, string>> | undefined;
   /** The name is being edited in place. */
-  renaming?: boolean;
+  renaming?: boolean | undefined;
   /** Give the tile its own accessible name. The canvas names the React Flow node element instead. */
-  labelled?: boolean;
-  actions?: Partial<CanvasNodeActions>;
-  className?: string;
+  labelled?: boolean | undefined;
+  actions?: Partial<CanvasNodeActions> | undefined;
+  className?: string | undefined;
 }
 
 /**

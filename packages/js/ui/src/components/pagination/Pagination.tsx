@@ -23,7 +23,7 @@ export interface PaginationProps {
   page: number;
   pageCount: number;
   onPageChange: (page: number) => void;
-  className?: string;
+  className?: string | undefined;
 }
 
 /** Previous and next with the current position in words. The position is announced politely when it changes. */

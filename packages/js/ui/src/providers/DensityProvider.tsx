@@ -32,10 +32,10 @@ export function applyDensity(density: Density, root: HTMLElement = document.docu
 
 export interface DensityProviderProps {
   children: ReactNode;
-  defaultDensity?: Density;
+  defaultDensity?: Density | undefined;
   /** Controlled density (Storybook globals, tests). Disables persistence. */
-  density?: Density;
-  onDensityChange?: (density: Density) => void;
+  density?: Density | undefined;
+  onDensityChange?: ((density: Density) => void) | undefined;
 }
 
 export function DensityProvider({

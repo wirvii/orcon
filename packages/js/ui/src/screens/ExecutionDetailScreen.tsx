@@ -53,15 +53,15 @@ const messages = defineMessages({
 });
 
 export interface ExecutionDetailScreenProps {
-  timeline?: readonly TimelineNode[];
+  timeline?: readonly TimelineNode[] | undefined;
   /** The decision panel for an operation whose result is unknown. Omit when nothing needs one. */
-  resolution?: UncertainResolution;
+  resolution?: UncertainResolution | undefined;
   /** The person may read execution data (the `execution:read-data` permission). Without it data is shown as hidden. */
-  canReadData?: boolean;
-  onContinue?: () => void;
-  onRetry?: () => void;
-  onCancel?: () => void;
-  onResolve?: (actionId: string) => void;
+  canReadData?: boolean | undefined;
+  onContinue?: (() => void) | undefined;
+  onRetry?: (() => void) | undefined;
+  onCancel?: (() => void) | undefined;
+  onResolve?: ((actionId: string) => void) | undefined;
 }
 
 /**
@@ -80,7 +80,7 @@ export function ExecutionDetailScreen({
 }: ExecutionDetailScreenProps) {
   const intl = useIntl();
   const hintId = useId();
-  const needsDecision = timeline.some((node) => node.status === 'UNCERTAIN') && resolution !== undefined;
+  const needsDecision = timeline.some((node) => node.status === 'UNCERTAIN');
   const overall = timeline.some((node) => node.status === 'UNCERTAIN') ? 'UNCERTAIN' : 'SUCCEEDED';
 
   return (
@@ -172,7 +172,7 @@ export function ExecutionDetailScreen({
             ))}
           </ol>
         </section>
-        {needsDecision && resolution ? (
+        {needsDecision ? (
           <div className="lg:w-panel-width lg:shrink-0 xl:w-panel-width">
             <UncertainResolutionPanel
               nodeName={resolution.nodeName}

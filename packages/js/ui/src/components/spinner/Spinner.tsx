@@ -16,10 +16,10 @@ const messages = defineMessages({
 
 export interface SpinnerProps {
   /** Icon size in px: 16, 20 or 24. */
-  size?: 16 | 20 | 24;
+  size?: 16 | 20 | 24 | undefined;
   /** Decorative spinners (inside a button that already says what is happening) are hidden from assistive tech. */
-  decorative?: boolean;
-  className?: string;
+  decorative?: boolean | undefined;
+  className?: string | undefined;
 }
 
 const sizeClass = { 16: 'size-icon-16', 20: 'size-icon-20', 24: 'size-icon-24' } as const;

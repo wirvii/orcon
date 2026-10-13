@@ -6,6 +6,7 @@ import { expect, within } from 'storybook/test';
 
 import { agentGraph, exampleNodes } from '../../canvas/fixtures';
 import { DetailsDemo } from '../sample/DetailsDemo';
+import { must } from '../../lib/must';
 
 
 const slack = { ...exampleNodes.slack, status: undefined, statusCode: undefined };
@@ -45,7 +46,7 @@ export const Trigger: Story = {
   },
 };
 export const Agent: Story = {
-  args: { node: agentGraph.nodes[1]! },
+  args: { node: must(agentGraph.nodes[1]) },
   play: async ({ canvasElement }) => {
     const dialog = await body(canvasElement).findByRole('dialog', { name: 'Support agent details' });
     await expect(within(dialog).getByRole('tab', { name: 'Agent' })).toBeVisible();

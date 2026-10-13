@@ -31,8 +31,9 @@ import {
   undoHistory,
   type Graph,
 } from '../../src/canvas/model';
+import { must } from '../../src/lib/must';
 
-const item = (id: string) => exampleCatalog.find((candidate) => candidate.id === id)!;
+const item = (id: string) => must(exampleCatalog.find((candidate) => candidate.id === id));
 
 describe('canvas model', () => {
   it('snaps positions to the 20 px grid', () => {
@@ -43,7 +44,7 @@ describe('canvas model', () => {
   });
 
   it('sizes a tile 100 x 100, grows it beyond two outputs and makes the agent tile 200 wide', () => {
-    const two = exampleDraft.nodes.find((node) => node.id === 'validate')!;
+    const two = must(exampleDraft.nodes.find((node) => node.id === 'validate'));
     expect(nodeSize(two)).toEqual({ w: 100, h: 100 });
     const many = { kind: 'logic' as const, inputs: [{ id: 'main' }], outputs: Array.from({ length: 5 }, (_, index) => ({ id: String(index) })) };
     // max(100, 26 x outputs + 22)
@@ -72,28 +73,28 @@ describe('canvas model', () => {
 
   it('moves nodes by grid steps and keeps them on the grid', () => {
     const moved = moveNodes(exampleDraft, ['validate'], GRID, -GRID * 4);
-    const before = exampleDraft.nodes.find((node) => node.id === 'validate')!.position;
-    const after = moved.nodes.find((node) => node.id === 'validate')!.position;
+    const before = must(exampleDraft.nodes.find((node) => node.id === 'validate')).position;
+    const after = must(moved.nodes.find((node) => node.id === 'validate')).position;
     expect(after).toEqual({ x: before.x + GRID, y: before.y - GRID * 4 });
     expect(after.x % GRID).toBe(0);
     // The original graph is not changed.
-    expect(exampleDraft.nodes.find((node) => node.id === 'validate')!.position).toEqual(before);
+    expect(must(exampleDraft.nodes.find((node) => node.id === 'validate')).position).toEqual(before);
   });
 
   it('adds a node from the catalog with a unique id and no input on a trigger', () => {
-    const trigger = exampleCatalog.find((candidate) => candidate.kind === 'trigger')!;
+    const trigger = must(exampleCatalog.find((candidate) => candidate.kind === 'trigger'));
     const first = addNode(exampleDraft, trigger, { x: 13, y: 31 });
     const second = addNode(first.graph, trigger, { x: 0, y: 0 });
     expect(first.id).not.toBe(second.id);
-    const node = first.graph.nodes.find((candidate) => candidate.id === first.id)!;
+    const node = must(first.graph.nodes.find((candidate) => candidate.id === first.id));
     expect(node.inputs).toEqual([]);
     expect(node.position).toEqual({ x: 20, y: 40 });
   });
 
   it('adds a node after an output: one column to the right, same row, connected', () => {
     const result = addNodeAfter(exampleDraft, item('send-email'), 'http', 'main');
-    const source = exampleDraft.nodes.find((node) => node.id === 'http')!;
-    const added = result.graph.nodes.find((node) => node.id === result.id)!;
+    const source = must(exampleDraft.nodes.find((node) => node.id === 'http'));
+    const added = must(result.graph.nodes.find((node) => node.id === result.id));
     // The slot to the right of HTTP Request is taken (Slack), so the node moves down to the first free spot.
     expect(added.position.x).toBe(source.position.x + COLUMN_PITCH);
     expect(added.position.x % GRID).toBe(0);
@@ -102,8 +103,8 @@ describe('canvas model', () => {
 
   it('lands on the same row when the slot is free', () => {
     const result = addNodeAfter(exampleDraft, item('send-email'), 'merge', 'main');
-    const source = exampleDraft.nodes.find((node) => node.id === 'merge')!;
-    expect(result.graph.nodes.find((node) => node.id === result.id)!.position).toEqual({ x: source.position.x + COLUMN_PITCH, y: source.position.y });
+    const source = must(exampleDraft.nodes.find((node) => node.id === 'merge'));
+    expect(must(result.graph.nodes.find((node) => node.id === result.id)).position).toEqual({ x: source.position.x + COLUMN_PITCH, y: source.position.y });
   });
 
   it('inserts a node on a connection: splits it, reconnects it and moves what follows one column right', () => {
@@ -112,11 +113,11 @@ describe('canvas model', () => {
     expect(edges.some((edge) => edge.id === 'e1')).toBe(false);
     expect(edges.some((edge) => edge.source === 'webhook' && edge.target === result.id)).toBe(true);
     expect(edges.some((edge) => edge.source === result.id && edge.target === 'validate')).toBe(true);
-    const before = exampleDraft.nodes.find((node) => node.id === 'validate')!.position;
-    const after = result.graph.nodes.find((node) => node.id === 'validate')!.position;
+    const before = must(exampleDraft.nodes.find((node) => node.id === 'validate')).position;
+    const after = must(result.graph.nodes.find((node) => node.id === 'validate')).position;
     expect(after.x).toBe(before.x + COLUMN_PITCH);
     // The new node takes the target's old column.
-    expect(result.graph.nodes.find((node) => node.id === result.id)!.position.x).toBe(before.x);
+    expect(must(result.graph.nodes.find((node) => node.id === result.id)).position.x).toBe(before.x);
   });
 
   it('finds what follows a node', () => {

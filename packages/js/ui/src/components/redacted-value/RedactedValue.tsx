@@ -19,7 +19,7 @@ const messages = defineMessages({
 });
 
 /** Stands in for a value the person may not see. It says so; it is never blank. */
-export function RedactedValue({ className }: { className?: string }) {
+export function RedactedValue({ className }: { className?: string | undefined }) {
   const intl = useIntl();
   return (
     <span
@@ -40,7 +40,7 @@ export interface ProtectedValueProps {
   value: string;
   /** The person lacks `execution:read-data`. */
   hidden: boolean;
-  className?: string;
+  className?: string | undefined;
 }
 
 /**
@@ -67,7 +67,7 @@ export function ProtectedValue({ value, hidden, className }: ProtectedValueProps
   return (
     <span className={cn('inline-flex items-center gap-1', className)}>
       <code className="bg-surface-sunken text-fg rounded-sm px-2 font-mono text-mono wrap-anywhere">{value}</code>
-      <IconButton variant="ghost" icon={copied ? Check : Copy} label={intl.formatMessage(messages.copyValue)} onClick={copy} />
+      <IconButton variant="ghost" icon={copied ? Check : Copy} label={intl.formatMessage(messages.copyValue)} onClick={() => void copy()} />
       <span role="status" className="sr-only">
         {copied ? intl.formatMessage(messages.copied) : null}
       </span>

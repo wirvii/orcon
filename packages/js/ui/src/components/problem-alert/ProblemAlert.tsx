@@ -40,8 +40,8 @@ export interface ProblemAlertProps {
    * For `attention-already-resolved` (HTTP 409): the outcome that is now in
    * effect, so the person sees the result instead of a generic error.
    */
-  currentResult?: ReactNode;
-  className?: string;
+  currentResult?: ReactNode | undefined;
+  className?: string | undefined;
 }
 
 /**
@@ -103,7 +103,7 @@ export function ProblemAlert({ problem, currentResult, className }: ProblemAlert
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <span>{intl.formatMessage(messages.requestId)}</span>
           <code className="font-mono text-mono break-all">{problem.requestId}</code>
-          <IconButton variant="secondary" icon={Copy} label={intl.formatMessage(messages.copyRequestId)} onClick={copy} />
+          <IconButton variant="secondary" icon={Copy} label={intl.formatMessage(messages.copyRequestId)} onClick={() => void copy()} />
           <span role="status" className="text-sm">
             {copied ? intl.formatMessage(messages.copied) : null}
           </span>
