@@ -46,7 +46,7 @@ type NodeTypes interface {
 // so validation does not ask the catalog about it.
 func isFormatType(nodeType string) bool {
 	switch typeName(nodeType) {
-	case typeLoop, typeIf, typeSwitch:
+	case typeLoop, typeIf, typeSwitch, typeVariables:
 		return true
 	default:
 		return false

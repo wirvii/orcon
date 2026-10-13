@@ -30,7 +30,7 @@ type schemaChecker struct {
 var supportedKeywords = map[string]bool{
 	"$schema": true, "$id": true, "$comment": true, "title": true, "description": true, "$defs": true,
 	"$ref": true, "type": true, "properties": true, "required": true, "additionalProperties": true,
-	"items": true, "minItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true,
+	"items": true, "minItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true, "if": true, "then": true,
 	"minimum": true, "format": true, "oneOf": true, "allOf": true, "not": true, "propertyNames": true,
 }
 
@@ -59,7 +59,7 @@ func (c *schemaChecker) checkKeywords(t *testing.T, schema jsonvalue.Value, at s
 			for _, sub := range m.Value.Members() {
 				c.checkKeywords(t, sub.Value, path+"/"+sub.Key)
 			}
-		case "items", "additionalProperties", "not", "propertyNames":
+		case "items", "additionalProperties", "not", "propertyNames", "if", "then":
 			c.checkKeywords(t, m.Value, path)
 		case "oneOf", "allOf":
 			for i, sub := range m.Value.Items() {
@@ -286,6 +286,11 @@ func (c *schemaChecker) checkCombinators(schema, inst jsonvalue.Value, path stri
 		}
 		if matches != 1 {
 			errs = append(errs, fmt.Sprintf("%s: matches %d of the oneOf alternatives, want exactly 1", path, matches))
+		}
+	}
+	if cond, ok := schema.Get("if"); ok && len(c.validate(cond, inst, path)) == 0 {
+		if then, hasThen := schema.Get("then"); hasThen {
+			errs = append(errs, c.validate(then, inst, path)...)
 		}
 	}
 	if not, ok := schema.Get("not"); ok && len(c.validate(not, inst, path)) == 0 {

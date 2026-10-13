@@ -6,14 +6,15 @@ package flow
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
-// The format does not yet say how a node writes a variable, so these tests
-// feed the V9 analysis through the validator's writers function with a stub.
-// When the format decides, only [writersOf] changes; these cases still hold.
+// These tests feed the V9 analysis through the validator's writers function
+// with a stub, so the graph rules are tested apart from how a node names the
+// variables it writes (see [writersOf] and variables_test.go for that).
 
 func loadInternal(t *testing.T, name string) Document {
 	t.Helper()
@@ -50,18 +51,22 @@ func validateWriters(d *Document, byNode map[NodeID][]string) Report {
 	return validate(d, validatorConfig{writers: stubWriters(byNode)})
 }
 
-func TestWritersOfReportsNoneYet(t *testing.T) {
+func TestWritersOfReadsVariablesNodes(t *testing.T) {
 	t.Parallel()
-	doc := loadInternal(t, "parallel-join")
+	doc := loadInternal(t, "variables")
+	want := map[NodeID][]string{"left": {"total"}, "right": {"total"}, "opened": {"status"}, "closed": {"status", "total"}}
 	for i := range doc.Nodes {
-		if got := writersOf(&doc.Nodes[i]); got != nil {
-			t.Errorf("writersOf(%s) = %v, want none until the format defines writes", doc.Nodes[i].ID, got)
+		n := &doc.Nodes[i]
+		got := writersOf(n)
+		if !slices.Equal(got, want[n.ID]) {
+			t.Errorf("writersOf(%s) = %v, want %v", n.ID, got, want[n.ID])
 		}
 	}
-	// With no writers, even a plain variable on a parallel flow is fine.
-	doc.Variables[0].Accumulator = ""
-	if r := Validate(&doc); r.HasErrors() {
-		t.Errorf("Validate = %v, want no errors", r.Errors())
+	// A node of another type writes nothing, whatever its parameters say.
+	other := loadInternal(t, "parallel-join")
+	nodeByID(&other, "a").Parameters = doc.Nodes[2].Parameters
+	if got := writersOf(nodeByID(&other, "a")); got != nil {
+		t.Errorf("writersOf(non-variables node) = %v, want none", got)
 	}
 }
 

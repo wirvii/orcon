@@ -288,6 +288,7 @@ func (v *validator) node(i int, n *Node) {
 	checkExt(r, base+"/ext", n.Ext)
 	checkOptEnum(r, base+"/onError", n.OnError, OnErrors())
 	v.routingAndLoop(base, n)
+	v.variablesShape(i, n)
 	v.nodeBlocks(base, n)
 	v.waitAndBoundary(base, n)
 	if n.Attention != nil {

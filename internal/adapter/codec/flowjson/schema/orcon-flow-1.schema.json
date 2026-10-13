@@ -127,6 +127,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "name", "element", "type", "parameters"],
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "pattern": "^orcon\\.variables@" } } },
+          "then": {
+            "properties": {
+              "element": { "const": "task" },
+              "parameters": { "$ref": "#/$defs/variablesParameters" }
+            }
+          }
+        }
+      ],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1, "maxLength": 128 },
@@ -251,6 +262,26 @@
           "additionalProperties": false,
           "required": ["notify"],
           "properties": { "notify": { "$ref": "#/$defs/attentionNotify" } }
+        }
+      }
+    },
+    "variablesParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assignments"],
+      "properties": {
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["variable", "value"],
+            "properties": {
+              "variable": { "$ref": "#/$defs/variableName" },
+              "value": {}
+            }
+          }
         }
       }
     },

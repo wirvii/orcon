@@ -91,6 +91,10 @@ A node has `id`, `name`, `element`, `type` and `parameters` (an object whose str
 
 A document that carries `effect` or `writes` is rejected as an unknown member (see "Open points").
 
+### The variables node
+
+`orcon.variables@1` (`element: task`) is part of the format, like `orcon.loop@1`, and the only node type that writes execution variables (ADR-0008 §4.3). Its parameters are `{ "assignments": [ { "variable": "total", "value": 1 } ] }`: at least one assignment; `variable` is a literal name declared in `variables[]` (an expression there is an error, and so is an undeclared name); `value` is a literal or an expression, and for an accumulator variable it is the delta. Per-item evaluation order and writing several items in one activation belong to the cut that implements variables. `loop.carry` is unchanged.
+
 ## Edges
 
 `{ id, from: { node, port }, to: { node }, condition?, default?, kind, order? }`. `kind: "BACK"` is legal only when the target is an `orcon.loop` node.
@@ -111,14 +115,14 @@ Validation runs in levels; the first level that has errors is reported alone so 
 | V5 | 3 | an exclusive or inclusive gateway with several outgoing edges has exactly one default edge | warning when none, error when several |
 | V6 | 3 | a join has at least two incoming edges | error |
 | V7 | 3 | a boundary event is attached to an activity | error |
-| V8 | 4 | a node reads only nodes that dominate it, or that a join upstream merged; reads of unknown, own, sibling or downstream nodes are errors; a read through an `ACTIVATED` or `FIRST` join without `.isExecuted` is a warning | error / warning |
-| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; the writers come from one function, `writersOf`, which reports none until the format says how a node writes a variable | error |
+| V8 | 4 | (expressions in `orcon.variables` values are scanned like any other) a node reads only nodes that dominate it, or that a join upstream merged; reads of unknown, own, sibling or downstream nodes are errors; a read through an `ACTIVATED` or `FIRST` join without `.isExecuted` is a warning | error / warning |
+| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; writers are the variables named by `parameters.assignments[].variable` of `orcon.variables@1` nodes (`writersOf`); two such nodes that can run at the same time and name the same plain variable are an error, sequential writes are fine | error |
 | V10 | 5 | with a node-type catalog: every node type is known, and the contract of an effect type is valid (ADR-0029 §5); `attention.notify: OFF` is refused on a node whose type writes | error |
 | V11 | 6 | a call activity has a call block and does not call its own flow without `intentionalRecursion`; dynamic targets without `allowedTargets` are warned about; across flows, a call cycle with an unmarked edge blocks publication (`CheckCallGraph`) | error / warning |
 
 ### Node types and safety contracts
 
-A node type, not a flow, owns its safety contract (ADR-0007 §3, ADR-0029 §5), so a document cannot declare itself safer than its type. `internal/flow` consumes a port, `NodeTypes.Lookup(ctx, type)`, that returns the purity (ADR-0008 §5) and, for `EFFECT` types, the contract. `ValidateWithTypes` applies rule V10 through it: an unknown type is a level 5 error naming the type, and the contract rules of ADR-0029 §5 (`CheckContract`) are a pure function: `UNKNOWN` is held to the `WRITE` rules, `READ_ONLY` only with `READ`, `IDEMPOTENCY_KEY` needs a key mode, location and ttl, `RECONCILE` needs a verification operation of purity `READ`, `UNSAFE` needs `retrySafe` false and `onUncertain` `SUSPEND`, and `RESEND_WITH_KEY` needs `IDEMPOTENCY_KEY`. `Validate` without a catalog skips these rules. The connector registry implements the port in SPEC-003; tests use a fake catalog. The types the format itself defines (`orcon.loop`, `orcon.if`, `orcon.switch`) are not looked up.
+A node type, not a flow, owns its safety contract (ADR-0007 §3, ADR-0029 §5), so a document cannot declare itself safer than its type. `internal/flow` consumes a port, `NodeTypes.Lookup(ctx, type)`, that returns the purity (ADR-0008 §5) and, for `EFFECT` types, the contract. `ValidateWithTypes` applies rule V10 through it: an unknown type is a level 5 error naming the type, and the contract rules of ADR-0029 §5 (`CheckContract`) are a pure function: `UNKNOWN` is held to the `WRITE` rules, `READ_ONLY` only with `READ`, `IDEMPOTENCY_KEY` needs a key mode, location and ttl, `RECONCILE` needs a verification operation of purity `READ`, `UNSAFE` needs `retrySafe` false and `onUncertain` `SUSPEND`, and `RESEND_WITH_KEY` needs `IDEMPOTENCY_KEY`. `Validate` without a catalog skips these rules. The connector registry implements the port in SPEC-003; tests use a fake catalog. The types the format itself defines (`orcon.loop`, `orcon.if`, `orcon.switch`, `orcon.variables`) are not looked up.
 
 The expression scan behind V8 is lexical: it recognises `$('Name')` and `$node["Name"]` inside `{{ }}` segments of `=` strings and in edge and multi-instance conditions. The full expression grammar belongs to the expression engine (ADR-0018).
 
@@ -134,7 +138,6 @@ A breaking change creates `orcon/flow@2` and an `upgrade_1_to_2` function; reade
 
 These wait for an owner decision or a later cut; the implementation takes the reading shown.
 
-- **How a node writes an execution variable** (owner decision pending): either a built-in `orcon.variables@1` node type or a per-node `writes` declaration. Until then no `writes` member exists in the format and V9 reads writers from `writersOf`, the one function the decision will change.
 - **The per-node override of a safety contract** (ADR-0007 §3 "per-node overrides allowed by that contract") is defined by the SPEC-003 cut that implements the node-type registry, as an additive amendment within `@1`.
 - **Additive blocks of later specs** (`trigger`, `connector`, `credentials`, `ai`) are not in the schema yet; each arrives with its own cut, which extends the schema.
 - **Rule V13** (loop-exit heuristic warning, ADR-0010 §11) belongs to cut C5, which builds expression reference extraction; the in-memory cache of upgraded documents (ADR-0007 §7) belongs to cut C4, the first cut that loads pinned revisions on the hot path.

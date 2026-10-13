@@ -249,6 +249,14 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"node name too long", "linear", "/nodes/1/name", `"` + strings.Repeat("n", 129) + `"`},
 		{"unknown node member", "linear", "/nodes/1/shade", `"red"`},
 		{"disabled is a string", "linear", "/nodes/1/disabled", `"yes"`},
+		{"variables node with no assignments", "variables", "/nodes/2/parameters/assignments", `[]`},
+		{"variables node without assignments", "variables", "/nodes/2/parameters", `{}`},
+		{"variable name is an expression", "variables", "/nodes/2/parameters/assignments/0/variable", `"={{ x }}"`},
+		{"assignment without value", "variables", "/nodes/2/parameters/assignments/0/value", ""},
+		{"assignment without variable", "variables", "/nodes/2/parameters/assignments/0/variable", ""},
+		{"assignment with an unknown member", "variables", "/nodes/2/parameters/assignments/0/extra", `1`},
+		{"variables node with an unknown parameter", "variables", "/nodes/2/parameters/mode", `"x"`},
+		{"variables node that is not a task", "variables", "/nodes/2/element", `"serviceTask"`},
 		{"writes is not a member of the format", "parallel-join", "/nodes/2/writes", `["seen"]`},
 		{"effect is not a member of the format", "effects-calls-and-settings", "/nodes/1/effect", `{"effect":"READ"}`},
 		{"flow id is not a UUID", "linear", "/id", `"linear"`},
@@ -317,7 +325,7 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 
 // shapeCodes are the issue codes of the levels the JSON Schema also covers.
 var shapeCodes = map[string]bool{
-	flow.CodeStructure: true, flow.CodeFormat: true, flow.CodeEnum: true, flow.CodeValue: true, flow.CodeExt: true,
+	flow.CodeStructure: true, flow.CodeBlock: true, flow.CodeFormat: true, flow.CodeEnum: true, flow.CodeValue: true, flow.CodeExt: true,
 }
 
 // goRejectsShape reports whether the reader fails or the validator finds a
@@ -345,6 +353,7 @@ func TestSchemaLeavesSemanticRulesToTheValidator(t *testing.T) {
 	}{
 		{"element shape: start event with an incoming edge", "linear", "/edges/1/to/node", `"start"`, flow.CodeElement},
 		{"V3 loop block missing is a shape-valid document", "loop", "/nodes/1/loop", ``, flow.CodeV3},
+		{"reference to an undeclared variable", "variables", "/nodes/2/parameters/assignments/0/variable", `"ghost"`, flow.CodeReference},
 		{"V12 duplicate names", "linear", "/nodes/2/name", `"Fetch"`, flow.CodeV12},
 		{"reference to an unknown node", "linear", "/edges/1/to/node", `"ghost"`, flow.CodeReference},
 		{"V8 read of a downstream node", "linear", "/nodes/1/parameters", `{"v":"={{ $('Done').item }}"}`, flow.CodeV8},

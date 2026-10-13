@@ -40,6 +40,7 @@ func TestValidateRulesFromJSON(t *testing.T) {
 		{"V6 join with one incoming edge", "parallel-join", "/edges/4", ``, flow.CodeV6, flow.SeverityError},
 		{"V7 boundary on a non-activity", "waits-and-boundary", "/nodes/5/attachedTo", `"pause"`, flow.CodeV7, flow.SeverityError},
 		{"V8 read of a sibling branch", "parallel-join", "/nodes/3/parameters", `{"v":"={{ $('Branch A').item }}"}`, flow.CodeV8, flow.SeverityError},
+		{"V9 concurrent writers of a plain variable", "variables", "/variables/0/accumulator", ``, flow.CodeV9, flow.SeverityError},
 		{"V11 call to itself", "effects-calls-and-settings", "/nodes/4/call/target", `"01930000-0000-7000-8000-000000000007"`, flow.CodeV11, flow.SeverityError},
 		{"V12 duplicate names", "linear", "/nodes/2/name", `"Fetch"`, flow.CodeV12, flow.SeverityError},
 	}
