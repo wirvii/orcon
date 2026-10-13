@@ -44,7 +44,7 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .bin
-          key: bin-${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('tools/versions.mk') }}
+          key: bin-${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('tools/versions.mk', 'go.mod', 'tools/go.mod') }}
       - run: make check
 
   # provenance keeps AI authorship marks out of the pull request range, its title
