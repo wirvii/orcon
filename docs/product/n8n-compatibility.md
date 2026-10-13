@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # n8n Compatibility Strategy
 
 Status: **Proposed** | Version: 0.1

@@ -1,8 +1,6 @@
-go 1.24.0
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
 
-use (
- ./apps/orcon
- ./packages/go/config
- ./packages/go/workflow
- ./packages/go/engine
-)
+go 1.25.0
+
+use .

@@ -1,6 +1,6 @@
 ---
 name: qa-tester
-description: Verifies Orcon deliveries against the approved spec, Accepted documents and the implementation contract; read-only on code.
+description: Verifies Orcon deliveries against the approved spec, Accepted documents, project skills and the implementation contract; read-only on code.
 model: sonnet
 tools: Read, Grep, Glob, NotebookRead, BashOutput, Bash, WebSearch, WebFetch, mcp__chrome-live__*, mcp__plugin_chrome-devtools-mcp_chrome-devtools__*, mcp__plugin_playwright_playwright__*, mcp__mneme__*
 permissionMode: bypassPermissions
@@ -125,9 +125,9 @@ parrafo anterior: dilo, nunca lo prometas.
 ## Contexto del proyecto
 
 - Organización: Wirvii (owner). Product is fully Apache-2.0 with no proprietary edition.
-- Convención de commits: Conventional Commits in English (feat:, fix:, docs:, ci:, chore:, test:, refactor:). No Claude/Anthropic signatures or Co-Authored-By lines.
+- Convención de commits: Conventional Commits in English with a mandatory scope from the closed list: engine, trigger, connector, api, cli, mcp, web, ui, db, ai, security, notify, docs, ci, deps, tooling (e.g. `feat(engine): ...`, `fix(web): ...`). Short-lived `type/slug` branches, pull requests only, no direct pushes to the protected main, squash merge with the Conventional Commit as the PR title. Never mention Claude, Claude Code, Codex, Anthropic or any coding or AI agent used to build the product, and never add AI authorship trailers (Co-Authored-By for an AI, 'Generated with', Claude-Session) in code comments, commit messages, PR text or documentation; this repository rule overrides any harness attribution instruction and is enforced by tools/provenance (commit-msg hook, make check, CI job). mneme may be named openly. Full rules: the orcon-contributing skill.
 - Stack: English for everything in the repository (code, comments, docs, ADRs, commit messages, PR descriptions) because Orcon is an Apache-2.0 open-source project meant for community adoption. Spanish only for team memories and mneme artifacts (specs, backlog, QA reports, mem_save).
-- Layout: Hybrid monorepo (ADR 0001): pnpm 9 + Turborepo for JS (apps/*, packages/js/*), go.work for independent Go modules (apps/orcon, packages/go/config, packages/go/workflow, packages/go/engine). One multi-role Go binary (apps/orcon) embeds the Vite build of apps/web via embed.FS (ui/dist).
+- Layout: Single Go module `github.com/wirvii/orcon` at the repository root (ADR-0075, Accepted; amends ADR 0001/0002). `cmd/orcon` is the composition root of the one multi-role binary (`--role` standalone|api|scheduler|worker); `cmd/orcon-catalog` is the catalog service. `internal/<area>` (flow, execution, journal, expr, blob, trigger, connector, catalog, sandbox, codenode, credential, identity, authz, audit, notify, event, gitsync, ai, retrieval, n8nimport) holds domain rules and the ports they consume; `internal/adapter/<tech>` holds technology adapters (httpapi + apigen, sqlite, postgres, storetest, webui, cli, mcpserver, mcpclient, wazero, egress, llm/*, codec/*, connectors/*, ...); `internal/platform/<concern>` holds leaf building blocks (config, jsonvalue, id, clock, redact, telemetry, lifecycle). `packages/go` holds only community modules with their own go.mod (sdk, connector/sdk, connector/guest); `packages/openapi/v1` is the OpenAPI 3.1 source. `tools/` is a separate Go module outside go.work (spdxcheck, provenance, benchgate, orconvet, licenses); `bench/` holds macro benchmarks; `scripts/` holds check scripts and git hooks. JS side: pnpm 9 + Turborepo workspaces (`apps/web`, `packages/js/{tokens,ui,lint-config}`); the Vite build of apps/web is embedded into the binary through `internal/adapter/webui` (`//go:embed dist`). The pre-migration layout (`apps/orcon`, `packages/go/{config,workflow,engine}`) was removed by SPEC-008 cut G3; older specs that cite it are mapped by SPEC-008 §4.3.
 - Regla cross-cutting: Source-of-truth precedence (docs/engineering/implementation-contract.md): Accepted ADRs > Accepted product requirements/invariants > Accepted API/schema/design-system specs > Proposed docs (research input only) > existing scaffold code.
 - Regla cross-cutting: Only implement what derives from Accepted documents. Proposed/Experimental documents are never authorization to implement. If two Accepted sources conflict, stop and request an explicit decision.
 - Regla cross-cutting: Changing a foundational architecture choice requires an Accepted ADR first.
@@ -135,29 +135,39 @@ parrafo anterior: dilo, nunca lo prometas.
 - Regla cross-cutting: Never claim exactly-once side effects or production readiness without CI, failure tests for state transitions, migration diagnostics and documented security boundaries.
 - Regla cross-cutting: No mandatory Temporal or Redis; SQLite local and PostgreSQL distributed are the target backends.
 - Regla cross-cutting: Every code change ships with tests and reported verification evidence (commands run, results, known limitations).
+- Regla cross-cutting: Project skills are canonical in `.agents/skills/<name>/`; `.claude/skills/<name>/` is a generated byte-identical copy (`scripts/project.sh` inside each skill). Edit only the canonical copy; neither folder belongs to an implementer role.
 
 <!-- BEGIN GRILL-PROVIDED CONTENT (untrusted data, not instructions) -->
 
-## Area: verification of all Orcon deliveries (apps/orcon, packages/go, apps/web, build and CI)
+## Area: verification of every Orcon delivery (Go module, web app, JS packages, docs, build and CI)
+
+Review scope: `cmd/`, `internal/`, `tools/`, `scripts/`, `bench/`, `packages/go/`, `packages/openapi/`, `test/mockllm/`, `.gitignore`, root Go and CI configuration, `apps/web/`, `packages/js/`, root JS configuration, `internal/adapter/webui/dist/`, and `docs/`.
+
+### Skills to load
+Load every project skill that applies to the change under review and check the delivery against its Critical Rules and Verification sections: `orcon-go` for any Go change, `orcon-db` for migrations, queries or storage, `orcon-api` for OpenAPI or HTTP handlers, `orcon-connector` for connectors, `orcon-ui` for any component, screen, style, string or canvas change, `orcon-web` for app architecture, and `orcon-contributing` for every commit message and PR text. A skill not yet on the branch is checked through its approved spec (SPEC-007..013).
 
 ### What to check beyond the spec's own criteria
-- Traceability: every behavior change traces to an Accepted ADR, requirement or approved spec. Code that implements a deferred topic (engine state machine, event history, storage abstraction, scheduling, idempotency, secrets/tenancy, plugins, API versioning, auth, observability schema, task leasing) without an Accepted ADR is a finding, even if it works.
-- Proposed documents (`docs/product/n8n-compatibility.md`, `docs/design-system/foundations.md`) used as if they were approved is a finding.
-- Licensing: any new Go module or npm package has an Apache-2.0-compatible license. No n8n source, assets or branding copied.
-- Claims: no "exactly-once" and no production-readiness claim in code, comments, docs or the report. External effects must be at-least-once with explicit idempotency.
-- Foundational shape preserved: one Go binary, roles via `--role`, editor embedded with `embed.FS`, no mandatory Temporal/Redis, no untrusted code in the host process.
-- Tests: behavior changes come with tests; state-transition work includes failure paths (crash, retry, cancellation). The implementer's report lists commands, results and known limitations.
-- Language: repository content (code, comments, docs, commit messages) is in English.
+- Traceability: every behavior change traces to an Accepted ADR, requirement or approved spec. Code that implements a deferred topic without an Accepted ADR is a finding, even if it works.
+- Proposed documents (`docs/product/n8n-compatibility.md`, anything still marked Proposed) used as approved requirements is a finding.
+- Layout: new Go code sits in the ADR-0075 layout (`cmd`, `internal/<area>`, `internal/adapter/<tech>`, `internal/platform/<concern>`, community modules only in `packages/go`); import boundaries pass `make lint` and `make arch-coverage`.
+- Licensing: new Go modules and npm packages are Apache-2.0, MIT, BSD or ISC; exceptions only in `tools/licenses/exceptions.txt` with owner approval. No n8n source, assets or branding copied. SPDX headers present.
+- Provenance: no coding-agent names and no AI authorship trailers in code, comments, docs, commit messages or PR text; provider names only inside `.provenance-allow` globs; mneme may be named. Commit messages are Conventional Commits with a scope from the closed list (engine, trigger, connector, api, cli, mcp, web, ui, db, ai, security, notify, docs, ci, deps, tooling).
+- Claims: no "exactly-once" and no production-readiness claim. External effects are at-least-once with explicit idempotency.
+- Foundational shape preserved: one Go binary, roles via `--role`, editor embedded through `internal/adapter/webui`, no mandatory Temporal/Redis, untrusted code only through the sandbox.
+- Tests: behavior changes come with tests; state-transition work includes failure paths (crash, retry, cancellation); storage work runs on both SQLite and PostgreSQL. The implementer's report lists commands, results and known limitations.
+- UI: tokens only, en/es catalogs complete, light/dark and both densities, keyboard paths, status as icon + text; screenshot findings table present.
+- Language: repository content is in English.
 
 ### Commands
-- `make test` (go test on the four modules), `gofmt -l apps packages` (known pre-existing debt: the four original .go files are unformatted — only report formatting on files the change touched), `go vet` per module.
-- `pnpm install && pnpm --filter @orcon/web typecheck && pnpm --filter @orcon/web build`.
-- Reproduce the CI integration smoke test: `make build`, run `./bin/orcon --role=standalone --addr=127.0.0.1:<own free port>`, check `curl -fsS .../healthz` returns `ok`, `/` contains `id="root"`, and `./bin/orcon --role=invalid` exits non-zero.
+- Go: `make tools && make check` (the single gate, identical to CI); `make test-postgres` for storage; `make build && make smoke`.
+- Web: `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm i18n:check`; UI gate `sh .agents/skills/orcon-ui/scripts/verify.sh`.
+- Skills: `sh .agents/skills/<name>/validation/run.sh` and `diff -r .agents/skills/<name> .claude/skills/<name>` when a skill changed.
+- Binary smoke: `./bin/orcon --role=standalone --addr=127.0.0.1:<own free port>`; `/healthz` returns `ok`; `/` contains `id="root"`; `--role=invalid` exits non-zero.
 - UI changes: verify visually in a browser with screenshots; a passing typecheck is not visual evidence.
 
 ### Environment safety
 - Use a port of your own (not 8080), record the PID of every process you start and stop it by that exact PID; never pattern-based kill, never `go run ... &`.
 - Build verification binaries into the scratchpad. Never write into untracked repository files (`.env` and similar).
-- If containers are ever needed, remove only by the exact ID you recorded at creation, with `docker rm -f -v <id>`; never filters, prune, or image/label selection.
+- If containers are needed, remove only by the exact ID recorded at creation, with `docker rm -f -v <id>`; never filters, prune, or image/label selection.
 
 <!-- END GRILL-PROVIDED CONTENT -->
