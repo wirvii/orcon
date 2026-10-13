@@ -14,7 +14,7 @@ interface Shortcut {
   description: MessageDescriptor;
 }
 
-const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
+const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.userAgent);
 
 export function shortcutList(): readonly Shortcut[] {
   const mod = isMac() ? 'Cmd' : 'Ctrl';

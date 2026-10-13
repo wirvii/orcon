@@ -29,7 +29,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: (args) => {
+  render: function Render(args) {
     const [page, setPage] = useState(args.page);
     return <Pagination {...args} page={page} onPageChange={setPage} />;
   },

@@ -15,7 +15,7 @@ const meta = {
   title: 'Components/ThemeSwitcher',
   component: ThemeSwitcher,
   // Stories keep their own value so the toolbar theme stays in charge of the page.
-  render: (args) => {
+  render: function Render(args) {
     const [value, setValue] = useState<ThemePreference>('system');
     return <ThemeSwitcher {...args} value={value} onValueChange={setValue} />;
   },

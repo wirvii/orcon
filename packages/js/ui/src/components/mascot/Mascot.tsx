@@ -7,8 +7,8 @@ import { cn } from '../../lib/cn';
 export type MascotPose = 'welcome' | 'thinking' | 'thumbs-up' | 'explorer';
 
 export interface MascotProps {
-  pose?: MascotPose;
-  className?: string;
+  pose?: MascotPose | undefined;
+  className?: string | undefined;
 }
 
 /**

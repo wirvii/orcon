@@ -13,6 +13,7 @@ import { EXAMPLE_LIMIT, columnsOf, inferSchema, protectedValue, visibleValue } f
 import { SchemaView } from '../../src/editor/schema-view/SchemaView';
 
 import { renderWithProviders } from './helpers';
+import { must } from '../../src/lib/must';
 
 describe('DataTableView', () => {
   it('numbers the items and shows one column per field, values in mono text', () => {
@@ -32,7 +33,7 @@ describe('DataTableView', () => {
   it('collapses nested objects as "{…} 3 keys" and expands them on request', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DataTableView items={orderItems} />);
-    const toggle = screen.getAllByRole('button', { name: '{…} 3 keys, shipping' })[0]!;
+    const toggle = must(screen.getAllByRole('button', { name: '{…} 3 keys, shipping' })[0]);
     expect(toggle).toHaveTextContent('{…} 3 keys');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await user.click(toggle);
@@ -62,7 +63,7 @@ describe('DataTableView', () => {
     const region = screen.getByRole('region', { name: 'Orders' });
     expect(region).toHaveProperty('tabIndex', 0);
     expect(region.className).toContain('overflow-auto');
-    const header = within(region).getAllByRole('columnheader')[1]!;
+    const header = must(within(region).getAllByRole('columnheader')[1]);
     expect(header).toHaveClass('sticky', 'bg-surface-sunken');
   });
 
@@ -122,7 +123,9 @@ describe('JsonTreeView', () => {
     renderWithProviders(<JsonTreeView value={[{ shipping: { city: 'Neiva' } }]} />);
     const items = () => screen.getAllByRole('treeitem');
     expect(items().filter((item) => item.tabIndex === 0)).toHaveLength(1);
-    await act(async () => items()[0]!.focus());
+    act(() => {
+      must(items()[0]).focus();
+    });
     await user.keyboard('{ArrowDown}');
     await vi.waitFor(() => expect(items()[1]).toHaveFocus());
     await user.keyboard('{ArrowDown}');
@@ -154,13 +157,13 @@ describe('SchemaView', () => {
     const fields = inferSchema([{ note: 'x'.repeat(300) }]);
     expect(fields[0]?.example?.length).toBeLessThanOrEqual(EXAMPLE_LIMIT);
     renderWithProviders(<SchemaView items={[{ note: 'x'.repeat(300) }]} />);
-    const example = document.querySelector<HTMLElement>('[data-schema-field="note"] [data-schema-example]')!;
-    expect(example.textContent!.length).toBeLessThanOrEqual(EXAMPLE_LIMIT);
+    const example = must(document.querySelector<HTMLElement>('[data-schema-field="note"] [data-schema-example]'));
+    expect(example.textContent.length).toBeLessThanOrEqual(EXAMPLE_LIMIT);
   });
 
   it('masks the example of a sensitive field', () => {
     renderWithProviders(<SchemaView items={mixedItems} />);
-    const row = document.querySelector('[data-schema-field="apiToken"]')!;
+    const row = must(document.querySelector('[data-schema-field="apiToken"]'));
     expect(within(row as HTMLElement).getByText('hidden')).toBeInTheDocument();
     expect(row.querySelector('[data-schema-example="masked"]')).not.toBeNull();
     expect(row.textContent).not.toMatch(/sk-/);

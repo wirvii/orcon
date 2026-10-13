@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl';
 import { cn } from '../../lib/cn';
 import { ProtectedCell } from '../data-table-view/DataTableView';
 import { editorMessages } from '../messages';
-import { isBinary, isProtected } from '../model';
+import { isBinary, isProtected, plainText } from '../model';
 
 /** The JSON literal null, shown dimmed. It is data, not a message. */
 const NULL = String(null);
@@ -17,9 +17,9 @@ export interface JsonTreeViewProps {
   /** Any JSON-like value: an array of items, an item, a list. Protected values and files are recognised. */
   value: unknown;
   /** Nodes deeper than this start collapsed. */
-  defaultExpandedDepth?: number;
-  label?: string;
-  className?: string;
+  defaultExpandedDepth?: number | undefined;
+  label?: string | undefined;
+  className?: string | undefined;
 }
 
 interface Row {
@@ -66,7 +66,7 @@ function Primitive({ value }: { value: unknown }): ReactNode {
   if (typeof value === 'string') return <span className="text-fg-accent">&quot;{value}&quot;</span>;
   if (typeof value === 'number') return <span className="text-fg-link">{String(value)}</span>;
   if (typeof value === 'boolean') return <span className="text-fg font-semibold">{String(value)}</span>;
-  return <span>{String(value)}</span>;
+  return <span>{plainText(value)}</span>;
 }
 
 /**

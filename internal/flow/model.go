@@ -108,6 +108,10 @@ type Join struct {
 	Mode       JoinMode
 	Data       JoinData
 	MatchField string
+	// Remaining applies to FIRST joins only; absent means CANCEL. An explicit
+	// CANCEL is kept as written, so the content hash tells the two apart even
+	// though they behave the same.
+	Remaining JoinRemaining
 }
 
 // Loop configures an orcon.loop control node.

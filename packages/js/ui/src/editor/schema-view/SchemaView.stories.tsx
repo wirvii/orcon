@@ -8,6 +8,7 @@ import { MatrixTable } from '../../stories/MatrixTable';
 import { mixedItems, orderItems } from '../fixtures';
 
 import { SchemaView } from './SchemaView';
+import { must } from '../../lib/must';
 
 const meta = {
   title: 'Editor/SchemaView',
@@ -42,8 +43,8 @@ export const Protected: Story = {
 export const LongExample: Story = {
   args: { items: [{ id: 'ord_1', note: 'x'.repeat(200) }] },
   play: async ({ canvasElement }) => {
-    const example = canvasElement.querySelector<HTMLElement>('[data-schema-field="note"] [data-schema-example]')!;
-    await expect(example.textContent?.length).toBeLessThanOrEqual(60);
+    const example = must(canvasElement.querySelector<HTMLElement>('[data-schema-field="note"] [data-schema-example]'));
+    await expect(example.textContent.length).toBeLessThanOrEqual(60);
   },
 };
 

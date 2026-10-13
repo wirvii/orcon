@@ -17,7 +17,9 @@ for (const theme of ['light', 'dark'] as const) {
     test(`the welcome screen has no accessibility violations in the ${theme} theme on a ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       // The saved preference is what theme-init.js applies before the first paint.
-      await page.addInitScript((value) => window.localStorage.setItem('orcon.theme', value), theme);
+      await page.addInitScript((value) => {
+        window.localStorage.setItem('orcon.theme', value);
+      }, theme);
       await page.goto('/');
 
       await expect(page.locator('#root')).toBeVisible();

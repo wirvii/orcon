@@ -47,7 +47,8 @@ export function evaluatePairs(pairs: Pair[], values: Record<string, string>): st
       if (!pair.reason) problems.push(`${label}: ${pair.kind} pair needs a reason`);
       continue;
     }
-    const required = MINIMUM[pair.kind as 'text' | 'ui'];
+    // The pair comes from JSON, so its kind is not guaranteed to be one of the known ones.
+    const required = (MINIMUM as Record<string, number | undefined>)[pair.kind];
     if (required === undefined) {
       problems.push(`${label}: unknown kind "${pair.kind}"`);
       continue;

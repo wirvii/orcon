@@ -50,7 +50,7 @@ describe.each(viewports)('axe on a $name viewport ($width px)', ({ width, height
       await entry.Story.play?.({ canvasElement: container });
       await settle();
 
-      const rules = (entry.Story.parameters?.a11y as { config?: { rules?: { id: string; enabled?: boolean }[] } } | undefined)?.config?.rules ?? [];
+      const rules = (entry.Story.parameters?.['a11y'] as { config?: { rules?: { id: string; enabled?: boolean }[] } } | undefined)?.config?.rules ?? [];
       const violations = await axeViolations(
         document.body,
         rules.filter((rule) => rule.enabled === false).map((rule) => rule.id),

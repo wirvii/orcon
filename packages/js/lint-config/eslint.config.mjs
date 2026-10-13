@@ -26,29 +26,29 @@ const testsAndStories = ['**/*.test.{ts,tsx}', '**/test/**', '**/*.stories.tsx']
 
 // Views where the mascot never appears: canvas, execution detail, errors,
 // security warnings and dense views (inbox, tables).
-const mascotFreeViews = [
+export const mascotFreeViews = [
   '**/canvas/**',
   '**/{execution,executions,errors,error,security,inbox,data-table}/**',
   '**/screens/**/*{Execution,Inbox,ErrorPage,Security,Approval}*.{ts,tsx}',
 ];
 
-const mascotImport = {
+export const mascotImport = {
   group: ['**/Mascot', '**/mascot', '**/mascot/**', '@orcon/ui/mascot'],
   message:
     'The mascot is not allowed on canvas, execution, error, security or dense views. Use EmptyState in an allowed context.',
 };
-const mascotName = {
+export const mascotName = {
   group: ['**'],
   importNamePattern: '^Mascot$',
   message: mascotImport.message,
 };
-const svgImports = {
+export const svgImports = {
   group: ['**/*.svg?react', '**/*.svg?raw', '**/*.svg?inline'],
   message:
     'Connector logos render only through ConnectorIcon (an <img>). Own icons live under icons/.',
 };
 
-const inlineSvg = {
+export const inlineSvg = {
   selector: 'JSXOpeningElement[name.name="svg"]',
   message:
     'Inline <svg> is not allowed. Connector logos render only through ConnectorIcon (an <img>); own icons live under icons/.',
@@ -69,6 +69,7 @@ export function createConfig({ tailwindEntryPoint, cwd } = {}) {
       ignores: [
         '**/node_modules/**',
         '**/dist/**',
+        '**/dist-perf/**',
         '**/storybook-static/**',
         '**/coverage/**',
         '**/test/fixtures/**',

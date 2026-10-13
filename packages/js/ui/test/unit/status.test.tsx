@@ -17,7 +17,7 @@ describe('StatusBadge', () => {
     expect(badge).not.toBeNull();
     // Meaning is never carried by color alone: a decorative icon plus text.
     expect(badge?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(badge?.textContent?.trim().length).toBeGreaterThan(0);
+    expect(badge?.textContent.trim().length).toBeGreaterThan(0);
   });
 
   it('covers every state of the normative map with a label in en and es', () => {
@@ -40,7 +40,7 @@ describe('StatusBadge', () => {
   it('UNCERTAIN is never named as a failure or a success, in either language', () => {
     for (const locale of ['en', 'es'] as const) {
       const { unmount } = renderWithProviders(<StatusBadge status="UNCERTAIN" />, { locale });
-      const text = document.body.textContent ?? '';
+      const text = document.body.textContent;
       expect(text).not.toMatch(/fail|succe|fall|correct|éxito/i);
       unmount();
     }

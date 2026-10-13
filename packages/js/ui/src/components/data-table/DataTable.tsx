@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import { cn } from '../../lib/cn';
@@ -30,8 +31,8 @@ export interface DataColumn<Row> {
   header: string;
   /** Renders the cell. Return text or a component; use StatusBadge for status. */
   cell: (row: Row) => ReactNode;
-  sortable?: boolean;
-  align?: 'start' | 'end';
+  sortable?: boolean | undefined;
+  align?: 'start' | 'end' | undefined;
 }
 
 export interface DataTableProps<Row> {
@@ -41,21 +42,32 @@ export interface DataTableProps<Row> {
   rows: readonly Row[];
   getRowId: (row: Row) => string;
   /** `ready` shows the rows; `loading` shows placeholder rows; `error` shows a message with a retry. */
-  status?: 'ready' | 'loading' | 'error';
-  sort?: SortState;
+  status?: 'ready' | 'loading' | 'error' | undefined;
+  sort?: SortState | undefined;
   /** Sorting is done by the caller (usually on the server). */
-  onSortChange?: (sort: SortState) => void;
+  onSortChange?: ((sort: SortState) => void) | undefined;
   /** Text for an empty table. Defaults to a generic one; say what to do when you can. */
-  emptyMessage?: ReactNode;
+  emptyMessage?: ReactNode | undefined;
   /** Text for a failed load. */
-  errorMessage?: ReactNode;
-  onRetry?: () => void;
+  errorMessage?: ReactNode | undefined;
+  onRetry?: (() => void) | undefined;
   /** Keep the header visible while the body scrolls. Set a height on the table with `className`, such as `max-h-panel-width`. */
-  stickyHeader?: boolean;
+  stickyHeader?: boolean | undefined;
   /** How many placeholder rows to show while loading. */
-  loadingRows?: number;
-  className?: string;
+  loadingRows?: number | undefined;
+  /**
+   * Render only the rows near the visible part of the table (for a list that can pass 100 rows).
+   * The table must scroll: give it a height with `className`, such as `h-96`. Rows keep their
+   * place in the table for assistive technology (`aria-rowcount`, `aria-rowindex`).
+   */
+  virtual?: boolean | undefined;
+  className?: string | undefined;
 }
+
+/** The first guess of a row's height before it is measured: the comfortable density. */
+const ESTIMATED_ROW_HEIGHT = 40;
+/** Rows rendered beyond the visible ones, so a fast scroll does not show blank space. */
+const OVERSCAN_ROWS = 8;
 
 /**
  * A table of data with sortable columns and the loading, empty and error states
@@ -75,36 +87,54 @@ export function DataTable<Row>({
   onRetry,
   stickyHeader = false,
   loadingRows = 3,
+  virtual = false,
   className,
 }: DataTableProps<Row>) {
   const intl = useIntl();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const showRows = status === 'ready' && rows.length > 0;
+  const virtualizer = useVirtualizer({
+    count: virtual && showRows ? rows.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: OVERSCAN_ROWS,
+    getItemKey: (index) => {
+      const row = rows[index];
+      return row === undefined ? index : getRowId(row);
+    },
+  });
+  const virtualItems = virtualizer.getVirtualItems();
+  const spaceBefore = virtualItems[0]?.start ?? 0;
+  const lastItem = virtualItems[virtualItems.length - 1];
+  const spaceAfter = lastItem ? virtualizer.getTotalSize() - lastItem.end : 0;
 
   const toggle = (column: DataColumn<Row>) => {
     if (!onSortChange) return;
     const active = sort?.columnId === column.id;
-    onSortChange({ columnId: column.id, direction: active && sort?.direction === 'ascending' ? 'descending' : 'ascending' });
+    onSortChange({ columnId: column.id, direction: active && sort.direction === 'ascending' ? 'descending' : 'ascending' });
   };
 
   const span = columns.length;
 
   return (
     <div
+      ref={scrollRef}
       role="region"
       aria-label={label}
       tabIndex={0}
       className={cn('bg-surface border-border overflow-auto rounded-md border', className)}
     >
-      <Table aria-busy={status === 'loading' || undefined}>
+      <Table aria-busy={status === 'loading' || undefined} aria-rowcount={virtual && showRows ? rows.length + 1 : undefined}>
         <TableHeader>
           <TableRow header>
             {columns.map((column) => {
               const active = sort?.columnId === column.id;
-              const SortIcon = !active ? ChevronsUpDown : sort?.direction === 'ascending' ? ArrowUp : ArrowDown;
+              const SortIcon = !active ? ChevronsUpDown : sort.direction === 'ascending' ? ArrowUp : ArrowDown;
               return (
                 <TableHead
                   key={column.id}
                   sticky={stickyHeader}
-                  aria-sort={column.sortable ? (active ? sort?.direction : 'none') : undefined}
+                  aria-sort={column.sortable ? (active ? sort.direction : 'none') : undefined}
                   className={column.align === 'end' ? 'text-right' : undefined}
                 >
                   {column.sortable ? (
@@ -155,7 +185,7 @@ export function DataTable<Row>({
               </TableCell>
             </TableRow>
           ) : null}
-          {status === 'ready'
+          {status === 'ready' && !virtual
             ? rows.map((row) => (
                 <TableRow key={getRowId(row)}>
                   {columns.map((column) => (
@@ -166,8 +196,38 @@ export function DataTable<Row>({
                 </TableRow>
               ))
             : null}
+          {virtual && showRows ? (
+            <>
+              <SpaceRow height={spaceBefore} span={span} />
+              {virtualItems.map((item) => {
+                const row = rows[item.index];
+                if (row === undefined) return null;
+                return (
+                  <TableRow key={item.key} ref={virtualizer.measureElement} data-index={item.index} aria-rowindex={item.index + 2}>
+                    {columns.map((column) => (
+                      <TableCell key={column.id} className={column.align === 'end' ? 'text-right' : undefined}>
+                        {column.cell(row)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
+              <SpaceRow height={spaceAfter} span={span} />
+            </>
+          ) : null}
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+/** The room the rows above or below the rendered ones would take, so the scrollbar stays true. */
+function SpaceRow({ height, span }: { height: number; span: number }) {
+  if (height <= 0) return null;
+  return (
+    <tr aria-hidden>
+      {/* eslint-disable-next-line orcon/no-inline-style -- the height is computed at runtime from the rows that are not rendered */}
+      <td colSpan={span} className="p-0" style={{ height }} />
+    </tr>
   );
 }

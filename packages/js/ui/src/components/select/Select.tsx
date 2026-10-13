@@ -12,18 +12,18 @@ import { useFieldControlProps } from '../form-field/field-context';
 export interface SelectOption {
   value: string;
   label: string;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
 }
 
 export interface SelectProps extends Omit<ComponentProps<typeof SelectPrimitive.Root>, 'children'> {
   options: readonly SelectOption[];
   /** Text shown when nothing is selected. Pass a translated string. */
-  placeholder?: string;
-  id?: string;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: AriaAttributes['aria-invalid'];
-  className?: string;
+  placeholder?: string | undefined;
+  id?: string | undefined;
+  'aria-label'?: string | undefined;
+  'aria-describedby'?: string | undefined;
+  'aria-invalid'?: AriaAttributes['aria-invalid'] | undefined;
+  className?: string | undefined;
 }
 
 /** Single choice from a list. Inside a FormField it is labeled, described and marked invalid automatically. */
