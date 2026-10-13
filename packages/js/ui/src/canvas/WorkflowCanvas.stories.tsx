@@ -10,6 +10,7 @@ import { MatrixTable } from '../stories/MatrixTable';
 import { agentGraph, exampleCatalog, exampleDraft, exampleGraph, largeGraph, placeholderNode } from './fixtures';
 import type { Graph } from './model';
 import { WorkflowCanvas } from './WorkflowCanvas';
+import { must } from '../lib/must';
 
 const meta = {
   title: 'Canvas/WorkflowCanvas',
@@ -65,8 +66,8 @@ export const Compare: Story = {
       nodes: [
         ...exampleDraft.nodes.map((node) => (node.id === 'http' ? { ...node, diff: 'changed' as const } : node)),
         { ...placeholderNode, id: 'unsupported', position: { x: 440, y: 440 } },
-        { ...exampleDraft.nodes[0]!, id: 'added', name: 'Audit log', subtitle: 'Write entry', diff: 'added' as const, kind: 'action' as const, icon: 'file' as const, inputs: [{ id: 'main' }], position: { x: 640, y: 280 } },
-        { ...exampleDraft.nodes[0]!, id: 'removed', name: 'Notify team', subtitle: 'Send message', diff: 'removed' as const, kind: 'action' as const, icon: 'message' as const, inputs: [{ id: 'main' }], position: { x: 840, y: 40 } },
+        { ...must(exampleDraft.nodes[0]), id: 'added', name: 'Audit log', subtitle: 'Write entry', diff: 'added' as const, kind: 'action' as const, icon: 'file' as const, inputs: [{ id: 'main' }], position: { x: 640, y: 280 } },
+        { ...must(exampleDraft.nodes[0]), id: 'removed', name: 'Notify team', subtitle: 'Send message', diff: 'removed' as const, kind: 'action' as const, icon: 'message' as const, inputs: [{ id: 'main' }], position: { x: 840, y: 40 } },
       ],
     } satisfies Graph,
   },

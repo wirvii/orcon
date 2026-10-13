@@ -118,11 +118,11 @@ export interface EdgeLook {
   /** Stroke class (the color). */
   stroke: string;
   /** SVG stroke-dasharray, absent for a solid line. */
-  dash?: string;
+  dash?: string | undefined;
   /** The dash pattern flows (running only; off under reduced motion). */
-  flows?: boolean;
+  flows?: boolean | undefined;
   /** The family of the label chip. */
-  family?: StatusFamily;
+  family?: StatusFamily | undefined;
 }
 
 /** canvas.md#edges: color is never the only signal; the dash pattern differs per state. */

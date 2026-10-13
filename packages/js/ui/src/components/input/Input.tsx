@@ -8,7 +8,7 @@ import { textControl } from '../../lib/control';
 import { useFieldControlProps } from '../form-field/field-context';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  ref?: Ref<HTMLInputElement>;
+  ref?: Ref<HTMLInputElement> | undefined;
 }
 
 /** Single-line text input. Inside a FormField it is labeled, described and marked invalid automatically. */

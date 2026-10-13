@@ -19,27 +19,27 @@ const messages = defineMessages({
 export interface ComboboxOption {
   value: string;
   label: string;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** Extra words that also match the search. */
-  keywords?: readonly string[];
+  keywords?: readonly string[] | undefined;
 }
 
 export interface ComboboxProps {
   options: readonly ComboboxOption[];
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
+  value?: string | undefined;
+  defaultValue?: string | undefined;
+  onValueChange?: ((value: string) => void) | undefined;
   /** Shown on the button when nothing is chosen. Pass a translated string. */
   placeholder: string;
   /** Accessible name and placeholder of the search box. Pass a translated string. */
   searchLabel: string;
-  disabled?: boolean;
-  defaultOpen?: boolean;
-  id?: string;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: AriaAttributes['aria-invalid'];
-  className?: string;
+  disabled?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  id?: string | undefined;
+  'aria-label'?: string | undefined;
+  'aria-describedby'?: string | undefined;
+  'aria-invalid'?: AriaAttributes['aria-invalid'] | undefined;
+  className?: string | undefined;
 }
 
 /**
@@ -109,8 +109,8 @@ export function Combobox({
                 <Command.Item
                   key={option.value}
                   value={option.label}
-                  keywords={option.keywords ? [...option.keywords] : undefined}
-                  disabled={option.disabled}
+                  {...(option.keywords ? { keywords: [...option.keywords] } : {})}
+                  {...(option.disabled === undefined ? {} : { disabled: option.disabled })}
                   onSelect={() => choose(option.value)}
                   className={commandItem}
                 >

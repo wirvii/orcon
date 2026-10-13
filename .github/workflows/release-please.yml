@@ -1,0 +1,117 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Release pull request and signed tag (orcon-contributing RL-2..RL-4; ADR 0081 section 4).
+#
+# The jobs use the credentials of the release GitHub App from the `release`
+# environment (ORCON_RELEASE_APP_ID, ORCON_RELEASE_APP_PRIVATE_KEY). They stay
+# inert until the owner has created the App and the environment (references/github-settings.md,
+# sections A and B) and then sets the repository variable ORCON_RELEASE_ENABLED to
+# true; a skipped job never touches the environment.
+name: Release PR
+on:
+  push:
+    branches: [main]
+permissions: {}
+# Concurrency is per job, not per workflow: a workflow-level group keeps only one pending
+# run, so a queued run (and its `tag` job) could be replaced by a newer push.
+jobs:
+  release-pr:
+    if: ${{ vars.ORCON_RELEASE_ENABLED == 'true' }}
+    concurrency:
+      group: release-please-pr
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    outputs:
+      pr: ${{ steps.rp.outputs.pr }}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.ORCON_RELEASE_APP_ID }}
+          private-key: ${{ secrets.ORCON_RELEASE_APP_PRIVATE_KEY }}
+      - id: rp
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          token: ${{ steps.app.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
+  release-pr-extras:
+    needs: release-pr
+    if: ${{ needs.release-pr.outputs.pr != '' }}
+    concurrency:
+      group: release-please-extras
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.ORCON_RELEASE_APP_ID }}
+          private-key: ${{ secrets.ORCON_RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ fromJSON(needs.release-pr.outputs.pr).headBranchName }}
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate per-release files
+        env:
+          APP_ID: ${{ secrets.ORCON_RELEASE_APP_ID }}
+        run: |
+          version="v$(node -p 'require("./.release-please-manifest.json")["."]')"
+          make release-prepare VERSION="$version"
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "orcon-release[bot]"
+            git config user.email "${APP_ID}+orcon-release[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(tooling): prepare release $version"
+            git push origin HEAD
+          fi
+  tag:
+    if: "${{ vars.ORCON_RELEASE_ENABLED == 'true' && startsWith(github.event.head_commit.message, 'chore(tooling): release ') }}"
+    # One group per merge commit: a queued tag job is never replaced by a later push.
+    concurrency:
+      group: release-tag-${{ github.sha }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.ORCON_RELEASE_APP_ID }}
+          private-key: ${{ secrets.ORCON_RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          token: ${{ steps.app.outputs.token }}
+      - name: Install gitsign
+        run: sh scripts/release/install-tools.sh gitsign
+      - name: Create, verify and push the signed tag
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/release/tag.sh

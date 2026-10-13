@@ -12,18 +12,18 @@ import { commonMessages } from '../../lib/messages';
 import { IconButton } from '../icon-button/IconButton';
 
 export interface SheetProps {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  trigger?: ReactElement;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
+  trigger?: ReactElement | undefined;
   title: string;
-  description?: ReactNode;
-  children?: ReactNode;
+  description?: ReactNode | undefined;
+  children?: ReactNode | undefined;
   /**
    * `responsive` (default): a bottom sheet below the md breakpoint (phones) and a
    * side panel from md up. `bottom` and `right` fix the placement.
    */
-  side?: 'responsive' | 'bottom' | 'right';
+  side?: 'responsive' | 'bottom' | 'right' | undefined;
 }
 
 const placement = {

@@ -8,8 +8,8 @@ const PRODUCT_NAME = 'Orcon';
 
 export interface BrandMarkProps {
   /** `lockup` shows the symbol and the name; `symbol` only the symbol. */
-  variant?: 'lockup' | 'symbol';
-  className?: string;
+  variant?: 'lockup' | 'symbol' | undefined;
+  className?: string | undefined;
 }
 
 /**

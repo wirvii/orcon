@@ -17,12 +17,12 @@ const messages = defineMessages({
 });
 
 export interface NotificationBellProps {
-  ref?: Ref<HTMLButtonElement>;
+  ref?: Ref<HTMLButtonElement> | undefined;
   /** Items that need a person's attention. */
   count: number;
   /** Opens the attention inbox. */
-  onClick?: () => void;
-  className?: string;
+  onClick?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /** The bell in the top bar. Its name carries the count in words; the number on the badge is the same count, so the visible text is part of the name. */

@@ -173,6 +173,7 @@ func (n *Node) writeBlocks(b *builder) {
 		j.str("mode", string(n.Join.Mode))
 		j.str("data", string(n.Join.Data))
 		j.str("matchField", n.Join.MatchField)
+		j.str("remaining", string(n.Join.Remaining))
 		b.val("join", j.build())
 	}
 	if n.Loop != nil {

@@ -20,3 +20,4 @@ playwright-report/
 packages/js/ui/visual/report/
 .bin/
 bin/
+build/goreleaser/

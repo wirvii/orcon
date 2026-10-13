@@ -18,8 +18,8 @@ export interface CodeBlockProps {
   /** Names the block for assistive technology, for example "Request body". */
   label: string;
   /** Show a copy button. Never use it for values the person may not see; use ProtectedValue for those. */
-  copyable?: boolean;
-  className?: string;
+  copyable?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /**
@@ -53,7 +53,7 @@ export function CodeBlock({ code, label, copyable = false, className }: CodeBloc
       </pre>
       {copyable ? (
         <div className="absolute top-1 right-1">
-          <IconButton variant="ghost" icon={copied ? Check : Copy} label={intl.formatMessage(messages.copy)} onClick={copy} />
+          <IconButton variant="ghost" icon={copied ? Check : Copy} label={intl.formatMessage(messages.copy)} onClick={() => void copy()} />
         </div>
       ) : null}
       <span role="status" className="sr-only">

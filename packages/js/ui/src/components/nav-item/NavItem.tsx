@@ -8,18 +8,18 @@ import { cn } from '../../lib/cn';
 import { Tooltip } from '../tooltip/Tooltip';
 
 export interface NavItemProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> {
-  ref?: Ref<HTMLAnchorElement>;
+  ref?: Ref<HTMLAnchorElement> | undefined;
   icon: LucideIcon;
   /** The destination name. Always present: with `collapsed` it becomes hidden text plus a tooltip. */
   label: string;
   /** The page being shown. Marks the item with aria-current, a heavier weight and a leading bar. */
-  current?: boolean;
+  current?: boolean | undefined;
   /** Icon only (a navigation rail). The label stays available to assistive technology and as a tooltip. */
-  collapsed?: boolean;
+  collapsed?: boolean | undefined;
   /** Count of things waiting in that area. Shown next to the label and read after it. */
-  badge?: ReactNode;
+  badge?: ReactNode | undefined;
   /** Show the label from the lg breakpoint up and only the icon below it. Used by the responsive shell. */
-  responsiveLabel?: boolean;
+  responsiveLabel?: boolean | undefined;
 }
 
 /** One entry of the main navigation. */

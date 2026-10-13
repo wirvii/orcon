@@ -7,10 +7,10 @@ import { Breadcrumb, type BreadcrumbItem } from '../components/breadcrumb/Breadc
 
 export interface PageHeaderProps {
   title: string;
-  description?: ReactNode;
-  breadcrumb?: readonly BreadcrumbItem[];
+  description?: ReactNode | undefined;
+  breadcrumb?: readonly BreadcrumbItem[] | undefined;
   /** Buttons at the end of the header. They wrap under the title on a phone. */
-  actions?: ReactNode;
+  actions?: ReactNode | undefined;
 }
 
 /** The top of a page: where you are, the h1, a line of context and the page actions. */

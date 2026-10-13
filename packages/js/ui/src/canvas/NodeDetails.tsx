@@ -15,9 +15,9 @@ export interface NodeDetailsProps {
   node: GraphNode | undefined;
   onClose: () => void;
   /** Link to the execution detail of this node. Omit when no execution is being shown. */
-  executionHref?: string;
+  executionHref?: string | undefined;
   /** `bottom` on phones, `responsive` (side panel from md) elsewhere. */
-  side?: 'bottom' | 'responsive';
+  side?: 'bottom' | 'responsive' | undefined;
 }
 
 /**

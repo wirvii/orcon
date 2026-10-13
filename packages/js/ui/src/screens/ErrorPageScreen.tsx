@@ -29,8 +29,8 @@ const exampleProblem: ProblemDetails = {
 };
 
 export interface ErrorPageScreenProps {
-  problem?: ProblemDetails;
-  onRetry?: () => void;
+  problem?: ProblemDetails | undefined;
+  onRetry?: (() => void) | undefined;
 }
 
 /**

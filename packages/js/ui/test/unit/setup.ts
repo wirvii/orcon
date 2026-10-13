@@ -25,7 +25,7 @@ class MemoryStorage implements Storage {
     this.data.delete(key);
   }
   setItem(key: string, value: string) {
-    this.data.set(key, String(value));
+    this.data.set(key, value);
   }
 }
 
@@ -35,9 +35,15 @@ Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable
 
 // jsdom does not implement ResizeObserver, which Radix scroll areas use.
 class ResizeObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe() {
+    // jsdom has no layout, so there is nothing to observe.
+  }
+  unobserve() {
+    // See observe.
+  }
+  disconnect() {
+    // See observe.
+  }
 }
 globalThis.ResizeObserver = ResizeObserverStub;
 

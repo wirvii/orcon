@@ -46,7 +46,7 @@ export const Default: Story = {
 };
 export const Selected: Story = {
   args: { selected: true, onSelectedChange: () => undefined },
-  render: (args) => {
+  render: function Render(args) {
     const [selected, setSelected] = useState(true);
     return <AttentionInboxItem {...args} selected={selected} onSelectedChange={setSelected} />;
   },

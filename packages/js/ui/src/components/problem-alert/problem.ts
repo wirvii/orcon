@@ -5,16 +5,16 @@ import { defineMessages, type MessageDescriptor } from 'react-intl';
 
 /** An `application/problem+json` body (RFC 9457) with the Orcon members the UI reads. */
 export interface ProblemDetails {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
+  type?: string | undefined;
+  title?: string | undefined;
+  status?: number | undefined;
+  detail?: string | undefined;
+  instance?: string | undefined;
   /** Stable machine code. A catalog key `problem.<code>` translates it. */
-  code?: string;
-  requestId?: string;
+  code?: string | undefined;
+  requestId?: string | undefined;
   /** Per-field errors. `pointer` is a JSON pointer into the request body, such as "/name". */
-  errors?: readonly { pointer: string; detail: string; code?: string }[];
+  errors?: readonly { pointer: string; detail: string; code?: string }[] | undefined;
 }
 
 /** Messages for known problem codes. A code without a message falls back to the problem title. */

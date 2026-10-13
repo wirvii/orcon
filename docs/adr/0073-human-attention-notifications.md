@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0073 — Human-attention notifications for suspended executions
 
-Status: **Accepted** | Date: 2026-10-12 | Amended: 2026-10-12 (ADR-0077, ADR-0080)
+Status: **Accepted** | Date: 2026-10-12 | Amended: 2026-10-12 (ADR-0077, ADR-0080); 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -131,3 +131,4 @@ Every enumerated value this ADR defines is UPPER_SNAKE wherever it crosses a pub
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-005.** Cross-reference: "Programmatic surface (public events `execution.awaiting_human`, `execution.awaiting_human.escalated`, `execution.human_resolved`; REST operations to list items awaiting human action and to continue/repeat/cancel; MCP tools) is defined by ADR-0052 §3, ADR-0055 §2 and ADR-0059; this ADR defines the semantics, notification routing and escalation."
+- **SPEC-014 (ADR-0082, 2026-10-13, owner decision OQ2).** §1a and §4: an attention request of an execution of mode `TEST` is created exactly as for any other execution (same causes, same notification class), but its only recipient is the principal who started the test run, through the in-app channel (§2, item 1). Routing configuration (§4), the fallback to the organization's Owners and Admins, escalation (§5) and the email, outbound webhook and chat channels never apply to it; reminders and expiry notices, if any, are in-app only. If that principal no longer exists or can no longer read the execution, the request stays open without a recipient, visible in the execution view, until it is resolved or the test execution ends. The effect confirmation wait of ADR-0082 §4 is not an attention cause and opens no attention request.

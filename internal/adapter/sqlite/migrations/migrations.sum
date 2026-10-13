@@ -6,3 +6,5 @@
 # lines of new files and never rewrites an existing line; `make db-check`
 # rejects a changed, removed or unlisted migration. A published migration is
 # never edited: a fix is a new migration.
+0001_create_instance_tables.sql  054893f1a40f400ad72e2ecc3b541dcfdc0dec5d2736fed5c9c51733f3583296
+0002_create_flow_tables.sql  f6f290e126d22dc0ce376d0bf5cd4cea6cb94474ee2c5c0f100c0a31af996e84

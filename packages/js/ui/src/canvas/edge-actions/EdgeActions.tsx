@@ -13,14 +13,14 @@ export interface EdgeActionsProps {
   /** Name of the node the connection ends at. */
   target: string;
   /** Insert a node in the middle of the connection. */
-  onAdd?: () => void;
-  onDelete?: () => void;
+  onAdd?: (() => void) | undefined;
+  onDelete?: (() => void) | undefined;
   /** Reachable with Tab. */
-  tabbable?: boolean;
+  tabbable?: boolean | undefined;
   /** Pointer enter and leave, so the canvas keeps the bar open while the pointer is on it. */
-  onPointerEnter?: () => void;
-  onPointerLeave?: () => void;
-  className?: string;
+  onPointerEnter?: (() => void) | undefined;
+  onPointerLeave?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 const button =

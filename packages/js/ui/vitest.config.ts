@@ -110,6 +110,16 @@ export default defineConfig({
         },
       },
       {
+        // A table of 10,000 rows stays virtualized and smooth (orcon-web PF-5).
+        extends: true,
+        test: {
+          name: 'virtual',
+          setupFiles: quiet,
+          include: ['test/virtual/**/*.test.tsx'],
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
         // Touch and a coarse pointer: every interactive control is at least 44x44 px.
         extends: true,
         test: {
