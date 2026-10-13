@@ -32,7 +32,7 @@ The pages below are routes under `docs/user/en/` and, mirrored, under `docs/user
 
 ## Pages that exist today
 
-`getting-started/quickstart.md`, `configuration/overview.md`, `operations/upgrade-and-rollback.md`, `operations/backup-and-restore.md`, `operations/alerts.md` and `migrating-from-n8n/overview.md`, in English and Spanish, and `support-matrix.yaml`. The other routes are written by the slices that deliver their features.
+`getting-started/quickstart.md`, `configuration/overview.md`, `operations/upgrade-and-rollback.md`, `operations/backup-and-restore.md`, `operations/alerts.md`, `migrating-from-n8n/overview.md` and `building-flows/editor.md`, in English and Spanish, and `support-matrix.yaml`. The other routes are written by the slices that deliver their features.
 
 ## Front matter
 
