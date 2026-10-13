@@ -260,6 +260,43 @@ func TestJoinAllMixedFails(t *testing.T) {
 	if got := executiontest.Executed(res, "after"); got != 0 {
 		t.Errorf("node after the failed join ran %d times, want 0", got)
 	}
+	// The failing join has the node execution it would have had when firing,
+	// with the same deterministic id (amendment 9 section C-3).
+	fires := executiontest.Run(t, syncJoin(), execution.Deps{Runner: &executiontest.TraceRunner{}}, executiontest.Batch(`{}`))
+	var firedID, failedID execution.NodeExecutionID
+	for _, ne := range fires.NodeExecutions {
+		if ne.Node == "j" {
+			firedID = ne.ID
+		}
+	}
+	for _, ne := range res.NodeExecutions {
+		if ne.Node == "j" {
+			failedID = ne.ID
+			if ne.State != execution.NodeFailed {
+				t.Errorf("node execution of j is %s, want FAILED", ne.State)
+			}
+		}
+	}
+	if firedID == "" || failedID != firedID || res.Failure.NodeExecution != firedID {
+		t.Errorf("node execution ids: fired %q, failed %q, failure %q; want one deterministic id", firedID, failedID, res.Failure.NodeExecution)
+	}
+	if res.Failure.Class != execution.ClassPermanent || res.Failure.Origin != execution.FailureEngine {
+		t.Errorf("failure class %s origin %s, want PERMANENT raised by the engine", res.Failure.Class, res.Failure.Origin)
+	}
+	// One atomic step, in this order, with no attempt events and no continuation.
+	var tail []execution.EventType
+	for i := range res.Events {
+		if res.Events[i].NodeExecution == failedID || res.Events[i].Type == execution.EventExecutionFailed {
+			tail = append(tail, res.Events[i].Type)
+		}
+	}
+	want := []execution.EventType{execution.EventNodeStarted, execution.EventJoinFailed, execution.EventNodeFailed, execution.EventExecutionFailed}
+	if diff := cmp.Diff(want, tail); diff != "" {
+		t.Errorf("events of the failing join mismatch (-want +got):\n%s", diff)
+	}
+	if got := executiontest.Count(res, execution.EventJoinFired); got != 0 {
+		t.Errorf("join.fired events = %d, want 0", got)
+	}
 }
 
 func TestActivatedJoinWithNoLiveTokenCompletesWithZeroTokens(t *testing.T) {
@@ -601,4 +638,70 @@ func wcp28Like() *executiontest.Builder {
 		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingLetFinish).
 		Chain("s", "p0").Edge("p0", "a").Edge("p0", "b").Edge("a", "m").Edge("b", "m").Edge("m", "sp").
 		Edge("sp", "x").Edge("sp", "y").Edge("x", "j").Edge("y", "j").Chain("j", "after", "e")
+}
+
+// canceledInputFlow has a FIRST/CANCEL discriminator j over a and b, and an
+// external join x that receives b directly and the continuation of j.
+func canceledInputFlow(xMode flow.JoinMode) *executiontest.Builder {
+	return executiontest.NewFlow("canceled-input").
+		Start("s").Parallel("p").Task("a").Task("b").Parallel("j").Task("after").Parallel("x").Task("done").End("e").
+		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingCancel).Join("x", xMode).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "j").Edge("b", "j").Edge("b", "x").
+		Edge("j", "after").Edge("after", "x").Chain("x", "done", "e")
+}
+
+func TestJoinAllCanceledInputFails(t *testing.T) {
+	t.Parallel()
+	// An edge closed by cancellation counts like any edge closed with no live
+	// token: x gets a live token from the winner and a canceled input, so it
+	// fails with JoinRequirementNotMet and a failed node execution.
+	res := executiontest.Run(t, canceledInputFlow(flow.JoinAll), execution.Deps{Runner: &executiontest.TraceRunner{}}, executiontest.Batch(`{}`))
+	if res.Status != execution.ExecFailed || res.Failure == nil || res.Failure.Code != execution.CodeJoinRequirementNotMet || res.Failure.Node != "x" {
+		t.Fatalf("result = %s %+v, want FAILED with JoinRequirementNotMet at x", res.Status, res.Failure)
+	}
+	var failed int
+	for _, ne := range res.NodeExecutions {
+		if ne.Node == "x" && ne.State == execution.NodeFailed && ne.ID == res.Failure.NodeExecution {
+			failed++
+		}
+	}
+	if failed != 1 {
+		t.Errorf("failed node executions of x = %d, want 1 matching the failure", failed)
+	}
+}
+
+func TestJoinInCanceledRegionIsCanceled(t *testing.T) {
+	t.Parallel()
+	// The ALL join jj lies in branch B of the split p. A discriminator on p
+	// cancels B after b1 reached jj; the other input of jj closes by
+	// cancellation. jj neither fires nor fails and has no node execution, and
+	// the execution ends through the winning branch.
+	b := executiontest.NewFlow("canceled-region").
+		Start("s").Parallel("p").Task("bb").Parallel("q").Task("b1").Task("b2").Parallel("jj").Task("a").Parallel("j").Task("after").End("e").
+		Join("jj", flow.JoinAll).Join("j", flow.JoinFirst).Remaining("j", flow.RemainingCancel).
+		Chain("s", "p").Edge("p", "bb").Edge("p", "a").Edge("bb", "q").Edge("q", "b1").Edge("q", "b2").
+		Edge("b1", "jj").Edge("b2", "jj").Edge("jj", "j").Edge("a", "j").Chain("j", "after", "e")
+	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}}, executiontest.Batch(`{}`))
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
+	}
+	if got := executiontest.Executed(res, "jj"); got != 0 {
+		t.Errorf("the join in the canceled region has %d node executions, want none", got)
+	}
+	for _, e := range res.Events {
+		if (e.Type == execution.EventJoinFired || e.Type == execution.EventJoinFailed) && e.Node == "jj" {
+			t.Errorf("event %s for the canceled join", e.Type)
+		}
+	}
+	if diff := cmp.Diff([]string{"end:a>after"}, executiontest.Paths(res)); diff != "" {
+		t.Errorf("end paths mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// syncJoin is a split with an ALL join in which both branches arrive.
+func syncJoin() *executiontest.Builder {
+	return executiontest.NewFlow("sync").
+		Start("s").Parallel("p").Task("a").Task("b").Parallel("j").Task("after").End("e").
+		Join("j", flow.JoinAll).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "j").Edge("b", "j").Chain("j", "after", "e")
 }

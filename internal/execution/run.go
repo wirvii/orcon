@@ -62,9 +62,6 @@ type nodeState struct {
 	inflight  int
 	signaled  []bool
 	completed bool
-	// canceled is set when a canceled branch fed the node: the signals it sends
-	// when it completes are cancellation signals too.
-	canceled bool
 }
 
 func (ns *nodeState) allSignaled() bool {
@@ -85,15 +82,6 @@ type loopInstance struct {
 	// armed is set once the entry is complete: no more tokens will enter.
 	armed  bool
 	closed bool
-	// canceled is set when a canceled branch fed the loop before any instance
-	// started: its exit edges close with cancellation signals.
-	canceled bool
-	// entries and abandoned list the entry tokens of the instances, and those
-	// whose instance a discriminator canceled as a whole. The exit edges close
-	// as canceled only when every instance was abandoned: a live instance
-	// leaves tokens on them.
-	entries   []TokenID
-	abandoned map[TokenID]bool
 }
 
 // seqGroup holds the sibling tokens of one fork in SEQUENTIAL branch mode.
@@ -105,11 +93,9 @@ type seqGroup struct {
 	dirty  bool
 }
 
-// signal is a pending completion signal: edge e is complete in scope. A
-// canceled signal closes the edge of a branch that was canceled.
+// signal is a pending completion signal: edge e is complete in scope.
 type signal struct {
 	edgeKey
-	canceled bool
 }
 
 // nodeExec is a node execution.
@@ -148,7 +134,7 @@ type run struct {
 	forkLive map[forkKey]int
 	groups   map[NodeExecutionID]*seqGroup
 	// canceledSplits holds the split executions whose branches a discriminator
-	// canceled.
+	// canceled; a join whose continuation would descend from one is canceled.
 	canceledSplits map[NodeExecutionID]bool
 	// splitLive counts the active tokens that descend from each split instance.
 	// It is the one descendant accounting behind SEQUENTIAL branch order and the

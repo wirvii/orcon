@@ -166,6 +166,8 @@ type Failure struct {
 	Internal bool
 	// Node is the node whose execution failed, when there is one.
 	Node flow.NodeID
+	// NodeExecution is the node execution that failed, when there is one.
+	NodeExecution NodeExecutionID
 	// Scope is the scope the failure happened in.
 	Scope ScopePath
 	// Message is a human-readable explanation.

@@ -59,6 +59,56 @@ func TestJoinAllMixedFails(t *testing.T) {
 	if res.Status != execution.ExecFailed || res.Failure == nil || res.Failure.Code != execution.CodeJoinRequirementNotMet || res.Failure.Node != "j" {
 		t.Fatalf("result = %s %+v, want FAILED with JoinRequirementNotMet at j", res.Status, res.Failure)
 	}
+	// The failing join has a FAILED node execution and no continuation.
+	failed := 0
+	for _, ne := range res.NodeExecutions {
+		if ne.Node == "j" && ne.State == execution.NodeFailed && ne.ID == res.Failure.NodeExecution {
+			failed++
+		}
+	}
+	if failed != 1 || executiontest.Count(res, execution.EventJoinFired) != 0 {
+		t.Errorf("failed node executions of j = %d, join.fired = %d, want 1 and 0", failed, executiontest.Count(res, execution.EventJoinFired))
+	}
+}
+
+func TestJoinAllCanceledInputFails(t *testing.T) {
+	t.Parallel()
+	requireStore(t)
+	// The losing branch of a FIRST/CANCEL discriminator also feeds an external
+	// ALL join that receives a live token from the winner: a canceled edge
+	// counts like any edge closed with no live token.
+	b := executiontest.NewFlow("canceled-input").
+		Start("s").Parallel("p").Task("a").Task("b").Parallel("j").Task("after").Parallel("x").Task("done").End("e").
+		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingCancel).Join("x", flow.JoinAll).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "j").Edge("b", "j").Edge("b", "x").
+		Edge("j", "after").Edge("after", "x").Chain("x", "done", "e")
+	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}}, one())
+	if res.Status != execution.ExecFailed || res.Failure == nil || res.Failure.Code != execution.CodeJoinRequirementNotMet || res.Failure.Node != "x" {
+		t.Fatalf("result = %s %+v, want FAILED with JoinRequirementNotMet at x", res.Status, res.Failure)
+	}
+}
+
+func TestJoinInCanceledRegionIsCanceled(t *testing.T) {
+	t.Parallel()
+	requireStore(t)
+	// The ALL join jj lies in branch B of the split p; the discriminator on p
+	// cancels B after b1 reached jj. jj neither fires nor fails, has no node
+	// execution, and the execution ends through the winning branch.
+	b := executiontest.NewFlow("canceled-region").
+		Start("s").Parallel("p").Task("bb").Parallel("q").Task("b1").Task("b2").Parallel("jj").Task("a").Parallel("j").Task("after").End("e").
+		Join("jj", flow.JoinAll).Join("j", flow.JoinFirst).Remaining("j", flow.RemainingCancel).
+		Chain("s", "p").Edge("p", "bb").Edge("p", "a").Edge("bb", "q").Edge("q", "b1").Edge("q", "b2").
+		Edge("b1", "jj").Edge("b2", "jj").Edge("jj", "j").Edge("a", "j").Chain("j", "after", "e")
+	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}}, one())
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
+	}
+	if got := executiontest.Executed(res, "jj"); got != 0 {
+		t.Errorf("the join in the canceled region has %d node executions, want none", got)
+	}
+	if diff := cmp.Diff([]string{"end:a>after"}, executiontest.Paths(res)); diff != "" {
+		t.Errorf("end paths mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestJoinFirstCancelDiscriminator(t *testing.T) {

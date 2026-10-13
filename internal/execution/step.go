@@ -50,7 +50,7 @@ func (r *run) beginNode(t *token, n *planNode, scope ScopePath) (*nodeExec, erro
 	return ne, nil
 }
 
-func (r *run) finishNode(ne *nodeExec, to NodeExecutionState, t *token) error {
+func (r *run) finishNode(ne *nodeExec, to NodeExecutionState, token TokenID, code string) error {
 	next, err := ne.state.Transition(to)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (r *run) finishNode(ne *nodeExec, to NodeExecutionState, t *token) error {
 	if to == NodeFailed {
 		typ = EventNodeFailed
 	}
-	r.event(Event{Type: typ, Token: t.id, NodeExecution: ne.id, Node: r.nodeID(ne.node), Scope: ne.scope})
+	r.event(Event{Type: typ, Token: token, NodeExecution: ne.id, Node: r.nodeID(ne.node), Scope: ne.scope, Detail: code})
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (r *run) stepNode(ctx context.Context, t *token, n *planNode) (*token, erro
 	if err != nil {
 		return nil, r.activationError(t, ne, n, err)
 	}
-	if err := r.finishNode(ne, NodeSucceeded, t); err != nil {
+	if err := r.finishNode(ne, NodeSucceeded, t.id, ""); err != nil {
 		return nil, err
 	}
 	if n.kind == kindEnd {
@@ -327,7 +327,7 @@ func (r *run) reachEnd(ctx context.Context, t *token, n *planNode, arrival nodeK
 // failNode ends the execution in FAILED because of a failure at a node.
 func (r *run) failNode(f *Failure, t *token, ne *nodeExec) error {
 	if ne != nil {
-		if err := r.finishNode(ne, NodeFailed, t); err != nil {
+		if err := r.finishNode(ne, NodeFailed, t.id, ""); err != nil {
 			return err
 		}
 	}
