@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0015 — Storage contract: logical schema, SQLite and PostgreSQL adapters, migrations
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (ADR-0077)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (ADR-0077); 2026-10-13 (SPEC-009: unique execution event order; stored enumerated values are UPPER_SNAKE in every table)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -47,7 +47,7 @@ Every table has `id` (primary key), `created_at`, and `updated_at` unless append
 - `variable(org_id, id, execution_id, scope_path, name, value_document, version)`; `variable_change(org_id, id, sequence_number, execution_id, scope_path, name, node_execution_id, changed_at, old_value_reference, new_value_reference)` append-only.
 - `flow_data(org_id, id, flow_id, data_key, value_document, version)`; `flow_data_operation(org_id, id, operation_key, result_document, applied_at)`.
 - `nondeterminism_record(org_id, id, execution_id, node_execution_id, sequence_number, value_document)` append-only.
-- `execution_event(org_id, id, sequence_number, execution_id, root_execution_id, occurred_at, type, schema_version, reference_document, data_document)` append-only; `sequence_number` gives the ADR-0009 §7 order.
+- `execution_event(org_id, id, sequence_number, execution_id, root_execution_id, occurred_at, type, schema_version, reference_document, data_document)` append-only; unique `(org_id, execution_id, sequence_number)` (`uq_execution_event_org_id_execution_id_sequence_number`); `sequence_number` gives the ADR-0009 §7 order, is assigned in the transaction that writes the event (by the single writer on SQLite) and is not the primary key.
 - `outbox(org_id, id, topic, payload_document, lease_owner, lease_expires_at, delivered_at, attempt_count)`.
 - `blob(org_id, id, execution_id, flow_id, size_bytes, sha256, media_type, backend, location, committed_at)`; `blob_chunk(org_id, id, blob_id, chunk_index, data)` (PostgreSQL backend, 1 MiB chunks).
 - `limit_bucket(org_id, id, bucket_key, capacity, refill_per_second, tokens, blocked_until_at)`; `trigger_rate(org_id, id, flow_id, window_started_at, fire_count)`. Worker-level limits live in process memory.
@@ -72,7 +72,7 @@ Tables of other designs (triggers, connectors, identity, AI) follow the same rul
 One process per database file (exclusive lock file); WAL; `synchronous=FULL` default (durable on power loss; `NORMAL` documented as a weaker opt-in); `foreign_keys=ON` on every connection; a single writer goroutine applying transactions with group commit; a read connection pool; `busy_timeout`. Driver: `modernc.org/sqlite` (BSD-3, pure Go, keeps cross-compilation of the single binary). Measurement plan: the D20 scenarios S1/S2/S4 run on SQLite; if the gate fails due to the driver, `ncruces/go-sqlite3` (MIT, WASM) and `mattn/go-sqlite3` (MIT, CGO) are benchmarked; switching requires an ADR amendment.
 
 ### 6. PostgreSQL adapter
-`pgx/v5` (MIT); READ COMMITTED; `FOR UPDATE SKIP LOCKED`; LISTEN/NOTIFY on a dedicated connection; advisory locks for migrations and singleton jobs (reaper, pruning); session time zone UTC. Supported versions declared in docs (≥ 14); DDL uses only features available in PostgreSQL 14 (no `NULLS NOT DISTINCT`, no `security_invoker` views, no `MERGE`, no `ON DELETE SET NULL (column)`). The event table's primary key is `id`; its index `(org_id, execution_id, sequence_number)` serves ordered reads and allows time partitioning later.
+`pgx/v5` (MIT); READ COMMITTED; `FOR UPDATE SKIP LOCKED`; LISTEN/NOTIFY on a dedicated connection; advisory locks for migrations and singleton jobs (reaper, pruning); session time zone UTC. Supported versions declared in docs (≥ 14); DDL uses only features available in PostgreSQL 14 (no `NULLS NOT DISTINCT`, no `security_invoker` views, no `MERGE`, no `ON DELETE SET NULL (column)`). The event table's primary key is `id`; its unique constraint `(org_id, execution_id, sequence_number)` serves ordered reads. Partitioning the table by time later needs the partition column in the primary key and in that constraint, and is decided by its own ADR.
 
 ### 7. SQLite → PostgreSQL migration
 `orcon store migrate-to-postgres --from <sqlite path> --to <dsn>`: requires the source to be stopped (lock file), copies all tables in dependency order preserving ids, copies filesystem blobs into the target blob backend, resets leases, verifies per-table row counts and content checksums, and refuses a non-empty target.
@@ -97,3 +97,5 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-004.** §3: `org_id` on every organization table, with composite foreign keys and the logical schema of ADR-0077 §3; `project_id` is no longer `'default'` and becomes a real foreign key; the new tables of ADR-0038…ADR-0048 (with the names fixed by SPEC-004 §21). §6: roles `orcon_owner`, `orcon_application` and `orcon_engine` (created automatically with `CREATEROLE`, or with `orcon db setup-roles`), the context schema `orcon_context`, forced RLS policies, no views over organization data, and the startup verification of ADR-0046 §4. §7: the SQLite → PostgreSQL migration installs the policies and verifies them before accepting two or more organizations.
 - **SPEC-005.** Adds the tables of ADR-0052…ADR-0059 with `org_id` and RLS, with the names and types of the `orcon-db` rulebook (ADR-0077 §3, §5).
 - **SPEC-006.** Adds the tables of ADR-0060…ADR-0069 with the names and types of the `orcon-db` rulebook (ADR-0077); FTS5 on SQLite; `tsvector` and pgvector on PostgreSQL; `ai_stream_chunk` is `UNLOGGED` and carries `org_id`.
+- **SPEC-009 (2026-10-13).** §3 and §6: `execution_event.sequence_number` is unique per `(org_id, execution_id)` and is not the primary key, as ADR-0077 §3 states.
+- **SPEC-009 K19 (2026-10-13, owner decision).** §2: the value-spelling rule binds every enumerated column of every design, not only the tables of §3; no adapter translates an enumerated value between the database and the API. ADR-0009, ADR-0019, ADR-0038, ADR-0040 to ADR-0043, ADR-0045, ADR-0050, ADR-0053, ADR-0055 to ADR-0057, ADR-0059, ADR-0060, ADR-0062, ADR-0065 and ADR-0067 to ADR-0069 were aligned the same day.
