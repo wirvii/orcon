@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-go 1.25.0
+go 1.26.0
 
 use .
