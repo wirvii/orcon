@@ -84,7 +84,7 @@ jobs:
   # postgres runs the adapter contract suites and the database rule checks against
   # real PostgreSQL: the oldest supported release (14) and the latest (17), pinned
   # by image digest. Keep the digests equal to PG_IMAGES in the Makefile.
-  postgres:
+  postgres-matrix:
     name: postgres (${{ matrix.image }})
     runs-on: ubuntu-latest
     strategy:
@@ -109,6 +109,24 @@ jobs:
         env:
           ORCON_TEST_POSTGRES_IMAGE: ${{ matrix.image }}
         run: make db-fixtures
+
+  # postgres is the single required status check for the matrix above, so the
+  # ruleset does not depend on the image digests in the leg names. It fails when
+  # any leg failed, was cancelled or was skipped.
+  postgres:
+    name: postgres
+    runs-on: ubuntu-latest
+    needs: postgres-matrix
+    if: always()
+    steps:
+      - name: Require every postgres leg to pass
+        env:
+          RESULT: ${{ needs.postgres-matrix.result }}
+        run: |
+          if [ "$RESULT" != "success" ]; then
+            echo "postgres matrix result: $RESULT"
+            exit 1
+          fi
 
   # sbom publishes the CycloneDX bill of materials of a release (dependencies.md DEP-4).
   sbom:
