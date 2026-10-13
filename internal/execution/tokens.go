@@ -23,7 +23,33 @@ func (r *run) spawn(id TokenID, state TokenState, node, inEdge int, scope ScopeP
 	r.tokens[id] = t
 	r.order = append(r.order, t)
 	r.track(t)
+	r.holdRounds(t)
 	return t
+}
+
+// holdRounds counts a token as a live descendant of every split instance in its
+// lineage, for the rounds of LET_FINISH joins. Unlike the counters of
+// SEQUENTIAL branch order, which treat a WAITING token as done (ADR-0010
+// section 5), a round stays open while a descendant is WAITING or SUSPENDED
+// (amendment 9, B-2): it holds until the token reaches a terminal state.
+func (r *run) holdRounds(t *token) {
+	t.roundHeld = true
+	for _, f := range t.lineage {
+		r.splitLive[f.SplitNodeExecution]++
+	}
+}
+
+// releaseRounds ends the hold of a token that reached a terminal state and
+// queues the joins whose rounds may now reset.
+func (r *run) releaseRounds(t *token) {
+	if !t.roundHeld {
+		return
+	}
+	t.roundHeld = false
+	for _, f := range t.lineage {
+		r.splitLive[f.SplitNodeExecution]--
+		r.dirtyJoins = append(r.dirtyJoins, r.roundJoins[f.SplitNodeExecution]...)
+	}
 }
 
 // setToken moves a token along its state table. A token that leaves the
@@ -35,8 +61,14 @@ func (r *run) setToken(t *token, to TokenState) error {
 		return err
 	}
 	t.state = next
-	if !next.isActive() {
+	switch {
+	case !next.isActive():
 		r.untrack(t)
+	case !t.tracked:
+		r.track(t) // a WAITING token that runs again counts again
+	}
+	if next.IsTerminal() {
+		r.releaseRounds(t)
 	}
 	return nil
 }
@@ -71,7 +103,6 @@ func (r *run) track(t *token) {
 	}
 	for _, f := range t.lineage {
 		r.forkLive[forkKey{f.SplitNodeExecution, f.Branch}]++
-		r.splitLive[f.SplitNodeExecution]++
 	}
 }
 
@@ -87,8 +118,6 @@ func (r *run) untrack(t *token) {
 	for _, f := range t.lineage {
 		fk := forkKey{f.SplitNodeExecution, f.Branch}
 		r.forkLive[fk]--
-		r.splitLive[f.SplitNodeExecution]--
-		r.dirtyJoins = append(r.dirtyJoins, r.roundJoins[f.SplitNodeExecution]...)
 		if g := r.groups[f.SplitNodeExecution]; g != nil && !g.dirty {
 			g.dirty = true
 			r.dirtyGroup = append(r.dirtyGroup, g)

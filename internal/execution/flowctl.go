@@ -282,9 +282,7 @@ func (r *run) cancelBranches(ctx context.Context, split NodeExecutionID, join in
 			continue
 		}
 		key := r.retract(c)
-		for _, k := range r.instances(c.scope) {
-			r.loopOf(k).canceled = true // its exit edges close as canceled
-		}
+		r.abandonLoops(c.scope, split)
 		if err := r.setToken(c, TokenCanceled); err != nil {
 			return nil, err
 		}
@@ -476,6 +474,10 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 			fmt.Sprintf("the loop would start iteration %d; maxIterations is %d", iteration, n.maxIterations))
 	}
 	scope := outer.Push(LoopFrame(n.node.ID, entry, iteration))
+	if !back {
+		inst := r.loopOf(key)
+		inst.entries = append(inst.entries, entry)
+	}
 	// Two tokens returning in the same iteration of one instance would share a
 	// scope: ADR-0010 names an instance by its entry token only, so the
 	// situation has no defined meaning yet and stops the run instead of mixing
@@ -526,8 +528,9 @@ func (r *run) closeLoop(key nodeKey) {
 		return
 	}
 	inst.closed = true
+	canceled := inst.canceled || (len(inst.entries) > 0 && len(inst.abandoned) == len(inst.entries))
 	for _, ei := range r.plan.nodes[key.node].closing {
-		r.signals = append(r.signals, signal{edgeKey: edgeKey{ei, key.scope}, canceled: inst.canceled})
+		r.signals = append(r.signals, signal{edgeKey: edgeKey{ei, key.scope}, canceled: canceled})
 	}
 }
 
@@ -615,4 +618,27 @@ func (r *run) splitNode(n *planNode) flow.NodeID {
 		return ""
 	}
 	return r.plan.nodes[n.splitFor].node.ID
+}
+
+// abandonLoops notes, for every loop instance a canceled token lies in, whether
+// the whole instance was abandoned: its entry token descends from the canceled
+// split, so the loop was started by the branch being canceled. An instance
+// entered from outside the canceled branches goes on, even if the cancellation
+// reaches a branch of its body.
+func (r *run) abandonLoops(scope ScopePath, split NodeExecutionID) {
+	prefix := ScopePath("")
+	for _, f := range scope.Frames() {
+		if f.Kind == ScopeLoop {
+			idx, known := r.plan.index[f.Node]
+			entry := r.tokens[f.Entry]
+			if known && entry != nil && hasSplit(entry.lineage, split) {
+				inst := r.loopOf(nodeKey{idx, prefix})
+				if inst.abandoned == nil {
+					inst.abandoned = make(map[TokenID]bool)
+				}
+				inst.abandoned[f.Entry] = true
+			}
+		}
+		prefix = prefix.Push(f)
+	}
 }

@@ -50,6 +50,9 @@ type token struct {
 	passed bool
 	// tracked is set while the token counts toward loop and branch counters.
 	tracked bool
+	// roundHeld is set until the token reaches a terminal state; it keeps the
+	// rounds of its split instances open.
+	roundHeld bool
 }
 
 // nodeState is the completion tracker of a node in a scope (ADR-0010
@@ -82,9 +85,15 @@ type loopInstance struct {
 	// armed is set once the entry is complete: no more tokens will enter.
 	armed  bool
 	closed bool
-	// canceled is set when a canceled branch fed the loop: its exit edges close
-	// with cancellation signals.
+	// canceled is set when a canceled branch fed the loop before any instance
+	// started: its exit edges close with cancellation signals.
 	canceled bool
+	// entries and abandoned list the entry tokens of the instances, and those
+	// whose instance a discriminator canceled as a whole. The exit edges close
+	// as canceled only when every instance was abandoned: a live instance
+	// leaves tokens on them.
+	entries   []TokenID
+	abandoned map[TokenID]bool
 }
 
 // seqGroup holds the sibling tokens of one fork in SEQUENTIAL branch mode.
