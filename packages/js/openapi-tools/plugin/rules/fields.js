@@ -134,7 +134,11 @@ function withSecretHolders(model) {
         const top = model.deref(raw, mt.loc.child(['schema']));
         const nodes = [top.node];
         if (isObject(top.node) && Array.isArray(top.node.allOf)) {
-          top.node.allOf.forEach((member, i) => nodes.push(model.deref(member, top.loc.child(['allOf', i])).node));
+          // Only inline members: a member that is a $ref (the base resource) is shared with
+          // other responses and never holds a returned secret.
+          top.node.allOf.forEach((member, i) => {
+            if (isObject(member) && typeof member.$ref !== 'string') nodes.push(model.deref(member, top.loc.child(['allOf', i])).node);
+          });
         }
         for (const node of nodes) {
           if (!isObject(node)) continue;
@@ -169,6 +173,9 @@ export const secretFields = defineRule((model, report) => {
       const sensitive = node.format === 'password' || (typesOf(node).includes('string') && isSensitiveName(name));
       if (!sensitive) continue;
       const writeOnly = node.writeOnly === true || raw?.writeOnly === true;
+      if (writeOnly && (node.readOnly === true || raw?.readOnly === true)) {
+        report('FIELD-7', `Secret field "${name}" is both writeOnly and readOnly; a secret is either received (writeOnly) or returned once (readOnly in a <Resource>WithSecret).`, propLoc);
+      }
       if (!writeOnly) {
         const returned = name === 'secret' && (node.readOnly === true || node.format === 'password');
         if (!returned) {
@@ -184,6 +191,17 @@ export const secretFields = defineRule((model, report) => {
           report('FIELD-7', `Example of secret field "${name}" must be a marker like example-secret-1.`, propLoc);
         }
       });
+    }
+  }
+  // A password-format schema reached through `items` or `additionalProperties` is a secret
+  // too; it is allowed only as writeOnly (it cannot be the single `secret` property).
+  for (const { schema, loc } of model.allSchemas) {
+    for (const key of ['items', 'additionalProperties']) {
+      if (!isObject(schema[key])) continue;
+      const child = model.deref(schema[key], loc.child([key]));
+      if (isObject(child.node) && child.node.format === 'password' && child.node.writeOnly !== true && schema[key].writeOnly !== true) {
+        report('FIELD-7', `A secret in "${key}" must set writeOnly: true; a returned secret is only the "secret" property of a <Resource>WithSecret response.`, child.loc);
+      }
     }
   }
   for (const entry of model.operations) {

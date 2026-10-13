@@ -120,6 +120,18 @@ const REPORTS = [
   ['readOnly secret outside a WithSecret schema', 'secret-fields', 'allowed only as the readOnly "secret"', (d) => {
     schemas(d).Flow.properties.secret = { type: 'string', format: 'password', readOnly: true, description: 'Secret.', examples: ['example-secret-1'] };
   }],
+  ['secret on the base resource returned by other operations', 'secret-fields', 'allowed only as the readOnly "secret"', (d) => {
+    schemas(d).ApiKey.properties.secret = { type: 'string', format: 'password', readOnly: true, description: 'Secret.', examples: ['example-secret-1'] };
+  }],
+  ['secret that is both writeOnly and readOnly', 'secret-fields', 'both writeOnly and readOnly', (d) => {
+    schemas(d).CreateApiKeyRequest.properties.secret = { type: 'string', format: 'password', writeOnly: true, readOnly: true, maxLength: 100, description: 'Secret.', examples: ['example-secret-1'] };
+  }],
+  ['password format in array items', 'secret-fields', 'in "items"', (d) => {
+    schemas(d).Flow.properties.keys = { type: 'array', description: 'Keys.', items: { type: 'string', format: 'password', examples: ['example-secret-1'] } };
+  }],
+  ['password format in additionalProperties', 'secret-fields', 'in "additionalProperties"', (d) => {
+    schemas(d).Flow.properties.keyMap = { type: 'object', description: 'Keys.', additionalProperties: { type: 'string', format: 'password', examples: ['example-secret-1'] } };
+  }],
   ['WithSecret returned by an operation with optional idempotency', 'secret-fields', 'required idempotency', (d) => {
     d.paths['/orgs/{orgId}/api-keys'].post['x-orcon-idempotency'] = 'optional';
   }],
