@@ -7,6 +7,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode }
 import { useIntl } from 'react-intl';
 
 import { Button } from '../../components/button/Button';
+import { IconButton } from '../../components/icon-button/IconButton';
 import { Tabs } from '../../components/tabs/Tabs';
 import { NodeGlyph } from '../../canvas/NodeGlyph';
 import { NodeStatusChip } from '../../canvas/node-status-chip/NodeStatusChip';
@@ -96,31 +97,60 @@ function NodeName({ name, onRename }: { name: string; onRename?: (name: string) 
 
 function Header({ node, onBack, onExecute, onRename, compact = false }: { node: GraphNode; onBack: () => void; onExecute?: () => void; onRename?: (name: string) => void; compact?: boolean }) {
   const intl = useIntl();
-  return (
-    <header className={cn('border-border flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2', !compact && 'min-h-target')}>
-      <Button variant="ghost" onClick={onBack}>
-        <ArrowLeft aria-hidden className="size-icon-16" />
-        {intl.formatMessage(editorMessages.backToCanvas)}
-      </Button>
-      <span className="bg-surface-sunken border-border grid size-canvas-icon shrink-0 place-items-center rounded-lg border" aria-hidden>
-        <NodeGlyph node={node} iconClassName="size-icon-24" className="size-icon-24" />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <NodeName name={node.name} onRename={onRename} />
-        {node.subtitle ? (
-          <span className="text-fg-muted truncate px-1 text-xs" data-truncate>
-            {node.subtitle}
-          </span>
-        ) : null}
-      </div>
+  const back = intl.formatMessage(editorMessages.backToCanvas);
+  const execute = onExecute ? (
+    <Button onClick={onExecute} className={compact ? undefined : 'ms-auto'}>
+      <Play aria-hidden className="size-icon-16" />
+      {intl.formatMessage(editorMessages.executeStep)}
+    </Button>
+  ) : null;
+  const chips = (
+    <>
       {node.status ? <NodeStatusChip status={node.status} code={node.statusCode} /> : null}
       {node.pinned ? <NodeStatusChip kind="pinned" /> : null}
-      {onExecute ? (
-        <Button onClick={onExecute} className="ms-auto">
-          <Play aria-hidden className="size-icon-16" />
-          {intl.formatMessage(editorMessages.executeStep)}
-        </Button>
+    </>
+  );
+  const glyph = (
+    <span className="bg-surface-sunken border-border grid size-canvas-icon shrink-0 place-items-center rounded-lg border" aria-hidden>
+      <NodeGlyph node={node} iconClassName="size-icon-24" className="size-icon-24" />
+    </span>
+  );
+  const name = (
+    <div className="flex min-w-canvas-node-wide flex-1 flex-col">
+      <NodeName name={node.name} onRename={onRename} />
+      {node.subtitle ? (
+        <span className="text-fg-muted truncate px-1 text-xs" data-truncate>
+          {node.subtitle}
+        </span>
       ) : null}
+    </div>
+  );
+  if (compact) {
+    // The docked panel is narrow: the back arrow, the node and its name on one row, the state and the action under them.
+    return (
+      <header className="border-border flex shrink-0 flex-col gap-2 border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <IconButton variant="ghost" icon={ArrowLeft} label={back} onClick={onBack} />
+          {glyph}
+          {name}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {chips}
+          <span className="ms-auto">{execute}</span>
+        </div>
+      </header>
+    );
+  }
+  return (
+    <header className="border-border flex min-h-target shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
+      <Button variant="ghost" onClick={onBack}>
+        <ArrowLeft aria-hidden className="size-icon-16" />
+        {back}
+      </Button>
+      {glyph}
+      {name}
+      {chips}
+      {execute}
     </header>
   );
 }

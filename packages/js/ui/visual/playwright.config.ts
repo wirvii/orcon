@@ -5,8 +5,9 @@ import { defineConfig } from '@playwright/test';
 
 const PORT = 6199;
 
-// Two projects share the built Storybook:
+// Three projects share the built Storybook:
 //   visual  every Matrix and screen template, compared with the committed baselines
+//   parity  the end state of every Editor/Parity story, in light and dark
 //   pseudo  the same targets in the long-string pseudo-locale, checked for text that overflows
 // Baselines are only valid when made in the pinned Playwright container (see run-docker.sh):
 // fonts and rasterization differ per operating system.
@@ -30,6 +31,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'visual', testMatch: 'visual.spec.ts', use: { browserName: 'chromium' } },
+    { name: 'parity', testMatch: 'parity.spec.ts', use: { browserName: 'chromium' } },
     { name: 'pseudo', testMatch: 'pseudo.spec.ts', use: { browserName: 'chromium' } },
   ],
   webServer: {

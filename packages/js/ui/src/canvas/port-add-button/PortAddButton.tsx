@@ -28,14 +28,16 @@ export interface PortAddButtonProps {
   className?: string;
 }
 
-const dot = 'bg-canvas-node-bg border-canvas-port text-action-primary-fg z-20 grid size-port place-items-center rounded-full border-2 p-0';
+// The control is the target size (24 px, 44 px with a coarse pointer) centered on the tile edge; the
+// visible dot inside it is 10 px and grows to 24 px with a plus on hover and on focus.
+const control = 'group/port z-20 grid size-target place-items-center rounded-full border-0 bg-transparent p-0 outline-hidden';
 
-const interactiveLook = [
-  // The visible dot is 10 px; the hit area reaches 34 px, and 50 px under a coarse pointer.
-  'after:absolute after:-inset-3 pointer-coarse:after:-inset-5',
-  'hover:size-canvas-port-hover hover:bg-action-primary hover:border-action-primary',
-  'focus-visible:size-canvas-port-hover focus-visible:bg-action-primary focus-visible:border-action-primary',
-  'orcon-handle hover:[&>svg]:opacity-100 focus-visible:[&>svg]:opacity-100',
+const dotLook = 'bg-canvas-node-bg border-canvas-port text-action-primary-fg grid size-port place-items-center rounded-full border-2';
+const dotMotion = [
+  'orcon-handle',
+  'group-hover/port:size-canvas-port-hover group-hover/port:bg-action-primary group-hover/port:border-action-primary',
+  'group-focus-visible/port:size-canvas-port-hover group-focus-visible/port:bg-action-primary group-focus-visible/port:border-action-primary',
+  'group-focus-visible/port:outline-focus group-focus-visible/port:outline-2 group-focus-visible/port:outline-offset-2',
 ].join(' ');
 
 /**
@@ -52,6 +54,11 @@ export function PortAddButton({ id, label, top, live = false, connectable = true
       onAdd?.();
     }
   };
+  const dot = (
+    <span data-port-dot aria-hidden className={cn(dotLook, interactive && dotMotion, selected && 'border-canvas-selection')}>
+      {interactive ? <Plus aria-hidden strokeWidth={3} className="size-3 opacity-0 transition-opacity group-hover/port:opacity-100 group-focus-visible/port:opacity-100" /> : null}
+    </span>
+  );
   const common = {
     role: interactive ? 'button' : undefined,
     tabIndex: interactive ? (tabbable ? 0 : -1) : undefined,
@@ -60,8 +67,8 @@ export function PortAddButton({ id, label, top, live = false, connectable = true
     'data-port': 'output',
     'data-port-id': id,
     onKeyDown: interactive ? onKeyDown : undefined,
-    className: cn(dot, interactive ? interactiveLook : 'pointer-events-none', selected && 'border-canvas-selection', className),
-    children: interactive ? <Plus aria-hidden strokeWidth={3} className="size-3 opacity-0 transition-opacity" /> : null,
+    className: cn(control, !interactive && 'pointer-events-none', className),
+    children: dot,
   };
   if (live) {
     return (

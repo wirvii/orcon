@@ -15,8 +15,8 @@ export const sampleMessages = defineMessages({
   message: { id: 'editor.sample.message', defaultMessage: 'Message text', description: 'Label of the field with the text of the message.' },
   messageValue: {
     id: 'editor.sample.messageValue',
-    defaultMessage: "New order '{{' $json.id '}}' from '{{' $json.customer '}}'",
-    description: 'Sample expression in the message field. The double braces are part of the expression and must stay.',
+    defaultMessage: 'New order {open}$json.id{close} from {open}$json.customer{close}',
+    description: 'Sample expression in the message field. {open} and {close} are the braces that open and close an expression; they are filled in by the code and must stay.',
   },
   fixed: { id: 'editor.sample.fixed', defaultMessage: 'Fixed', description: 'Option that makes a field hold a plain value.' },
   expression: { id: 'editor.sample.expression', defaultMessage: 'Expression', description: 'Option that makes a field hold an expression computed from the data.' },

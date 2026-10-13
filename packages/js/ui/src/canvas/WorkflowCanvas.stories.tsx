@@ -83,7 +83,7 @@ export const Keyboard: Story = {
     const view = within(canvasElement);
     // Phones are view only: there is no toolbar to reach.
     if (!view.queryByRole('button', { name: 'Add node' })) return;
-    view.getByRole('group', { name: /^Webhook, / }).focus();
+    (await view.findByRole('group', { name: /^Webhook, / })).focus();
     // One node holds the tab stop and shows its toolbar.
     await waitFor(() => expect(view.getAllByRole('toolbar', { name: /Actions for/ }).length).toBe(1));
   },

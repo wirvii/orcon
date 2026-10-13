@@ -45,6 +45,7 @@ import {
   addNote,
   connect,
   connectError,
+  freeInput,
   freeSpot,
   insertOnEdge,
   metrics,
@@ -81,7 +82,7 @@ import { useMediaQuery, wideQuery } from './useMediaQuery';
 const edgeTypes = { canvas: CanvasEdge };
 
 /** Below these zoom levels node text stops being readable, so fitting never goes lower: the view is anchored to the first node instead. */
-const READABLE_ZOOM_WIDE = 0.75;
+const READABLE_ZOOM_WIDE = 0.6;
 const READABLE_ZOOM_NARROW = 0.6;
 const FIT_PADDING = 0.2;
 /** Fitting never zooms in past 100 %: a small flow stays at its natural size. */
@@ -157,6 +158,8 @@ export interface WorkflowCanvasProps {
   executionHref?: (nodeId: string) => string;
   /** Force view-only mode. Below the md breakpoint the canvas is always view-only. */
   readOnly?: boolean;
+  /** Say that the canvas is view only when it is. Off where the page already makes that clear. */
+  notice?: boolean;
   /** Show the strip of tools (add, connect, delete, undo, redo, outline, shortcuts) above the canvas. */
   tools?: boolean;
   defaultOutlineOpen?: boolean;
@@ -259,6 +262,7 @@ function Canvas({
   onExecuteWorkflow,
   executionHref,
   readOnly = false,
+  notice = true,
   tools = false,
   defaultOutlineOpen = false,
   minimap = true,
@@ -269,6 +273,7 @@ function Canvas({
   const intl = useIntl();
   const wide = useMediaQuery(wideQuery);
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const coarse = useMediaQuery('(pointer: coarse)');
   const editable = wide && !readOnly;
   const flow = useReactFlow();
   const { announce, region } = useAnnouncer();
@@ -299,6 +304,7 @@ function Canvas({
   const [moving, setMoving] = useState(false);
   const [minimapHover, setMinimapHover] = useState(false);
 
+  const editingRef = useRef<string | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectNext = useRef<ReadonlySet<string> | undefined>(undefined);
   const paletteOrigin = useRef<HTMLElement | null>(null);
@@ -332,7 +338,8 @@ function Canvas({
     const rect = containerRef.current?.getBoundingClientRect();
     const all = flow.getNodes();
     if (!rect || rect.width === 0 || all.length === 0) return;
-    const readable = wide ? READABLE_ZOOM_WIDE : READABLE_ZOOM_NARROW;
+    // With a coarse pointer controls must stay at least 44 px, so the flow is never fitted below 100 %: it starts at the trigger and is panned.
+    const readable = coarse ? 1 : wide ? READABLE_ZOOM_WIDE : READABLE_ZOOM_NARROW;
     const bounds = getNodesBounds(all);
     const fitted = getViewportForBounds(bounds, rect.width, rect.height, metrics.minZoom, FIT_MAX_ZOOM, FIT_PADDING);
     const duration = reducedMotion ? 0 : 160;
@@ -345,7 +352,7 @@ function Canvas({
       { x: ANCHOR_MARGIN - first.position.x * readable, y: rect.height / 2 - (bounds.y + bounds.height / 2) * readable, zoom: readable },
       { duration },
     );
-  }, [flow, wide, reducedMotion]);
+  }, [flow, wide, reducedMotion, coarse]);
   const nodesReady = useNodesInitialized();
   const fittedOnOpen = useRef(false);
   useEffect(() => {
@@ -358,7 +365,9 @@ function Canvas({
 
   // The graph is the source of truth; React Flow keeps what it measures.
   useEffect(() => {
-    setNodes((previous) => syncNodes(previous, graph, { intl, editable, activeId, select: selectNext.current, onNoteChange, onNoteResize }));
+    // The selection to apply is read now: the updater below runs later, after the ref is cleared.
+    const select = selectNext.current;
+    setNodes((previous) => syncNodes(previous, graph, { intl, editable, activeId, select, onNoteChange, onNoteResize }));
     selectNext.current = undefined;
   }, [graph, intl, editable, activeId, setNodes, onNoteChange, onNoteResize]);
 
@@ -411,6 +420,7 @@ function Canvas({
   const openDetails = useCallback(
     (id: string, tab?: 'agent') => {
       if (graphRef.current.notes?.some((note) => note.id === id)) {
+        editingRef.current = id;
         setEditingNoteId(id);
         return;
       }
@@ -536,14 +546,15 @@ function Canvas({
 
   const addSticky = () => {
     const anchor = graphRef.current.nodes.find((node) => node.id === (selectedIds[0] ?? activeId));
-    const at = anchor ? { x: anchor.position.x, y: anchor.position.y + 160 } : viewportCenter();
+    const at = anchor ? { x: anchor.position.x, y: anchor.position.y + 220 } : viewportCenter();
     const result = addNote(baseRef.current, at, '');
     selectNext.current = new Set([result.id]);
     commit(result.graph);
     announce(intl.formatMessage(canvasMessages.announceNoteAdded));
     setActiveId(result.id);
+    // The note opens for editing and its text field takes focus; the node regains focus when editing ends.
     setTimeout(() => {
-      focusNode(result.id);
+      editingRef.current = result.id;
       setEditingNoteId(result.id);
     }, 60);
   };
@@ -633,6 +644,8 @@ function Canvas({
     // Dialogs and the palette handle their own keys; nothing typed in a field reaches the canvas.
     if (!containerRef.current?.contains(target)) return;
     if (target.closest('input, textarea, select, [contenteditable="true"], [data-node-palette]')) return;
+    // Enter and Space on a button of the node (toolbar, port, stub, block) belong to that button.
+    if ((event.key === 'Enter' || event.key === ' ') && target.closest('button, [role="button"], [role="menuitem"], a[href]')) return;
     const edgeId = currentEdgeId(target);
     const id = edgeId ? undefined : currentItemId(target);
     const modifier = event.metaKey || event.ctrlKey;
@@ -653,6 +666,11 @@ function Canvas({
     if (modifier && key.toLowerCase() === 'y' && editable) {
       event.preventDefault();
       redo();
+      return;
+    }
+    if (modifier && key.toLowerCase() === 'a' && editable) {
+      event.preventDefault();
+      setNodes((previous) => previous.map((item) => ({ ...item, selected: true })));
       return;
     }
     if (modifier && event.shiftKey && isNote && editable && arrowDirection[key]) {
@@ -700,12 +718,14 @@ function Canvas({
     const direction = arrowDirection[key];
     if (direction) {
       event.preventDefault();
+      // The arrow keys act on the item that has focus; with focus on the canvas itself they pan.
+      const focusedItem = target.closest<HTMLElement>('.react-flow__node')?.dataset.id;
       if (event.shiftKey) {
-        if (!editable || !id) return;
-        const moving = selectedIds.includes(id) ? selectedIds : [id];
+        if (!editable || !focusedItem) return;
+        const moving = selectedIds.includes(focusedItem) ? selectedIds : [focusedItem];
         nudge(moving, direction, event.altKey ? COARSE_STEPS : 1);
-      } else if (id) {
-        const next = nextFocus(graphRef.current, id, direction);
+      } else if (focusedItem) {
+        const next = nextFocus(graphRef.current, focusedItem, direction);
         if (next) focusNode(next);
       } else {
         const bounds = flow.getViewport();
@@ -748,7 +768,7 @@ function Canvas({
       }
     } else if (lower === 'c') {
       event.preventDefault();
-      setConnectOpen(true);
+      if (!quickConnect()) setConnectOpen(true);
     } else if (lower === 'r' && id && !isNote) {
       event.preventDefault();
       actions.runStep(id);
@@ -765,6 +785,24 @@ function Canvas({
       event.preventDefault();
       requestDelete(selectedIds.length > 0 ? selectedIds : [id]);
     }
+  };
+
+  /**
+   * With exactly two nodes selected, C connects the one on the left to the one on the right using
+   * the first free output and the first free input. It returns false when that is not possible, and
+   * the connect form opens instead.
+   */
+  const quickConnect = (): boolean => {
+    const chosen = graphRef.current.nodes.filter((node) => selectedIds.includes(node.id));
+    if (chosen.length !== 2) return false;
+    const [source, target] = [...chosen].sort((a, b) => a.position.x - b.position.x) as [GraphNode, GraphNode];
+    const output = source.outputs.find((port) => !graphRef.current.edges.some((edge) => edge.source === source.id && edge.sourceOutput === port.id)) ?? source.outputs[0];
+    const input = freeInput(graphRef.current, target.id);
+    if (!output || !input) return false;
+    const request = { source: source.id, sourceOutput: output.id, target: target.id, targetInput: input };
+    if (connectError(graphRef.current, request) !== undefined) return false;
+    connectNodes(request);
+    return true;
   };
 
   const onConnectByPointer = (connection: Connection) => {
@@ -856,7 +894,11 @@ function Canvas({
       labelScale,
       renamingId,
       editingNoteId,
-      setEditingNote: setEditingNoteId,
+      setEditingNote: (id) => {
+        if (id === undefined && editingRef.current) focusNode(editingRef.current);
+        editingRef.current = id;
+        setEditingNoteId(id);
+      },
       focusedId,
       dangling,
       connectingFrom,
@@ -881,6 +923,7 @@ function Canvas({
           outlineOpen={outlineOpen}
           onAdd={catalog.length > 0 ? () => openPalette({ mode: graph.nodes.length === 0 ? 'first' : 'free' }) : undefined}
           onConnect={() => setConnectOpen(true)}
+          onAddSticky={addSticky}
           onDelete={() => requestDelete(selectedIds.length > 0 ? selectedIds : activeId ? [activeId] : [])}
           onUndo={undo}
           onRedo={redo}
@@ -888,7 +931,7 @@ function Canvas({
           onShortcuts={() => setShortcutsOpen(true)}
         />
       ) : null}
-      {!editable ? <p className="text-fg-muted px-3 py-2 text-sm">{intl.formatMessage(canvasMessages.readOnly)}</p> : null}
+      {!editable && notice ? <p className="text-fg-muted px-3 py-2 text-sm">{intl.formatMessage(canvasMessages.readOnly)}</p> : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div
           ref={containerRef}
@@ -896,6 +939,7 @@ function Canvas({
           aria-label={intl.formatMessage(canvasMessages.canvasLabel, { nodes: graph.nodes.length })}
           data-lod={detail}
           data-zoom={percent}
+          tabIndex={0}
           className="bg-canvas relative min-h-canvas-node min-w-0 flex-1 overflow-hidden"
           onKeyDown={onKeyDown}
           onFocus={(event) => {
@@ -909,6 +953,8 @@ function Canvas({
           }}
           onBlur={(event) => {
             const next = event.relatedTarget as HTMLElement | null;
+            // Focus moving into a menu opened from the node's toolbar keeps the toolbar, and the menu, in place.
+            if (next?.closest('[role="menu"]')) return;
             const inside = next?.closest<HTMLElement>('.react-flow__node')?.dataset.id;
             setFocusedId((current) => (inside && inside === current ? current : undefined));
             if (!next?.closest('.react-flow__edge')) setFocusedEdgeId(undefined);

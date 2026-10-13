@@ -24,6 +24,7 @@
     "test:stories": "node scripts/check-story-coverage.mjs --strict",
     "test:a11y": "vitest run --project a11y",
     "test:canvas": "vitest run --project canvas --project canvas-motion",
+    "test:parity": "vitest run --project parity && node scripts/check-parity-coverage.mjs",
     "test:targets": "vitest run --project targets --project density",
     "test:density": "vitest run --project density",
     "test:expansion": "vitest run --project expansion",

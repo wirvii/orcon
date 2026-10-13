@@ -46,7 +46,7 @@ function BinaryCell({ value }: { value: ReturnType<typeof asBinary> }) {
         {name} <span className="text-fg-muted">· {mediaType} · {intl.formatMessage(editorMessages.fileSize, { size })}</span>
       </span>
       {href ? (
-        <a href={href} download={name} aria-label={intl.formatMessage(editorMessages.download, { name })} className="text-fg-link inline-flex min-h-target items-center rounded-sm px-1 underline">
+        <a href={href} download={name} aria-label={intl.formatMessage(editorMessages.download, { name })} className="text-fg-link inline-flex min-h-target min-w-target items-center justify-center rounded-sm px-1 underline">
           <Download aria-hidden className="size-icon-16" />
         </a>
       ) : null}
@@ -70,12 +70,12 @@ function Cell({ name, value }: { name: string; value: unknown }) {
         <button
           type="button"
           aria-expanded={open}
-          aria-label={intl.formatMessage(open ? editorMessages.collapse : editorMessages.expand, { name })}
+          aria-label={intl.formatMessage(editorMessages.nestedLabel, { summary, name })}
           onClick={() => setOpen((current) => !current)}
           className="text-fg-link hover:bg-surface-sunken inline-flex min-h-target items-center gap-1 rounded-sm px-1"
         >
           {open ? <ChevronDown aria-hidden className="size-icon-16" /> : <ChevronRight aria-hidden className="size-icon-16" />}
-          <span aria-hidden>{summary}</span>
+          <span>{summary}</span>
         </button>
         {open ? <pre className="bg-surface-sunken rounded-md p-2 text-mono whitespace-pre-wrap">{JSON.stringify(visibleValue(value, intl.formatMessage(editorMessages.secretMasked)), null, 2)}</pre> : null}
       </span>
@@ -129,7 +129,7 @@ export function DataTableView({ items, label, className }: DataTableViewProps) {
       aria-label={label ?? intl.formatMessage(editorMessages.tableLabel)}
       data-data-table
       onScroll={(event) => windowed && setScrollTop(event.currentTarget.scrollTop)}
-      className={cn('max-w-full overflow-auto', className)}
+      className={cn('h-full max-w-full overflow-auto', className)}
     >
       <table className="w-full min-w-max border-collapse text-mono">
         <caption className="sr-only">{label ?? intl.formatMessage(editorMessages.tableLabel)}</caption>
@@ -156,7 +156,7 @@ export function DataTableView({ items, label, className }: DataTableViewProps) {
           {visible.map((item, offset) => {
             const index = first + offset;
             return (
-              <tr key={index} data-row={index} aria-rowindex={index + 2} className="h-row">
+              <tr key={index} data-item-row={index} aria-rowindex={index + 2} className="h-row">
                 <td className="text-fg-subtle border-border border-b px-3 align-middle">{index + 1}</td>
                 {columns.map((column) => (
                   <td key={column} className="text-fg border-border border-b px-3 align-middle whitespace-nowrap">

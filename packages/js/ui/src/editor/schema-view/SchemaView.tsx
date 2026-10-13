@@ -68,7 +68,8 @@ export function SchemaView({ items, label, className }: SchemaViewProps) {
   const intl = useIntl();
   const fields = inferSchema(items);
   return (
-    <ul aria-label={label ?? intl.formatMessage(editorMessages.schemaLabel)} data-schema-view className={cn('overflow-auto py-2', className)}>
+    // The list scrolls on its own, so it takes keyboard focus to be scrollable by keyboard.
+    <ul tabIndex={0} aria-label={label ?? intl.formatMessage(editorMessages.schemaLabel)} data-schema-view className={cn('h-full overflow-auto py-2', className)}>
       {fields.map((field) => (
         <Field key={field.key} field={field} depth={0} />
       ))}

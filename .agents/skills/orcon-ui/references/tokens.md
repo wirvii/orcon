@@ -175,6 +175,7 @@ Radius usage: controls `md` (8); cards and panels `lg` (12); dialogs and sheets 
 | `space.gap` | 12 px | 8 px |
 | `size.connector-icon` | 32 px | 24 px |
 | `size.connector-icon-safe` | 20 px | 16 px |
+| `size.panel-width` | 240 px | 208 px |
 
 `size.target-min` is 44 px under `@media (pointer: coarse)` and 24 px otherwise, independent of density ([foundations.md#density](foundations.md#density)).
 
@@ -203,6 +204,9 @@ Canvas geometry is density-independent: these tokens do not change with density,
 | `canvas.icon` | 36 | Built-in node icon |
 | `canvas.label-width` | 150 | Maximum label width |
 | `canvas.badge` | 22 | Status and pinned badges, trigger mark |
+| `canvas.badge-glyph` | 14 | Status glyph inside a badge |
+| `canvas.label-gap` | 6 | Space between a tile and its label |
+| `canvas.ring-gap` | 6 | Distance of the run ring from the tile |
 | `size.port` | 10 | Port diameter |
 | `canvas.port-hover` | 24 | Output port grown on hover or focus |
 | `canvas.stub` | 30 | Dangling output stub length |

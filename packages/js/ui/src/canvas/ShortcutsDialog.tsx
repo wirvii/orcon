@@ -37,6 +37,7 @@ export function shortcutList(): readonly Shortcut[] {
     { keys: ['+', '-', '0', '1'], description: canvasMessages.shortcutsZoom },
     { keys: [mod, 'Z'], description: canvasMessages.shortcutsUndo },
     { keys: [mod, 'Shift', 'Z'], description: canvasMessages.shortcutsRedo },
+    { keys: [mod, 'A'], description: canvasMessages.shortcutsSelectAll },
     { keys: ['Esc'], description: canvasMessages.shortcutsClear },
     { keys: ['?'], description: canvasMessages.shortcutsHelp },
   ];

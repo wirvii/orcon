@@ -39,7 +39,7 @@ export function Tabs({ tabs, label, value, defaultValue, onValueChange, classNam
             value={tab.value}
             disabled={tab.disabled}
             className={cn(
-              'text-fg-muted relative inline-flex min-h-target min-w-target max-w-full items-center rounded-md px-control-x py-2 text-base wrap-break-word whitespace-normal transition-colors',
+              'text-fg-muted relative inline-flex min-h-target min-w-target max-w-full items-center rounded-md px-control-x py-2 text-base wrap-anywhere whitespace-normal transition-colors',
               // The selected bar is drawn inside the trigger, so the focus ring can follow the control radius.
               'after:absolute after:inset-x-2 after:bottom-0 after:border-b-2 after:border-transparent',
               'hover:text-fg data-[state=active]:text-fg data-[state=active]:font-semibold data-[state=active]:after:border-action-primary',

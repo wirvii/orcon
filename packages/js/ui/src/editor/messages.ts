@@ -64,8 +64,11 @@ export const editorMessages = defineMessages({
     defaultMessage: '[…] {count, plural, one {# entry} other {# entries}}',
     description: 'A table cell that holds a list, collapsed. Shows how many entries it has.',
   },
-  expand: { id: 'editor.table.expand', defaultMessage: 'Show {name}', description: 'Accessible name of the button that expands a collapsed value of a table cell. {name} is the field name.' },
-  collapse: { id: 'editor.table.collapse', defaultMessage: 'Hide {name}', description: 'Accessible name of the button that collapses an expanded value of a table cell.' },
+  nestedLabel: {
+    id: 'editor.table.nestedLabel',
+    defaultMessage: '{summary}, {name}',
+    description: 'Accessible name of the button that expands or collapses a nested value in a table cell. {summary} is the collapsed text ("{…} 3 keys") and {name} the field.',
+  },
   tableLabel: { id: 'editor.table.label', defaultMessage: 'Data table', description: 'Accessible name of the scrollable region that holds the data table.' },
   tableEmpty: { id: 'editor.table.empty', defaultMessage: 'No items', description: 'Shown in place of a table that has no items.' },
   jsonLabel: { id: 'editor.json.label', defaultMessage: 'Data as JSON', description: 'Accessible name of the JSON tree of the data.' },

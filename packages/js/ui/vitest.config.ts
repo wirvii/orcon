@@ -69,6 +69,17 @@ export default defineConfig({
         },
       },
       {
+        // Every parity row of the editor: its pointer script and its keyboard script, in light and in dark.
+        extends: true,
+        test: {
+          name: 'parity',
+          setupFiles: quiet,
+          include: ['test/parity/**/*.test.tsx'],
+          testTimeout: 30_000,
+          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+        },
+      },
+      {
         // The only looping motion is on running elements: with motion allowed, nothing else animates.
         extends: true,
         test: {

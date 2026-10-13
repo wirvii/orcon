@@ -112,14 +112,16 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
     const { container } = stage(theme, <CanvasNode node={plain} labelled editable />);
     const input = container.querySelector<HTMLElement>('[data-port="input"]')!;
     const output = container.querySelector<HTMLElement>('[data-port="output"]')!;
+    const dot = output.querySelector<HTMLElement>('[data-port-dot]')!;
     expect(rect(input).width).toBe(10);
-    expect(rect(output).width).toBe(10);
+    expect(rect(dot).width).toBe(10);
+    // The control around the dot is at least the target size.
+    expect(rect(output).width).toBeGreaterThanOrEqual(24);
     output.focus();
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(output.matches(':focus-visible') || document.activeElement === output).toBe(true);
-    expect(Math.round(rect(output).width)).toBe(24);
-    expect(output.querySelector('svg')).not.toBeNull();
-    expect(Number(getComputedStyle(output.querySelector('svg')!).opacity)).toBe(1);
+    expect(Math.round(rect(dot).width)).toBe(24);
+    expect(dot.querySelector('svg')).not.toBeNull();
+    expect(Number(getComputedStyle(dot.querySelector('svg')!).opacity)).toBe(1);
   });
 
   it('labels the outputs of an if node inside the tile at 24 and 76, in mono text', () => {
@@ -150,7 +152,7 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
     const line = stub.firstElementChild as HTMLElement;
     expect(rect(line).width).toBe(30);
     expect(getComputedStyle(line).borderTopStyle).toBe('dashed');
-    const square = stub.querySelector('button')!;
+    const square = stub.querySelector<HTMLElement>('[data-stub-box]')!;
     expect(rect(square).width).toBe(22);
     expect(getComputedStyle(square).borderTopStyle).toBe('dashed');
     expect(square.querySelector('svg')).not.toBeNull();

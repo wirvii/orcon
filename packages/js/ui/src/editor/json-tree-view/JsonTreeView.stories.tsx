@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
 import { mixedItems, orderItems } from '../fixtures';
@@ -32,9 +32,9 @@ export const Default: Story = {
     const first = within(tree).getAllByRole('treeitem')[0]!;
     first.focus();
     await userEvent.keyboard('{ArrowDown}');
-    await expect(within(tree).getAllByRole('treeitem')[1]).toHaveFocus();
+    await waitFor(() => expect(within(tree).getAllByRole('treeitem')[1]).toHaveFocus());
     await userEvent.keyboard('{ArrowLeft}');
-    await expect(within(tree).getAllByRole('treeitem')[1]).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => expect(within(tree).getAllByRole('treeitem')[1]).toHaveAttribute('aria-expanded', 'false'));
   },
 };
 export const Collapsed: Story = { args: { defaultExpandedDepth: 0 } };

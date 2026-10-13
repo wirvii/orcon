@@ -139,7 +139,7 @@ export function JsonTreeView({ value, defaultExpandedDepth = 2, label, className
   const tabStop = rows.some((row) => row.path === focused) ? focused : '$';
 
   return (
-    <div role="tree" aria-label={label ?? intl.formatMessage(editorMessages.jsonLabel)} data-json-tree className={cn('text-mono overflow-auto p-3', className)}>
+    <div role="tree" aria-label={label ?? intl.formatMessage(editorMessages.jsonLabel)} data-json-tree className={cn('h-full text-mono overflow-auto p-3', className)}>
       {rows.map((row, index) => {
         const name = row.key ?? '';
         // The indent follows the depth, which only exists at run time.
@@ -158,7 +158,7 @@ export function JsonTreeView({ value, defaultExpandedDepth = 2, label, className
             onKeyDown={(event) => onKeyDown(event, index)}
             // eslint-disable-next-line orcon/no-inline-style -- indent computed from the depth of the row
             style={indent}
-            className="hover:bg-surface-sunken flex min-h-6 items-start gap-1 rounded-sm"
+            className="hover:bg-surface-sunken flex min-h-target items-center gap-1 rounded-sm"
           >
             {row.expandable ? (
               <button
@@ -166,12 +166,12 @@ export function JsonTreeView({ value, defaultExpandedDepth = 2, label, className
                 tabIndex={-1}
                 aria-label={intl.formatMessage(row.expanded ? editorMessages.treeCollapse : editorMessages.treeExpand, { name: name || '$' })}
                 onClick={() => toggle(row, !row.expanded)}
-                className="text-fg-muted hover:text-fg grid size-icon-20 shrink-0 place-items-center"
+                className="text-fg-muted hover:text-fg grid size-icon-20 min-h-target min-w-target shrink-0 place-items-center"
               >
                 {row.expanded ? <ChevronDown aria-hidden className="size-icon-16" /> : <ChevronRight aria-hidden className="size-icon-16" />}
               </button>
             ) : (
-              <span aria-hidden className="size-icon-20 shrink-0" />
+              <span aria-hidden className="size-icon-20 min-w-target shrink-0" />
             )}
             {row.key !== undefined ? <span className="text-fg">{row.key}</span> : null}
             {row.key !== undefined ? <span className="text-fg-muted">:</span> : null}

@@ -226,7 +226,11 @@ export const canvasMessages = defineMessages({
     description: 'Shortcut description: Alt and Shift plus arrow moves the node by four steps of the grid.',
   },
   shortcutsAdd: { id: 'canvas.shortcuts.add', defaultMessage: 'Add a node', description: 'Shortcut description: A opens the add-node list.' },
-  shortcutsConnect: { id: 'canvas.shortcuts.connect', defaultMessage: 'Connect two nodes', description: 'Shortcut description: C opens the connect form.' },
+  shortcutsConnect: {
+    id: 'canvas.shortcuts.connect',
+    defaultMessage: 'Connect two nodes',
+    description: 'Shortcut description: C connects two selected nodes, or opens the connect form.',
+  },
   shortcutsDelete: {
     id: 'canvas.shortcuts.delete',
     defaultMessage: 'Delete the selected nodes',
@@ -234,6 +238,7 @@ export const canvasMessages = defineMessages({
   },
   shortcutsUndo: { id: 'canvas.shortcuts.undo', defaultMessage: 'Undo', description: 'Shortcut description: undo the last change.' },
   shortcutsRedo: { id: 'canvas.shortcuts.redo', defaultMessage: 'Redo', description: 'Shortcut description: redo the last undone change.' },
+  shortcutsSelectAll: { id: 'canvas.shortcuts.selectAll', defaultMessage: 'Select every node', description: 'Shortcut description: Control or Command and A select all nodes.' },
   shortcutsHelp: { id: 'canvas.shortcuts.help', defaultMessage: 'Show this list', description: 'Shortcut description: the question mark opens this list.' },
   shortcutsClear: { id: 'canvas.shortcuts.clear', defaultMessage: 'Clear the selection', description: 'Shortcut description: Escape unselects all nodes.' },
   announceAdded: { id: 'canvas.announce.added', defaultMessage: 'Added {name}', description: 'Spoken after a node was added. {name} is the node name.' },

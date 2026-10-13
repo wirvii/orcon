@@ -144,7 +144,7 @@ export function DataPane({
             />
           </div>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-hidden">
           {view === 'table' ? <DataTableView items={items} /> : view === 'json' ? <JsonTreeView value={items} /> : <SchemaView items={items} />}
         </div>
       </div>

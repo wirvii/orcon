@@ -46,8 +46,8 @@ export function EdgePreview({ data, loopBack = false }: { data?: CanvasEdgeData;
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
+          // At 100 % so the controls drawn on the connection keep their size.
+          defaultViewport={{ x: 60, y: 20, zoom: 1 }}
           nodesDraggable={false}
           nodesConnectable={false}
           nodesFocusable={false}

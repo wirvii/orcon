@@ -101,12 +101,73 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | ThemeSwitcher | Base component | Pending | — | — | — | — |
 | DensitySwitcher | Base component | Pending | — | — | — | — |
 | LocaleSwitcher | Base component | Pending | — | — | — | — |
+| CanvasNode | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodeStatusBadge | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodeStatusChip | Canvas primitive (style A) | Pending | — | — | — | — |
+| PinnedBadge | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodePort | Canvas primitive (style A) | Pending | — | — | — | — |
+| PortAddButton | Canvas primitive (style A) | Pending | — | — | — | — |
+| OutputStub | Canvas primitive (style A) | Pending | — | — | — | — |
+| CanvasEdge | Canvas primitive (style A) | Pending | — | — | — | — |
+| EdgeLabel | Canvas primitive (style A) | Pending | — | — | — | — |
+| EdgeActions | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodeToolbar | Canvas primitive (style A) | Pending | — | — | — | — |
+| StickyNote | Canvas primitive (style A) | Pending | — | — | — | — |
+| CanvasControls | Canvas primitive (style A) | Pending | — | — | — | — |
+| CanvasMinimap | Canvas primitive (style A) | Pending | — | — | — | — |
+| AddFirstStep | Canvas primitive (style A) | Pending | — | — | — | — |
+| AiBlock | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodePalettePanel | Canvas primitive (style A) | Pending | — | — | — | — |
+| CanvasOutline | Canvas primitive (style A) | Pending | — | — | — | — |
+| NodeDetailsView | Editor component | Pending | — | — | — | — |
+| PaneSplitter | Editor component | Pending | — | — | — | — |
+| DataPane | Editor component | Pending | — | — | — | — |
+| DataTableView | Editor component | Pending | — | — | — | — |
+| JsonTreeView | Editor component | Pending | — | — | — | — |
+| SchemaView | Editor component | Pending | — | — | — | — |
 | S1 Shell and welcome/onboarding | Screen template | Pending | — | — | — | — |
 | S2 Flow list | Screen template | Pending | — | — | — | — |
-| S3 Flow editor (desktop/tablet) and read-only canvas (phone) | Screen template | Pending | — | — | — | — |
+| S3 Flow editor in style A (desktop/tablet), with the node details view and the data panel, and read-only canvas (phone) | Screen template | Pending | — | — | — | Reopened by the style A decision (SPEC-007 Enmienda 1) |
 | S4 Execution list | Screen template | Pending | — | — | — | — |
-| S5 Execution detail | Screen template | Pending | — | — | — | — |
+| S5 Execution detail, with the style A canvas | Screen template | Pending | — | — | — | Canvas reopened by the style A decision (SPEC-007 Enmienda 1) |
 | S6 Human attention inbox and notifications panel | Screen template | Pending | — | — | — | — |
 | S7 Approval page | Screen template | Pending | — | — | — | — |
 | S8 Empty states, 404 and error page | Screen template | Pending | — | — | — | — |
 | S9 Settings › Appearance and language | Screen template | Pending | — | — | — | — |
+
+## Editor parity review
+
+The V1 bar for the flow editor is that every interaction of the parity table in [`canvas.md#parity`](../../.agents/skills/orcon-ui/references/canvas.md#parity) is equal to or better than the n8n editor experience, observed as a user (nothing is copied). The owner records `Equal`, `Better` or `Worse — changes requested` for each row, with the date and the commit of the Storybook reviewed. No row may stay `Worse` when the canvas, editor and S3 rows above are approved. Rows whose owner is SPEC-014 are reviewed when that specification delivers them. The decision mockup of style A is kept at [`mockups/editor-style-a.html`](mockups/editor-style-a.html) as a record; `canvas.md` governs.
+
+| Row | Interaction | Verdict | Date | Reviewed Storybook commit | Notes |
+|---|---|---|---|---|---|
+| P-01 | First step on an empty canvas | Pending | — | — | — |
+| P-02 | Add a node after a node | Pending | — | — | — |
+| P-03 | Add after a dangling output | Pending | — | — | — |
+| P-04 | Insert a node on a connection | Pending | — | — | — |
+| P-05 | Delete a connection | Pending | — | — | — |
+| P-06 | Connect two nodes | Pending | — | — | — |
+| P-07 | Move and multi-select | Pending | — | — | — |
+| P-08 | Node quick actions | Pending | — | — | — |
+| P-09 | Select and open a node | Pending | — | — | — |
+| P-10 | Node details view | Pending | — | — | — |
+| P-11 | Switch data view | Pending | — | — | — |
+| P-12 | Map an input field into a parameter | Pending | — | — | — |
+| P-13 | Execute one step | Pending | — | — | — |
+| P-14 | Execute the workflow | Pending | — | — | — |
+| P-15 | Pin output data | Pending | — | — | — |
+| P-16 | Disable a node | Pending | — | — | — |
+| P-17 | Read a failed node | Pending | — | — | — |
+| P-18 | Read an uncertain node | Pending | — | — | — |
+| P-19 | Sticky notes | Pending | — | — | — |
+| P-20 | Zoom | Pending | — | — | — |
+| P-21 | Minimap | Pending | — | — | — |
+| P-22 | Pan | Pending | — | — | — |
+| P-23 | Copy, paste, duplicate | Pending | — | — | — |
+| P-24 | Undo and redo | Pending | — | — | — |
+| P-25 | Rename a node | Pending | — | — | — |
+| P-26 | Tidy up | Pending | — | — | — |
+| P-27 | Find a node type | Pending | — | — | — |
+| P-28 | Multi-output node | Pending | — | — | — |
+| P-29 | Trigger node | Pending | — | — | — |
+| P-30 | Same experience in dark theme and by keyboard | Pending | — | — | — |

@@ -4,6 +4,8 @@
 import { useId } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
+import { exampleGraph } from '../canvas/fixtures';
+import { WorkflowCanvas } from '../canvas/WorkflowCanvas';
 import { AlertDialog } from '../components/alert-dialog/AlertDialog';
 import { Button } from '../components/button/Button';
 import { CodeBlock } from '../components/code-block/CodeBlock';
@@ -46,6 +48,7 @@ const messages = defineMessages({
   },
   output: { id: 'screen.execution.output', defaultMessage: 'Output data', description: 'Label of the data a step produced.' },
   outputName: { id: 'screen.execution.outputName', defaultMessage: 'Output of {name}', description: 'Accessible name of the block with the data of a step. {name} is the step.' },
+  flow: { id: 'screen.execution.flow', defaultMessage: 'Flow', description: 'Heading of the read-only diagram of the flow with the state of each step in this execution.' },
   summary: { id: 'screen.execution.summary', defaultMessage: 'Execution', description: 'Label before the execution id.' },
 });
 
@@ -116,6 +119,14 @@ export function ExecutionDetailScreen({
           {intl.formatMessage(messages.continueBlocked)}
         </p>
       ) : null}
+      <section aria-labelledby="flow-heading" className="flex flex-col gap-2 pb-6">
+        <h2 id="flow-heading" className="text-lg font-semibold wrap-anywhere">
+          {intl.formatMessage(messages.flow)}
+        </h2>
+        <div className="border-border h-editor-params-min overflow-hidden rounded-lg border">
+          <WorkflowCanvas defaultGraph={exampleGraph} readOnly notice={false} minimap={false} />
+        </div>
+      </section>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <section aria-labelledby="timeline-heading" className="min-w-0 flex-1">
           <h2 id="timeline-heading" className="text-lg font-semibold wrap-anywhere">

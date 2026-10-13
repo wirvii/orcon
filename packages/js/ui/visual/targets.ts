@@ -45,9 +45,11 @@ export function loadTargets(): Target[] {
   };
   const targets: Target[] = [];
   for (const entry of Object.values(index.entries)) {
-    if (entry.type !== 'story' || entry.name !== 'Matrix') continue;
+    if (entry.type !== 'story') continue;
     const screen = entry.title.startsWith('Screens/');
     const editor = entry.title.startsWith('Screens/S3 ');
+    // The flow editor also has its execution view and its node details view as targets, on every viewport.
+    if (entry.name !== 'Matrix' && !(editor && (entry.name === 'Details' || entry.name === 'Execution'))) continue;
     targets.push({
       id: entry.id,
       title: entry.title,

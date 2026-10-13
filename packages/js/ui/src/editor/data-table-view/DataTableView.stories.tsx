@@ -31,7 +31,7 @@ export const Default: Story = {
     await expect(view.getByRole('columnheader', { name: '#' })).toBeVisible();
     // null is dimmed, nested data is collapsed and expandable.
     await expect(view.getAllByText('null').length).toBeGreaterThan(0);
-    const toggle = view.getAllByRole('button', { name: 'Show shipping' })[0]!;
+    const toggle = view.getAllByRole('button', { name: /, shipping$/ })[0]!;
     await expect(toggle).toHaveTextContent('{…} 3 keys');
     await userEvent.click(toggle);
     await expect(within(canvasElement).getByText(/"city": "Neiva"/)).toBeVisible();
@@ -53,7 +53,7 @@ export const Virtualized: Story = {
   args: { items: manyItems(1000) },
   play: async ({ canvasElement }) => {
     // Only the rows in view are in the page.
-    await expect(canvasElement.querySelectorAll('tbody tr[data-row]').length).toBeLessThan(60);
+    await expect(canvasElement.querySelectorAll('tbody tr[data-item-row]').length).toBeLessThan(60);
   },
 };
 

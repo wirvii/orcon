@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Cable, Keyboard, ListTree, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
+import { Cable, Keyboard, ListTree, NotebookText, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { useIntl } from 'react-intl';
 
 import { IconButton } from '../components/icon-button/IconButton';
@@ -20,6 +20,7 @@ export interface CanvasToolsProps {
   outlineOpen?: boolean;
   onAdd?: () => void;
   onConnect?: () => void;
+  onAddSticky?: () => void;
   onDelete?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -33,7 +34,7 @@ export interface CanvasToolsProps {
  * canvas depends on a pointer: add, connect, delete, undo and redo, plus the flow outline and the
  * shortcut list. Each button names itself and shows its name in a tooltip.
  */
-export function CanvasTools({ editable = true, canUndo = false, canRedo = false, canDelete = false, outlineOpen = false, onAdd, onConnect, onDelete, onUndo, onRedo, onToggleOutline, onShortcuts, className }: CanvasToolsProps) {
+export function CanvasTools({ editable = true, canUndo = false, canRedo = false, canDelete = false, outlineOpen = false, onAdd, onConnect, onAddSticky, onDelete, onUndo, onRedo, onToggleOutline, onShortcuts, className }: CanvasToolsProps) {
   const intl = useIntl();
   const button = (label: string, icon: typeof Plus, onClick: (() => void) | undefined, extra: { disabled?: boolean; pressed?: boolean } = {}) => (
     <Tooltip content={label}>
@@ -51,6 +52,7 @@ export function CanvasTools({ editable = true, canUndo = false, canRedo = false,
         <>
           {button(intl.formatMessage(canvasMessages.addNode), Plus, onAdd)}
           {button(intl.formatMessage(canvasMessages.connectNodes), Cable, onConnect)}
+          {button(intl.formatMessage(canvasMessages.stickyAdd), NotebookText, onAddSticky)}
           {button(intl.formatMessage(canvasMessages.deleteSelected), Trash2, onDelete, { disabled: !canDelete })}
           <Separator orientation="vertical" className="h-6" />
           {button(intl.formatMessage(canvasMessages.undo), Undo2, onUndo, { disabled: !canUndo })}

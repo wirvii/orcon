@@ -32,14 +32,14 @@ describe('DataTableView', () => {
   it('collapses nested objects as "{…} 3 keys" and expands them on request', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DataTableView items={orderItems} />);
-    const toggle = screen.getAllByRole('button', { name: 'Show shipping' })[0]!;
+    const toggle = screen.getAllByRole('button', { name: '{…} 3 keys, shipping' })[0]!;
     expect(toggle).toHaveTextContent('{…} 3 keys');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText(/"zip": "410001"/)).toBeInTheDocument();
     // Lists too.
-    expect(screen.getAllByRole('button', { name: 'Show lines' })[0]).toHaveTextContent('[…] 2 entries');
+    expect(screen.getAllByRole('button', { name: '[…] 2 entries, lines' })[0]).toHaveTextContent('[…] 2 entries');
   });
 
   it('shows a protected value as a notice, never blank and never the value', () => {
@@ -69,7 +69,7 @@ describe('DataTableView', () => {
   it('renders only the rows in view for a long list', () => {
     renderWithProviders(<DataTableView items={manyItems(1000)} />);
     expect(manyItems(1000).length).toBeGreaterThan(VIRTUALIZE_ROWS);
-    const rows = document.querySelectorAll('tbody tr[data-row]');
+    const rows = document.querySelectorAll('tbody tr[data-item-row]');
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.length).toBeLessThan(60);
   });

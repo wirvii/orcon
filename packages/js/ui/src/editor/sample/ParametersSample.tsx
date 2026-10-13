@@ -83,7 +83,7 @@ export function ParametersSample({ node }: { node: GraphNode }) {
         {({ id, expression }) => <Input id={id} defaultValue="#orders-alerts" className={cn(expression && 'font-mono text-mono')} />}
       </ExpressionField>
       <ExpressionField label={intl.formatMessage(sampleMessages.message)} defaultExpression>
-        {({ id, expression }) => <Textarea id={id} defaultValue={intl.formatMessage(sampleMessages.messageValue)} className={cn(expression && 'font-mono text-mono')} />}
+        {({ id, expression }) => <Textarea id={id} defaultValue={intl.formatMessage(sampleMessages.messageValue, { open: '{{ ', close: ' }}' })} className={cn(expression && 'font-mono text-mono')} />}
       </ExpressionField>
     </div>
   );

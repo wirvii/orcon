@@ -95,6 +95,8 @@ export function CanvasEdge({ id, sourceX, sourceY, targetX, targetY, data }: Edg
       <path d={arrow} data-edge-arrow className={cn(arrowFill[key], 'stroke-none')} />
       {/* A wide invisible stroke makes the thin line easy to hover and click. */}
       <path d={d} fill="none" strokeWidth={20} className="stroke-transparent" />
+      {/* A straight line has no height, so it has nothing to point at: this disc at its middle gives the connection a target of its own. */}
+      <circle cx={mid.x} cy={mid.y} r={10} pointerEvents="all" data-edge-hit className="fill-transparent" />
       <EdgeLabelRenderer>
         <div
           className="nodrag nopan pointer-events-none absolute"

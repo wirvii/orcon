@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { exampleCatalog, exampleDraft } from '../canvas/fixtures';
 import type { CatalogItem, Graph } from '../canvas/model';
 import { NodeStatusChip } from '../canvas/node-status-chip/NodeStatusChip';
-import { useMediaQuery } from '../canvas/useMediaQuery';
+import { useMediaQuery, wideQuery } from '../canvas/useMediaQuery';
 import { applyOverlay, WorkflowCanvas, type ExecutionOverlay, type WorkflowCanvasHandle } from '../canvas/WorkflowCanvas';
 import { Button } from '../components/button/Button';
 import type { StatusKey } from '../components/status-badge/status-map';
@@ -74,6 +74,7 @@ export function EditorFrame({
 }: EditorFrameProps) {
   const intl = useIntl();
   const wide = useMediaQuery(lgQuery);
+  const medium = useMediaQuery(wideQuery);
   const canvas = useRef<WorkflowCanvasHandle>(null);
   const [graph, setGraph] = useState<Graph>(initialGraph);
   const graphRef = useRef(graph);
@@ -86,10 +87,12 @@ export function EditorFrame({
   const [outputView, setOutputView] = useState<DataView>('table');
   const [port, setPort] = useState<string | undefined>();
   const [dock, setDock] = useState<'input' | 'output'>('output');
-  const editable = !readOnly;
+  // Editing needs md or wider: on a phone the canvas is view only, so there is nothing to save or run.
+  const editable = !readOnly && medium;
 
   const shown = useMemo(() => applyOverlay(graph, run.overlay), [graph, run.overlay]);
-  const details = shown.nodes.find((node) => node.id === detailsId);
+  // The details view needs md or wider; on a phone a node opens the status sheet of the canvas instead.
+  const details = medium ? shown.nodes.find((node) => node.id === detailsId) : undefined;
   const trigger = shown.nodes.find((node) => node.kind === 'trigger');
   const last = lastRunStatus(shown);
 
