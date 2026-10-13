@@ -44,6 +44,25 @@ describe('the shell', () => {
     marker.remove();
   });
 
+  it('opens the flow editor from the navigation, at its own address, and marks it as the section being shown', async () => {
+    const { router } = renderRoute('/');
+    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
+    const editor = sectionLinks('Flow editor')[0];
+    if (!editor) throw new Error('The shell has no Flow editor link.');
+    expect(editor).toHaveAttribute('href', '/flows/01930000-0000-7000-8000-00000000ed5a');
+    await userEvent.click(editor);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
+    expect(router.state.location.pathname).toBe('/flows/01930000-0000-7000-8000-00000000ed5a');
+    for (const link of sectionLinks('Flow editor')) expect(link).toHaveAttribute('aria-current', 'page');
+    for (const link of sectionLinks('Start')) expect(link).not.toHaveAttribute('aria-current');
+  });
+
+  it('says a page that is not a flow id does not exist', async () => {
+    renderRoute('/flows/not-a-flow');
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeVisible();
+  });
+
   it('leaves a click with a modifier key to the browser', async () => {
     const { router } = renderRoute('/');
     await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });

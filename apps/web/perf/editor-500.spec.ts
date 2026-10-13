@@ -70,9 +70,12 @@ async function gesture(page: Page, durationMs: number, step: (progress: number) 
   return stopFrames(page);
 }
 
+/** The route the measurement opens: the editor of the 500-node reference flow (the `perf` build serves it under this id). */
+const EDITOR_ROUTE = '/flows/01930000-0000-7000-8000-000000000500';
+
 test('the editor with 500 nodes opens fast and stays smooth', async ({ browser }, testInfo) => {
-  const harnessURL = String(testInfo.project.metadata['harnessURL'] ?? '');
-  if (harnessURL === '') throw new Error('The project declares no harness URL.');
+  const editorURL = String(testInfo.project.metadata['editorURL'] ?? '');
+  if (editorURL === '') throw new Error('The project declares no editor URL.');
 
   const opens: number[] = [];
   const lostRatios: number[] = [];
@@ -81,7 +84,7 @@ test('the editor with 500 nodes opens fast and stays smooth', async ({ browser }
   for (let run = 0; run < RUNS; run += 1) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US', timezoneId: 'UTC' });
     const view = await context.newPage();
-    await view.goto(harnessURL, { waitUntil: 'commit' });
+    await view.goto(`${editorURL}${EDITOR_ROUTE}`, { waitUntil: 'commit' });
     await view.waitForFunction(() => performance.getEntriesByName('orcon:editor-ready').length > 0, undefined, { timeout: 60_000 });
     opens.push(await view.evaluate(() => performance.getEntriesByName('orcon:editor-ready')[0]?.startTime ?? Number.NaN));
 

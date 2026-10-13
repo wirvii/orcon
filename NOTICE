@@ -55,9 +55,11 @@ Copyright (c) 2021 Dany Castillo; clsx, Copyright (c) Luke Edwards; React and
 React DOM, Copyright (c) Meta Platforms, Inc. and affiliates (all MIT);
 lucide-react (ISC), Copyright (c) Cole Bemis 2013-2026 (Feather, MIT) and Lucide
 Contributors 2026; react-intl and intl-messageformat (BSD-3-Clause), Copyright
-2019 Oath Inc.; class-variance-authority (Apache-2.0); the d3 modules used by
-@xyflow/react (ISC and BSD-3-Clause). Each package carries its own license text
-in its distribution.
+2019 Oath Inc.; class-variance-authority (Apache-2.0); zustand (MIT), Copyright
+(c) 2019 Paul Henschel; immer (MIT), Copyright (c) 2017 Michel Weststrate;
+@dagrejs/dagre and @dagrejs/graphlib (MIT), Copyright (c) 2012-2014 Chris
+Pettitt; the d3 modules used by @xyflow/react (ISC and BSD-3-Clause). Each
+package carries its own license text in its distribution.
 
 --------------------------------------------------------------------------------
 Fonts (SIL Open Font License, Version 1.1)
