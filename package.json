@@ -8,10 +8,18 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "i18n:check": "turbo i18n:check"
+    "i18n:check": "turbo i18n:check",
+    "generate": "turbo run generate",
+    "generate:check": "pnpm generate && git diff --exit-code -- apps/web/src/app/routeTree.gen.ts"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
     "vitest": "^3.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "msw"
+    ]
   }
 }
