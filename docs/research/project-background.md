@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon — Project Background
 
 Date: 2026-10-10. Status: historical context, not a blanket implementation approval. Accepted ADRs and specifications supersede anything stated here.

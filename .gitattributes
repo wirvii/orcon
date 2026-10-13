@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
 # >>> mneme (SPEC-140): finales de línea de los ficheros que mneme escribe y vuelve a leer >>>
 .mneme/**        text eol=lf
 .claude/agents/** text eol=lf

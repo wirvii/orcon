@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon — Product Vision
 
 Status: **Accepted** | Owner: Wirvii | Version: 0.1

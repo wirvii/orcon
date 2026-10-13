@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Product AI feature paths where assistant and model-provider names (class B
+# terms) are allowed because they are features of Orcon itself (SPEC-006).
+# AI authorship marks (class A) stay forbidden here too.
+# One glob per line, each with a reason: "glob  # reason". Add a glob only in a
+# reviewed pull request, and only for a product AI feature (tooling.md TOOL-4.5).
+
+internal/ai/**  # AI agents and provider-facing logic (SPEC-006)
+internal/adapter/llm/**  # model provider adapters (SPEC-006)
+internal/adapter/mcpserver/**  # MCP server exposed to AI clients (ADR-0059)
+internal/adapter/mcpclient/**  # MCP client used by AI agents (ADR-0067)
+internal/n8nimport/**  # mapping of n8n AI nodes (ADR-0071)
+internal/adapter/codec/n8n/**  # n8n export format with its AI node types (SPEC-006 21.3)
+internal/retrieval/**  # knowledge ingestion and embedding providers (ADR-0065)
+docs/adr/006[0-9]-*.md  # AI ADRs 0060-0069 (SPEC-006)
+docs/adr/007[0-2]-*.md  # AI ADRs 0070-0072 (SPEC-006)
+packages/openapi/v1/**  # provider enumerations in the API contract
+docs/reference/n8n-ai-coverage.md  # n8n AI node coverage table (SPEC-006 21.3)
+docs/reference/ai-prices*  # model price tables by provider (SPEC-006 21.3)
+docs/reference/connectors/ai/**  # reference pages of AI connectors
+test/mockllm/**  # mock model provider used by tests (SPEC-006 21.3)
+
+# Not a product AI feature: the only non-product entry. This file holds the
+# line-ending block that mneme writes for the tool configuration directories,
+# which has to name them. It is flagged for the owner's confirmation.
+.gitattributes  # mneme-managed block naming the tool configuration directories

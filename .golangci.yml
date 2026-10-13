@@ -1,0 +1,371 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Rulebook: .agents/skills/orcon-go/references/ (go-style.md, architecture-layers.md). Every change here is a rule change.
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - asasalint
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forbidigo
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gocognit
+    - gocritic
+    - godot
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - govet
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - ireturn
+    - makezero
+    - mirror
+    - misspell
+    - nakedret
+    - nilerr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - predeclared
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - testableexamples
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+
+  settings:
+    depguard:
+      rules:
+        area-purity:
+          list-mode: lax
+          files:
+            - "**/internal/**/*.go"
+            - "!**/internal/adapter/**"
+            - "!**/internal/platform/jsonvalue/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter
+              desc: areas declare ports; only cmd/orcon wires adapters (architecture-layers.md AL-2)
+            - pkg: github.com/wirvii/orcon/cmd
+              desc: nothing imports the composition root (AL-8)
+            - pkg: database/sql
+              desc: SQL lives in internal/adapter/{sqlite,postgres} (data-access.md DA-2)
+            - pkg: github.com/jackc/pgx
+              desc: driver confined to the postgres adapter
+            - pkg: modernc.org/sqlite
+              desc: driver confined to the sqlite adapter
+            - pkg: net/http
+              desc: HTTP is an adapter concern (httpapi, egress, webui)
+            - pkg: net/rpc
+              desc: transport is an adapter concern
+            - pkg: encoding/json
+              desc: use internal/platform/jsonvalue for item data and internal/adapter/codec for formats (AL-4, AL-7)
+            - pkg: encoding/xml
+              desc: formats live in internal/adapter/codec (AL-7)
+            - pkg: encoding/csv
+              desc: formats live in internal/adapter/codec (AL-7)
+            - pkg: encoding/gob
+              desc: formats live in internal/adapter/codec (AL-7)
+            - pkg: gopkg.in/yaml
+              desc: formats live in internal/adapter/codec (AL-7)
+            - pkg: go.yaml.in/yaml
+              desc: formats live in internal/adapter/codec (AL-7)
+            - pkg: github.com/tetratelabs/wazero
+              desc: WASM runtime confined to internal/adapter/wazero; areas use the sandbox port
+            - pkg: go.opentelemetry.io/otel/sdk
+              desc: areas use only the OpenTelemetry API; SDK setup lives in internal/adapter/otel
+            - pkg: go.opentelemetry.io/otel/exporters
+              desc: exporters live in internal/adapter/otel
+            - pkg: os/exec
+              desc: process execution is an adapter concern with isolation (implementation contract)
+        platform-leaf:
+          list-mode: lax
+          files:
+            - "**/internal/platform/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter
+              desc: platform packages are leaves (AL-1)
+            # one entry per area; scripts/check-depguard-coverage.sh keeps this list complete
+            - pkg: github.com/wirvii/orcon/internal/flow
+              desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/execution
+              desc: platform packages are leaves (AL-1)
+        pgx-confined:
+          files:
+            - "$all"
+            - "!**/internal/adapter/postgres/**"
+            - "!**/internal/adapter/connectors/postgres/**"
+            - "!**/internal/adapter/storetest/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: pgx is confined to the postgres adapters
+        sqlite-confined:
+          files:
+            - "$all"
+            - "!**/internal/adapter/sqlite/**"
+            - "!**/internal/adapter/storetest/**"
+          deny:
+            - pkg: modernc.org/sqlite
+              desc: SQLite driver is confined to the sqlite adapter
+            - pkg: database/sql
+              desc: database/sql is used only by the sqlite adapter (postgres uses pgx natively)
+        wazero-confined:
+          files:
+            - "$all"
+            - "!**/internal/adapter/wazero/**"
+          deny:
+            - pkg: github.com/tetratelabs/wazero
+              desc: WASM runtime is confined to internal/adapter/wazero
+        otel-sdk-confined:
+          files:
+            - "$all"
+            - "!**/internal/adapter/otel/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: go.opentelemetry.io/otel/sdk
+              desc: OpenTelemetry SDK setup lives in internal/adapter/otel
+            - pkg: go.opentelemetry.io/otel/exporters
+              desc: exporters live in internal/adapter/otel
+        oapi-runtime-confined:
+          files:
+            - "$all"
+            - "!**/internal/adapter/httpapi/**"
+          deny:
+            - pkg: github.com/oapi-codegen/runtime
+              desc: generated API code is confined to internal/adapter/httpapi
+        # adapter-private-<name>: one rule per directory in internal/adapter (coverage script enforces)
+        adapter-private-httpapi:
+          files:
+            - "$all"
+            - "!**/internal/adapter/httpapi/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/httpapi
+              desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-webui:
+          files:
+            - "$all"
+            - "!**/internal/adapter/webui/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/webui
+              desc: only cmd/orcon wires adapters (AL-8)
+        banned-everywhere:
+          files:
+            - "$all"
+          deny:
+            - pkg: github.com/stretchr/testify
+              desc: standard testing + go-cmp only (go-style.md GS-T1)
+            - pkg: go.uber.org/mock
+              desc: hand-written fakes only (GS-T3)
+            - pkg: github.com/golang/mock
+              desc: hand-written fakes only (GS-T3)
+            - pkg: github.com/vektra/mockery
+              desc: hand-written fakes only (GS-T3)
+            - pkg: github.com/gofiber
+              desc: net/http only (ADR-0076)
+            - pkg: github.com/valyala/fasthttp
+              desc: net/http only (ADR-0076)
+            - pkg: gorm.io
+              desc: sqlc only, no ORM (ADR-0076)
+            - pkg: entgo.io
+              desc: sqlc only, no ORM (ADR-0076)
+            - pkg: github.com/uptrace/bun
+              desc: sqlc only, no ORM (ADR-0076)
+            - pkg: github.com/jmoiron/sqlx
+              desc: sqlc only (ADR-0076)
+            - pkg: go.uber.org/fx
+              desc: manual constructor injection (ADR-0075)
+            - pkg: go.uber.org/dig
+              desc: manual constructor injection (ADR-0075)
+            - pkg: github.com/google/wire
+              desc: manual constructor injection (ADR-0075)
+            - pkg: github.com/samber/do
+              desc: manual constructor injection (ADR-0075)
+            - pkg: go.uber.org/zap
+              desc: log/slog only (ADR-0076)
+            - pkg: github.com/sirupsen/logrus
+              desc: log/slog only (ADR-0076)
+            - pkg: github.com/rs/zerolog
+              desc: log/slog only (ADR-0076)
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+    exhaustive:
+      default-signifies-exhaustive: false
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: write to an injected io.Writer or use the injected *slog.Logger (GS-O1)
+        - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
+          msg: use the injected *slog.Logger (GS-O1)
+        - pattern: ^os\.Exit$
+          msg: only cmd/orcon main may exit the process (AL-8)
+        - pattern: ^time\.Sleep$
+          msg: use the injected clock.Clock (GS-K7)
+    gocognit:
+      min-complexity: 30
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      settings:
+        hugeParam:
+          sizeThreshold: 256
+    godot:
+      scope: declarations
+      capital: true
+    gomoddirectives:
+      replace-local: false
+      retract-allow-no-explanation: false
+      toolchain-forbidden: false
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    interfacebloat:
+      max: 6
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 0
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: datarace
+        - name: defer
+        - name: dot-imports
+        - name: early-return
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: use-any
+        - name: var-declaration
+        - name: var-naming
+    sloglint:
+      no-mixed-args: true
+      no-global: all
+      context: scope
+      static-msg: true
+      key-naming-case: snake
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
+    spancheck:
+      checks:
+        - end
+        - record-error
+        - set-status
+    staticcheck:
+      checks:
+        - all
+    unparam:
+      check-exported: false
+    usetesting:
+      os-temp-dir: true
+      context-background: true
+      context-todo: true
+
+  exclusions:
+    generated: strict
+    warn-unused: true
+    presets: []
+    rules:
+      # tests that exercise timeouts against real servers may wait on real time; reviewers require the reason
+      - path: _test\.go
+        linters:
+          - forbidigo
+        text: time\.Sleep
+      # the composition root owns the process exit code
+      - path: ^cmd/
+        linters:
+          - forbidigo
+        text: os\.Exit
+      # table-driven test functions are long by design
+      - path: _test\.go
+        linters:
+          - gocognit
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+    goimports:
+      local-prefixes:
+        - github.com/wirvii/orcon
+  exclusions:
+    generated: strict
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

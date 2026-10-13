@@ -1,6 +1,10 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0002 — Single binary, multiple runtime roles
 
 Status: **Accepted (conceptual)** | Date: 2026-10-10
+
+> Amended by [ADR 0075](0075-go-module-and-package-layout.md) for the Go module layout (accepted): the sentence "Shared libraries remain in packages/go" is replaced by its single-module layout.
 
 ## Context
 Orcon must be easily distributed locally, in containers, and as horizontally scaled services, without separate runtime installations of the web frontend.

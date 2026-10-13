@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0004 — SQLite local and PostgreSQL distributed
 
 Status: **Accepted (architectural direction)** | Date: 2026-10-10

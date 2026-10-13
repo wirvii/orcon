@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 # Orcon design tokens v0.1
 
 **Status: Proposed, implementation guidance, not a final approved palette.**
