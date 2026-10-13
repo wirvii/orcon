@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Owner-approved license exceptions for npm packages in the production closure
+# of apps/web and in the bundled modules (SPEC-010 P1; the JS counterpart of
+# tools/licenses/exceptions.txt, SPEC-008 D-O2). Every package whose license is
+# not Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause or ISC fails the web license
+# check unless its exact package and version has a line here.
+#
+# One exception per line, fields separated by two or more spaces:
+#
+#   <package>@<version>  <SPDX id>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+#
+# The line covers that exact version only; upgrading the package requires a
+# renewed line. Add lines only in a pull request the owner approves. A malformed
+# line, or one without approved-by:, makes the check fail. No exception can
+# admit GPL, AGPL, LGPL, SSPL, BUSL, Elastic, Commons Clause or other
+# source-available licenses.
+
+@fontsource-variable/inter@5.3.0  OFL-1.1  self-hosted UI font embedded in the binary (ADR-0074)  2026-10-12  approved-by:owner
+@fontsource-variable/jetbrains-mono@5.3.0  OFL-1.1  self-hosted UI monospace font embedded in the binary (ADR-0074)  2026-10-12  approved-by:owner
+tslib@2.8.1  0BSD  runtime helper required by react-intl and FormatJS  2026-10-12  approved-by:owner
+isbot@5.2.2  Unlicense  bot detection helper used by the web app  2026-10-13  approved-by:owner
