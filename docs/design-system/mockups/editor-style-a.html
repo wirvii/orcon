@@ -1,0 +1,484 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orcon Node Styles</title>
+<!-- Decision mockup, not production code. Tokens mirror packages/js/tokens (feat/spec-007-ui-design-system). Self-contained: no network requests. -->
+<style>
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false}
+:root,[data-theme=light]{
+  --bg-app:#F8FAFC;--surface:#FFFFFF;--raised:#FFFFFF;--sunken:#F1F5F9;
+  --fg:#0F172A;--muted:#475569;--subtle:#64748B;--disabled:#94A3B8;--link:#0E7490;--accent:#15803D;
+  --act-bg:#15803D;--act-hover:#166534;--act-fg:#FFFFFF;--danger-bg:#B91C1C;--danger-fg:#FFFFFF;
+  --border:#E2E8F0;--control:#64748B;--focus:#0E7490;
+  --st-neutral-fg:#475569;--st-neutral-bg:#F1F5F9;--st-active-fg:#155E75;--st-active-bg:#ECFEFF;
+  --st-success-fg:#166534;--st-success-bg:#F0FDF4;--st-warning-fg:#92400E;--st-warning-bg:#FFFBEB;
+  --st-danger-fg:#B91C1C;--st-danger-bg:#FEF2F2;--st-attention-fg:#6D28D9;--st-attention-bg:#F5F3FF;
+  --cv-bg:#F8FAFC;--cv-grid:#CBD5E1;--cv-edge:#64748B;--cv-port:#64748B;--cv-edge-active:#16A34A;--cv-sel:#16A34A;--cv-node-border:#CBD5E1;
+  --sh-sm:0 1px 2px #0F172A14;--sh-md:0 4px 8px -2px #0F172A1A,0 2px 4px -2px #0F172A0F;--sh-lg:0 12px 24px -4px #0F172A1F,0 4px 8px -2px #0F172A0F;
+}
+[data-theme=dark]{
+  --bg-app:#0B1120;--surface:#0F172A;--raised:#1E293B;--sunken:#020617;
+  --fg:#F8FAFC;--muted:#CBD5E1;--subtle:#94A3B8;--disabled:#64748B;--link:#22D3EE;--accent:#4ADE80;
+  --act-bg:#4ADE80;--act-hover:#86EFAC;--act-fg:#0F172A;--danger-bg:#F87171;--danger-fg:#0F172A;
+  --border:#1E293B;--control:#64748B;--focus:#67E8F9;
+  --st-neutral-fg:#CBD5E1;--st-neutral-bg:#1E293B;--st-active-fg:#67E8F9;--st-active-bg:#083344;
+  --st-success-fg:#86EFAC;--st-success-bg:#052E16;--st-warning-fg:#FCD34D;--st-warning-bg:#451A03;
+  --st-danger-fg:#FCA5A5;--st-danger-bg:#450A0A;--st-attention-fg:#C4B5FD;--st-attention-bg:#2E1065;
+  --cv-bg:#0B1120;--cv-grid:#1E293B;--cv-edge:#94A3B8;--cv-port:#94A3B8;--cv-edge-active:#22C55E;--cv-sel:#22C55E;--cv-node-border:#334155;
+  --sh-sm:0 1px 2px #0206174D;--sh-md:0 4px 8px -2px #02061759;--sh-lg:0 12px 24px -4px #02061766;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}[data-theme=dark]{color-scheme:dark}
+body{margin:0;background:var(--bg-app);color:var(--fg);font:14px/20px InterVariable,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.ic{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:inline-block;vertical-align:middle}
+.wrap{max-width:1480px;margin:0 auto;padding:16px}
+header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+h1{font-size:20px;line-height:28px;margin:0}
+.lead{color:var(--muted);margin:4px 0 0;max-width:80ch}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 12px;border:1px solid var(--control);background:var(--surface);border-radius:8px}
+.btn:hover{background:var(--sunken)}
+.btn[aria-pressed=true]{background:var(--st-active-bg);color:var(--st-active-fg);border-color:var(--st-active-fg)}
+.btn.pri{background:var(--act-bg);color:var(--act-fg);border-color:transparent}.btn.pri:hover{background:var(--act-hover)}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--border);margin:12px 0}
+.tab{min-height:40px;padding:6px 14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);font-weight:500}
+.tab[aria-selected=true]{color:var(--fg);border-bottom-color:var(--cv-sel);font-weight:600}
+.about{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-bottom:12px}
+.about section,.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
+.about h2{font-size:14px;margin:0 0 4px}.about p{margin:0;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:0 0 12px;padding:0;list-style:none;color:var(--muted);font-size:13px}
+.legend li{display:flex;align-items:center;gap:6px}
+.note{color:var(--muted);font-size:13px;margin:0 0 12px}
+/* editor shell */
+.shell{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"bar bar" "cv cfg" "data data";border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;margin-bottom:16px}
+.bar{grid-area:bar;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.bar .name{font-weight:600;margin-right:auto}
+.chipst{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:9999px;font-size:12px;line-height:20px;font-weight:500;background:var(--s-bg);color:var(--s-fg);border:1px solid var(--s-fg)}
+.cvwrap{grid-area:cv;min-width:0;border-right:1px solid var(--border)}
+.cvbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted)}
+.cv{overflow:auto;max-width:100%;background-color:var(--cv-bg);background-image:radial-gradient(var(--cv-grid) 1.4px,transparent 1.6px);background-size:var(--gs,20px) var(--gs,20px);background-position:12px 12px;padding:12px;position:relative}
+.cv.lines{background-image:linear-gradient(var(--cv-grid) 1px,transparent 1px),linear-gradient(90deg,var(--cv-grid) 1px,transparent 1px);background-size:var(--gs,24px) var(--gs,24px);background-position:12px 12px;opacity:1}
+.cfg{grid-area:cfg;min-width:0;padding:12px;background:var(--surface);overflow:auto}
+.data{grid-area:data;border-top:1px solid var(--border);min-width:0;background:var(--surface)}
+@media (max-width:900px){.shell{grid-template-columns:minmax(0,1fr);grid-template-areas:"bar" "cv" "cfg" "data"}.cvwrap{border-right:0}.cv{max-height:460px}}
+@media (min-width:901px){.cv{min-height:300px}}
+/* canvas world */
+.stage{position:relative}
+.world{position:absolute;left:0;top:0;transform-origin:0 0}
+svg.edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.edges path{fill:none;stroke-width:2;stroke-linecap:round}
+.e-ok{stroke:var(--cv-edge-active)}.e-run{stroke:var(--st-active-fg);stroke-dasharray:7 6;animation:flow .8s linear infinite}
+.e-err{stroke:var(--st-danger-fg);stroke-dasharray:2 5}.e-unc{stroke:var(--st-attention-fg);stroke-dasharray:8 5}.e-idle{stroke:var(--cv-edge);stroke-dasharray:3 5}
+@keyframes flow{to{stroke-dashoffset:-13}}
+.mk-ok{fill:var(--cv-edge-active)}.mk-run{fill:var(--st-active-fg)}.mk-err{fill:var(--st-danger-fg)}.mk-unc{fill:var(--st-attention-fg)}.mk-idle{fill:var(--cv-edge)}
+.elab{position:absolute;transform:translate(-50%,-50%);display:inline-flex;gap:3px;align-items:center;padding:0 7px;min-height:20px;border-radius:9999px;background:var(--surface);border:1px solid var(--s-fg,var(--cv-node-border));color:var(--s-fg,var(--muted));font-size:11px;line-height:18px;font-weight:500;white-space:nowrap;box-shadow:var(--sh-sm);z-index:3}
+.ok{--s-fg:var(--st-success-fg);--s-bg:var(--st-success-bg)}.run{--s-fg:var(--st-active-fg);--s-bg:var(--st-active-bg)}
+.err{--s-fg:var(--st-danger-fg);--s-bg:var(--st-danger-bg)}.unc{--s-fg:var(--st-attention-fg);--s-bg:var(--st-attention-bg)}
+.off,.idle{--s-fg:var(--st-neutral-fg);--s-bg:var(--st-neutral-bg)}
+.node{position:absolute;z-index:2}
+.node:hover,.node:focus-within{z-index:30}
+.node.sel{z-index:25}
+.tile,.card{font:inherit;background:var(--surface);border:1px solid var(--cv-node-border);box-shadow:var(--sh-sm);position:relative;display:block;padding:0;text-align:inherit}
+.tile:hover,.card:hover{border-color:var(--cv-edge)}
+.badge{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--s-fg);color:var(--s-bg);border:2px solid var(--cv-bg);font-size:12px;z-index:4}
+.badge .ic{stroke-width:3}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:0 7px;min-height:20px;border-radius:9999px;font-size:11px;line-height:18px;font-weight:600;background:var(--s-bg);color:var(--s-fg);border:1px solid var(--s-fg);white-space:nowrap}
+.off .chip{border-style:dashed}
+.runring{position:absolute;inset:-6px;border-radius:var(--rr,22px);padding:3px;pointer-events:none;background:conic-gradient(from var(--a),transparent 0 50%,var(--st-active-fg) 100%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:rot 1.3s linear infinite}
+@keyframes rot{to{--a:360deg}}
+.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+[data-motion=reduce] .runring{animation:none;background:repeating-conic-gradient(var(--st-active-fg) 0 9deg,transparent 9deg 18deg)}
+[data-motion=reduce] .spin,[data-motion=reduce] .e-run{animation:none}
+@media (prefers-reduced-motion:reduce){.runring{animation:none;background:repeating-conic-gradient(var(--st-active-fg) 0 9deg,transparent 9deg 18deg)}.spin,.e-run{animation:none}}
+/* toolbar + ports */
+.tb{position:absolute;left:50%;top:-40px;transform:translateX(-50%);display:flex;gap:2px;padding:3px;background:var(--raised);border:1px solid var(--cv-node-border);border-radius:8px;box-shadow:var(--sh-md);opacity:0;pointer-events:none;transition:opacity .12s;z-index:10}
+.tb::after{content:"";position:absolute;left:0;right:0;top:100%;height:10px}
+.node:hover .tb,.node:focus-within .tb,.node.sel .tb{opacity:1;pointer-events:auto}
+.tb button{width:28px;height:28px;display:grid;place-items:center;border:0;background:none;border-radius:6px;font-size:16px;color:var(--fg)}
+.tb button:hover{background:var(--sunken)}.tb button.del:hover{background:var(--st-danger-bg);color:var(--st-danger-fg)}
+.port{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--surface);border:2px solid var(--cv-port);padding:0;z-index:5;display:grid;place-items:center;color:var(--act-fg);transition:transform .12s,background .12s}
+.port .ic{font-size:5px;stroke-width:4;opacity:0}
+button.port::after{content:"";position:absolute;inset:-9px}
+button.port:hover,button.port:focus-visible{transform:scale(2.4);background:var(--act-bg);border-color:var(--act-bg)}
+button.port:hover .ic,button.port:focus-visible .ic{opacity:1}
+.node.sel .port{border-color:var(--cv-sel)}
+.stub{position:absolute;height:0;border-top:2px dashed var(--cv-edge);width:30px}
+.stubbox{position:absolute;width:22px;height:22px;margin-top:-11px;border:2px dashed var(--cv-edge);border-radius:6px;display:grid;place-items:center;font-size:12px;color:var(--muted);background:var(--surface);padding:0}
+.stubbox:hover{border-color:var(--act-bg);color:var(--act-bg)}
+/* style A and C: tile */
+.A .tile,.C .tile{width:100px;height:100px;border-radius:18px;display:grid;place-items:center;font-size:36px;color:var(--fg)}
+.A .tile.trig,.C .tile.trig{border-radius:46px 18px 18px 46px}
+.A .runring,.C .runring{--rr:24px}
+.tile .bolt{position:absolute;left:-9px;top:50%;margin-top:-11px;width:22px;height:22px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:12px;z-index:4}
+.tile.trig .bolt{left:-11px}
+.logic .tile>.ic{color:var(--link)}.trigger .tile>.ic{color:var(--accent)}
+.tilelab{position:absolute;left:50%;top:106px;transform:translateX(-50%);width:150px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none}
+.tilelab b{font-size:13px;line-height:18px;font-weight:600;color:var(--fg)}
+.tilelab .sub{font-size:12px;line-height:16px;color:var(--muted)}
+.tilelab .chip{margin-top:2px}
+.olab{position:absolute;right:10px;font:600 10px/12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:-6px;color:var(--muted);pointer-events:none}
+.A .tile.err,.C .tile.err{}
+.A .node.err .tile{border:2px solid var(--st-danger-fg);background:var(--st-danger-bg)}
+.A .node.unc .tile{border:2px solid var(--st-attention-fg)}
+.A .node.run .tile{border-color:var(--st-active-fg)}
+.node.off .tile,.node.off .card{border-style:dashed;border-color:var(--cv-edge);background:var(--sunken)}
+.node.off .tile>.ic,.node.off .card .ico{opacity:.6}
+.node.sel .tile{outline:2px solid var(--cv-sel);outline-offset:4px}
+.node.sel .card{outline:2px solid var(--cv-sel);outline-offset:3px}
+.C .node.sel .tile{outline-offset:9px}
+/* style C ring */
+.C .ring{position:absolute;inset:-5px;border-radius:23px;border:2px solid var(--s-fg);pointer-events:none}
+.C .trig+.x{}
+.C .node.off .ring{border-style:dashed}
+.C .node.idle .ring{display:none}
+.C .node.run .ring{display:none}
+.C .pop{position:absolute;left:50%;top:152px;transform:translateX(-50%);width:200px;background:var(--raised);border:1px solid var(--cv-node-border);border-radius:12px;box-shadow:var(--sh-lg);padding:8px 10px;font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:12;color:var(--muted)}
+.C .pop b{display:block;color:var(--fg);font-size:13px;line-height:18px}
+.C .node:hover .pop,.C .node:focus-within .pop,.C .node.sel .pop{opacity:1}
+.C .tilelab{top:106px}
+.C .tilelab .chip{display:none}
+.C .node:hover .tilelab .chip,.C .node.sel .tilelab .chip{display:none}
+.C .node.err .tilelab .chip,.C .node.unc .tilelab .chip,.C .node.run .tilelab .chip,.C .node.off .tilelab .chip{display:inline-flex}
+/* style B: card */
+.B .card{width:196px;height:var(--h,72px);border-radius:12px;display:flex;align-items:center;gap:10px;padding:0 10px;box-shadow:var(--sh-sm)}
+.B .ico{width:36px;height:36px;border-radius:10px;background:var(--sunken);display:grid;place-items:center;font-size:20px;flex:none;color:var(--fg);position:relative}
+.B .logic .ico{color:var(--link)}.B .trigger .ico{color:var(--accent)}
+.B .ico .bolt{position:absolute;left:-6px;top:-6px;width:16px;height:16px;border-radius:50%;background:var(--surface);border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:9px}
+.B .txt{min-width:0;display:flex;flex-direction:column}
+.B .txt b{font-size:13px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.B .txt .sum{font-size:12px;line-height:16px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.B .txt .sum.st{color:var(--s-fg);font-weight:600;display:flex;gap:4px;align-items:center}
+.B .node.err .card{border:2px solid var(--st-danger-fg);background:var(--st-danger-bg)}
+.B .node.unc .card{border:2px solid var(--st-attention-fg)}
+.B .node.err .card .ico,.B .node.unc .card .ico{background:var(--surface)}
+.B .runring{--rr:16px;inset:-5px}
+.B .card.hasout{padding-right:44px}
+.B .badge{top:-9px;right:-9px}
+.B .olab{right:14px}
+.B .port{background:var(--surface);border:2px solid var(--cv-port)}
+/* sticky note */
+.sticky{position:absolute;z-index:1;background:var(--st-active-bg);border:1px solid var(--link);border-radius:8px;padding:10px 12px;font-size:12px;line-height:17px;color:var(--fg);box-shadow:var(--sh-sm)}
+.sticky b{display:flex;gap:6px;align-items:center;color:var(--st-active-fg);font-size:12px;margin-bottom:2px}
+.sticky::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:10px;border-right:2px solid var(--link);border-bottom:2px solid var(--link);border-radius:0 0 4px 0;opacity:.8}
+/* lod (zoomed out) */
+.lod .tilelab .sub,.lod .elab,.lod .tb,.lod .olab{display:none}
+.lod .tilelab{width:190px}.lod .tilelab b{font-size:20px;line-height:24px}.lod .tilelab .chip{font-size:18px;line-height:24px;min-height:26px;padding:0 10px}
+.lod .badge{transform:scale(1.4)}
+/* config panel */
+.cfg h2{font-size:16px;line-height:24px;margin:0}
+.cfghead{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.cfghead .ico2{width:36px;height:36px;border-radius:10px;background:var(--sunken);display:grid;place-items:center;font-size:20px}
+.sub2{color:var(--muted);font-size:12px;margin:0}
+.ptabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.ptabs span{padding:6px 10px;font-size:13px;color:var(--muted)}
+.ptabs span[aria-current]{color:var(--fg);font-weight:600;border-bottom:2px solid var(--cv-sel)}
+.fld{margin-bottom:10px}
+.fld label{display:block;font-weight:500;font-size:13px;margin-bottom:3px}
+.fld .hint{font-size:12px;color:var(--muted);margin-top:2px}
+.in{width:100%;min-height:32px;padding:5px 8px;background:var(--surface);border:1px solid var(--control);border-radius:8px}
+textarea.in{min-height:72px;resize:vertical}
+.expr{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.sw{display:flex;align-items:center;gap:8px;min-height:32px}
+.alert{display:flex;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--s-fg);background:var(--s-bg);color:var(--s-fg);font-size:13px;margin-bottom:10px}
+.alert b{display:block}.alert .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.alert button{background:var(--surface);border:1px solid var(--s-fg);color:var(--s-fg);border-radius:6px;min-height:28px;padding:0 8px;font-weight:600}
+/* data panel */
+.dhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border)}
+.dhead .t{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--control);border-radius:8px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:3px 12px;min-height:28px}
+.seg button[aria-pressed=true]{background:var(--fg);color:var(--bg-app);font-weight:600}
+.tw{overflow:auto;max-width:100%;max-height:230px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{position:sticky;top:0;background:var(--sunken);font-weight:600;color:var(--muted);font-size:12px}
+td.n,th.n{color:var(--subtle);width:40px}
+td.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+pre.json{margin:0;padding:10px 12px;font:13px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto;max-height:230px;color:var(--fg)}
+/* compare */
+.cmp h3{margin:12px 0 4px;font-size:15px}
+.zoomstrip{margin-bottom:16px}
+.zoomstrip .cv{padding:8px}
+.dec{overflow:auto;max-width:100%;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:24px}
+.dec th{position:static}
+.dec td,.dec th{white-space:normal;min-width:130px;vertical-align:top}
+h2.sec{font-size:16px;margin:20px 0 6px}
+.toast{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:var(--fg);color:var(--bg-app);padding:6px 14px;border-radius:8px;font-size:13px;max-width:calc(100vw - 24px);opacity:0;pointer-events:none;transition:opacity .15s;z-index:100}
+.toast.on{opacity:1}
+@media (pointer:coarse){.tb button,.btn,.seg button,.tab{min-width:44px;min-height:44px}.tb{gap:0}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+<marker id="mk-ok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk-ok" d="M1 1l8 4-8 4z" stroke="none" style="stroke:none;fill:var(--cv-edge-active)"/></marker>
+<marker id="mk-run" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1l8 4-8 4z" style="stroke:none;fill:var(--st-active-fg)"/></marker>
+<marker id="mk-err" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1l8 4-8 4z" style="stroke:none;fill:var(--st-danger-fg)"/></marker>
+<marker id="mk-unc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1l8 4-8 4z" style="stroke:none;fill:var(--st-attention-fg)"/></marker>
+<marker id="mk-idle" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1l8 4-8 4z" style="stroke:none;fill:var(--cv-edge)"/></marker>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="i-webhook" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.5"/><circle cx="5.5" cy="18" r="2.5"/><circle cx="18.5" cy="18" r="2.5"/><path d="M11 8 6.5 15.7M13 8l4.5 7.7M8 18h8"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 3.5v12M18 8.5a9 9 0 0 1-9 9"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 0 1-12.2 7.6L3.5 21l1.3-4.8A8.5 8.5 0 1 1 21 12z"/><path d="M10 8.5 9 15M15 8.5 14 15M7.8 10.5h8M7.2 13.2h8"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 6 8.5-6"/></symbol>
+<symbol id="i-merge" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V21M6 12c0 4 4 6 9.5 6"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3.5h14v11.5l-5.5 5.5H5z"/><path d="M13.5 20.5V15H19M8.5 8h7M8.5 11.5h4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-q" viewBox="0 0 24 24"><path d="M9 9.2a3 3 0 1 1 4.3 2.7c-.9.5-1.3 1.1-1.3 2M12 18v.01"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+<symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M6.3 7.3a8 8 0 1 0 11.4 0"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4h5v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a7 7 0 0 0 10 10z"/></symbol>
+<symbol id="i-motion" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Orcon editor: canvas and node style options</h1>
+    <p class="lead">Decision mockup for SPEC-007. The same order-intake flow drawn in three node styles, inside a full editor frame (canvas, node settings, data panel). Static page, no production code. Statuses are spread across nodes to show every state at once; they are not one coherent run.</p>
+  </div>
+  <div class="ctrls">
+    <button class="btn" id="themeBtn" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg><span>Dark theme</span></button>
+    <button class="btn" id="motionBtn" aria-pressed="false" title="Previews the prefers-reduced-motion behaviour"><svg class="ic" aria-hidden="true"><use href="#i-motion"/></svg><span>Reduce motion</span></button>
+  </div>
+</header>
+
+<div class="tabs" role="tablist" aria-label="Node style">
+  <button class="tab" role="tab" id="tab-A" aria-controls="view" data-v="A">A. Familiar</button>
+  <button class="tab" role="tab" id="tab-B" aria-controls="view" data-v="B">B. Current, refined</button>
+  <button class="tab" role="tab" id="tab-C" aria-controls="view" data-v="C">C. Hybrid</button>
+  <button class="tab" role="tab" id="tab-ALL" aria-controls="view" data-v="ALL">Compare all three</button>
+</div>
+
+<ul class="legend" aria-label="Status legend">
+  <li><span class="chip ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Succeeded</span> check badge, green edge</li>
+  <li><span class="chip run"><svg class="ic" aria-hidden="true"><use href="#i-loader"/></svg>Running</span> animated ring</li>
+  <li><span class="chip err"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>Failed</span> cross badge, red outline</li>
+  <li><span class="chip unc"><svg class="ic" aria-hidden="true"><use href="#i-q"/></svg>Uncertain</span> violet question mark</li>
+  <li><span class="chip off"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg>Disabled</span> dashed outline</li>
+</ul>
+
+<div id="view" role="tabpanel"></div>
+
+<h2 class="sec">Style A at 50% zoom</h2>
+<p class="note">Names and badges stay readable at the minimum size; subtitles, edge counts and hover toolbars are hidden at this zoom. Scrolls inside the strip only.</p>
+<div class="zoomstrip"><div class="cv" id="strip" aria-label="Style A at 50 percent zoom"></div></div>
+
+<h2 class="sec">Side-by-side summary</h2>
+<div class="dec" tabindex="0" role="region" aria-label="Comparison table (scrollable)">
+<table>
+<thead><tr><th scope="col">Criterion</th><th scope="col">A. Familiar</th><th scope="col">B. Current, refined</th><th scope="col">C. Hybrid</th></tr></thead>
+<tbody>
+<tr><th scope="row">Recognition for n8n users</th><td>Highest: square tile, name below, lightning trigger, hover toolbar</td><td>Lowest: reads as a card list</td><td>High: same tile and toolbar, extra ring</td></tr>
+<tr><th scope="row">Information on the canvas</th><td>Name and operation only</td><td>Name and one-line summary always visible</td><td>Name; summary on hover, focus or selection</td></tr>
+<tr><th scope="row">Width of this flow (canvas px, 100%)</th><td>940</td><td>1252</td><td>940</td></tr>
+<tr><th scope="row">Status signals</th><td>Corner badge, text chip under name, outline, edge style and label</td><td>Corner badge, status text replaces summary, outline, edge label</td><td>Ring, corner badge, text chip, edge label</td></tr>
+<tr><th scope="row">Zoomed out (50%)</th><td>Compact; names legible</td><td>Cards become wide; fewer nodes per screen</td><td>As A</td></tr>
+<tr><th scope="row">Extra build work vs today</th><td>New tile, trigger shape, port add button, hover toolbar</td><td>Spacing, border and port polish only</td><td>Everything in A, plus ring and summary popover</td></tr>
+</tbody></table></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(()=>{
+const $=(s,r=document)=>r.querySelector(s);
+const ic=(n,c='')=>`<svg class="ic ${c}" aria-hidden="true" focusable="false"><use href="#i-${n}"/></svg>`;
+const ST={ok:{l:'Succeeded',i:'check'},run:{l:'Running',i:'loader'},err:{l:'Failed',i:'x'},unc:{l:'Uncertain',i:'q'},off:{l:'Disabled',i:'ban'},idle:{l:'Not run',i:'ban'}};
+const NODES={
+ hook:{name:'Webhook',sub:'On POST /orders',sum:'POST /orders, header auth',icon:'webhook',cls:'trigger',trig:1,state:'ok',detail:'1 item received in 84 ms',stext:'Succeeded'},
+ iff:{name:'Validate order',sub:'If total > 0',sum:'If total > 0 and customer set',icon:'branch',cls:'logic',state:'ok',outs:['true','false'],detail:'1 item in 12 ms',stext:'Succeeded'},
+ http:{name:'HTTP Request',sub:'GET inventory',sum:'GET /inventory/stock',icon:'globe',state:'run',detail:'Running for 2.1 s',stext:'Running'},
+ slack:{name:'Slack',sub:'Send message',sum:'Send message to #orders-alerts',icon:'chat',state:'unc',detail:'Request timed out; outcome unknown',stext:'Outcome unknown'},
+ gmail:{name:'Gmail',sub:'Send email',sum:'Send email to ops@example.com',icon:'mail',state:'err',detail:'401 Unauthorized, credential expired',stext:'Failed · 401'},
+ merge:{name:'Merge',sub:'Append',sum:'Append both branches',icon:'merge',cls:'logic',state:'off',detail:'Disabled, input passes through',stext:'Disabled'}
+};
+const CHIP={ok:'',run:'Running',err:'Failed · 401',unc:'Uncertain',off:'Disabled'};
+const EDGES=[
+ ['hook',0,'iff',0,'ok','1 item'],['iff',0,'http',0,'ok','1 item'],['iff',1,'gmail',0,'ok','1 item'],
+ ['http',0,'slack',0,'run','3 items'],['slack',0,'merge',0,'unc','unknown'],['gmail',0,'merge',1,'err','0 items']
+];
+let sel='slack',view='A',zoom='fit',reduce=false;
+
+function layout(style){
+ if(style==='B'){
+  const W=196,H=72,HI=96,c=i=>24+i*(W+56);
+  return{w:1252,h:450,n:{
+   hook:{x:c(0),y:152,w:W,h:H,ins:[],outs:[36]},iff:{x:c(1),y:140,w:W,h:HI,ins:[48],outs:[30,66]},
+   http:{x:c(2),y:56,w:W,h:H,ins:[36],outs:[36]},slack:{x:c(3),y:56,w:W,h:H,ins:[36],outs:[36]},
+   gmail:{x:c(2),y:272,w:W,h:H,ins:[36],outs:[36]},merge:{x:c(4),y:140,w:W,h:HI,ins:[30,66],outs:[48]}},
+   sticky:{x:24,y:318,w:250,h:96}};
+ }
+ const T=100,c=i=>36+i*190;
+ const t=(i,y,ins,outs)=>({x:c(i),y,w:T,h:T,ins,outs});
+ return{w:960,h:style==='C'?520:470,n:{
+  hook:t(0,150,[],[50]),iff:t(1,150,[50],[24,76]),http:t(2,50,[50],[50]),slack:t(3,50,[50],[50]),
+  gmail:t(2,270,[50],[50]),merge:t(4,150,[24,76],[50])},
+  sticky:{x:36,y:330,w:210,h:100}};
+}
+function badge(s){const k=ST[s];return `<span class="badge" aria-hidden="true">${ic(k.i,s==='run'?'spin':'')}</span>`}
+function tb(n){const nm=NODES[n].name,off=NODES[n].state==='off';
+ return `<div class="tb" role="toolbar" aria-label="Actions for ${nm}">
+ <button type="button" data-act="Run step: ${nm}" aria-label="Run step" title="Run step">${ic('play')}</button>
+ <button type="button" data-act="${off?'Enable':'Disable'}: ${nm}" aria-label="${off?'Enable':'Disable'} node" title="${off?'Enable':'Disable'} node">${ic('power')}</button>
+ <button type="button" class="del" data-act="Delete: ${nm} (demo only)" aria-label="Delete node" title="Delete node">${ic('trash')}</button>
+ <button type="button" data-act="More actions: ${nm}" aria-label="More actions" title="More actions">${ic('more')}</button></div>`}
+function ports(n,L,style){
+ const o=L.n[n],d=NODES[n];let h='';
+ o.ins.forEach(y=>{h+=`<span class="port" style="left:0;top:${y}px" aria-hidden="true"></span>`});
+ o.outs.forEach((y,i)=>{const lab=d.outs?` ${d.outs[i]} output`:'';
+  h+=`<button type="button" class="port out" style="left:${o.w}px;top:${y}px" data-act="Add a node after ${d.name}${lab}" aria-label="Add node after ${d.name}${lab}">${ic('plus')}</button>`});
+ if(n==='merge')h+=`<span class="stub" style="left:${o.w+5}px;top:${o.outs[0]}px" aria-hidden="true"></span><button type="button" class="stubbox" style="left:${o.w+34}px;top:${o.outs[0]}px" data-act="Add a node after Merge" aria-label="Add node after Merge">${ic('plus')}</button>`;
+ return h;
+}
+function nodeHTML(n,L,style){
+ const o=L.n[n],d=NODES[n],s=d.state,selc=sel===n?' sel':'';
+ const aria=`${d.name}, ${d.sub}. Status: ${ST[s].l}${s==='err'?' (401)':''}.${sel===n?' Selected.':''}`;
+ const pos=`left:${o.x}px;top:${o.y}px`;
+ const run=s==='run'?'<span class="runring" aria-hidden="true"></span>':'';
+ const ol=d.outs?d.outs.map((t,i)=>`<span class="olab" style="top:${o.outs[i]}px">${t}</span>`).join(''):'';
+ const sr=s==='ok'?`<span class="sr-only">Succeeded</span>`:'';
+ if(style==='B'){
+  const st=s==='ok'?`<span class="sum">${d.sum}</span>`:`<span class="sum st">${ic(ST[s].i,s==='run'?'spin':'')}${d.stext}</span>`;
+  return `<div class="node ${s} ${d.cls||''}${selc}" style="${pos}">${tb(n)}
+  <button type="button" class="card${d.outs?' hasout':''}" style="--h:${o.h}px" data-sel="${n}" aria-pressed="${sel===n}" aria-label="${aria} ${d.sum}">
+   <span class="ico">${ic(d.icon)}${d.trig?`<span class="bolt">${ic('bolt')}</span>`:''}</span>
+   <span class="txt"><b>${d.name}</b>${st}</span>${badge(s)}${sr}${run}${ol}</button>${ports(n,L,style)}</div>`;
+ }
+ const chip=CHIP[s]?`<span class="chip">${ic(ST[s].i,s==='run'?'spin':'')}${CHIP[s]}</span>`:'';
+ const ring=style==='C'?'<span class="ring" aria-hidden="true"></span>':'';
+ const pop=style==='C'?`<div class="pop" aria-hidden="true"><b>${d.sub}</b>${d.sum}<br>${d.detail}</div>`:'';
+ const sub=style==='C'?'':`<span class="sub">${d.sub}</span>`;
+ return `<div class="node ${s} ${d.cls||''}${selc}" style="${pos}">${tb(n)}
+  <button type="button" class="tile${d.trig?' trig':''}" data-sel="${n}" aria-pressed="${sel===n}" aria-label="${aria}${style==='C'?' '+d.sum:''}">
+   ${ring}${d.trig?`<span class="bolt" aria-hidden="true">${ic('bolt')}</span>`:''}${ic(d.icon)}${badge(s)}${sr}${run}${ol}</button>
+  ${ports(n,L,style)}<div class="tilelab"><b>${d.name}</b>${sub}${chip}</div>${pop}</div>`;
+}
+function canvasHTML(style,scale,lod){
+ const L=layout(style);let paths='',labs='',outline='';
+ EDGES.forEach(([a,i,b,j,s,t])=>{
+  const A=L.n[a],B=L.n[b],x1=A.x+A.w+6,y1=A.y+A.outs[i],x2=B.x-8,y2=B.y+B.ins[j],dx=Math.max(30,(x2-x1)*.5);
+  paths+=`<path class="e-${s}" d="M${x1} ${y1}C${x1+dx} ${y1} ${x2-dx} ${y2} ${x2} ${y2}" marker-end="url(#mk-${s})"/>`;
+  const state={ok:'ok',run:'run',err:'err',unc:'unc'}[s];
+  labs+=`<span class="elab ${state}" style="left:${(x1+x2)/2}px;top:${(y1+y2)/2}px">${t}</span>`;
+  outline+=`<li>${NODES[a].name}${NODES[a].outs?' ('+NODES[a].outs[i]+')':''} to ${NODES[b].name}: ${t}, ${ST[s==='ok'?'ok':s].l.toLowerCase()}</li>`;
+ });
+ const sk=L.sticky;
+ let nodes='';Object.keys(NODES).forEach(n=>nodes+=nodeHTML(n,L,style));
+ const sticky=`<div class="sticky" style="left:${sk.x}px;top:${sk.y}px;width:${sk.w}px;min-height:${sk.h}px"><b>${ic('note')}Sticky note</b>Orders above 5,000 need a manual review first. Handled by the review flow.</div>`;
+ return `<ul class="sr-only" aria-label="Canvas outline, style ${style}">${outline}</ul>
+ <div class="stage" style="width:${L.w*scale}px;height:${L.h*scale}px"><div class="world ${style}${lod?' lod':''}" style="width:${L.w}px;height:${L.h}px;transform:scale(${scale})">
+ <svg class="edges" width="${L.w}" height="${L.h}" aria-hidden="true">${paths}</svg>${labs}${sticky}${nodes}</div></div>`;
+}
+function mount(host,style,mode,lod){
+ const L=layout(style);
+ const avail=host.clientWidth-24;
+ let sc=mode==='fit'?Math.max(.55,Math.min(1,avail/L.w)):mode;
+ if(lod)sc=.5;
+ host.classList.toggle('lines',style==='B');
+ host.style.setProperty('--gs',(style==='B'?24:20)*sc+'px');
+ host.innerHTML=canvasHTML(style,sc,lod);
+ host.dataset.style=style;host.dataset.lod=lod?1:'';
+}
+const DESC={
+ A:['Familiar','Square 100px tile with a large connector icon, name and operation below. Trigger has a rounded left side and a lightning mark.','Round ports; the output port grows into a plus button on hover. Smooth edges with item counts, dotted grid, per-node hover toolbar, true/false inside the IF tile.','Densest and closest to what n8n users already know; shows no summary of the settings on the canvas.'],
+ B:['Current, refined','Wide card with icon, name and a one-line summary always visible. More padding, softer borders, ring-style ports, lightning chip on the trigger icon.','Status text replaces the summary on failed, uncertain, running and disabled cards. true/false labels sit inside the IF card. Grid lines instead of dots.','Most informative per node but widest: this flow needs 1252px against 940px.'],
+ C:['Hybrid','Same tile as A plus a thin status ring around it, so the state reads before the badge does.','The summary and last-run detail appear in a popover on hover, keyboard focus or selection; the name stays below the tile.','Compact like A and informative like B, at the cost of the ring and popover work.']
+};
+const SEQ={A:'A',B:'B',C:'C'};
+function cfgHTML(){
+ const d=NODES[sel];
+ const head=`<div class="cfghead"><span class="ico2">${ic(d.icon)}</span><div><h2>${d.name}</h2><p class="sub2">${d.sub}</p></div><span class="chip ${d.state}" style="margin-left:auto">${ic(ST[d.state].i)}${ST[d.state].l}</span></div>
+ <div class="ptabs" role="presentation"><span aria-current="true">Parameters</span><span>Settings</span><span>Docs</span></div>`;
+ if(sel!=='slack')return `<h2 class="sr-only">Node settings</h2>${head}<p class="note">This mockup draws the form for Slack only. Select the Slack node to see the fields.</p>`;
+ return `<h2 class="sr-only">Node settings</h2>${head}
+ <div class="alert unc" role="status">${ic('q')}<div><b>Outcome unknown</b>The request timed out after Slack may have accepted it. Check the channel before running again.<div class="acts"><button type="button">Mark as sent</button><button type="button">Run again</button></div></div></div>
+ <div class="fld"><label for="f-cred">Credential</label><select id="f-cred" class="in"><option>Team workspace (OAuth)</option><option>Create new credential</option></select></div>
+ <div class="fld"><label for="f-op">Operation</label><select id="f-op" class="in"><option>Send message</option><option>Update message</option><option>Add reaction</option></select></div>
+ <div class="fld"><label for="f-ch">Channel</label><input id="f-ch" class="in" value="#orders-alerts" aria-describedby="f-ch-h"><div class="hint" id="f-ch-h">Pick from the list or type a channel ID.</div></div>
+ <div class="fld"><label for="f-tx">Message text</label><textarea id="f-tx" class="in expr">New order {{ input.order.id }} from {{ input.customer.name }}: {{ input.order.total }}</textarea><div class="hint">Expressions use the output of the previous node.</div></div>
+ <div class="fld sw"><input id="f-un" type="checkbox" checked><label for="f-un" style="margin:0">Unfurl links</label></div>
+ <div class="fld"><label for="f-rt">On failure</label><select id="f-rt" class="in"><option>Stop and mark failed</option><option>Retry up to 3 times</option><option>Continue with empty output</option></select></div>
+ <button type="button" class="btn pri" data-act="Execute step: Slack">${ic('play')}Execute step</button>`;
+}
+let dtab='input',dview='table';
+const IN=[{sku:'SKU-1042',name:'Orbit mug',qty:2,price:12.5,in_stock:true},{sku:'SKU-2210',name:'Desk mat',qty:1,price:29,in_stock:true},{sku:'SKU-3307',name:'Cable kit',qty:4,price:8.75,in_stock:false}];
+const OUT=[{channel:'#orders-alerts',message_ts:null,ok:'unknown',error:'Request timed out; outcome unconfirmed'}];
+function dataHTML(){
+ const rows=dtab==='input'?IN:OUT, src=dtab==='input'?'from HTTP Request':'from Slack';
+ const n=rows.length;
+ let body;
+ if(dview==='json')body=`<pre class="json" tabindex="0" aria-label="JSON data">${JSON.stringify(rows,null,2).replace(/</g,'&lt;')}</pre>`;
+ else{const k=Object.keys(rows[0]);
+  body=`<div class="tw" tabindex="0" role="region" aria-label="Data table (scrollable)"><table><caption class="sr-only">${dtab} data, ${n} items</caption><thead><tr><th scope="col" class="n">#</th>${k.map(x=>`<th scope="col">${x}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr><td class="n">${i+1}</td>${k.map(x=>`<td class="m">${r[x]===null?'<span style="color:var(--subtle)">null</span>':r[x]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+ return `<div class="dhead"><span class="t">${NODES[sel==='slack'?'slack':sel].name}</span>
+ <div class="seg" role="group" aria-label="Direction"><button type="button" data-dt="input" aria-pressed="${dtab==='input'}">Input</button><button type="button" data-dt="output" aria-pressed="${dtab==='output'}">Output</button></div>
+ <div class="seg" role="group" aria-label="View"><button type="button" data-dv="table" aria-pressed="${dview==='table'}">Table</button><button type="button" data-dv="json" aria-pressed="${dview==='json'}">JSON</button></div>
+ <span class="sub2">${n} item${n>1?'s':''} ${src}</span></div>${body}`;
+}
+function shell(style){
+ const d=DESC[style];
+ return `<div class="about"><section><h2>${style}. ${d[0]}</h2><p>${d[1]}</p></section><section><h2>Interactions</h2><p>${d[2]}</p></section><section><h2>Trade-off</h2><p>${d[3]}</p></section></div>
+ <p class="note">Hover or focus any node for its toolbar; hover an output port for the add button. Click a node to select it.</p>
+ <div class="shell"><div class="bar"><span class="name">Order intake</span><span class="chipst unc">${ic('q')}Last run: uncertain</span><button type="button" class="btn" data-act="Save (demo only)">Save</button><button type="button" class="btn pri" data-act="Execute workflow (demo only)">${ic('play')}Execute workflow</button></div>
+ <div class="cvwrap"><div class="cvbar" role="group" aria-label="Zoom">Zoom ${[['fit','Fit'],['1','100%'],['0.5','50%']].map(([v,t])=>`<button type="button" class="btn" data-z="${v}" aria-pressed="${String(zoom)===v}">${t}</button>`).join('')}</div>
+ <div class="cv" id="main" aria-label="Workflow canvas, style ${style} (scrollable)" tabindex="-1"></div></div>
+ <aside class="cfg" aria-label="Node settings" id="cfg"></aside>
+ <section class="data" id="data" aria-label="Node data"></section></div>`;
+}
+function renderView(){
+ document.querySelectorAll('.tab').forEach(t=>{const on=t.dataset.v===view;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1});
+ $('#view').setAttribute('aria-labelledby','tab-'+view);
+ if(view==='ALL'){
+  $('#view').innerHTML=`<p class="note">All three at the same zoom. Zoom: ${[['fit','Fit'],['1','100%']].map(([v,t])=>`<button type="button" class="btn" data-z="${v}" aria-pressed="${String(zoom)===v}">${t}</button>`).join(' ')}</p><div class="cmp">`+['A','B','C'].map(s=>`<h3>${s}. ${DESC[s][0]}</h3><div class="cv" data-slot="${s}" aria-label="Style ${s} canvas (scrollable)"></div>`).join('')+'</div>';
+ }else{$('#view').innerHTML=shell(view)}
+ paint();
+}
+function paint(){
+ document.querySelectorAll('#view .cv').forEach(h=>mount(h,view==='ALL'?h.dataset.slot:view,zoom,false));
+ mount($('#strip'),'A',.5,true);
+ if($('#cfg')){$('#cfg').innerHTML=cfgHTML();$('#data').innerHTML=dataHTML()}
+}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),1800)}
+document.addEventListener('click',e=>{
+ const s=e.target.closest('[data-sel]');if(s){sel=s.dataset.sel;paint();const f=document.querySelector(`#view [data-sel="${sel}"]`);f&&f.focus({preventScroll:true});return}
+ const a=e.target.closest('[data-act]');if(a){toast(a.dataset.act+' - not wired in this mockup');return}
+ const z=e.target.closest('[data-z]');if(z){zoom=z.dataset.z==='fit'?'fit':parseFloat(z.dataset.z);renderView();return}
+ const dt=e.target.closest('[data-dt]');if(dt){dtab=dt.dataset.dt;$('#data').innerHTML=dataHTML();return}
+ const dv=e.target.closest('[data-dv]');if(dv){dview=dv.dataset.dv;$('#data').innerHTML=dataHTML();return}
+ const t=e.target.closest('.tab');if(t){view=t.dataset.v;renderView()}
+});
+$('.tabs').addEventListener('keydown',e=>{
+ const ts=[...document.querySelectorAll('.tab')],i=ts.indexOf(document.activeElement);if(i<0)return;
+ let j=null;if(e.key==='ArrowRight')j=(i+1)%ts.length;if(e.key==='ArrowLeft')j=(i+ts.length-1)%ts.length;
+ if(j!==null){e.preventDefault();ts[j].focus();view=ts[j].dataset.v;renderView();ts[j].focus()}
+});
+function setTheme(dark){document.documentElement.dataset.theme=dark?'dark':'light';const b=$('#themeBtn');b.setAttribute('aria-pressed',dark);b.querySelector('span').textContent=dark?'Light theme':'Dark theme';b.querySelector('use').setAttribute('href',dark?'#i-sun':'#i-moon')}
+$('#themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme!=='dark');
+function setMotion(r){reduce=r;if(r)document.documentElement.dataset.motion='reduce';else delete document.documentElement.dataset.motion;$('#motionBtn').setAttribute('aria-pressed',r)}
+$('#motionBtn').onclick=()=>setMotion(!reduce);
+const mq=matchMedia('(prefers-reduced-motion: reduce)');if(mq.matches)setMotion(true);
+if(matchMedia('(prefers-color-scheme: dark)').matches)setTheme(true);
+let rt,lw=innerWidth;new ResizeObserver(()=>{if(innerWidth===lw)return;lw=innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(zoom==='fit')paint()},120)}).observe(document.body);
+renderView();
+})();
+</script>
+</body>
+</html>
