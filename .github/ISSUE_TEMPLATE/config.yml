@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/wirvii/orcon/security/advisories/new
+    about: Please report vulnerabilities privately, never in a public issue.
+  - name: Contributing guide
+    url: https://github.com/wirvii/orcon/blob/main/CONTRIBUTING.md
+    about: How to propose changes and open pull requests.
