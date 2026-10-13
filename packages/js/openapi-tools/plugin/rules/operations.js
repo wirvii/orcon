@@ -174,7 +174,6 @@ export const deprecation = defineRule((model, report) => {
   for (const { schema, loc } of model.allSchemas) checkDeprecation(schema, loc, report, 'Schema');
 });
 
-/** Loads the set of permission names from the catalog file (every `resource:action` string). */
 const permissionCache = new Map();
 function repoRoot() {
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -185,25 +184,45 @@ function repoRoot() {
   return process.cwd();
 }
 
+const PERMISSION_SCOPES = ['organization', 'project', 'instance'];
+const PERMISSION_NAME = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
+
+/**
+ * Reads the permission catalog (internal/authz/permissions.yaml). The format is strict:
+ *
+ *   version: 1
+ *   permissions:
+ *     organization: [ { name: project:create, note: ... } ]
+ *     project:      [ { name: flow:read } ]
+ *     instance:     [ { name: instance:connectors } ]
+ *   roles: {}        # not read here
+ *
+ * A missing or different `version`, an unknown scope or an item without a valid `name` is a
+ * configuration error (an Error is thrown), never ignored. Returns { names, file }.
+ */
 export function loadPermissions(file) {
   const candidates = isAbsolute(file) ? [file] : [resolve(process.cwd(), file), resolve(repoRoot(), file)];
   const found = candidates.find((c) => existsSync(c));
-  if (!found) return { error: `permissions file not found: ${file}` };
+  if (!found) throw new Error(`orcon/permission: permissions file not found: ${file}`);
   if (permissionCache.has(found)) return permissionCache.get(found);
-  const names = new Set();
-  const visit = (v) => {
-    if (typeof v === 'string') {
-      if (/^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/.test(v)) names.add(v);
-    } else if (Array.isArray(v)) {
-      v.forEach(visit);
-    } else if (isObject(v)) {
-      for (const [k, val] of Object.entries(v)) {
-        visit(k);
-        visit(val);
-      }
-    }
+  const fail = (message) => {
+    throw new Error(`orcon/permission: ${found}: ${message}`);
   };
-  visit(parse(readFileSync(found, 'utf8')));
+  const doc = parse(readFileSync(found, 'utf8'));
+  if (!isObject(doc)) fail('the file is not a mapping');
+  if (doc.version !== 1) fail(`version must be 1, found ${JSON.stringify(doc.version)}`);
+  if (!isObject(doc.permissions)) fail('permissions must be a mapping of scopes');
+  const names = new Set();
+  for (const [scope, items] of Object.entries(doc.permissions)) {
+    if (!PERMISSION_SCOPES.includes(scope)) fail(`unknown scope "${scope}" (organization, project, instance)`);
+    if (!Array.isArray(items)) fail(`permissions.${scope} must be a list`);
+    items.forEach((item, i) => {
+      if (!isObject(item) || typeof item.name !== 'string' || !PERMISSION_NAME.test(item.name)) {
+        fail(`permissions.${scope}[${i}] needs a name of the form resource:action`);
+      }
+      names.add(item.name);
+    });
+  }
   const result = { names, file: found };
   permissionCache.set(found, result);
   return result;
@@ -218,7 +237,6 @@ export function permissionNames(value) {
 
 export const permission = defineRule((model, report, options) => {
   const catalog = typeof options.permissionsFile === 'string' ? loadPermissions(options.permissionsFile) : undefined;
-  if (catalog?.error) report('CHAN-7', `${catalog.error}. Set the permissionsFile option of orcon/permission.`, model.rootLoc);
   for (const entry of model.pathOperations) {
     const value = entry.op['x-orcon-permission'];
     const loc = entry.loc.child(['x-orcon-permission']);

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { isJsonMedia, isObject, isObjectSchema, typesOf } from '../model.js';
+import { isJsonMedia, isObject, isObjectSchema, refName, typesOf } from '../model.js';
 import { CAMEL, UPPER_SNAKE, defineRule } from '../rule.js';
 
 const SECRET_EXAMPLE = /^example-secret-[0-9]+$/;
@@ -118,28 +118,80 @@ function checkExampleValue(value, loc, report) {
   }
 }
 
-export const secretFields = defineRule((model, report) => {
-  eachProperty(model, (name, raw, resolved, loc) => {
-    const node = resolved.node;
-    if (!isObject(node)) return;
-    const sensitive = node.format === 'password' || (typesOf(node).includes('string') && isSensitiveName(name));
-    if (!sensitive) return;
-    if (node.writeOnly !== true && raw?.writeOnly !== true) {
-      report('FIELD-7', `Secret field "${name}" must set writeOnly: true and is never returned.`, loc);
-    }
-    const samples = [node.example, ...(Array.isArray(node.examples) ? node.examples : []), node.default];
-    samples.forEach((sample) => {
-      if (typeof sample === 'string' && !SECRET_EXAMPLE.test(sample)) {
-        report('FIELD-7', `Example of secret field "${name}" must be a marker like example-secret-1.`, loc);
+/**
+ * FIELD-7: schemas of `<Resource>WithSecret` response bodies, mapped to the operations that
+ * return them. The only returned secret is their readOnly `secret` property.
+ */
+function withSecretHolders(model) {
+  const holders = new Map();
+  for (const entry of model.contractOperations) {
+    for (const r of model.responses(entry)) {
+      if (!/^2/.test(r.status)) continue;
+      for (const mt of model.mediaTypes(r.resp, r.loc)) {
+        const raw = mt.media.schema;
+        const name = refName(raw);
+        if (!name || !/WithSecret$/.test(name)) continue;
+        const top = model.deref(raw, mt.loc.child(['schema']));
+        const nodes = [top.node];
+        if (isObject(top.node) && Array.isArray(top.node.allOf)) {
+          top.node.allOf.forEach((member, i) => nodes.push(model.deref(member, top.loc.child(['allOf', i])).node));
+        }
+        for (const node of nodes) {
+          if (!isObject(node)) continue;
+          if (!holders.has(node)) holders.set(node, { name, entries: [] });
+          holders.get(node).entries.push(entry);
+        }
       }
-    });
-  });
+    }
+  }
+  return holders;
+}
+
+/** Why the readOnly `secret` property of `holder` is not an allowed returned secret, or undefined. */
+function returnedSecretProblem(node, holder) {
+  if (node.readOnly !== true || node.format !== 'password') return 'it is readOnly: true with format: password';
+  if (!holder) return 'it belongs to a response schema named <Resource>WithSecret';
+  const bad = holder.entries.find((e) => e.op['x-orcon-idempotency'] !== 'required' || !(e.op['x-orcon-problems'] ?? []).includes('secret-already-issued'));
+  if (bad) return `${bad.op.operationId ?? bad.key} that returns it declares x-orcon-idempotency: required and secret-already-issued`;
+  return undefined;
+}
+
+export const secretFields = defineRule((model, report) => {
+  const holders = withSecretHolders(model);
+  for (const { schema, loc } of model.allSchemas) {
+    if (!isObject(schema.properties)) continue;
+    for (const name of Object.keys(schema.properties)) {
+      const raw = schema.properties[name];
+      const propLoc = loc.child(['properties', name]);
+      const resolved = model.deref(raw, propLoc);
+      const node = resolved.node;
+      if (!isObject(node)) continue;
+      const sensitive = node.format === 'password' || (typesOf(node).includes('string') && isSensitiveName(name));
+      if (!sensitive) continue;
+      const writeOnly = node.writeOnly === true || raw?.writeOnly === true;
+      if (!writeOnly) {
+        const returned = name === 'secret' && (node.readOnly === true || node.format === 'password');
+        if (!returned) {
+          report('FIELD-7', `Secret field "${name}" must set writeOnly: true and is never returned (the only exception is the readOnly "secret" of a <Resource>WithSecret response).`, propLoc);
+        } else {
+          const why = returnedSecretProblem(node, holders.get(schema));
+          if (why) report('FIELD-7', `A returned secret is allowed only as the readOnly "secret" property of a <Resource>WithSecret response, once, in an operation with required idempotency and secret-already-issued; check that ${why}.`, propLoc);
+        }
+      }
+      const samples = [node.example, ...(Array.isArray(node.examples) ? node.examples : []), node.default];
+      samples.forEach((sample) => {
+        if (typeof sample === 'string' && !SECRET_EXAMPLE.test(sample)) {
+          report('FIELD-7', `Example of secret field "${name}" must be a marker like example-secret-1.`, propLoc);
+        }
+      });
+    }
+  }
   for (const entry of model.operations) {
-    const holders = [];
+    const holdersOfExamples = [];
     const body = model.requestBody(entry);
-    if (body) holders.push(...model.mediaTypes(body.node, body.loc));
-    for (const r of model.responses(entry)) holders.push(...model.mediaTypes(r.resp, r.loc));
-    for (const { media, loc } of holders) {
+    if (body) holdersOfExamples.push(...model.mediaTypes(body.node, body.loc));
+    for (const r of model.responses(entry)) holdersOfExamples.push(...model.mediaTypes(r.resp, r.loc));
+    for (const { media, loc } of holdersOfExamples) {
       if (media.example !== undefined) checkExampleValue(media.example, loc.child(['example']), report);
       if (isObject(media.examples)) {
         for (const name of Object.keys(media.examples)) {

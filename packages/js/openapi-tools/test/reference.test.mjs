@@ -14,9 +14,11 @@ import { decorate } from '../scripts/decorate.mjs';
 import { readDocument } from '../scripts/doc-io.mjs';
 import { operationsOf } from '../scripts/doc-io.mjs';
 import { packageDir } from '../scripts/lib.mjs';
+import { REFERENCE_CSP, createReferenceServer } from '../scripts/serve-reference.mjs';
 import { renderOperationIndex } from '../scripts/operation-index.mjs';
 import { renderProblemCodes } from '../scripts/problem-codes.mjs';
 import { withoutExperimental } from '../scripts/stability-filter.mjs';
+import { bundledPackages, expressionAllowed, licenseProblems, loadExceptions } from '../scripts/third-party.mjs';
 
 const good = join(packageDir, 'testdata', 'good', 'openapi.yaml');
 let work;
@@ -35,7 +37,7 @@ after(() => rmSync(work, { recursive: true, force: true }));
 
 test('P1: the reference site builds with the vendored Scalar script and its license, within 3 MiB', () => {
   assert.deepEqual(site.problems, []);
-  assert.deepEqual(site.files.map((f) => f.name), ['LICENSE-scalar.txt', 'index.html', 'openapi.json', 'reference-config.js', 'scalar.standalone.js']);
+  assert.deepEqual(site.files.map((f) => f.name), ['LICENSE-scalar.txt', 'index.html', 'openapi.json', 'reference-config.js', 'scalar.standalone.js', 'third-party-notices.txt']);
   assert.ok(site.gzipTotal <= BUDGET_BYTES, `${site.gzipTotal} bytes compressed`);
   const script = readFileSync(join(work, 'site', 'scalar.standalone.js'));
   assert.equal(createHash('sha256').update(script).digest('hex'), createHash('sha256').update(readFileSync(scalarScript())).digest('hex'), 'the script is copied unchanged');
@@ -105,4 +107,51 @@ test('the stability filter removes experimental operations and keeps the rest', 
   assert.equal(filtered.paths['/flows/{flowId}'].get, undefined);
   assert.ok(filtered.paths['/flows/{flowId}'].patch);
   assert.equal(copy.paths['/flows/{flowId}'].get['x-orcon-stability'], 'experimental', 'the input is not modified');
+});
+
+test('third-party notices cover Scalar and every bundled package with an allowed license', () => {
+  const text = readFileSync(join(work, 'site', 'third-party-notices.txt'), 'utf8');
+  assert.match(text, /^Third-party notices of the Orcon API reference site/);
+  assert.match(text, /@scalar\/api-reference@\d+\.\d+\.\d+ \(MIT\)\n\n[\s\S]*?MIT License\n\nCopyright \(c\) 2023-present Scalar/);
+  assert.match(text, /\nvue@\d+\.\d+\.\d+ \(MIT\)/);
+  const packages = bundledPackages(scalarScript());
+  assert.ok(packages.length > 100, `${packages.length} bundled packages`);
+  assert.deepEqual(licenseProblems(packages), []);
+  assert.equal([...text.matchAll(/^-{80}$/gm)].length, packages.length);
+});
+
+test('license check: allowed expressions, exceptions and failures name the package', () => {
+  assert.ok(expressionAllowed('MIT'));
+  assert.ok(expressionAllowed('(MIT OR CC0-1.0)'));
+  assert.ok(expressionAllowed('(AFL-2.1 OR BSD-3-Clause)'));
+  assert.ok(expressionAllowed('MIT AND ISC'));
+  assert.ok(!expressionAllowed('GPL-3.0-only'));
+  assert.ok(!expressionAllowed('MIT AND GPL-3.0-only'));
+  assert.ok(!expressionAllowed('0BSD'));
+  const fake = [{ name: 'tslib', version: '2.8.1', pkg: { license: '0BSD' } }, { name: 'left-pad', version: '1.0.0', pkg: { license: 'GPL-3.0-only' } }];
+  assert.deepEqual(licenseProblems(fake, new Set(['tslib@2.8.1'])).map((m) => m.match(/left-pad@1.0.0/)?.[0]), ['left-pad@1.0.0']);
+  assert.equal(licenseProblems(fake, new Set()).length, 2);
+  assert.ok(loadExceptions().has('tslib@2.8.1'), 'the repository exception file is read');
+});
+
+test('the preview server sends the reference policy and redirects /api/reference keeping the query', async () => {
+  const server = createReferenceServer({ dir: join(work, 'site') });
+  await new Promise((resolveListening) => server.listen(0, '127.0.0.1', resolveListening));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const redirect = await fetch(`${base}/api/reference?tag=flows`, { redirect: 'manual' });
+    assert.equal(redirect.status, 301);
+    assert.equal(redirect.headers.get('location'), '/api/reference/?tag=flows');
+    const head = await fetch(`${base}/api/reference`, { method: 'HEAD', redirect: 'manual' });
+    assert.equal(head.status, 301);
+    const page = await fetch(`${base}/api/reference/`);
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get('content-security-policy'), REFERENCE_CSP);
+    assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(await page.text(), /<base href="\/api\/reference\/"/);
+    assert.equal((await fetch(`${base}/api/reference/%2e%2e/%2e%2e/etc/passwd`)).status, 404);
+    assert.equal((await fetch(`${base}/api/reference/third-party-notices.txt`)).status, 200);
+  } finally {
+    server.close();
+  }
 });

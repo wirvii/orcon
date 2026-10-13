@@ -117,6 +117,24 @@ const REPORTS = [
   ['secret value in a media example', 'secret-fields', 'marker', (d) => {
     getFlow(d).responses['200'].content['application/json'].examples.getExistingFlow.value.password = 'hunter2';
   }],
+  ['readOnly secret outside a WithSecret schema', 'secret-fields', 'allowed only as the readOnly "secret"', (d) => {
+    schemas(d).Flow.properties.secret = { type: 'string', format: 'password', readOnly: true, description: 'Secret.', examples: ['example-secret-1'] };
+  }],
+  ['WithSecret returned by an operation with optional idempotency', 'secret-fields', 'required idempotency', (d) => {
+    d.paths['/orgs/{orgId}/api-keys'].post['x-orcon-idempotency'] = 'optional';
+  }],
+  ['WithSecret returned by an operation without secret-already-issued', 'secret-fields', 'secret-already-issued', (d) => {
+    d.paths['/orgs/{orgId}/api-keys'].post['x-orcon-problems'] = d.paths['/orgs/{orgId}/api-keys'].post['x-orcon-problems'].filter((c) => c !== 'secret-already-issued');
+  }],
+  ['returned secret that is not readOnly password', 'secret-fields', 'readOnly: true with format: password', (d) => {
+    delete schemas(d).ApiKeyWithSecret.allOf[1].properties.secret.readOnly;
+  }],
+  ['resource reporting failure in "error"', 'response-shape', '"error" is an envelope member', (d) => {
+    schemas(d).Operation.properties.error = field('error');
+  }],
+  ['"results" at the root of a 2xx body', 'response-shape', '"results" is an envelope member', (d) => {
+    schemas(d).Flow.properties.results = { type: 'array', description: 'Results.', items: { type: 'string', maxLength: 5, examples: ['a'] } };
+  }],
   ['request schema left open', 'named-schemas', 'additionalProperties: false', (d) => {
     delete schemas(d).CreateFlowRequest.additionalProperties;
   }],

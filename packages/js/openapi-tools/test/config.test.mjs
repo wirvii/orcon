@@ -31,9 +31,11 @@ test('orcon/path-shape runs first and lists the protocol paths of the plugin', (
   assert.deepEqual(config.rules['orcon/path-shape'].protocolPaths, [...DEFAULT_PROTOCOL_PATHS]);
 });
 
-test('no rule is turned off or downgraded', () => {
+test('the only rule turned off is the built-in operation-4xx-problem-details-rfc7807', () => {
+  const off = Object.entries(config.rules).filter(([, rule]) => severityOf(rule) === 'off').map(([name]) => name);
+  assert.deepEqual(off, ['operation-4xx-problem-details-rfc7807']);
   for (const [name, rule] of Object.entries(config.rules)) {
-    assert.equal(severityOf(rule), 'error', `${name} is not an error`);
+    if (!off.includes(name)) assert.equal(severityOf(rule), 'error', `${name} is not an error`);
   }
 });
 
@@ -51,5 +53,5 @@ test('the built-in rules of the toolchain are enabled', () => {
     'no-server-trailing-slash',
     'operation-4xx-problem-details-rfc7807',
   ];
-  for (const name of required) assert.equal(config.rules[name], 'error', name);
+  for (const name of required) assert.equal(severityOf(config.rules[name]), name === 'operation-4xx-problem-details-rfc7807' ? 'off' : 'error', name);
 });
