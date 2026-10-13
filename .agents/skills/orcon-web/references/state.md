@@ -38,4 +38,4 @@ Precedence: accepted ADRs > accepted `orcon-go` rules > `orcon-ui` rules for any
 
 ## Canvas
 
-- **ST-10** React Flow is controlled by the store: nodes and edges are memoized selectors; `onNodesChange`/`onEdgesChange`/`onConnect` translate into store actions. The look of the canvas follows [canvas](../../orcon-ui/references/canvas.md#style).
+- **ST-10** React Flow is controlled by the store: nodes and edges are memoized selectors; `onNodesChange`/`onEdgesChange`/`onConnect` translate into store actions. The look of the canvas follows [canvas](../../orcon-ui/references/canvas.md).

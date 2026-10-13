@@ -11,3 +11,7 @@ Do not modify foundational architecture without an accepted ADR. Include tests a
 ## Go code
 
 Before writing, reviewing or refactoring Go code, `go.mod`, SQL, generated API handlers or Go CI configuration, load the `orcon-go` skill (`.agents/skills/orcon-go/`). Its `references/` folder is the complete Go rulebook; [docs/engineering/go.md](docs/engineering/go.md) is the short human overview. Edit the skill only under `.agents/skills/orcon-go/` and re-run `make skill-sync`. `make check` is the single gate, locally and in CI.
+
+## Web application code
+
+Before writing, reviewing or refactoring TypeScript or React code in `apps/web` or `packages/js`, load the `orcon-web` skill (`.agents/skills/orcon-web/`), and the `orcon-ui` skill when the change touches anything visual. Its `references/` folder is the complete web application rulebook; [docs/engineering/web.md](docs/engineering/web.md) is the short human overview. Edit the skill only under `.agents/skills/orcon-web/` and re-run `sh .agents/skills/orcon-web/scripts/project.sh`.
