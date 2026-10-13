@@ -1,0 +1,14 @@
+{
+  "connector.displayName": "Acme Queue",
+  "connector.description": "Send and read messages in Acme Queue.",
+  "node.acmeQueue.displayName": "Acme Queue",
+  "parameter.acmeQueue.queue.description": "Name of the queue.",
+  "parameter.acmeQueue.body.description": "Body of the message.",
+  "parameter.acmeQueue.returnAll.description": "Whether to return every waiting message instead of the first ones up to the limit.",
+  "parameter.acmeQueue.limit.description": "Maximum number of messages to return.",
+  "operation.message.getMany.displayName": "Get many messages",
+  "operation.message.send.displayName": "Send a message",
+  "operation.message.send.manualCheck": "Open the queue {{ $parameter.queue }} in the Acme Queue console and look for a message sent around {{ $intent.sentAt }}.",
+  "credential.password.displayName": "Acme Queue user",
+  "changelog.1.0.0.first": "First release: messages (send, get many)."
+}

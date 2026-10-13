@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Example commit message (references/commits.md, CM-1..CM-12). Lines starting
+# with "#" are comments; git removes them when this file is used as a commit
+# template (git config commit.template <this file>).
+#
+# Header: <type>(<scope>)[!]: <summary>, at most 72 characters.
+#   type:  feat fix perf refactor docs test build ci chore revert
+#   scope: engine trigger connector api cli mcp web ui db ai security notify
+#          docs ci deps tooling (exactly one)
+#   summary: English, imperative, lowercase first letter, no final period.
+#
+# Body (optional, after a blank line): why the change is needed; lines up to
+# 100 characters.
+#
+# Footers (optional): Refs: #<issue> and Spec: SPEC-NNN only. No AI
+# authorship trailers (references/provenance.md, PV-1).
+
+fix(engine): retry a step after a lease expires mid-execution
+
+A worker that lost its lease left the step in running state until the
+execution timed out. The scheduler now requeues the step when the lease
+expires, so the execution resumes on another worker.
+
+Refs: #123
+Spec: SPEC-021

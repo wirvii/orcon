@@ -1,0 +1,236 @@
+{
+  "format": "orcon/connector@1",
+  "id": "orcon.acme",
+  "version": "1.0.0",
+  "kind": "DECLARATIVE",
+  "displayName": "Acme",
+  "description": "Manage contacts and send messages in Acme.",
+  "publisher": { "name": "The Orcon Authors", "url": "https://github.com/wirvii/orcon", "contact": "https://github.com/wirvii/orcon/issues" },
+  "license": "Apache-2.0",
+  "source": { "repository": "https://github.com/wirvii/orcon", "commit": "0000000000000000000000000000000000000000" },
+  "compat": { "engineApi": "^1.0.0" },
+  "nodes": [
+    {
+      "name": "acme",
+      "type": "orcon.acme.acme@1",
+      "displayName": "Acme",
+      "group": "ACTION",
+      "parameters": [
+        {
+          "name": "resource",
+          "type": "OPTIONS",
+          "required": true,
+          "default": "contact",
+          "options": [
+            { "value": "contact", "label": "Contact" },
+            { "value": "message", "label": "Message" }
+          ],
+          "description": "The kind of record to work with."
+        },
+        {
+          "name": "contactId",
+          "type": "RESOURCE_LOCATOR",
+          "required": true,
+          "modes": ["LIST", "ID", "URL"],
+          "displayWhen": { "operation": ["contact.get", "contact.update", "contact.delete"] },
+          "description": "The contact to work with."
+        },
+        {
+          "name": "email",
+          "type": "STRING",
+          "required": true,
+          "sensitive": true,
+          "displayWhen": { "operation": ["contact.create"] },
+          "description": "E-mail address of the contact."
+        },
+        {
+          "name": "updateFields",
+          "type": "COLLECTION",
+          "required": false,
+          "default": {},
+          "displayWhen": { "operation": ["contact.update"] },
+          "description": "Fields to change on the contact."
+        },
+        {
+          "name": "returnAll",
+          "type": "BOOLEAN",
+          "required": false,
+          "default": false,
+          "displayWhen": { "operation": ["contact.getMany"] },
+          "description": "Whether to return every contact instead of the first ones up to the limit."
+        },
+        {
+          "name": "limit",
+          "type": "NUMBER",
+          "required": false,
+          "default": 50,
+          "minimum": 1,
+          "displayWhen": { "operation": ["contact.getMany"], "returnAll": [false] },
+          "description": "Maximum number of contacts to return."
+        },
+        {
+          "name": "filters",
+          "type": "COLLECTION",
+          "required": false,
+          "default": {},
+          "displayWhen": { "operation": ["contact.getMany"] },
+          "description": "Conditions the contacts must meet."
+        },
+        {
+          "name": "updatedAfter",
+          "type": "DATE_TIME",
+          "required": false,
+          "displayWhen": { "operation": ["contact.getMany"] },
+          "description": "Only contacts changed after this moment (RFC 3339, UTC)."
+        },
+        {
+          "name": "to",
+          "type": "STRING",
+          "required": true,
+          "sensitive": true,
+          "displayWhen": { "operation": ["message.send"] },
+          "description": "E-mail address the message is sent to."
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "required": true,
+          "displayWhen": { "operation": ["message.send"] },
+          "description": "Text of the message."
+        }
+      ],
+      "operations": [
+        {
+          "name": "contact.create",
+          "displayName": "Create a contact",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "IDEMPOTENCY_KEY",
+            "idempotency": { "mode": "PROVIDER_KEY", "location": { "in": "HEADER", "name": "Idempotency-Key" }, "ttl": "24h", "scope": "CREDENTIAL" },
+            "onUncertain": "RESEND_WITH_KEY",
+            "retrySafe": true,
+            "proofLevel": "DECLARED"
+          },
+          "rateLimit": "api"
+        },
+        {
+          "name": "contact.get",
+          "displayName": "Get a contact",
+          "purity": "READ",
+          "itemMode": "PER_ITEM",
+          "rateLimit": "api"
+        },
+        {
+          "name": "contact.getMany",
+          "displayName": "Get many contacts",
+          "purity": "READ",
+          "itemMode": "PER_ITEM",
+          "rateLimit": "api"
+        },
+        {
+          "name": "contact.update",
+          "displayName": "Update a contact",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "RECONCILE",
+            "verification": { "operation": "contact.get", "match": "$response.updatedAt >= $intent.sentAt", "notFoundMeansFailed": true, "consistency": "STRONG" },
+            "onUncertain": "RECONCILE",
+            "retrySafe": false,
+            "proofLevel": "DECLARED"
+          },
+          "rateLimit": "api"
+        },
+        {
+          "name": "contact.delete",
+          "displayName": "Delete a contact",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "DELETE",
+            "level": "RECONCILE",
+            "verification": { "operation": "contact.get", "match": "false", "notFoundMeansFailed": false, "consistency": "STRONG" },
+            "onUncertain": "RECONCILE",
+            "retrySafe": false,
+            "proofLevel": "DECLARED"
+          },
+          "rateLimit": "api"
+        },
+        {
+          "name": "message.send",
+          "displayName": "Send a message",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": { "mode": "NONE" },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the sent messages in Acme and look for a message to {{ $parameter.to }} sent around {{ $intent.sentAt }}.",
+              "url": "https://app.acme.example/messages/sent"
+            },
+            "proofLevel": "DECLARED"
+          },
+          "rateLimit": "api"
+        }
+      ],
+      "outputs": ["main"],
+      "sensitiveFields": ["$.parameters.email", "$.parameters.to", "$.output.email"],
+      "n8n": {
+        "types": [
+          {
+            "name": "n8n-nodes-base.acme",
+            "typeVersions": [1],
+            "parameterMap": {
+              "resource": "resource",
+              "operation": { "contact:create": "contact.create", "contact:get": "contact.get", "contact:getAll": "contact.getMany", "contact:update": "contact.update", "contact:delete": "contact.delete", "message:send": "message.send" },
+              "contactId": "contactId",
+              "email": "email",
+              "updateFields": "updateFields",
+              "returnAll": "returnAll",
+              "limit": "limit",
+              "filters": "filters",
+              "to": "to",
+              "text": "text"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credentials": [
+    {
+      "id": "apiKey",
+      "displayName": "Acme API key",
+      "fields": [
+        { "name": "apiKey", "type": "STRING", "sensitive": true, "required": true }
+      ],
+      "scheme": { "type": "API_KEY", "in": "HEADER", "name": "Authorization", "prefix": "Bearer " },
+      "test": "contact.getMany",
+      "n8nTypes": ["acmeApi"]
+    }
+  ],
+  "permissions": {
+    "network": { "domains": ["api.acme.example"], "schemes": ["https"], "allowPrivateNetworks": false },
+    "credentials": ["apiKey"],
+    "credentialRawAccess": false,
+    "resources": { "memoryMiB": 16, "timeout": "30s", "maxConcurrent": 4 }
+  },
+  "rateLimits": [
+    {
+      "name": "api",
+      "key": "CREDENTIAL",
+      "requestsPerSecond": 10,
+      "burst": 20,
+      "respectHeaders": { "retryAfter": "Retry-After", "resetAt": { "header": "X-RateLimit-Reset", "format": "EPOCH" }, "remaining": "X-RateLimit-Remaining" }
+    }
+  ],
+  "changelog": [
+    { "version": "1.0.0", "date": "2026-10-13", "notes": ["changelog.1.0.0.first"] }
+  ]
+}
