@@ -1,0 +1,7 @@
+{
+  "format": "orcon/connector-live@1",
+  "sandbox": { "available": false, "reasonUnavailable": "example service" },
+  "secrets": { "apiKey": "ORCON_LIVE_ACME_API_KEY" },
+  "operations": [],
+  "writes": false
+}

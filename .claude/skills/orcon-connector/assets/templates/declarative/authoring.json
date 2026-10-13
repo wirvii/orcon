@@ -1,0 +1,9 @@
+{
+  "format": "orcon/connector-authoring@1",
+  "kind": { "chosen": "DECLARATIVE" },
+  "verbExceptions": [],
+  "resourceExceptions": [],
+  "rateLimitSources": [
+    { "name": "api", "url": "https://docs.acme.example/rate-limits" }
+  ]
+}

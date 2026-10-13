@@ -1,0 +1,26 @@
+{
+  "format": "orcon/cassette@1",
+  "operation": "message.send",
+  "case": "ok",
+  "example": true,
+  "parameters": { "to": "person1@example.com", "text": "Hello from Orcon" },
+  "items": [ {} ],
+  "credential": { "type": "apiKey", "fixture": "default" },
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.acme.example/v1/messages",
+        "headers": { "Authorization": "[REDACTED:credential.apiKey]", "Content-Type": "application/json" },
+        "body": { "to": "person1@example.com", "text": "Hello from Orcon" }
+      },
+      "response": {
+        "status": 201,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "data": { "id": "m_1", "to": "person1@example.com", "status": "queued" } }
+      }
+    }
+  ],
+  "expect": { "items": [ { "id": "m_1", "to": "person1@example.com", "status": "queued" } ] },
+  "recorded": { "at": "2026-10-13T00:00:00Z", "orconVersion": "0.0.0", "scrubber": { "version": 1, "rulesDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000" } }
+}

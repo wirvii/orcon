@@ -6,3 +6,16 @@
 .claude/agents/** text eol=lf
 .codex/agents/**  text eol=lf
 # <<< mneme (SPEC-140) <<<
+
+# Pull request size exclusions (orcon-contributing PR-7, PR-8). Add a line when you create such a path.
+pnpm-lock.yaml                                   pr-size-exclude
+**/go.sum                                        pr-size-exclude
+CHANGELOG.md                                     pr-size-exclude
+.claude/skills/**                                pr-size-exclude linguist-generated
+**/i18n/*.json                                   pr-size-exclude
+packages/js/ui/visual/__screenshots__/**         pr-size-exclude
+.agents/skills/orcon-ui/references/contrast-report.md  pr-size-exclude linguist-generated
+internal/adapter/sqlite/sqlcgen/**               pr-size-exclude linguist-generated
+internal/adapter/postgres/sqlcgen/**             pr-size-exclude linguist-generated
+internal/adapter/httpapi/apigen/**               pr-size-exclude linguist-generated
+docs/reference/api/**                            pr-size-exclude linguist-generated
