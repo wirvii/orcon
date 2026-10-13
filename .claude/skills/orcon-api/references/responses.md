@@ -12,7 +12,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 - **RESP-1** A single resource is returned as the object itself: `GET /flows/{flowId}` → the `Flow` object. No wrapper. [`response-shape`]
 - **RESP-2** A list is always exactly `{ "items": [...], "nextPageToken": "..." }`; `nextPageToken` is absent on the last page; the only allowed addition is `totalIsLowerBound`/`total` where `x-orcon-include-total` is declared ([PAGE-4](pagination.md)). [`response-shape`]
-- **RESP-3** An error is always `application/problem+json` (RFC 9457) with `type`, `title`, `status`, `detail`, `instance`, `code`, `requestId` and `errors[] { pointer, code, message }` ([ERR-1](errors.md)). [`response-shape`, `problem-responses`]
+- **RESP-3** An error of a non-protocol operation is always `application/problem+json` (RFC 9457) with `type`, `title`, `status`, `detail`, `instance`, `code`, `requestId` and `errors[] { pointer, code, message }` ([ERR-1](errors.md)). Protocol-tagged operations answer errors in the format of their external standard (for example RFC 6749 §5.2); the Redocly built-in `operation-4xx-problem-details-rfc7807` is turned off for that reason and `problem-responses` covers every other operation. [`response-shape`, `problem-responses`]
 - **RESP-4** Auxiliary data travels in headers: `Orcon-Request-Id`, `ETag`, `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Location`, `Idempotent-Replayed`, `Deprecation`, `Sunset`, `Link`. Never copied into bodies. [`response-shape`]
 
 ## Status codes
@@ -21,4 +21,4 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 ## Forbidden envelope members
 
-- **RESP-6** Forbidden at the root of a 2xx body: `data`, `meta`, `success`, `ok`, `result`, `results`, `payload`, `response`, `error`, `errors`, `pagination`, `links`, `requestId`, `etag`, and a boolean `status`. Visibility flags that describe the resource itself (`dataHidden`) are resource fields, not envelopes. [`response-shape`]
+- **RESP-6** Forbidden at the root of a 2xx body: `data`, `meta`, `success`, `ok`, `result`, `results`, `payload`, `response`, `error`, `errors`, `pagination`, `links`, `requestId`, `etag`, and a boolean `status`. Visibility flags that describe the resource itself (`dataHidden`) are resource fields, not envelopes. A resource that reports how it failed (`Operation`, `Execution`) does so in a `failure` object (for `Operation`: `code` from the problem-code catalog, `title`, `detail?`), never in a member named `error`. A list of per-item results that is not a page is named after its content (`itemResults`), never `results`. [`response-shape`]
