@@ -10,7 +10,7 @@
     "test": "turbo test",
     "i18n:check": "turbo i18n:check",
     "generate": "turbo run generate",
-    "generate:check": "pnpm generate && git diff --exit-code -- apps/web/src/app/routeTree.gen.ts"
+    "generate:check": "pnpm generate && git diff --exit-code -- apps/web/src/app/routeTree.gen.ts packages/js/api-contract/src"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
