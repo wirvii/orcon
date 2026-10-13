@@ -124,8 +124,113 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build embedded frontend and Go binary
         run: make build
       - name: Smoke test standalone
         run: make smoke
+  ui-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter '@orcon/ui^...' build
+      - name: Install the Chromium browser for component and web accessibility checks
+        run: pnpm --filter @orcon/ui exec playwright install --with-deps chromium
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test lint rules
+        run: pnpm --filter @orcon/lint-config test
+      - name: Test tokens
+        run: pnpm --filter @orcon/tokens test
+      - name: Contrast report is up to date
+        run: git diff --exit-code .agents/skills/orcon-ui/references/contrast-report.md
+      - name: Check translations
+        run: pnpm i18n:check
+      - name: Build Storybook
+        run: pnpm --filter @orcon/ui build-storybook
+      - name: Unit tests
+        run: pnpm --filter @orcon/ui test:unit
+      - name: Story coverage
+        run: pnpm --filter @orcon/ui test:stories
+      - name: Component accessibility
+        run: pnpm --filter @orcon/ui test:a11y
+      - name: Touch targets and density
+        run: pnpm --filter @orcon/ui test:targets
+      - name: Canvas
+        run: pnpm --filter @orcon/ui test:canvas
+      - name: Parity and parity coverage
+        run: pnpm --filter @orcon/ui test:parity
+      - name: Expansion
+        run: pnpm --filter @orcon/ui test:expansion
+      - name: Build web app
+        run: pnpm --filter @orcon/web build
+      - name: Fonts are bundled and none is requested externally
+        shell: bash
+        run: |
+          if grep -rEq 'fonts\.(googleapis|gstatic)\.com|https?://[^"]+\.(woff2?|ttf|otf)' apps/web/dist; then
+            echo "external font reference found"; exit 1
+          fi
+          find apps/web/dist/assets -iname '*inter*.woff2' | grep -q .
+          find apps/web/dist/assets -iname '*jetbrains*.woff2' | grep -q .
+      - name: Web accessibility
+        run: pnpm --filter @orcon/web test:a11y
+  ui-visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter '@orcon/ui^...' build
+      - name: Baselines are committed
+        shell: bash
+        run: |
+          if [ -z "$(find packages/js/ui/visual/__screenshots__ -name '*.png' -print -quit 2>/dev/null)" ]; then
+            echo "::error title=Visual baselines missing::packages/js/ui/visual/__screenshots__ has no screenshots. Run the 'Visual baselines' workflow (workflow_dispatch), download its artifact, commit the folder, then re-run this job."
+            exit 1
+          fi
+      - name: Build Storybook on the host and run the visual suite in the pinned Playwright container
+        run: pnpm --filter @orcon/ui test:visual:docker
+      - name: Upload the difference report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: visual-report
+          path: |
+            packages/js/ui/visual/report
+            packages/js/ui/visual/test-results
+          if-no-files-found: ignore
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - name: Validate the skills
+        run: |
+          for skill in orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do
+            sh ".agents/skills/$skill/validation/run.sh"
+          done
+      - name: Validate against the Agent Skills standard
+        run: |
+          for skill in orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do
+            uvx --from "git+https://github.com/agentskills/agentskills@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref" skills-ref validate ".agents/skills/$skill"
+          done

@@ -1,0 +1,259 @@
+{
+  "bg": {
+    "$type": "color",
+    "app": {
+      "$value": "{color.slate.50}"
+    }
+  },
+  "surface": {
+    "$type": "color",
+    "default": {
+      "$value": "{color.white}"
+    },
+    "raised": {
+      "$value": "{color.white}"
+    },
+    "sunken": {
+      "$value": "{color.slate.100}"
+    },
+    "inverse": {
+      "$value": "{color.slate.900}"
+    }
+  },
+  "fg": {
+    "$type": "color",
+    "default": {
+      "$value": "{color.slate.900}"
+    },
+    "muted": {
+      "$value": "{color.slate.600}"
+    },
+    "subtle": {
+      "$value": "{color.slate.500}"
+    },
+    "disabled": {
+      "$value": "{color.slate.400}"
+    },
+    "link": {
+      "$value": "{color.cyan.700}"
+    },
+    "accent": {
+      "$value": "{color.green.700}"
+    },
+    "inverse": {
+      "$value": "{color.slate.50}"
+    }
+  },
+  "action": {
+    "$type": "color",
+    "primary": {
+      "bg": {
+        "$value": "{color.green.700}"
+      },
+      "bg-hover": {
+        "$value": "{color.green.800}"
+      },
+      "fg": {
+        "$value": "{color.white}"
+      }
+    },
+    "danger": {
+      "bg": {
+        "$value": "{color.red.700}"
+      },
+      "bg-hover": {
+        "$value": "{color.red.800}"
+      },
+      "fg": {
+        "$value": "{color.white}"
+      }
+    }
+  },
+  "border": {
+    "$type": "color",
+    "default": {
+      "$value": "{color.slate.200}"
+    },
+    "control": {
+      "$value": "{color.slate.500}"
+    }
+  },
+  "focus": {
+    "$type": "color",
+    "ring": {
+      "$value": "{color.cyan.700}"
+    }
+  },
+  "status": {
+    "$type": "color",
+    "neutral": {
+      "fg": {
+        "$value": "{color.slate.600}"
+      },
+      "bg": {
+        "$value": "{color.slate.100}"
+      }
+    },
+    "active": {
+      "fg": {
+        "$value": "{color.cyan.800}"
+      },
+      "bg": {
+        "$value": "{color.cyan.50}"
+      }
+    },
+    "success": {
+      "fg": {
+        "$value": "{color.green.800}"
+      },
+      "bg": {
+        "$value": "{color.green.50}"
+      }
+    },
+    "warning": {
+      "fg": {
+        "$value": "{color.amber.800}"
+      },
+      "bg": {
+        "$value": "{color.amber.50}"
+      }
+    },
+    "danger": {
+      "fg": {
+        "$value": "{color.red.700}"
+      },
+      "bg": {
+        "$value": "{color.red.50}"
+      }
+    },
+    "attention": {
+      "fg": {
+        "$value": "{color.violet.700}"
+      },
+      "bg": {
+        "$value": "{color.violet.50}"
+      }
+    }
+  },
+  "overlay": {
+    "$type": "color",
+    "scrim": {
+      "$value": "{color.slate.900}",
+      "$description": "Dims the page behind a modal dialog or sheet. Used with opacity; decorative."
+    }
+  },
+  "canvas": {
+    "$type": "color",
+    "bg": {
+      "$value": "{color.slate.50}"
+    },
+    "grid": {
+      "$value": "{color.slate.300}"
+    },
+    "edge": {
+      "$value": "{color.slate.500}"
+    },
+    "port": {
+      "$value": "{color.slate.500}"
+    },
+    "edge-active": {
+      "$value": "{brand.green-dark}"
+    },
+    "selection": {
+      "$value": "{brand.green-dark}"
+    },
+    "node": {
+      "border": {
+        "$value": "{color.slate.300}"
+      },
+      "bg": {
+        "$value": "{color.white}"
+      }
+    },
+    "marquee": {
+      "bg": {
+        "$value": "{color.alpha.green-600-10}"
+      }
+    },
+    "sticky": {
+      "1": {
+        "bg": {
+          "$value": "{color.cyan.50}"
+        },
+        "border": {
+          "$value": "{color.cyan.700}"
+        },
+        "accent": {
+          "$value": "{color.cyan.700}"
+        }
+      },
+      "2": {
+        "bg": {
+          "$value": "{color.green.50}"
+        },
+        "border": {
+          "$value": "{color.green.700}"
+        },
+        "accent": {
+          "$value": "{color.green.700}"
+        }
+      },
+      "3": {
+        "bg": {
+          "$value": "{color.slate.100}"
+        },
+        "border": {
+          "$value": "{color.slate.500}"
+        },
+        "accent": {
+          "$value": "{color.slate.600}"
+        }
+      },
+      "4": {
+        "bg": {
+          "$value": "{color.white}"
+        },
+        "border": {
+          "$value": "{color.slate.500}"
+        },
+        "accent": {
+          "$value": "{color.slate.600}"
+        }
+      },
+      "5": {
+        "bg": {
+          "$value": "{color.cyan.100}"
+        },
+        "border": {
+          "$value": "{color.cyan.800}"
+        },
+        "accent": {
+          "$value": "{color.cyan.800}"
+        }
+      },
+      "6": {
+        "bg": {
+          "$value": "{color.green.100}"
+        },
+        "border": {
+          "$value": "{color.green.800}"
+        },
+        "accent": {
+          "$value": "{color.green.800}"
+        }
+      }
+    }
+  },
+  "elevation": {
+    "$type": "shadow",
+    "sm": {
+      "$value": "{shadow.light.sm}"
+    },
+    "md": {
+      "$value": "{shadow.light.md}"
+    },
+    "lg": {
+      "$value": "{shadow.light.lg}"
+    }
+  }
+}

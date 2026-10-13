@@ -37,9 +37,21 @@ fi
 for copy in $copies; do
   diff -r "$skill" "$copy"
 done
+# The other project skills: structural validation and byte-identical copies.
+for other in orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do
+  oskill=.agents/skills/$other
+  sh "$oskill/validation/run.sh"
+  sh "$oskill/scripts/check-frontmatter.sh"
+  for copy in $(find . -maxdepth 3 -type d -path "./.*/skills/$other" ! -path './.agents/*' | sort); do
+    diff -r "$oskill" "$copy"
+  done
+done
 if ! command -v uvx >/dev/null 2>&1; then
   echo "skill-check: uv is required for the Agent Skills reference validator (https://docs.astral.sh/uv/)" >&2
   exit 1
 fi
 uvx --from "git+https://github.com/agentskills/agentskills@${skills_ref}#subdirectory=skills-ref" skills-ref validate "$skill"
+for other in orcon-ui orcon-api orcon-connector orcon-contributing orcon-web; do
+  uvx --from "git+https://github.com/agentskills/agentskills@${skills_ref}#subdirectory=skills-ref" skills-ref validate ".agents/skills/$other"
+done
 echo "skill-check: ok"

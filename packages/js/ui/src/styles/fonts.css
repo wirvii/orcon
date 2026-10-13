@@ -1,0 +1,10 @@
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/*
+ * Self-hosted variable fonts (SIL Open Font License 1.1). Vite bundles the
+ * woff2 files; nothing is requested from an external font service.
+ */
+
+@import '@fontsource-variable/inter/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';

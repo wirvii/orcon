@@ -9,6 +9,15 @@ node_modules/
 .env.*
 !.env.example
 coverage/
+.turbo/
+
+**/storybook-static/
+packages/js/ui/test/**/__screenshots__/
+
+# Playwright output
+test-results/
+playwright-report/
+packages/js/ui/visual/report/
 .bin/
 bin/
 .cache/

@@ -1,0 +1,14 @@
+/* SPDX-FileCopyrightText: The Orcon Authors */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Minimal stand-in for @orcon/tokens/tailwind-theme.css used by the rules test. */
+@import "tailwindcss";
+
+@theme inline {
+  --color-*: initial;
+  --color-surface: #fff;
+  --color-fg: #000;
+  --spacing-*: initial;
+  --spacing-0: 0px;
+  --spacing-4: 16px;
+}

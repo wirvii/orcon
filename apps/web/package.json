@@ -2,21 +2,32 @@
   "name": "@orcon/web",
   "version": "0.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "eslint . && stylelint --allow-empty-input \"**/*.css\"",
+    "test:a11y": "playwright test"
   },
   "dependencies": {
-    "@xyflow/react": "^12.0.0",
+    "@orcon/ui": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@orcon/lint-config": "workspace:*",
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^9.20.0",
+    "stylelint": "^16.15.0",
+    "tailwindcss": "^4.1.17",
     "typescript": "^5.7.0",
     "vite": "^6.0.0"
   }
