@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0053 — API conventions: pagination, filtering, errors, idempotency, concurrency, rate limits, long-running operations and response shapes
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 error catalog and response shapes; ADR-0077 schema rules)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 error catalog and response shapes; ADR-0077 schema rules) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-005.
 
@@ -26,7 +26,7 @@ The code catalog is part of the contract (`components/schemas/ProblemCode` with 
 
 ### 4. Idempotency
 - `Idempotency-Key` (1–255 visible ASCII) accepted on every `POST`; required on: running a flow, creating/rotating API keys, creating OAuth clients, creating event subscriptions, redelivering webhooks, starting imports and Git syncs, the continue/repeat/cancel human-attention actions (ADR-0052 §6), and every long-running operation.
-- `idempotency_record(org_id, id, requested_by_principal_id?, requester_identity, idempotency_key, fingerprint, status: in_progress|completed, response_status, response_body_reference, resource_reference, created_at, expires_at)`, unique `(org_id, requester_identity, idempotency_key)`, TTL 24 h. `requester_identity` is the exact requesting principal (a user, a service account, or the API key or OAuth token for key-authenticated calls), so two keys of the same user do not share records; `requested_by_principal_id` is the actor column of ADR-0077 §8. Fingerprint = SHA-256 of method, route template, path parameters and canonical body.
+- `idempotency_record(org_id, id, requested_by_principal_id?, requester_identity, idempotency_key, fingerprint, status: IN_PROGRESS|COMPLETED, response_status, response_body_reference, resource_reference, created_at, expires_at)`, unique `(org_id, requester_identity, idempotency_key)`, TTL 24 h. `requester_identity` is the exact requesting principal (a user, a service account, or the API key or OAuth token for key-authenticated calls), so two keys of the same user do not share records; `requested_by_principal_id` is the actor column of ADR-0077 §8. Fingerprint = SHA-256 of method, route template, path parameters and canonical body.
 - Same key and fingerprint after completion → stored response replayed with `Idempotent-Replayed: true`. Different fingerprint → `422 idempotency-key-reused`. In progress → `409 idempotency-in-progress` with `Retry-After`.
 - The record is written in the same transaction as the state change; handlers that start durable work store the created resource id so a replay returns it even if the first response was lost.
 - Responses disclosing a newly issued secret are stored without it; a replay returns `409 secret-already-issued` with the resource id.
@@ -71,3 +71,4 @@ Offset pagination (unstable under inserts); generic filter language in v1 (defer
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-014 (Amendment 5, carried by SPEC-005).** §3 gains error codes for new conditions. Additive only (ADR-0054 §3): no existing operation, field, permission, MCP level or tool changes; semantics of test runs, pinned data and effect confirmation: ADR-0082 (SPEC-014).
+- **SPEC-009 K19 (2026-10-13, owner decision).** §4 (`idempotency_record.status`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.

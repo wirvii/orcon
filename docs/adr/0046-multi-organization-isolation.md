@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0046 — Multi-organization isolation: data-access layer, static check, PostgreSQL RLS and SQLite behaviour
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (return type of current_org_ids)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -25,7 +25,7 @@ Every customer-data table has `org_id NOT NULL`, a unique constraint `(org_id, i
 
 ### 4. Wall 3: PostgreSQL row-level security
 - Roles: `orcon_owner` (owns schema, runs migrations), `orcon_application` (runtime; `NOSUPERUSER NOBYPASSRLS`, owner of nothing), `orcon_engine` (`NOLOGIN NOBYPASSRLS`, owns `orcon_engine` functions). With a single owner DSN that has `CREATEROLE`, Orcon creates `orcon_application` and `orcon_engine` and uses `SET ROLE orcon_application` on each pooled connection, asserted per transaction; without `CREATEROLE`, `orcon db setup-roles` prints the SQL for a DBA (owner decision, SPEC-004 Q12).
-- Every organization-scoped table: `ENABLE` and `FORCE ROW LEVEL SECURITY`; policy `org_isolation FOR ALL USING (org_id = (SELECT orcon_context.current_org()) OR current_user = 'orcon_engine' OR org_id = ANY ((SELECT orcon_context.current_org_ids()))) WITH CHECK (same)`; `current_org()` = `NULLIF(current_setting('orcon.org_id', true), '')::uuid` and `current_org_ids()` = the optional list context of ADR-0047 §4 (empty unless that variant is selected). The `org` table uses the same expression on `id` (`org_self_isolation`). No context → no rows. Functions exist only in the schemas `orcon_context` and `orcon_engine`.
+- Every organization-scoped table: `ENABLE` and `FORCE ROW LEVEL SECURITY`; policy `org_isolation FOR ALL USING (org_id = (SELECT orcon_context.current_org()) OR current_user = 'orcon_engine' OR org_id = ANY ((SELECT orcon_context.current_org_ids()))) WITH CHECK (same)`; `current_org()` = `NULLIF(current_setting('orcon.org_id', true), '')::uuid` and `current_org_ids()` `RETURNS SETOF uuid` (`STABLE`) = the optional list context of ADR-0047 §4: one row per organization in the transaction-local setting `orcon.org_ids` (comma-separated ID text form), no rows unless that variant is selected. It returns a set, not an array, because the policy compares `org_id` with the rows of the subquery `(SELECT orcon_context.current_org_ids())`. The `org` table uses the same expression on `id` (`org_self_isolation`). No context → no rows. Functions exist only in the schemas `orcon_context` and `orcon_engine`.
 - No views over organization data: PostgreSQL 14, the oldest supported version, runs views with their owner's privileges, which bypasses row-level security. The first PostgreSQL migration revokes `CREATE` on schema `public` from `PUBLIC`. DDL uses only what PostgreSQL 14 supports (no `NULLS NOT DISTINCT`, `security_invoker` views, `MERGE` or `ON DELETE SET NULL (column)`); composite foreign keys never use `SET NULL`, because it would null `org_id`.
 - Context is set only with `set_config(..., true)` (transaction-local), never session-level; a pool hook asserts the context is empty at transaction start.
 - Startup and second-organization checks: with ≥ 2 organizations Orcon refuses to start (and refuses to create the second organization) if the runtime role is superuser, has BYPASSRLS, owns tables, or any organization-scoped table lacks enabled+forced RLS and the policy. With one organization: warning.
@@ -45,3 +45,8 @@ Two independent walls on PostgreSQL, each tested alone; SQLite users are told pl
 
 ## Alternatives considered
 Schema per organization (rejected: migrations × N, connection/catalog bloat, cross-organization engine batches impossible); database per organization (rejected: same, plus SQLite-per-org rejected by the owner); RLS only, without the application layer (rejected by S3); warning only when the runtime role does not satisfy the checks (rejected: RLS would stop being a guarantee, SPEC-004 Q12); `security_invoker` views (rejected: not available on PostgreSQL 14).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.

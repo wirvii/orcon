@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0057 — Flows as code: repository layout, Git sync modes, environments and credential binding
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 enum form, including the values of the `orcon/repo@1` files; ADR-0077 schema rules)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 enum form, including the values of the `orcon/repo@1` files; ADR-0077 schema rules) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-005.
 
@@ -33,7 +33,7 @@ UTF-8, LF, 2-space indented JSON, keys in schema order (unknown `ext` keys sorte
 Nodes reference credentials by name (`credentials: { <slot>: { name } }`, additive to ADR-0007). At dispatch the name resolves to the credential with that name owned by, or shared to, the execution's project (ADR-0041 §5, ADR-0043). Each environment's project holds its own values (entered there, or as `$secrets` references to that environment's external store). Applying or publishing a flow with missing or type-mismatched names fails validation with the list of missing bindings.
 
 ### 5. Binding and storage
-`git_binding(org_id, id, project_id, repository_url, branch, path, mode: orcon_leads|git_leads, credential_id, committer_name, committer_email, poll_interval_seconds, provider_hook_secret_ciphertext, status, revision)` (API values `ORCON_LEADS`, `GIT_LEADS`); `git_sync_state(org_id, id, git_binding_id, last_synced_commit, flow_hash_document, flow_hash_document_format, last_attempt_at, last_error, behind_version_count)`; `credential_fingerprint(org_id, id, project_id, credential_id, field_name, hmac)` (HMAC keyed by a key derived from the organization key, ADR-0042). Sync runs are `api_operation` rows. Managed with `git:manage`; manual sync and conflict resolution with `git:sync`. Git access uses `go-git` (Apache-2.0) in process. The Git credential (SSH deploy key or HTTPS token) is a project credential (ADR-0043) whose `allowedHosts` is the repository host. One sync at a time per binding (lease). The binding reads `environment` and `protected` from its project (§1); the binding screen warns that a protected Git-leads project makes flows read-only in the editor.
+`git_binding(org_id, id, project_id, repository_url, branch, path, mode: ORCON_LEADS|GIT_LEADS, credential_id, committer_name, committer_email, poll_interval_seconds, provider_hook_secret_ciphertext, status, revision)`; `git_sync_state(org_id, id, git_binding_id, last_synced_commit, flow_hash_document, flow_hash_document_format, last_attempt_at, last_error, behind_version_count)`; `credential_fingerprint(org_id, id, project_id, credential_id, field_name, hmac)` (HMAC keyed by a key derived from the organization key, ADR-0042). Sync runs are `api_operation` rows. Managed with `git:manage`; manual sync and conflict resolution with `git:sync`. Git access uses `go-git` (Apache-2.0) in process. The Git credential (SSH deploy key or HTTPS token) is a project credential (ADR-0043) whose `allowedHosts` is the repository host. One sync at a time per binding (lease). The binding reads `environment` and `protected` from its project (§1); the binding screen warns that a protected Git-leads project makes flows read-only in the editor.
 
 ### 6. Mode "Orcon leads"
 - Publish, activation change, rollback and archival enqueue a commit job in the same transaction (outbox, ADR-0013 §8). The worker fetches, writes changed files, commits (author = acting user or service account; committer = binding identity; message `orcon: publish <project>/<flow> v<N> (<contentHash[:12]>)`) and pushes fast-forward only. Never force push.
@@ -61,3 +61,8 @@ Reviewable, promotable flows without secrets in Git; production can be locked to
 
 ## Alternatives considered
 Environment = separate instance only (still possible, not mandated); committing drafts (noisy, not deployable state); shelling out to `git` (breaks the self-contained binary); last-write-wins between Git and Orcon (rejected by P3); lowercase values in repository files as a separate file convention (rejected by ADR-0080 §3 as revised: one spelling for every public value).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 K19 (2026-10-13, owner decision).** §5 (`git_binding.mode`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0047 — Reconciling row-level security with cross-organization claims and group commit
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (policy branch spelled as in ADR-0046)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -23,7 +23,7 @@ Lookups that run before the organization is known (amended by ADR-0077 §6) are 
 Checkpoints, journal batches, ingress batches and pending-audit inserts remain **one transaction with one commit**. Rows are grouped by organization; each group is preceded by `SELECT set_config('orcon.org_id', $org, true)` and written with its own statement(s); the whole transaction is sent as one pipelined `pgx.Batch` (one network round trip). Cost: zero extra statements with one organization; k statements instead of 1 for k organizations in the batch (k ≤ batch size).
 
 ### 4. List context (fallback, "V2")
-If V1 misses the budget (§6), the session variable `orcon.org_ids` holds the organizations of the batch and the policy branch `org_id = ANY(orcon_context.current_org_ids())` lets a single statement cover the batch, still restricted to the batch's organizations. Selected by configuration `store.postgres.rlsBatchMode = perOrg|orgList`, decided by measurement and recorded in this ADR before acceptance of the implementing slice.
+If V1 misses the budget (§6), the session variable `orcon.org_ids` holds the organizations of the batch and the policy branch `org_id = ANY ((SELECT orcon_context.current_org_ids()))` (ADR-0046 §4; the function returns `SETOF uuid`) lets a single statement cover the batch, still restricted to the batch's organizations. Selected by configuration `store.postgres.rlsBatchMode = perOrg|orgList`, decided by measurement and recorded in this ADR before acceptance of the implementing slice.
 
 ### 5. Index and predicate shape
 RLS predicates use `(SELECT …)` so they are evaluated once per statement (init plan). Primary keys already identify rows; hot-path indexes keep their leading columns and add `org_id` only where the request plane lists by organization. The claim query's index is unchanged because the claim runs as `orcon_engine`.
@@ -49,3 +49,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-005.** `resolve_api_key` and `resolve_oauth_token` are the lookups of ADR-0056 §4 and §7 before the organization is known.
 - **SPEC-006.** `resolve_public_entry` and `resolve_trigger_address` also cover the public entry of the chat trigger and the address of the MCP server trigger.
+- **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.
