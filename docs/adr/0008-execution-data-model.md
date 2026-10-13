@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0008 — Execution data model: items, tokens and information layers
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12, 2026-10-13
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -63,3 +63,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-004.** §4: credentials are encrypted under ADR-0042 and resolved per dispatch under ADR-0043 (share check at every dispatch, host binding); they are never serialized.
 - **SPEC-006.** §5: a fifth purity class, `AGENTIC`: a stepped node with its own durable state and multiple waits (ADR-0060 §1).
 - **SPEC-001 (Amendment 6).** §4.3: an execution variable is written only by a node of the built-in type `orcon.variables@1` (`element: task`). Its parameters are `{ assignments: [ { variable, value } ] }` with at least one assignment; `variable` is a literal name declared in `variables[]` (an expression there is a validation error), and `value` is a literal or an expression (ADR-0018). For an accumulator variable the value is the delta. The set of variables a node writes is therefore known before publication, and the concurrent-writer rule applies to every `orcon.variables@1` node that names the variable. Loop carry (`loop.carry`, ADR-0007 §3) is unchanged. Per-item evaluation order and the write of several items in one activation are specified by the cut that implements variables. No other node type writes execution variables in `orcon/flow@1`; any later mechanism is an additive amendment.
+- **SPEC-001 (Amendment 10, 2026-10-13, owner decision).** §4.3: an expression reads an execution variable as `$execution.variables.<name>` (ADR-0018 §1), with `<name>` literal (`$execution.variables.total` or `$execution.variables["total"]`) and declared in `variables[]`; any other use of `$execution.variables` is a publication error (rule V8, ADR-0010 §11). The set of variables a node reads is therefore known before publication, like the set it writes. The value is read-only and constant during the activation: for `EXECUTION` scope, the variable's value when the activation started; for `ITERATION` scope, its value in the current loop instance; `undefined` while the variable has never been written. A child execution reads only its own variables. How the value is captured and recorded for recomputation, and the read of an accumulator in a concurrent region (warning and recorded value, above), are specified by the cut that implements variables.
