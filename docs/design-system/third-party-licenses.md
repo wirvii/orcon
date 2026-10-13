@@ -14,6 +14,7 @@ The Vite build bundles these into `internal/adapter/webui/dist/`, which the bina
 |---|---|---|
 | `@fontsource-variable/inter` | 5.3.0 | OFL-1.1 |
 | `@fontsource-variable/jetbrains-mono` | 5.3.0 | OFL-1.1 |
+| `@scalar/api-reference` | 1.74.0 | MIT |
 | `@xyflow/react` | 12.12.0 | MIT |
 | `class-variance-authority` | 0.7.1 | Apache-2.0 |
 | `clsx` | 2.1.1 | MIT |
@@ -25,6 +26,8 @@ The Vite build bundles these into `internal/adapter/webui/dist/`, which the bina
 | `react-intl` | 7.1.14 | BSD-3-Clause |
 | `sonner` | 2.0.8 | MIT |
 | `tailwind-merge` | 3.7.0 | MIT |
+
+`@scalar/api-reference` is the API reference site (`scalar.standalone.js`, served at `/api/reference`, built by `packages/js/openapi-tools`); the licenses of the packages bundled in that script are in `third-party-notices.txt`, written next to it and checked against the allowed list by `build-reference.mjs`.
 
 Transitive packages bundled with them (for example the d3 modules of `@xyflow/react`, `intl-messageformat`, `hoist-non-react-statics`) are MIT, ISC or BSD-3-Clause.
 
