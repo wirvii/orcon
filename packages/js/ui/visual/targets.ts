@@ -27,6 +27,8 @@ export interface Target {
   /** Storybook story id, such as "components-button--matrix". */
   id: string;
   title: string;
+  /** The story name: "Matrix", or "Details" and "Execution" for the flow editor. */
+  name: string;
   kind: 'matrix' | 'screen';
   /** The viewports it is checked on. Every target uses mobile and desktop; the flow editor adds tablet. */
   viewports: Viewport[];
@@ -53,6 +55,7 @@ export function loadTargets(): Target[] {
     targets.push({
       id: entry.id,
       title: entry.title,
+      name: entry.name,
       kind: screen ? 'screen' : 'matrix',
       viewports: editor ? [viewports.mobile, viewports.tablet, viewports.desktop] : [viewports.mobile, viewports.desktop],
     });

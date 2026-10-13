@@ -11,7 +11,7 @@ import { loadTargets, storyUrl, viewports } from './targets';
 test.describe('pseudo-locale xx-LS', () => {
   for (const target of loadTargets()) {
     for (const viewport of [viewports.mobile, viewports.desktop]) {
-      test(`${target.title} on ${viewport.name}`, async ({ page }) => {
+      test(`${target.title} ${target.name} on ${viewport.name}`, async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(storyUrl(target.id, { theme: 'light', density: 'comfortable', locale: 'xx-LS' }));
         await settle(page);

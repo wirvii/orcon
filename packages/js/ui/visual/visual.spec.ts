@@ -10,7 +10,7 @@ import { densities, loadTargets, storyUrl, themes } from './targets';
 // phone and a desktop (and a tablet for the flow editor), compared with the committed baseline.
 // Baselines come from the pinned container only: run `pnpm --filter @orcon/ui test:visual:docker`.
 for (const target of loadTargets()) {
-  test.describe(target.title, () => {
+  test.describe(`${target.title} ${target.name}`, () => {
     for (const viewport of target.viewports) {
       for (const theme of themes) {
         for (const density of densities) {
