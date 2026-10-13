@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -30,6 +31,17 @@ type instance struct {
 	broken bool
 	// reqPtr and reqCap are a request buffer reused across calls.
 	reqPtr, reqCap uint32
+
+	// answerAtDeadline makes Call run the module on its own goroutine and stop
+	// waiting when the context is done (ModeCooperativeAbandon). stateMu guards
+	// the hand-over between the caller and that goroutine.
+	answerAtDeadline bool
+	stateMu          sync.Mutex
+	callDone         bool
+	abandoned        bool
+	abandonedAt      time.Time
+	endedAt          time.Time
+	ended            chan struct{}
 }
 
 var _ expr.Runtime = (*instance)(nil)
@@ -93,7 +105,7 @@ func (e *engine) restore(ctx context.Context, snap *snapshot) (*instance, error)
 	if err != nil {
 		return nil, fmt.Errorf("wazero: instantiate the expression runtime: %w", err)
 	}
-	in := &instance{mod: mod, mem: mod.Memory()}
+	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon}
 	have := in.mem.Size() / pageSize
 	if need := uint32((len(snap.memory) + pageSize - 1) / pageSize); need > have { //nolint:gosec // bounded by the memory cap.
 		if _, ok := in.mem.Grow(need - have); !ok {
@@ -120,17 +132,21 @@ func (e *engine) build(ctx context.Context, cfg expr.SandboxConfig, memoryLimit 
 	if err != nil {
 		return nil, fmt.Errorf("wazero: instantiate the expression runtime: %w", err)
 	}
-	in := &instance{mod: mod, mem: mod.Memory()}
+	in := &instance{mod: mod, mem: mod.Memory(), answerAtDeadline: e.mode == ModeCooperativeAbandon}
 	if err := in.bind(); err != nil {
 		_ = mod.Close(ctx)
 		return nil, err
 	}
 	// The call runs under a state whose guest is a no-op: loading scripts
 	// needs the clock and nothing else.
-	loadCtx := withCall(ctx, &callState{guest: noGuest{}, inst: in})
+	var setup expr.Guest = noGuest{}
+	if cfg.Setup != nil {
+		setup = cfg.Setup
+	}
+	loadCtx := withCall(ctx, &callState{guest: setup, inst: in})
 	jsLimit := memoryLimit - reserve
 	var flags int32
-	if e.mode == ModeCooperativeLimit {
+	if e.mode != ModeHardLimit {
 		flags |= 1 // install the QuickJS interrupt handler
 	}
 	if err := in.start(loadCtx, int32(jsLimit), int32(cfg.StackLimit), flags); err != nil { //nolint:gosec // limits are far below 2 GiB.
@@ -264,6 +280,9 @@ func (in *instance) output(ctx context.Context) string {
 
 // Call implements [expr.Runtime].
 func (in *instance) Call(ctx context.Context, request []byte, guest expr.Guest) ([]byte, error) {
+	if in.answerAtDeadline {
+		return in.callAndAbandon(ctx, request, guest)
+	}
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	if in.broken {
@@ -279,6 +298,86 @@ func (in *instance) Call(ctx context.Context, request []byte, guest expr.Guest) 
 		return nil, err
 	}
 	return out, nil
+}
+
+type callResult struct {
+	out []byte
+	err error
+}
+
+// callAndAbandon runs the call on its own goroutine and answers the caller
+// when the call returns or the context is done, whichever comes first. On the
+// deadline the call is abandoned: it keeps the runtime locked until it ends
+// (its next poll of the interrupt handler sees the done context), then the
+// runtime is closed and never used again. SPEC-001 amendment 10, A.2 and A.4.
+func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest expr.Guest) ([]byte, error) {
+	in.mu.Lock()
+	if in.broken {
+		in.mu.Unlock()
+		return nil, fmt.Errorf("%w: the runtime failed earlier and must be reopened", expr.ErrSandbox)
+	}
+	in.ended = make(chan struct{})
+	in.callDone, in.abandoned = false, false
+	done := make(chan callResult, 1)
+	st := &callState{guest: guest, inst: in}
+	go func() {
+		out, err := in.callLocked(withCall(ctx, st), request)
+		if err == nil {
+			err = st.err
+		}
+		if err != nil {
+			in.broken = true
+		}
+		in.stateMu.Lock()
+		in.callDone = true
+		in.endedAt = time.Now()
+		abandoned := in.abandoned
+		in.stateMu.Unlock()
+		if abandoned {
+			// Nobody is waiting: the runtime is not reused, so close it here.
+			in.broken = true
+			_ = in.mod.Close(context.WithoutCancel(ctx))
+		}
+		close(in.ended)
+		done <- callResult{out, err}
+		in.mu.Unlock()
+	}()
+	select {
+	case r := <-done:
+		return r.out, r.err
+	case <-ctx.Done():
+		in.stateMu.Lock()
+		if in.callDone {
+			in.stateMu.Unlock()
+			r := <-done
+			return r.out, r.err
+		}
+		in.abandoned = true
+		in.abandonedAt = time.Now()
+		in.stateMu.Unlock()
+		return nil, fmt.Errorf("%w: %w", expr.ErrTimeout, context.Cause(ctx))
+	}
+}
+
+// AbandonedOvershoot waits for an abandoned call to end and reports how long it
+// kept running after the caller stopped waiting. The second result is false
+// when the last call was not abandoned. It exists for the isolation tests and
+// the measurement report.
+func (in *instance) AbandonedOvershoot(ctx context.Context) (time.Duration, bool) {
+	in.stateMu.Lock()
+	ended, abandoned := in.ended, in.abandoned
+	in.stateMu.Unlock()
+	if ended == nil || !abandoned {
+		return 0, false
+	}
+	select {
+	case <-ended:
+	case <-ctx.Done():
+		return 0, false
+	}
+	in.stateMu.Lock()
+	defer in.stateMu.Unlock()
+	return in.endedAt.Sub(in.abandonedAt), true
 }
 
 func (in *instance) callLocked(ctx context.Context, request []byte) ([]byte, error) {
@@ -332,6 +431,12 @@ func (in *instance) MemoryUsage(ctx context.Context) int64 {
 
 // Close implements [expr.Runtime].
 func (in *instance) Close(ctx context.Context) error {
+	in.stateMu.Lock()
+	abandoned := in.abandoned
+	in.stateMu.Unlock()
+	if abandoned {
+		return nil // the abandoned call closes the runtime when it ends
+	}
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	in.broken = true

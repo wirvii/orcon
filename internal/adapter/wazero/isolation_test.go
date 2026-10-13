@@ -29,7 +29,7 @@ func evalOne(t *testing.T, ev *expr.Evaluator, s *expr.Session, src string) (exp
 // fail only their own evaluation, inside the limits, and nothing survives
 // between executions.
 func TestSandboxIsolation(t *testing.T) {
-	for _, mode := range []wazero.Mode{wazero.ModeHardLimit, wazero.ModeCooperativeLimit} {
+	for _, mode := range []wazero.Mode{wazero.ModeHardLimit, wazero.ModeCooperativeLimit, wazero.ModeCooperativeAbandon} {
 		t.Run(mode.String(), func(t *testing.T) { sandboxIsolation(t, mode) })
 	}
 }
@@ -206,7 +206,7 @@ func mustCompile(t *testing.T, ev *expr.Evaluator, src string) *expr.Program {
 // the scale of a unit test: among many concurrent executions one runs an
 // infinite loop and one a memory bomb; only those two fail.
 func TestSandboxContainsABadNeighbor(t *testing.T) {
-	for _, mode := range []wazero.Mode{wazero.ModeHardLimit, wazero.ModeCooperativeLimit} {
+	for _, mode := range []wazero.Mode{wazero.ModeHardLimit, wazero.ModeCooperativeLimit, wazero.ModeCooperativeAbandon} {
 		t.Run(mode.String(), func(t *testing.T) { badNeighbor(t, mode) })
 	}
 }

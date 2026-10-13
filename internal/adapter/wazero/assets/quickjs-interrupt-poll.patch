@@ -1,0 +1,178 @@
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -8666,6 +8666,21 @@
+ static inline __exception int js_poll_interrupts(JSContext *ctx)
+ {
+     if (unlikely(--ctx->interrupt_counter <= 0)) {
++        return __js_poll_interrupts(ctx);
++    } else {
++        return 0;
++    }
++}
++
++/* Orcon patch: poll the interrupt handler from a native loop. units is the
++   work done since the previous poll, in the same scale as the bytecode
++   operations that js_poll_interrupts counts, so a long native loop reaches the
++   handler as often as a long bytecode loop does. Returns -1 with the
++   "interrupted" exception set when the handler asks to stop. */
++static inline __exception int js_poll_work(JSContext *ctx, int units)
++{
++    ctx->interrupt_counter -= units;
++    if (unlikely(ctx->interrupt_counter <= 0)) {
+         return __js_poll_interrupts(ctx);
+     } else {
+         return 0;
+@@ -43444,6 +43459,8 @@
+                 goto exception;
+             }
+             for (k = 0; k < len; k++, n++) {
++                if (js_poll_work(ctx, 8))
++                    goto exception;
+                 res = JS_TryGetPropertyInt64(ctx, e, k, &val);
+                 if (res < 0)
+                     goto exception;
+@@ -44091,6 +44108,8 @@
+     string_buffer_init(ctx, b, 0);
+ 
+     for(i = 0; i < n; i++) {
++        if (js_poll_work(ctx, 8))
++            goto fail;
+         if (i > 0) {
+             if (c >= 0) {
+                 string_buffer_putc8(b, c);
+@@ -44592,6 +44611,8 @@
+     }
+ 
+     for (sourceIndex = 0; sourceIndex < sourceLen; sourceIndex++) {
++        if (js_poll_work(ctx, 8))
++            return -1;
+         present = JS_TryGetPropertyInt64(ctx, source, sourceIndex, &element);
+         if (present < 0)
+             return -1;
+@@ -47286,7 +47307,7 @@
+     return -1;
+ }
+ 
+-static int string_indexof(JSString *p1, JSString *p2, int from)
++static int string_indexof(JSContext *ctx, JSString *p1, JSString *p2, int from)
+ {
+     /* assuming 0 <= from <= p1->len */
+     int c, i, j, len1 = p1->len, len2 = p2->len;
+@@ -47296,6 +47317,8 @@
+         j = string_indexof_char(p1, c, i);
+         if (j < 0 || j + len2 > len1)
+             break;
++        if (js_poll_work(ctx, len2 + 64))
++            return -2; /* interrupted */
+         if (!string_cmp(p1, p2, j + 1, 1, len2 - 1))
+             return j;
+     }
+@@ -47442,6 +47465,8 @@
+             }
+             if (i == stop)
+                 break;
++            if (js_poll_work(ctx, 16))
++                goto fail;
+         }
+     }
+     JS_FreeValue(ctx, str);
+@@ -47508,6 +47533,10 @@
+             }
+             if (i == stop)
+                 break;
++            if (js_poll_work(ctx, 16)) {
++                ret = -1;
++                goto fail;
++            }
+         }
+     }
+  done:
+@@ -47763,6 +47792,8 @@
+     endOfLastMatch = 0;
+     is_first = true;
+     for(;;) {
++        if (js_poll_work(ctx, 16))
++            goto exception;
+         if (unlikely(searchp->len == 0)) {
+             if (is_first)
+                 pos = 0;
+@@ -47771,7 +47802,9 @@
+             else
+                 pos = endOfLastMatch + 1;
+         } else {
+-            pos = string_indexof(sp, searchp, endOfLastMatch);
++            pos = string_indexof(ctx, sp, searchp, endOfLastMatch);
++            if (pos == -2)
++                goto exception;
+         }
+         if (pos < 0) {
+             if (is_first) {
+@@ -47882,7 +47915,11 @@
+     }
+     q = p;
+     for (q = p; (q += !r) <= s - r - !r; q = p = e + r) {
+-        e = string_indexof(sp, rp, q);
++        if (js_poll_work(ctx, 16))
++            goto exception;
++        e = string_indexof(ctx, sp, rp, q);
++        if (e == -2)
++            goto exception;
+         if (e < 0)
+             break;
+         T = js_sub_string(ctx, sp, p, e);
+@@ -48046,6 +48083,8 @@
+     if (p1) {
+         while (n > 0) {
+             int chunk = min_int(n, p1->len);
++            if (js_poll_work(ctx, 16))
++                goto fail;
+             if (string_buffer_concat(b, p1, 0, chunk))
+                 goto fail;
+             n -= chunk;
+@@ -48105,6 +48144,10 @@
+         string_buffer_fill(b, string_get(p, 0), n);
+     } else {
+         while (n-- > 0) {
++            if (js_poll_work(ctx, 16)) {
++                string_buffer_free(b);
++                goto fail;
++            }
+             string_buffer_concat(b, p, 0, len);
+         }
+     }
+@@ -48289,6 +48332,8 @@
+     if (string_buffer_init(ctx, b, p->len))
+         goto fail;
+     for(i = 0; i < p->len;) {
++        if (js_poll_work(ctx, 4))
++            goto fail;
+         c = string_getc(p, &i);
+         if (c == 0x3a3 && to_lower && test_final_sigma(p, i - 1)) {
+             res[0] = 0x3c2; /* final sigma */
+@@ -51035,6 +51080,8 @@
+     if (js_check_stack_overflow(ctx->rt, 0)) {
+         return JS_ThrowStackOverflow(ctx);
+     }
++    if (js_poll_work(ctx, 8))
++        return JS_EXCEPTION;
+ 
+     if (pr) {
+         pr->value = JS_UNDEFINED;
+@@ -51551,6 +51598,8 @@
+         JS_ThrowStackOverflow(ctx);
+         goto exception;
+     }
++    if (js_poll_work(ctx, 8))
++        goto exception;
+ 
+     if (JS_IsObject(val)) {
+         p = JS_VALUE_GET_OBJ(val);
+@@ -57148,6 +57197,8 @@
+     p = JS_VALUE_GET_STRING(str);
+     string_buffer_init(ctx, b, p->len);
+     for (k = 0; k < p->len;) {
++        if (js_poll_work(ctx, 4))
++            goto fail;
+         c = string_get(p, k);
+         k++;
+         if (isURIUnescaped(c, isComponent)) {

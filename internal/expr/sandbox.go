@@ -31,6 +31,10 @@ type SandboxConfig struct {
 	MemoryLimit uint32
 	// StackLimit is the cap on the JavaScript call stack, in bytes.
 	StackLimit uint32
+	// Setup serves the host calls the scripts make while they load, such as the
+	// zone conversions of the warm-up. It must be deterministic: the runtime
+	// built from the scripts is kept as a snapshot and reused. Nil means no data.
+	Setup Guest
 }
 
 // Script is JavaScript source loaded into a runtime.

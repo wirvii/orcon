@@ -173,7 +173,7 @@ N8N_VERSION ?= 2.43.4
 EXPR_CORPUS ?= $(CURDIR)/.cache/expr-corpus
 EXPR_CORPUS_LIMIT ?= 600
 EXPR_REPORT ?= $(CURDIR)/internal/expr/bench/REPORT.md
-EXPR_HARDWARE ?= $(shell uname -sm)
+EXPR_HARDWARE ?= $(shell { sysctl -n machdep.cpu.brand_string 2>/dev/null || sed -n "s/^model name[^:]*: //p" /proc/cpuinfo 2>/dev/null | head -n 1; uname -sm; } | paste -sd, -)
 EXPR_COMMIT ?= $(shell git rev-parse --short HEAD)
 
 # expr-corpus downloads the most viewed templates of the public n8n library

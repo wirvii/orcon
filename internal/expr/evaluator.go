@@ -131,7 +131,7 @@ func (e *Evaluator) Stats() Stats {
 // preludeScripts returns the scripts every runtime loads, in order.
 func preludeScripts() []Script {
 	var out []Script
-	for _, name := range []string{"intl.js", "luxon.min.js", "runtime.js", "jmespath.js", "extensions.js", "harden.js"} {
+	for _, name := range []string{"intl.js", "luxon.min.js", "runtime.js", "jmespath.js", "extensions.js", "warm.js", "harden.js"} {
 		src, err := preludeFS.ReadFile("prelude/" + name)
 		if err != nil {
 			panic(fmt.Sprintf("expr: the embedded prelude lacks %s: %v", name, err)) // a build defect, not a runtime condition
@@ -139,6 +139,18 @@ func preludeScripts() []Script {
 		out = append(out, Script{Name: name, Source: string(src)})
 	}
 	return out
+}
+
+// SandboxConfig returns the configuration of the runtimes the evaluator opens,
+// for tools that open runtimes themselves.
+func (e *Evaluator) SandboxConfig() SandboxConfig {
+	return SandboxConfig{
+		Scripts:     e.scripts,
+		Entry:       "__orcon_run",
+		Setup:       setupGuest{},
+		MemoryLimit: e.opts.MemoryLimit,
+		StackLimit:  e.opts.StackLimit,
+	}
 }
 
 // Prelude returns the scripts a sandbox runtime loads before it serves

@@ -62,12 +62,7 @@ func (s *Session) sandboxMode(ctx context.Context, code string, need needs, env 
 		return Result{}, errors.New("expr: the session is closed")
 	}
 	if s.rt == nil {
-		rt, err := s.ev.opts.Sandbox.Open(ctx, SandboxConfig{
-			Scripts:     s.ev.scripts,
-			Entry:       "__orcon_run",
-			MemoryLimit: s.ev.opts.MemoryLimit,
-			StackLimit:  s.ev.opts.StackLimit,
-		})
+		rt, err := s.ev.opts.Sandbox.Open(ctx, s.ev.SandboxConfig())
 		if err != nil {
 			return Result{}, fmt.Errorf("expr: open the sandbox: %w", err)
 		}
@@ -323,3 +318,24 @@ func zoneFields(payload string) []byte {
 	t := time.UnixMilli(n).In(loc)
 	return []byte(fmt.Sprintf("%d %d %d %d %d %d", t.Year(), int(t.Month()), t.Day(), t.Hour(), t.Minute(), t.Second()))
 }
+
+// setupGuest serves the host calls the prelude makes while it loads (the
+// zone conversions of the warm-up), with a fixed clock and no randomness, so
+// the memory snapshot built from it is the same every time.
+type setupGuest struct{}
+
+var _ Guest = setupGuest{}
+
+func (setupGuest) HostCall(_ context.Context, op int32, payload []byte) ([]byte, error) {
+	switch op {
+	case OpZoneFields:
+		return zoneFields(string(payload)), nil
+	case OpHash:
+		return hashText(string(payload)), nil
+	default:
+		return nil, nil
+	}
+}
+
+func (setupGuest) Now() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }
+func (setupGuest) Read(p []byte)  { clear(p) }

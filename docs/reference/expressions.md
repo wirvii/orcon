@@ -51,8 +51,8 @@ An expression is classified once, when the flow version is compiled (`Evaluator.
 - **Memory.** The WebAssembly memory is capped (default 64 MiB per runtime) and the JavaScript heap limit sits 8 MiB below it, so a memory bomb raises a catchable `InternalError` and the evaluation fails with `ErrMemory`.
 - **Time.** Each call runs under the context deadline (default 100 ms): `ErrTimeout`. See "Time limit modes".
 - **Stack.** The JavaScript stack is capped (512 KiB); runaway recursion throws a `RangeError` that is also reported as `ErrStack`.
-- **Isolation between executions.** A runtime serves one execution (`Session`) and is closed with it; it is never shared. After any sandbox failure the runtime is discarded and the next evaluation of the session starts from a pristine one. Within a runtime, the prelude freezes every built-in and the global object, so an expression cannot leave state behind (`globalThis.x = 1`, `Array.prototype.y = …`, `Math.random = …` are ignored), and the shared helpers are frozen too. `TestSandboxIsolation` checks all of this in both time-limit modes.
-- **Snapshots.** The prelude (Luxon, the context, the extension methods) is loaded once per configuration and the resulting memory is kept; a new runtime copies it instead of loading the scripts again, which takes well under a millisecond.
+- **Isolation between executions.** A runtime serves one execution (`Session`) and is closed with it; it is never shared. After any sandbox failure the runtime is discarded and the next evaluation of the session starts from a pristine one. Within a runtime, the prelude freezes every built-in and the global object, so an expression cannot leave state behind (`globalThis.x = 1`, `Array.prototype.y = …`, `Math.random = …` are ignored), and the shared helpers are frozen too. `TestSandboxIsolation` checks all of this in every time-limit mode.
+- **Snapshots.** The prelude (Luxon, the context, the extension methods) is loaded once per configuration and the resulting memory is kept; a new runtime copies it instead of loading the scripts again, which takes well under a millisecond. Before the snapshot is taken, `prelude/warm.js` runs a few representative Luxon operations on fixed instants (formatting, parsing, arithmetic, zones) so the caches Luxon and the engine fill on first use (international formatters, zone offsets, format parsers) are already in the snapshot. Luxon is unmodified and its `Settings` are untouched; the snapshot is byte-identical across builds, in one process and across processes (`TestSnapshotDeterministic`).
 
 ### Request protocol
 
@@ -60,12 +60,15 @@ A call carries a request string: a JSON header (`e` code, `m` mode `v`alue or `s
 
 ### Time limit modes
 
-ADR-0018 section 3 prescribes enforcing the deadline with wazero's close-on-context-done. wazero implements it by compiling a check into every function and loop of the module, and the QuickJS interpreter pays it on every bytecode operation, so it runs several times slower. The adapter therefore has two modes (`wazero.WithMode`):
+ADR-0018 section 3 prescribes enforcing the deadline with wazero's close-on-context-done. wazero implements it by compiling a check into every function and loop of the module, and the QuickJS interpreter pays it on every bytecode operation, so it runs several times slower. The adapter has three modes (`wazero.WithMode`):
 
-- `ModeHardLimit` (default): the ADR as written.
-- `ModeCooperativeLimit`: the deadline is enforced by the QuickJS interrupt handler, which the interpreter polls every ten thousand operations and inside regular expressions and long built-ins. Code that never polls (for example `JSON.stringify` of a 100000-deep array) is bounded only by the memory cap and can outlive the deadline; `TestSandboxIsolation` records a case that takes about 2.7 s against a 150 ms limit.
+- `ModeHardLimit` (default, and the only production mode): the ADR as written.
+- `ModeCooperativeLimit`: the deadline is enforced by the QuickJS interrupt handler, which the interpreter polls every ten thousand operations and inside the built-ins whose work grows with the input. The module is QuickJS-ng 0.17.0 plus a small interrupt-poll patch (`assets/quickjs-interrupt-poll.patch`) that adds those polls to string search, replace, split, repeat, pad, JSON, join, concat, flat, case conversion and URI encoding. A built-in the patch does not cover can still outlive the deadline, bounded only by the memory cap.
+- `ModeCooperativeAbandon`: the cooperative mode plus an answer at the deadline. The call runs on its own goroutine and the caller stops waiting when the context is done; the abandoned call stops at its next poll, closes its runtime, and the runtime is never reused. `TestSandboxIsolationAbandon` holds every patched built-in to an `ErrTimeout` within the deadline plus 5 ms for the caller and 100 ms of overshoot for the abandoned call.
 
-The measurement report compares them. Choosing between them is the owner's decision (an amendment of ADR-0018 section 3).
+The two cooperative modes exist for the measurement report and the tests. `TestCooperativeModesStayOutOfProduction` fails if any package outside `internal/adapter/wazero` and `internal/expr/bench` refers to them, or if the configuration, the flags or `cmd/orcon` expose them (SPEC-001 amendment 10, A.1). Choosing one for production is the owner's decision (an amendment of ADR-0018 section 3).
+
+A coarser outer deadline saves nothing. The cost of the hard limit is not paid when the deadline is reached: it is the check wazero compiles into every function and loop whenever close-on-context-done is on, paid on every operation whatever the length of the deadline, and wazero cannot stop from outside a module compiled without those checks. The only way to answer exactly at the deadline without them is to stop waiting for the code rather than to stop the code, which is what `ModeCooperativeAbandon` does.
 
 ## Determinism
 
@@ -91,7 +94,7 @@ The lists of known names are generated from the runtime itself: `go test ./inter
 
 | Component | Version | Licence | Where |
 |---|---|---|---|
-| QuickJS-ng | 0.17.0 | MIT | compiled into `internal/adapter/wazero/assets/quickjs.wasm` |
+| QuickJS-ng 0.17.0 + interrupt-poll patch | 0.17.0 | MIT | compiled into `internal/adapter/wazero/assets/quickjs.wasm`; the patch is `assets/quickjs-interrupt-poll.patch` (a modification of QuickJS-ng, so MIT), applied by `build.sh` |
 | Luxon | 3.7.2 | MIT | `internal/expr/prelude/luxon.min.js`, unmodified |
 | wazero | 1.11.0 | Apache-2.0 | Go module, `internal/adapter/wazero` only |
 | goja (parser packages only) | commit dc0ad5d | MIT | Go module, static analysis only |

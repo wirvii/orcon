@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -38,12 +39,21 @@ const (
 	CategoryRuntime Category = "RUNTIME"
 )
 
-// deferred identifiers belong to a later specification. They are reported as
-// not running unchanged, with the specification that owns them, so the owner
-// can read the figure with and without them.
+// deferred identifiers belong to a later specification that defines them by
+// name. They are reported as not running unchanged, with the specification
+// that owns them, so the figure can be read with and without them. The list is
+// closed: only an identifier a later specification will define belongs here,
+// and the adapter test TestDeferredIdentifiersAreStillUndefined fails once the
+// runtime defines one, so the exclusion cannot outlive its reason.
 var deferred = map[string]string{
 	"$fromAI": "SPEC-006 (agent tools)",
 }
+
+// DeferredIdentifiers returns the identifiers the compatibility gate of cut C5
+// leaves out because a later specification defines them, with the owner of
+// each. The launch gate (ADR-0019 section 5) counts them: it uses the full
+// reading.
+func DeferredIdentifiers() map[string]string { return maps.Clone(deferred) }
 
 // policy identifiers are refused on purpose.
 var policy = map[string]string{

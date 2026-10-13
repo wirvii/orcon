@@ -72,7 +72,7 @@ func TestSessionSandboxRequestAndAnswer(t *testing.T) {
 	if got := canon(t, res); got != `{"b":[1,2]}` {
 		t.Errorf("result = %s", got)
 	}
-	if sb.opened != 1 || len(sb.config.Scripts) != 6 || sb.config.Entry != "__orcon_run" ||
+	if sb.opened != 1 || len(sb.config.Scripts) != 7 || sb.config.Entry != "__orcon_run" ||
 		sb.config.MemoryLimit != expr.DefaultMemoryLimit || sb.config.StackLimit != expr.DefaultStackLimit {
 		t.Errorf("sandbox config = %+v opened %d", sb.config, sb.opened)
 	}

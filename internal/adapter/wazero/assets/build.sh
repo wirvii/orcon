@@ -11,7 +11,7 @@
 # Inputs, all downloaded into a temporary directory and checked against the
 # SHA-256 digests below before use:
 #   wasi-sdk 34.0       Apache-2.0 with LLVM exception (build toolchain only)
-#   QuickJS-ng 0.17.0   MIT (linked into quickjs.wasm)
+#   QuickJS-ng 0.17.0   MIT (linked into quickjs.wasm), plus quickjs-interrupt-poll.patch
 #
 # The Luxon bundle is vendored separately by internal/expr/prelude/vendor-luxon.sh.
 #
@@ -43,6 +43,10 @@ tar -xzf "$work/qjs/qjs.tgz" -C "$work/qjs"
 
 sdk=$(ls -d "$work"/sdk/wasi-sdk-*/)
 src=$(ls -d "$work"/qjs/quickjs-*/)
+
+# Orcon patch: poll the interrupt handler from the native loops of the
+# built-ins whose work grows with their input (SPEC-001 amendment 10, A.4).
+patch -s -p1 -d "$src" < "$here/quickjs-interrupt-poll.patch"
 
 "${sdk}bin/clang" --target=wasm32-wasip1 --sysroot="${sdk}share/wasi-sysroot" \
   -O2 -DNDEBUG -fno-exceptions -D_GNU_SOURCE \

@@ -48,14 +48,27 @@ const (
 	// code that never polls, such as a quadratic string search over megabytes,
 	// is only bounded by the memory cap. See doc.go and the measurement report.
 	ModeCooperativeLimit
+	// ModeCooperativeAbandon is ModeCooperativeLimit plus an answer at the
+	// deadline: the call runs on its own goroutine and the caller stops waiting
+	// when the context is done, whatever the module is doing. The abandoned call
+	// still runs until its next poll of the interrupt handler or its end, then
+	// its runtime is closed and never used again. This is the mode SPEC-001
+	// amendment 10 (A.4, B.1 option 2) prototypes; it is not for production
+	// until the owner decides.
+	ModeCooperativeAbandon
 )
 
 // String names the mode.
 func (m Mode) String() string {
-	if m == ModeCooperativeLimit {
+	switch m {
+	case ModeCooperativeLimit:
 		return "cooperative limit"
+	case ModeCooperativeAbandon:
+		return "cooperative limit with abandon"
+	case ModeHardLimit:
+		return "hard limit"
 	}
-	return "hard limit"
+	return "unknown mode"
 }
 
 // Option configures a [Sandbox].

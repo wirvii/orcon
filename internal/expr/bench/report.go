@@ -55,6 +55,33 @@ type ModeResult struct {
 	// BandP99Runs are the p99 of the median-complexity band in every run of
 	// the suite; Suite is the run with the median value.
 	BandP99Runs []time.Duration
+	// Abandon holds what only the mode that answers at the deadline measures;
+	// nil for the others.
+	Abandon *AbandonResult
+}
+
+// AbandonResult is the cost and the limits of answering at the deadline by
+// abandoning the call (SPEC-001 amendment 10, A.4).
+type AbandonResult struct {
+	// Functions are the built-ins covered by the interrupt-poll patch, each
+	// with how long the caller waited and how long the abandoned call ran on.
+	Functions []AbandonRow
+	// CallerSlack is the largest wait past the deadline seen by any caller;
+	// MaxOvershoot, the longest an abandoned call ran after its caller left.
+	CallerSlack, MaxOvershoot time.Duration
+	// Deadline is the limit the functions were run under.
+	Deadline time.Duration
+	// ExtraNs, ExtraAllocs and ExtraBytes are the cost per call of the
+	// goroutine and channels, against the same call without them.
+	ExtraNs, ExtraAllocs, ExtraBytes float64
+}
+
+// AbandonRow is one built-in driven past its deadline.
+type AbandonRow struct {
+	Name string
+	// Wait is the caller's wait beyond the deadline; Overshoot is how long the
+	// abandoned call ran after the caller stopped waiting.
+	Wait, Overshoot time.Duration
 }
 
 // Check is one target and what was measured against it.
@@ -198,6 +225,9 @@ func (m *Measurements) Markdown() string {
 			heading = "###"
 		}
 		m.writeSuite(&b, heading, mode)
+		if mode.Abandon != nil {
+			writeAbandon(&b, heading, mode.Abandon)
+		}
 	}
 
 	if m.Compat.Expressions > 0 {
@@ -224,7 +254,7 @@ func (m *Measurements) Markdown() string {
 
 	m.writeReading(&b)
 
-	w("## Isolation and determinism\n\nThese are tests, not measurements: `TestSandboxIsolation` (memory bombs, infinite loops, regular-expression backtracking, runaway recursion, attempts to reach the host, state left behind; run in both modes), `TestSandboxContainsABadNeighbour` (one failing execution among many; both modes) and `TestDeterminism` (recorded time and seeded randomness). They run in `make check`.\n\n")
+	w("## Isolation and determinism\n\nThese are tests, not measurements: `TestSandboxIsolation` (memory bombs, infinite loops, regular-expression backtracking, runaway recursion, attempts to reach the host, state left behind; run in every mode), `TestSandboxContainsABadNeighbour` (one failing execution among many; every mode) and `TestDeterminism` (recorded time and seeded randomness). They run in `make check`.\n\n")
 	w("## Reproducing\n\n```sh\nmake expr-compat N8N_VERSION=<pinned n8n release>   # corpus download, compatibility gate, this report\nmake expr-report                                   # this report from the last corpus, without the gate\n```\n")
 	return b.String()
 }
@@ -248,8 +278,23 @@ func (m *Measurements) writeReading(b *strings.Builder) {
 		w("- Luxon is used by %.1f %% of the code segments of the corpus (%.1f %% weighted by views) and by %.1f %% of the segments that need the sandbox. It is a large library that the interpreter runs operation by operation, so a single date operation costs tens to hundreds of microseconds however fast the call into the sandbox is.\n",
 			l.Percent(), l.WeightedPercent(), sl.Percent())
 	}
-	w("- The cost of the time limit is the difference between the modes: wazero's close-on-context-done adds a check to every function and loop of the module, and the interpreter runs several times slower with it. The alternative mode gives the interpreter its full speed and stops runaway code at the next poll of the interrupt handler, but code that never polls is bounded by the memory cap only.\n")
+	w("- The cost of the time limit is the difference between the modes: wazero's close-on-context-done adds a check to every function and loop of the module, and the interpreter runs several times slower with it.\n")
+	w("- A coarser outer deadline saves nothing. The cost is not paid when the deadline is reached; it is the check wazero compiles into every function and loop whenever close-on-context-done is on, and it is paid on every operation whatever the length of the deadline. wazero cannot stop, from outside, a module that was compiled without those checks. The only way to answer exactly at the deadline without them is to stop waiting for the code rather than to stop the code: run the call on its own goroutine and abandon it at the deadline, which is the third mode.\n")
+	w("- The cooperative modes stop the code at the next poll of the interrupt handler. Without the patch, code that never polls (a native string search over megabytes, a deep `JSON.stringify`) outlives its deadline by seconds and is bounded by the memory cap only. The patched module polls inside the built-ins whose work grows with the input, so an abandoned call ends within the overshoot table above.\n")
+	w("- Only the hard limit is a production mode today. The cooperative modes exist so this report and the tests can measure them; an architecture test keeps them out of every other package, of the configuration and of the flags (SPEC-001 amendment 10, A.1). Choosing one is the owner's decision.\n")
+	w("- Compatibility gate: the C5 gate of %.0f %% excludes only identifiers a later specification defines by name (`$fromAI`, SPEC-006), from a closed list in code; `$env` counts as failing. The launch gate of ADR-0019 section 5 uses the full count, the first row of the compatibility table.\n", CompatTarget)
 	w("- This report applies the targets as written and does not amend ADR-0018. Whether to keep the prescribed mechanism, adopt the cooperative one, restate the target for date expressions, or give the most common date operations a fast path is the owner's decision.\n\n")
+}
+
+func writeAbandon(b *strings.Builder, heading string, a *AbandonResult) {
+	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
+	w("%s Answering at the deadline\n\n", heading)
+	w("Each function below is made to run far past a %s deadline on a runtime that already served a request. \"Caller wait\" is how long after the deadline the caller got its `ErrTimeout`; \"call ran on\" is how long the abandoned call kept running before its next poll of the interrupt handler stopped it and its runtime was closed. The largest caller wait was %s and the largest overshoot %s (the tests hold them to 5 ms and 100 ms: `TestSandboxIsolationAbandon`).\n\n", dur(a.Deadline), dur(a.CallerSlack), dur(a.MaxOvershoot))
+	w("| Function | Caller wait past the deadline | Call ran on |\n|---|---|---|\n")
+	for _, r := range a.Functions {
+		w("| %s | %s | %s |\n", r.Name, dur(r.Wait), dur(r.Overshoot))
+	}
+	w("\nGoroutine cost per call, against the same call without the goroutine: %+.0f ns, %+.1f allocations, %+.0f bytes. A call that does not reach its deadline pays only this; an abandoned call also costs its runtime, which is closed when the call ends and never reused, so the next call opens a new one (see the cold open above).\n\n", a.ExtraNs, a.ExtraAllocs, a.ExtraBytes)
 }
 
 func verb(ok bool) string {

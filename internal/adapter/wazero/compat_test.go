@@ -4,10 +4,12 @@
 package wazero_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,10 +73,11 @@ func TestExprCompat(t *testing.T) {
 	}
 	t.Logf("every expression that does not run unchanged, with its node and field, is listed in %s", filepath.Join(dir, "unsupported.txt"))
 
-	// The gate (E-EXPR-3): at least 95 % run unchanged, both plain and weighted
-	// by usage. $fromAI belongs to the agent specification (SPEC-006) and is
-	// reported with its own reason; the strict reading, which counts it as not
-	// running, is logged above and is a question for the owner.
+	// The gate (E-EXPR-3) of cut C5: at least 95 % run unchanged, both plain and
+	// weighted by usage, leaving out only the identifiers a later specification
+	// defines by name (bench.DeferredIdentifiers, today $fromAI of SPEC-006).
+	// $env counts as a failure: it is refused on purpose. The launch gate
+	// (ADR-0019 section 5) uses the full reading logged above.
 	gate := 95.0
 	if v := os.Getenv("ORCON_EXPR_COMPAT_MIN"); v != "" {
 		parsed, err := strconv.ParseFloat(v, 64)
@@ -206,4 +209,26 @@ type corpusNodeSet map[string]expr.NodeOutput
 func (c corpusNodeSet) Node(name string) (expr.NodeOutput, bool) {
 	o, ok := c[name]
 	return o, ok
+}
+
+// TestDeferredIdentifiersAreStillUndefined keeps the exclusion of the C5
+// compatibility gate honest: an identifier is left out only while the runtime
+// does not define it. When the specification that owns it lands, this test
+// fails and the entry must go.
+func TestDeferredIdentifiersAreStillUndefined(t *testing.T) {
+	ev := evaluator(t, expr.Options{DisableFastPath: true})
+	s := ev.Open()
+	t.Cleanup(func() { _ = s.Close(context.WithoutCancel(t.Context())) })
+	for name, owner := range bench.DeferredIdentifiers() {
+		if owner == "" {
+			t.Errorf("%s has no owning specification", name)
+		}
+		res, err := evalOne(t, ev, s, "={{ typeof "+name+" }}")
+		if err != nil || outcome(res, err) != `"undefined"` {
+			t.Errorf("%s is now defined by the runtime (%s %v): remove it from the deferred list of internal/expr/bench", name, outcome(res, err), err)
+		}
+		if slices.Contains(expr.ContextNames(), name) || slices.Contains(expr.GlobalNames(), name) {
+			t.Errorf("%s is listed as a known name: remove it from the deferred list", name)
+		}
+	}
 }
