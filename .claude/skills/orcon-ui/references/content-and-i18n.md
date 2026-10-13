@@ -74,3 +74,8 @@ Use these terms consistently in both languages:
 | retry | reintentar | Run a failed attempt again |
 | continue | continuar | Resume a paused execution |
 | cancel | cancelar | Stop an execution |
+| pinned data | datos fijados | Output kept as the node's result so later runs reuse it |
+| sticky note | nota adhesiva | A free-text note placed on the canvas |
+| node details | detalle del nodo | The view that shows a node's input, parameters and output |
+| run step | ejecutar paso | Run one node using the data it already has |
+| tidy up | ordenar | Align nodes to the grid in columns |

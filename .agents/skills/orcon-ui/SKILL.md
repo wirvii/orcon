@@ -4,7 +4,7 @@ description: Builds and reviews Orcon web UI (apps/web, packages/js) with the Or
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with pnpm 9 and Node 22.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   pinned: true
   owner: wirvii
 ---
@@ -31,7 +31,8 @@ Reference map (load only what the task needs):
 | [foundations.md](references/foundations.md) | Color, theme, type, icons, mascot, brand mark, layout, density, elevation, motion |
 | [tokens.md](references/tokens.md) | Using, naming or adding tokens; contrast pairs |
 | [components.md](references/components.md) | Building or changing any component; status, errors, notifications, redaction, screen templates |
-| [canvas.md](references/canvas.md) | Anything on the workflow canvas |
+| [canvas.md](references/canvas.md) | Anything on the workflow canvas: tiles, ports, edges, states, node details view, data panel (style A) |
+| [canvas.md#parity](references/canvas.md#parity) | Editor parity: every interaction equal to or better than the n8n editor experience, with pointer and keyboard scripts |
 | [content-and-i18n.md](references/content-and-i18n.md) | Any user-visible text, formatting or translation |
 | [accessibility.md](references/accessibility.md) | Every change (WCAG 2.2 AA), and the manual pass |
 | [contrast-report.md](references/contrast-report.md) | Checking a certified pair (generated file) |
@@ -65,8 +66,9 @@ Reference map (load only what the task needs):
 22. Server errors (`application/problem+json`) render through `ProblemAlert` and `FormField`; input is never cleared on error ([forms and errors](references/components.md#forms-and-errors)).
 23. Protected data without permission renders as `RedactedValue`, never empty; copy never copies hidden values ([redaction](references/components.md#redaction)).
 24. Decisions never live in toasts; live announcements are polite and coalesced ([notifications](references/components.md#notifications), [live regions](references/accessibility.md#live-regions)).
-25. No n8n code, icons, artwork or branding; familiar interaction, original look ([principles](references/foundations.md#principles)).
-26. Code comments, stories, commit messages and PR text never name coding-agent products and never carry AI authorship trailers; use neutral contributor wording.
+25. No n8n code, CSS, icons, assets or branding; the editor is familiar in interaction and canvas layout (style A) with Orcon's own palette, icons and brand ([principles](references/foundations.md#principles), [style](references/canvas.md#style)).
+26. Editor parity: every row of the parity table owned by this repository is equal to or better than the n8n editor experience, within its maximum steps, with a pointer script and a keyboard script ([parity](references/canvas.md#parity)).
+27. Code comments, stories, commit messages and PR text never name coding-agent products and never carry AI authorship trailers; use neutral contributor wording.
 
 ## Automated Checks
 
@@ -78,8 +80,10 @@ Reference map (load only what the task needs):
 | Mascot and connector icon boundaries | `Mascot` is not imported in canvas, execution, error, security or dense views; `ConnectorIcon` is the only path for connector SVGs | Remove the import or use `EmptyState` in an allowed context |
 | Contrast | Every fg/bg pair × theme meets 4.5:1 (text) or 3:1 (UI); every color token is in a pair or marked decorative; no text pair uses an exact brand hue; every pair a component uses is declared; the report is current | Adjust the semantic token or declare the correct pair; never lower a minimum |
 | Accessibility (axe) | Zero axe violations (WCAG A/AA 2.0 to 2.2) in every story in light and dark, every template and the `apps/web` screen | Fix semantics, accessible names, roles or rendered contrast |
-| Story coverage | Every component has `meta.ts` with `states`, one story per state and `Matrix`; the visual configuration covers theme × viewport × density | Add the missing stories or states |
-| Visual regression | Every `Matrix` and template × {light, dark} × {mobile, desktop} × {comfortable, compact} (plus tablet for S3) matches its baseline | If intended, regenerate in the pinned container and ask for re-approval of approved items |
+| Story coverage | Every component, canvas primitive and editor component has `meta.ts` with `states`, one story per state and `Matrix`; the visual configuration covers theme × viewport × density | Add the missing stories or states |
+| Canvas geometry and states | Rendered measures of the style A tile, trigger, labels, badges, ports, stubs, edges and every execution state; animations only on running elements; level of detail; node details view layout by width | Match the measures of `canvas.md` or add the missing token |
+| Editor parity | Every `Editor/Parity/<ID>` story runs its pointer and keyboard scripts within the maximum steps; every parity row owned here has a story and light and dark baselines | Add or fix the story, script or baseline |
+| Visual regression | Every `Matrix` and template × {light, dark} × {mobile, desktop} × {comfortable, compact} (plus tablet for S3) and the end state of each parity story × {light, dark} match their baselines | If intended, regenerate in the pinned container and ask for re-approval of approved items |
 | Text expansion | In the pseudo-locale `xx-LS`, no text container overflows unless truncation is declared (`data-truncate` + tooltip) | Allow wrapping or declare truncation |
 | Targets and density | With touch and a coarse pointer, every interactive control is at least 44×44; table rows are 40 px (comfortable) and 32 px (compact) | Use `h-control` / `h-row` and the base component hit area |
 | Fonts self-hosted | The web build references no external font domain and contains `.woff2` files | Import fonts from `@fontsource-variable/*` |
@@ -87,7 +91,7 @@ Reference map (load only what the task needs):
 
 ## Verification
 
-1. `sh .agents/skills/orcon-ui/scripts/verify.sh` exits 0 (lint, typecheck, tokens test, i18n check, unit, stories, accessibility, targets and visual tests).
+1. `sh .agents/skills/orcon-ui/scripts/verify.sh` exits 0 (lint, typecheck, tokens test, i18n check, unit, stories, canvas, parity, accessibility, targets and visual tests).
 2. The screenshot review findings table is attached to the pull request ([review protocol](references/review-protocol.md#findings-table)).
 3. The manual keyboard and screen-reader pass is recorded in the pull request ([manual pass](references/accessibility.md#manual-pass)).
 4. `sh .agents/skills/orcon-ui/validation/run.sh` exits 0 and `.claude/skills/orcon-ui` is identical to `.agents/skills/orcon-ui` after `sh .agents/skills/orcon-ui/scripts/project.sh`.

@@ -36,6 +36,7 @@ This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and
 2. No keyboard traps except intentional dialog focus traps, which close with Escape.
 3. Single-character shortcuts (canvas `A`, `C`, `?`) work only when the canvas has focus and are listed in the shortcut help (2.1.4).
 4. Composite widgets (menus, tabs, radio groups, listboxes, tree outline) use arrow keys inside and a single Tab stop.
+5. Every row of [canvas.md#parity](canvas.md#parity) has a keyboard script that reaches the same end state as the pointer script within the same number of steps; inside a focused node, Tab reaches the toolbar buttons and then the output ports, and a focused connection offers its actions ([canvas.md#keyboard](canvas.md#keyboard)).
 
 ## Targets
 

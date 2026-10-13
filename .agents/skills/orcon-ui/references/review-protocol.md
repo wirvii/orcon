@@ -9,7 +9,7 @@ How a UI change is reviewed visually before the owner sees it, and how the owner
 ## Capture
 
 1. Build the static Storybook from the commit under review: `pnpm --filter @orcon/ui build-storybook`.
-2. Capture every affected `Matrix` story and screen template in the 8 combinations: {light, dark} × {mobile 390×844, desktop 1440×900} × {comfortable, compact}. The flow editor template (S3) adds tablet 1024×768.
+2. Capture every affected `Matrix` story and screen template in the 8 combinations: {light, dark} × {mobile 390×844, desktop 1440×900} × {comfortable, compact}. The flow editor template (S3) adds tablet 1024×768, including the node details view. For canvas and editor work also capture the end state of each `Editor/Parity/*` story in light and dark, and canvas views at 100 %, 50 % and 30 % zoom.
 3. Use the same pinned Playwright container as the visual regression suite (`pnpm --filter @orcon/ui test:visual:docker`), with reduced motion enabled, so captures are reproducible.
 4. Also capture the pseudo-locale `xx-LS` for screens with long text.
 5. Name captures `<story-id>--<theme>--<viewport>--<density>.png` and attach them to the pull request (or link the CI artifact).
@@ -27,7 +27,9 @@ Place each capture side by side with `brand/reference/orcon-board-primary.png` (
 | Accent use | Green-teal appears only for execution, primary action, focus and selection |
 | Status colors | Red, amber and violet appear only on status elements, always with icon + text |
 | No stock look | Nothing looks like default shadcn/ui (radius, gray palette, shadows, focus ring) |
-| No n8n traits | No n8n colors, node shapes, icons, artwork or layouts copied |
+| Nothing copied from n8n | No n8n code, CSS, icons, assets or branding; familiarity comes from measures, layout and interactions implemented with Lucide, Orcon icons and the Orcon palette |
+| Style A mockup | For canvas and editor work, compare each capture with `docs/design-system/mockups/editor-style-a.html` (style A tab, light and dark) and the measures of [canvas.md](canvas.md); the only deviations are the ones the specification lists |
+| Editor parity | Walk every row of [canvas.md#parity](canvas.md#parity) with the pointer and with the keyboard; each is equal to or better than the n8n editor experience and within its maximum steps |
 | Brand assets | BrandMark and Mascot show the neutral placeholders until approved assets exist; nothing tries to redraw the symbol or the character |
 | Themes and densities | Dark is designed (stepped surfaces, lighter accents), not inverted; compact keeps hierarchy and readability |
 
@@ -51,3 +53,4 @@ Attach this table to the pull request, one row per finding (or a single row "No 
 3. `BrandMark` and `Mascot` are reviewed as neutral placeholders; their final versions are reviewed when the approved brand assets are delivered.
 4. **Acceptance**: when every row is `Approved`, every normative reference changes its status line to `Status: Accepted` and `metadata.version` in `SKILL.md` becomes `1.1.0`. Until then, product screens must not rely on the design system as an accepted source.
 5. **Re-approval**: changing the visual baseline of an `Approved` component or template returns its row to `Pending`.
+6. **Editor parity review**: "Editor parity review" in `docs/design-system/README.md` has one row per row of [canvas.md#parity](canvas.md#parity) (P-01 to P-30). The owner records `Equal`, `Better` or `Worse — changes requested` with date and the commit of the reviewed Storybook; no row may stay `Worse` when the canvas and editor rows are approved. Visual baselines of the canvas and editor are generated only by the `visual-baselines` workflow in the pinned container.

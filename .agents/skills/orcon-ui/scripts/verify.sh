@@ -4,8 +4,8 @@
 #
 # Full local UI gate for Orcon. Runs, in order and stopping at the first
 # failure: lint, typecheck, the @orcon/tokens tests, the i18n check, and the
-# @orcon/ui unit, story, accessibility, target and visual tests (visual tests
-# run in the pinned container).
+# @orcon/ui unit, story, canvas, parity, accessibility, target and visual tests
+# (visual tests run in the pinned container).
 #
 # Usage: sh .agents/skills/orcon-ui/scripts/verify.sh
 #
@@ -56,7 +56,10 @@ step "typecheck" . typecheck pnpm typecheck
 step "tokens test" "$tokens" test pnpm --filter @orcon/tokens test
 step "i18n check" . i18n:check pnpm i18n:check
 step "unit tests" "$ui" test:unit pnpm --filter @orcon/ui test:unit
+step "storybook build" "$ui" build-storybook pnpm --filter @orcon/ui build-storybook
 step "story coverage" "$ui" test:stories pnpm --filter @orcon/ui test:stories
+step "canvas geometry and states" "$ui" test:canvas pnpm --filter @orcon/ui test:canvas
+step "editor parity" "$ui" test:parity pnpm --filter @orcon/ui test:parity
 step "accessibility" "$ui" test:a11y pnpm --filter @orcon/ui test:a11y
 step "targets and density" "$ui" test:targets pnpm --filter @orcon/ui test:targets
 step "visual regression" "$ui" test:visual:docker pnpm --filter @orcon/ui test:visual:docker

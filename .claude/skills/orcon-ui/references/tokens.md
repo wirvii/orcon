@@ -154,7 +154,7 @@ Rules:
 | Scale | Values |
 |---|---|
 | Spacing (base 4 px) | 0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16 steps = 0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 px |
-| Radius | sm 4, md 8, lg 12, xl 16, full (9999) |
+| Radius | sm 4, md 8, lg 12, xl 16, 2xl 18 (canvas nodes only), full (9999) |
 | Shadow (light theme) | sm, md, lg; dark theme uses border + raised surface and a faint shadow |
 | Z layers | base 0, sticky 10, dropdown 20, overlay 30, modal 40, toast 50, tooltip 60 |
 | Breakpoints | sm 640, md 768, lg 1024, xl 1280, 2xl 1536 |
@@ -163,7 +163,7 @@ Rules:
 | Font family | sans: Inter Variable; mono: JetBrains Mono Variable (self-hosted) |
 | Icon size | 16, 20, 24 |
 
-Radius usage: controls `md` (8); cards, panels, nodes `lg` (12); dialogs and sheets `xl` (16); pills and control nodes `full`.
+Radius usage: controls `md` (8); cards and panels `lg` (12); dialogs and sheets `xl` (16); canvas node tiles `2xl` (18); pills and status chips `full`.
 
 ## Density tokens
 
@@ -175,8 +175,6 @@ Radius usage: controls `md` (8); cards, panels, nodes `lg` (12); dialogs and she
 | `space.gap` | 12 px | 8 px |
 | `size.connector-icon` | 32 px | 24 px |
 | `size.connector-icon-safe` | 20 px | 16 px |
-| `size.node-width` (component) | 240 px | 208 px |
-| `size.control-node-height` (component) | 40 px | 32 px |
 
 `size.target-min` is 44 px under `@media (pointer: coarse)` and 24 px otherwise, independent of density ([foundations.md#density](foundations.md#density)).
 
@@ -192,6 +190,51 @@ Radius usage: controls `md` (8); cards, panels, nodes `lg` (12); dialogs and she
 | `easing.exit` | cubic-bezier(0.4, 0, 1, 1) |
 
 Under `@media (prefers-reduced-motion: reduce)` every `duration.*` resolves to 0 ms.
+
+## Canvas tokens
+
+Canvas geometry is density-independent: these tokens do not change with density, and scale only with canvas zoom ([canvas.md](canvas.md)). Sizes are CSS px at 100 % zoom.
+
+| Token | Value | Used by |
+|---|---|---|
+| `canvas.node-size` | 100 | Node tile width and height |
+| `canvas.node-wide` | 200 | Agent tile width |
+| `canvas.icon-box` | 40 | Icon box inside a tile |
+| `canvas.icon` | 36 | Built-in node icon |
+| `canvas.label-width` | 150 | Maximum label width |
+| `canvas.badge` | 22 | Status and pinned badges, trigger mark |
+| `size.port` | 10 | Port diameter |
+| `canvas.port-hover` | 24 | Output port grown on hover or focus |
+| `canvas.stub` | 30 | Dangling output stub length |
+| `canvas.stub-box` | 22 | Dangling output "+" box |
+| `canvas.toolbar-button` | 28 | Node toolbar button |
+| `canvas.ai-block` | 48 | AI block circle |
+| `canvas.grid-step` | 20 | Dot grid spacing and snap step |
+| `canvas.grid-dot` | 1.4 | Dot grid dot radius |
+| `canvas.minimap-w`, `canvas.minimap-h` | 200, 120 | Minimap size |
+| `canvas.palette-w` | 360 | Node palette panel width |
+| `editor.params-min`, `editor.params-max` | 420, 640 | Parameters pane width limits |
+| `editor.pane-min` | 280 | Input and Output pane minimum width |
+| `editor.docked-panel` | 320 | Docked Parameters pane width between md and lg |
+| `radius.2xl` | 18 | Node tile radius |
+| `motion.loop.ring`, `motion.loop.spin`, `motion.loop.edge` | 1300 ms, 1000 ms, 800 ms | Running ring sweep, running spinner, running edge flow; 0 ms under reduced motion |
+| `canvas.lod.detail`, `canvas.lod.minimal` | 0.6, 0.35 | Zoom thresholds of [canvas.md#level-of-detail](canvas.md#level-of-detail) |
+| `canvas.zoom.min`, `canvas.zoom.max` | 0.2, 4 | Zoom limits |
+
+Semantic colors (light / dark):
+
+| Token | Light | Dark | Type |
+|---|---|---|---|
+| `canvas.node.bg` | = `surface.default` #FFFFFF | = `surface.default` #0F172A | surface |
+| `canvas.marquee.bg` | #16A34A at 10 % | #22C55E at 15 % | decorative |
+| `canvas.sticky.1.bg` / `.border` / `.accent` | #ECFEFF / #0E7490 / #0E7490 | #083344 / #22D3EE / #22D3EE | bg and border decorative; accent is text |
+| `canvas.sticky.2.*` | #F0FDF4 / #15803D / #15803D | #052E16 / #4ADE80 / #4ADE80 | same |
+| `canvas.sticky.3.*` | #F1F5F9 / #64748B / #475569 | #1E293B / #94A3B8 / #94A3B8 | same |
+| `canvas.sticky.4.*` | #FFFFFF / #64748B / #475569 | #0F172A / #94A3B8 / #94A3B8 | same |
+| `canvas.sticky.5.*` | #CFFAFE / #155E75 / #155E75 | #164E63 / #67E8F9 / #67E8F9 | same |
+| `canvas.sticky.6.*` | #DCFCE7 / #166534 / #166534 | #14532D / #86EFAC / #86EFAC | same |
+
+Sticky notes use cyan, green and slate tones only: red, amber and violet are never decorative. The pairs these tokens take part in are declared in `pairs.json` and certified in [contrast-report.md](contrast-report.md).
 
 ## Outputs
 

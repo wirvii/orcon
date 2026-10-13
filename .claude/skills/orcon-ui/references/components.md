@@ -70,7 +70,7 @@ Base components under owner review. Each one has a row in "Owner review status" 
 | CommandPalette | `cmdk`; opens with Ctrl/Cmd+K; searchable; results grouped; full keyboard support. |
 | Separator | Decorative divider using `border.default`; `role="separator"` only when it separates interactive groups. |
 | ScrollArea | Radix ScrollArea; keyboard scrollable; focusable when it has no focusable children. |
-| ConnectorIcon | Orcon frame + `<img>` connector logo per [foundations.md#iconography](foundations.md#iconography). The only way to render connector SVGs. |
+| ConnectorIcon | Orcon frame + `<img>` connector logo per [foundations.md#iconography](foundations.md#iconography). The only way to render connector SVGs. Variant `tile` renders the bare `<img>` without the inner frame, for the icon box of a canvas node. |
 | BrandMark (placeholder) | Neutral placeholder until the approved assets exist ([foundations.md#brand-mark](foundations.md#brand-mark)). |
 | Mascot (placeholder) | Neutral placeholder; allowed contexts only; lazy-loaded; decorative ([foundations.md#mascot](foundations.md#mascot)). |
 | AppShell | Layout of [foundations.md#layout](foundations.md#layout): sidebar, rail, bottom navigation + drawer; landmarks `header`, `nav`, `main`; skip link to main content. |
@@ -82,7 +82,7 @@ Base components under owner review. Each one has a row in "Owner review status" 
 | DensitySwitcher | Comfortable, Compact ([foundations.md#density](foundations.md#density)). |
 | LocaleSwitcher | English, Español; each language name written in its own language. |
 
-Canvas primitives (NodeCard, ControlNode, Port, Edge, EdgeCount, NodeStatus, CanvasOutline, CanvasToolbar) follow [canvas.md](canvas.md) and the same contract.
+Canvas primitives (CanvasNode, NodeStatusBadge, NodeStatusChip, PinnedBadge, NodePort, PortAddButton, OutputStub, CanvasEdge, EdgeLabel, EdgeActions, NodeToolbar, StickyNote, CanvasControls, CanvasMinimap, AddFirstStep, AiBlock, NodePalettePanel, CanvasOutline) and editor components (NodeDetailsView, PaneSplitter, DataPane, DataTableView, JsonTreeView, SchemaView) follow [canvas.md](canvas.md) and the same contract. Each has a row in "Owner review status".
 
 ## States
 
@@ -153,6 +153,7 @@ Rules:
 4. Truncation is allowed only when declared (`data-truncate`) and the full value is reachable through a tooltip and the accessible name.
 5. Large lists and catalogs are virtualized.
 6. JSON previews are rendered as text (never as HTML) and respect [#redaction](#redaction).
+7. Wherever execution data is shown (node input and output, execution detail), tables, JSON trees and schema views follow [canvas.md#data-panel](canvas.md#data-panel): `DataPane` with `DataTableView`, `JsonTreeView` and `SchemaView`.
 
 ## Redaction
 
@@ -169,9 +170,9 @@ Screen templates live in `src/screens/`, use sample data fixtures and make no HT
 |---|---|---|
 | S1 | Shell + welcome/onboarding (mascot "welcome", neutral placeholder) | Phone, desktop |
 | S2 | Flow list (enable/disable a flow) | Phone, desktop |
-| S3 | Flow editor (desktop/tablet) and read-only canvas (phone) | Desktop, tablet; phone read-only |
+| S3 | Flow editor in style A (desktop/tablet): top bar, canvas, controls, minimap, node palette, node details view with three panes and the data panel; read-only canvas (phone); hosts the `Editor/Parity/*` stories | Desktop, tablet; phone read-only |
 | S4 | Execution list | Phone, desktop |
-| S5 | Execution detail: timeline, attempts per node, UNCERTAIN resolution panel, continue/retry/cancel | Phone, desktop |
+| S5 | Execution detail: style A canvas with execution states, timeline, attempts per node, UNCERTAIN resolution panel, continue/retry/cancel | Phone, desktop |
 | S6 | Human attention inbox + notifications panel | Phone, desktop |
 | S7 | Approval page: tool, arguments or RedactedValue, approve / deny with reason / edit arguments, relative expiry with Intl, 409 with current outcome | Phone, desktop |
 | S8 | Empty states, 404 (mascot "explorer", neutral placeholder), error page (no mascot) | Phone, desktop |

@@ -11,7 +11,7 @@ This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and
 1. Professional and restrained. The interface is a work tool: calm surfaces, a navy and graphite base, and green-teal highlights reserved for execution, the primary action and selection.
 2. Light surfaces are used for secondary layouts in the light theme; the dark theme keeps the navy character of the brand boards.
 3. Status is never conveyed by color alone. Every status has an icon and a text label; color only reinforces them ([components.md#status](components.md#status)).
-4. Familiar in interaction, original in look. People who know n8n MUST find the canvas, node palette and inspector easy to use, but Orcon MUST NOT copy n8n code, icons, illustrations, layouts pixel for pixel, names of visual elements or branding.
+4. Familiar in interaction and canvas layout (style A, [canvas.md](canvas.md)), with Orcon's own palette, icons and brand. People who know n8n MUST find the canvas, node palette and node details view easy to use, and V1 MUST match that editor experience at least ([canvas.md#parity](canvas.md#parity)); Orcon MUST NOT copy n8n code, CSS, icons, assets, illustrations or branding.
 5. No stock component-library look. Components derived from shadcn/ui MUST be re-themed (radius, color, shadow, focus, density) so that nothing looks like the library defaults.
 6. Accessible by construction: WCAG 2.2 AA is the floor ([accessibility.md#target](accessibility.md#target)).
 7. Motion is minimal and functional ([#motion](#motion)).
@@ -109,7 +109,7 @@ The exact shade of every status color is defined once in [tokens.md#semantic-col
    - `alt` is the connector display name.
    - Catalog admission: square SVG, no scripts, no external references, at most 8 KiB.
 5. Third-party logos are used only to identify the corresponding service, inside `ConnectorIcon`. They MUST NOT be recolored, combined with the Orcon mark, or used decoratively.
-6. n8n icons and node artwork MUST NOT be used or imitated.
+6. n8n icons and node artwork MUST NOT be used or imitated. Inside canvas nodes a connector logo is shown through `ConnectorIcon variant="tile"` (the bare `<img>` in the 40 px icon box, no inner frame); built-in nodes use Lucide icons ([canvas.md#node-tile](canvas.md#node-tile)).
 
 ## Mascot
 
@@ -170,6 +170,6 @@ The exact shade of every status color is defined once in [tokens.md#semantic-col
 1. Durations: `duration.fast` 120 ms, `duration.base` 160 ms, `duration.slow` 200 ms. Nothing longer.
 2. Easing: `easing.standard` cubic-bezier(0.2, 0, 0, 1); `easing.enter` cubic-bezier(0, 0, 0.2, 1); `easing.exit` cubic-bezier(0.4, 0, 1, 1).
 3. Allowed uses only: a state change, the spatial origin of a panel or sheet, and feedback to a click or press.
-4. Motion MUST NEVER block interaction and MUST NEVER animate large graphs continuously.
+4. Motion MUST NEVER block interaction and MUST NEVER animate large graphs continuously. The only looping motion on the canvas is on running elements (run ring, running spinner, running edge), and it is off with reduced motion ([canvas.md#execution-states](canvas.md#execution-states)).
 5. With `prefers-reduced-motion: reduce`, all durations are 0 ms and the running indicator does not spin; status stays visible by icon and text.
-6. No decorative, looping or parallax animation.
+6. No decorative, looping or parallax animation. Functional running indicators are the only loops, with durations `motion.loop.*` ([tokens.md#canvas-tokens](tokens.md#canvas-tokens)).
