@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Lint configuration of the public API contract (packages/openapi/v1/openapi.yaml).
+# The rulebook is .agents/skills/orcon-api/references/; the plugin implements its 31
+# `orcon/*` rules. No rule is disabled for the real contract (H-API1-1): an exception
+# is an amendment of ADR 0080, never a line here.
+#
+# Run from the repository root:
+#   pnpm --filter @orcon/openapi-tools exec redocly lint --config redocly.yaml <contract>
+
+extends:
+  - recommended-strict
+
+plugins:
+  - ./plugin/orcon.js
+
+rules:
+  # Built-in rules required by the toolchain (spec section 4.5).
+  struct: error
+  operation-operationId-unique: error
+  operation-operationId-url-safe: error
+  path-parameters-defined: error
+  no-ambiguous-paths: error
+  no-invalid-media-type-examples: error
+  no-invalid-schema-examples: error
+  no-unused-components: error
+  security-defined: error
+  no-server-trailing-slash: error
+  operation-4xx-problem-details-rfc7807: error
+
+  # Orcon rules, one per rulebook area. Severity error for all of them.
+  orcon/path-shape: error
+  orcon/action-verb: error
+  orcon/path-param-name: error
+  orcon/operation-id: error
+  orcon/header-names: error
+  orcon/field-camel-case: error
+  orcon/id-format: error
+  orcon/enum-upper-snake: error
+  orcon/time-format: error
+  orcon/secret-fields: error
+  orcon/named-schemas: error
+  orcon/response-shape: error
+  orcon/list-pagination: error
+  orcon/sort-allowlist: error
+  orcon/problem-responses: error
+  orcon/problem-codes-declared: error
+  orcon/idempotency: error
+  orcon/concurrency: error
+  orcon/rate-class: error
+  orcon/long-running: error
+  orcon/stability: error
+  orcon/deprecation: error
+  orcon/permission:
+    severity: error
+    permissionsFile: internal/authz/permissions.yaml
+  orcon/audit: error
+  orcon/cli-declared: error
+  orcon/mcp-declared: error
+  orcon/doc-operation: error
+  orcon/doc-fields: error
+  orcon/doc-examples: error
+  orcon/events: error
+  orcon/codegen-subset: error

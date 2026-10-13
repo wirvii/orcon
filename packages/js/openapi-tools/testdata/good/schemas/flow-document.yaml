@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A document the API returns verbatim (like orcon/flow@1). The contract references it, so
+# its enumerations follow the UPPER_SNAKE rule too (FIELD-3, orcon/enum-upper-snake).
+type: object
+description: The flow document stored in a draft.
+required: [schema, nodes]
+properties:
+  schema:
+    type: string
+    description: Identifier and version of the document format.
+    enum: [orcon/flow@1]
+    x-orcon-enum-kind: identifier
+  nodes:
+    type: array
+    description: The nodes of the flow.
+    items:
+      type: object
+      description: One node of the flow.
+      required: [id, kind]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the node inside the flow.
+          examples: [0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80]
+        kind:
+          type: string
+          description: Role of the node in the flow.
+          enum: [TRIGGER, ACTION, WAIT_FOR_HUMAN]

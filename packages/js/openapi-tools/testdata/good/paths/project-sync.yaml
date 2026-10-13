@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: '../openapi.yaml#/components/parameters/ProjectId'
+post:
+  operationId: syncProject
+  summary: Synchronize a project with its Git repository
+  description: >-
+    Starts a synchronization of the project with the repository it is bound to and returns the
+    operation that tracks it. Use the Location header to follow the operation until it
+    finishes; the flows of the project change only when the operation succeeds.
+  tags: [projects]
+  x-orcon-permission: flow:import
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: required
+  x-orcon-long-running:
+    kind: GIT_SYNC
+  x-orcon-audit: project.synced
+  x-orcon-problems:
+    - unauthenticated
+    - forbidden
+    - not-found
+    - validation-failed
+    - idempotency-key-reused
+    - idempotency-in-progress
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: projects sync
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: startProjectSync
+      scenario: project-with-git-binding
+      request:
+        pathParams:
+          projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        headers:
+          Idempotency-Key: sync-example-1
+      response:
+        status: 202
+        body: startProjectSync
+      operation:
+        terminalStatus: SUCCEEDED
+  parameters:
+    - $ref: '../openapi.yaml#/components/parameters/IdempotencyKeyRequired'
+  responses:
+    '202':
+      description: The synchronization was accepted; follow the operation named in Location.
+      headers:
+        Location:
+          $ref: '../openapi.yaml#/components/headers/Location'
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+        RateLimit:
+          $ref: '../openapi.yaml#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '../openapi.yaml#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Operation'
+          examples:
+            startProjectSync:
+              summary: A pending synchronization
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72
+                kind: GIT_SYNC
+                status: PENDING
+                createdAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '403':
+      $ref: '../openapi.yaml#/components/responses/Forbidden'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/NotFound'
+    '409':
+      $ref: '../openapi.yaml#/components/responses/Conflict'
+    '422':
+      $ref: '../openapi.yaml#/components/responses/IdempotencyKeyReused'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

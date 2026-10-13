@@ -1,0 +1,19 @@
+{
+  "name": "@orcon/openapi-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Orcon API contract toolchain: Redocly lint with the orcon plugin, bundle, reference site and changelog helpers.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "lint:contract": "node scripts/lint.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "gen:bad": "node test/support/write-bad-cases.mjs"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.63.0",
+    "@scalar/api-reference": "1.74.0",
+    "yaml": "2.9.1"
+  }
+}
