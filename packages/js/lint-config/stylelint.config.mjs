@@ -14,7 +14,7 @@ const ignoreValues = [tokenValue, tokenCalc, ...keywords];
 /** @type {import('stylelint').Config} */
 export default {
   plugins: ['stylelint-declaration-strict-value'],
-  ignoreFiles: ['**/node_modules/**', '**/dist/**', '**/storybook-static/**', '**/test/fixtures/**', 'packages/js/tokens/**'],
+  ignoreFiles: ['**/node_modules/**', '**/dist/**', '**/dist-perf/**', '**/storybook-static/**', '**/test/fixtures/**', 'packages/js/tokens/**'],
   rules: {
     'color-no-hex': true,
     'function-disallowed-list': ['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color'],

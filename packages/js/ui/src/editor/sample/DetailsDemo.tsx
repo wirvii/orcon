@@ -14,9 +14,9 @@ import { AgentSample, DocsSample, NodeStatusAlert, ParametersSample, SettingsSam
 
 export interface DetailsDemoProps {
   node: GraphNode;
-  layout?: 'dialog' | 'docked' | 'auto';
-  input?: PaneData;
-  output?: PaneData;
+  layout?: 'dialog' | 'docked' | 'auto' | undefined;
+  input?: PaneData | undefined;
+  output?: PaneData | undefined;
 }
 
 /** The node details view with sample panes, for stories. In `auto` it follows the lg breakpoint like the editor does. */

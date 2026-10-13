@@ -18,12 +18,12 @@ const messages = defineMessages({
 export interface BreadcrumbItem {
   label: string;
   /** Omit on the last item, the current page. */
-  href?: string;
+  href?: string | undefined;
 }
 
 export interface BreadcrumbProps {
   items: readonly BreadcrumbItem[];
-  className?: string;
+  className?: string | undefined;
 }
 
 /** The path to the current page. The last item is the page itself and is not a link. */

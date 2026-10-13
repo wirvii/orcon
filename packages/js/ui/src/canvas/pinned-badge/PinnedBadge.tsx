@@ -7,8 +7,8 @@ import { cn } from '../../lib/cn';
 
 export interface PinnedBadgeProps {
   /** Place the badge on the top-left corner of its parent (offset -8, -8). Off for a standalone badge. */
-  corner?: boolean;
-  className?: string;
+  corner?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /**

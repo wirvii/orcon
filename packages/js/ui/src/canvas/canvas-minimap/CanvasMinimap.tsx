@@ -10,11 +10,11 @@ import { metrics } from '../model';
 
 export interface CanvasMinimapProps {
   /** Shown while panning or zooming and for a second after, and while hovered. */
-  visible?: boolean;
+  visible?: boolean | undefined;
   /** Pointer enter and leave keep it open while the pointer is on it. */
-  onPointerEnter?: () => void;
-  onPointerLeave?: () => void;
-  className?: string;
+  onPointerEnter?: (() => void) | undefined;
+  onPointerLeave?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

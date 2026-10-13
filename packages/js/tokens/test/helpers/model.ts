@@ -26,7 +26,7 @@ export interface Model {
   component: Token[];
 }
 
-export const model = (await loadModel()) as Model;
+export const model = (await loadModel());
 export const pairs = readPairs() as Pair[];
 export const themeNames = ['light', 'dark'] as const;
 

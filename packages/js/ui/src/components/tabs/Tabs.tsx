@@ -10,18 +10,18 @@ export interface TabItem {
   value: string;
   label: string;
   content: ReactNode;
-  disabled?: boolean;
-  className?: string;
+  disabled?: boolean | undefined;
+  className?: string | undefined;
 }
 
 export interface TabsProps {
   tabs: readonly TabItem[];
   /** Names the tab list. */
   label: string;
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
-  className?: string;
+  value?: string | undefined;
+  defaultValue?: string | undefined;
+  onValueChange?: ((value: string) => void) | undefined;
+  className?: string | undefined;
 }
 
 /**
