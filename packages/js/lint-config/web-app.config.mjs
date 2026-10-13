@@ -188,6 +188,8 @@ const typedRules = {
   '@typescript-eslint/switch-exhaustiveness-check': ['error', { considerDefaultExhaustiveForUnions: true }],
   // React handlers are written as `onClick={() => close()}`; the arrow shorthand is clear there.
   '@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }],
+  // The SDK reports a failed request as a problem object, not an Error: it is thrown as `unknown` and read by toProblemDetails.
+  '@typescript-eslint/only-throw-error': ['error', { allowThrowingUnknown: true }],
   // Numbers in template strings are safe and common in class names and labels.
   '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
 };
