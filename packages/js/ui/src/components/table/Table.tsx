@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from 'react';
+import type { HTMLAttributes, Ref, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 
 import { cn } from '../../lib/cn';
 
@@ -32,11 +32,13 @@ export interface TableRowProps extends HTMLAttributes<HTMLTableRowElement> {
   selected?: boolean | undefined;
   /** A body row: its height follows the density (40 px comfortable, 32 px compact). Header rows are not data rows. */
   header?: boolean | undefined;
+  ref?: Ref<HTMLTableRowElement> | undefined;
 }
 
-export function TableRow({ className, selected = false, header = false, ...props }: TableRowProps) {
+export function TableRow({ className, selected = false, header = false, ref, ...props }: TableRowProps) {
   return (
     <tr
+      ref={ref}
       data-row={header ? undefined : ''}
       data-state={selected ? 'selected' : undefined}
       className={cn(
