@@ -110,7 +110,7 @@ func newHandler() (http.Handler, error) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
-	mux.Handle("/", http.FileServer(http.FS(assets)))
+	mux.Handle("/", webui.Handler(assets))
 	return mux, nil
 }
 
