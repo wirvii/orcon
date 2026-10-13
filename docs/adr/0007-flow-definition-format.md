@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0007 — Canonical flow definition format `orcon/flow@1`
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -91,3 +91,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-005.** Nodes gain the additive block `credentials: { <slot>: { name } }` (ADR-0057 §4); `draftRevision` is exposed as `ETag` (ADR-0053 §5); the deterministic readable serialization of ADR-0057 §3 is the file form and does not change `contentHash` (JCS).
 - **SPEC-006.** Nodes of type `orcon.ai.*` gain an `ai` block (model, fallbacks, tools, memory, redaction, caps, approval) whose enumerated values are UPPER_SNAKE (ADR-0080 §3); expressions gain `$fromAI`; validation levels 3 and 5 add rules for model capabilities and fallbacks, tools pinned by hash and the evaluation gate (ADR-0069); BPMN export represents an agent as `adHocSubProcess` with `orcon:agent` (ADR-0060 §11).
 - **SPEC-001 (Amendment 6).** §3: the node type `orcon.variables@1` belongs to the format, like `orcon.loop@1`; its parameters are defined by ADR-0008 §4.3. Validation level 4 (§9) and rule V9 (ADR-0010 §11) read the written variables from `parameters.assignments[].variable`.
+- **SPEC-001 (Amendment 9, 2026-10-13, owner decision).** §3: the `join` block gains the optional member `remaining: "CANCEL" | "LET_FINISH"`, valid only with `mode: "FIRST"`; absent means `CANCEL`, the behaviour `FIRST` had before this amendment. The block reads `{ mode: "ALL" | "ACTIVATED" | "FIRST", data: "APPEND" | "MATCH_FIELD" | "MATCH_POSITION", matchField?, remaining? }`. Until an amendment of ADR-0010 §3 defines `MATCH_FIELD` and `MATCH_POSITION`, publication rejects them and `matchField` (rule V14, ADR-0010 §11). §5: both values export as `complexGateway` with activation count 1 and `orcon:remaining` in `extensionElements`, so the round trip of §8 stays lossless; `LET_FINISH` is the BPMN 2.0 complex gateway's own wait-for-reset behaviour, `CANCEL` adds the cancellation of ADR-0010 §3. §11: the values of `remaining` are UPPER_SNAKE.
