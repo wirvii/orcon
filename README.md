@@ -43,3 +43,11 @@ Open http://localhost:8080. The `/healthz` endpoint responds with `ok`.
 ## Verification
 
 GitHub Actions runs Go tests, builds the React app, embeds its assets in the Go binary, and smoke-tests HTTP startup. A passing workflow is required before treating the scaffold as verified.
+
+## Contributing
+
+Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains branches, commit messages and pull requests, and everyone who takes part follows the [Code of Conduct](CODE_OF_CONDUCT.md). Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## Verifying a release
+
+Every release is signed and carries build provenance; [docs/releases/verifying.md](docs/releases/verifying.md) shows how to check it.
