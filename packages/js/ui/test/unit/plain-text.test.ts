@@ -17,6 +17,14 @@ describe('plainText', () => {
     expect(plainText(Symbol('k'))).toBe('Symbol(k)');
   });
 
+  it('prints undefined as nothing', () => {
+    expect(plainText(undefined)).toBe('');
+  });
+
+  it('prints an object as JSON', () => {
+    expect(plainText({ a: 1 })).toBe('{"a":1}');
+  });
+
   it('prints a function as nothing', () => {
     expect(plainText(() => 1)).toBe('');
   });

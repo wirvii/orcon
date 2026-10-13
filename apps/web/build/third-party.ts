@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import license, { type Dependency } from 'rollup-plugin-license';
+import { z } from 'zod';
 
 /** What `.vite/bundled-modules.json` holds for one package that is bundled into the application. */
 export interface BundledModule {
@@ -17,17 +18,13 @@ export interface BundledModule {
 /** Packages whose files reach the build as assets, not as JavaScript modules: the self-hosted fonts (ADR 0074). */
 const assetPackages = ['@fontsource-variable/inter', '@fontsource-variable/jetbrains-mono'];
 
-interface PackageFile {
-  name: string;
-  version: string;
-  license?: string;
-}
+const packageFile = z.object({ name: z.string(), version: z.string(), license: z.string().optional() });
 
 /** The notice of a package that ships as assets: its name, license and the text of its LICENSE file. */
 function assetNotice(packageName: string, resolveFrom: string): string {
   const require = createRequire(join(resolveFrom, 'package.json'));
   const manifestPath = require.resolve(`${packageName}/package.json`);
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageFile;
+  const manifest = packageFile.parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
   const licensePath = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'].map((name) => join(dirname(manifestPath), name)).find((path) => existsSync(path));
   const text = licensePath ? readFileSync(licensePath, 'utf8').trim() : '(the package ships no license file)';
   return `${manifest.name}@${manifest.version} (${manifest.license ?? 'unknown license'}), shipped as font files\n\n${wrapLines(text)}`;

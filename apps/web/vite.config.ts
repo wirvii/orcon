@@ -35,8 +35,9 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    // The bundle checks read what is inside each chunk. The license plugin below writes the notices
-    // and the list of bundled packages the license check reads.
+    // The bundle checks read what is inside each chunk. The rollup-plugin-license plugin (wired in
+    // build/third-party.ts, used below) writes the notices and the list of bundled packages the
+    // license check reads.
     chunkModules(repositoryRoot),
   ],
   build: { outDir, manifest: true, rollupOptions: { plugins: [thirdParty(outDir, resolve(repositoryRoot, 'packages/js/ui'))] } },

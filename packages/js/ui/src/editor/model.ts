@@ -50,6 +50,7 @@ export type JsonLike = unknown;
 
 /** The text a leaf value shows: strings, numbers, booleans, bigints and symbols print as themselves (as `String` does), a function as nothing. */
 export function plainText(value: unknown): string {
+  if (value === undefined) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint' || typeof value === 'symbol') return value.toString();
   return typeof value === 'function' ? '' : JSON.stringify(value);
