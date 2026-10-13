@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Orcon design system
 
 The Orcon design system is the shared set of design tokens, themed components, canvas visual language, content and i18n rules, and accessibility requirements that every Orcon web UI surface follows. It covers the embedded editor in `apps/web` and the shared packages under `packages/js` (`@orcon/tokens`, `@orcon/ui`, `@orcon/lint-config`).
