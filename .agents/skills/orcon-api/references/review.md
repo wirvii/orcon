@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # API review
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document is the review list for any pull request that changes the public API contract, the checks that enforce the rulebook (with tool, license, command, where it runs and how to fix a failure), the planted cases that prove each lint rule fails when it should, the checks inherited by the designs that build the API, and how API work is tracked. The toolchain is fixed by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) §9 and §11. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080 (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference.
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080, then this rulebook, then reviewer preference.
 
 ## Review checklist
 

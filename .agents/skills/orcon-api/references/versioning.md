@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Versioning, compatibility and deprecation
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines stability levels, what counts as a breaking change, how compatibility is checked, how operations are deprecated and how each release documents its API changes. It refines ADR-0054. Code generation from the contract is defined in [`../../orcon-go/references/api-codegen.md`](../../orcon-go/references/api-codegen.md) and is not repeated here. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`VER-…`) are stable.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
 
 ## Stability
 

@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Idempotency and concurrency
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines when operations take an `Idempotency-Key`, how replays behave, and how optimistic concurrency with ETags works. It refines the idempotency and ETag conventions of ADR-0053. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`IDEM-…`) are stable.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
 
 ## Idempotency
 

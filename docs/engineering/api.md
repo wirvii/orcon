@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Public API design
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 Orcon has one public API described by OpenAPI 3.1 in `packages/openapi/v1/`. The editor, the CLI, the SDKs and the MCP server are its clients; none of them has behavior the API does not offer. Every Orcon server shows its own reference for exactly the API it serves at `/api/reference`.
 

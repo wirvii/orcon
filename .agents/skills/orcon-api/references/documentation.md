@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Documentation and executable examples
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines what every operation and field must document, how examples are written and executed against the real binary, and how the reference site is produced. It is fixed by [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) §8 and §10. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`DOC-…`) are stable.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080 (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080, then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
 
 ## Operations
 

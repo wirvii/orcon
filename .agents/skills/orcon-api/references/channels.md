@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Channels: SDKs, CLI, MCP, permissions and audit
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how every operation declares its exposure on the SDKs, the CLI and the MCP server, the permission it requires and the audit action it records. It amends ADR-0058 §3 and ADR-0059 §2 through [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) §4 and §5. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`CHAN-…`) are stable.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080 (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080, then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
 
 ## SDKs
 

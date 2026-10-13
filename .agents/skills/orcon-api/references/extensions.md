@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Extensions
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document is the canonical list of every `x-orcon-*` extension of the OpenAPI contract: where it goes, its shape, when it is required and which rule checks it. It amends ADR-0054 §1 and ADR-0059 §2 through [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) §4. An extension that is not in this table is not allowed. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080 (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference.
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080, then this rulebook, then reviewer preference.
 
 ## Extension table
 

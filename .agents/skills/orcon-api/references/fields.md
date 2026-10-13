@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Fields and schemas
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This document defines how properties, ids, enum values, times, booleans, nulls, secrets and schemas are written in the OpenAPI contract `packages/openapi/v1/` and in the documents the API returns verbatim. The enum rule amends ADR-0052, ADR-0053, ADR-0055, ADR-0056, ADR-0059 and ADR-0073 through [ADR 0080](../../../../docs/adr/0080-public-api-design-rules-and-contract-toolchain.md) §3. MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Rule IDs (`FIELD-…`) are stable.
 
-Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080 (while ADR-0080 is Proposed, as design input), then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
+Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (ADR-0052 to ADR-0059) as amended by ADR-0080, then this rulebook, then reviewer preference. The check that enforces each rule is named in brackets (an `orcon/<rule>` lint rule, a make target, or `review`).
 
 ## Names and ids
 
