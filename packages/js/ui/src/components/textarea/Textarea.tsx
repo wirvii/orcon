@@ -8,7 +8,7 @@ import { textControl } from '../../lib/control';
 import { useFieldControlProps } from '../form-field/field-context';
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
-  ref?: Ref<HTMLTextAreaElement>;
+  ref?: Ref<HTMLTextAreaElement> | undefined;
 }
 
 /** Multi-line text input. Grows vertically only; it never clears what a person typed. */

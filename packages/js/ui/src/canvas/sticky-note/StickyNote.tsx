@@ -32,21 +32,21 @@ const stickyColors = [1, 2, 3, 4, 5, 6] as const satisfies readonly StickyColor[
 
 export interface StickyNoteProps {
   note: Pick<StickyNoteData, 'id' | 'color' | 'title' | 'body' | 'size'>;
-  selected?: boolean;
+  selected?: boolean | undefined;
   /** The note can be edited, resized and recolored. */
-  editable?: boolean;
+  editable?: boolean | undefined;
   /** Renders the live resize handle of React Flow. Without it the grip is only drawn. */
-  live?: boolean;
-  tabbable?: boolean;
+  live?: boolean | undefined;
+  tabbable?: boolean | undefined;
   /** Start in edit mode (stories). */
-  defaultEditing?: boolean;
+  defaultEditing?: boolean | undefined;
   /** Controlled edit mode: the canvas opens it from the keyboard. */
-  editing?: boolean;
-  onEditingChange?: (editing: boolean) => void;
-  onChange?: (patch: Partial<Pick<StickyNoteData, 'body' | 'color' | 'title'>>) => void;
+  editing?: boolean | undefined;
+  onEditingChange?: ((editing: boolean) => void) | undefined;
+  onChange?: ((patch: Partial<Pick<StickyNoteData, 'body' | 'color' | 'title'>>) => void) | undefined;
   /** The resize ended with this size. */
-  onResize?: (size: { w: number; h: number }) => void;
-  className?: string;
+  onResize?: ((size: { w: number; h: number }) => void) | undefined;
+  className?: string | undefined;
 }
 
 /**
@@ -73,6 +73,7 @@ export function StickyNote({ note, selected = false, editable = false, live = fa
       field.current?.focus();
     }
     // The draft starts from the saved text each time editing opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only opening the editor resets the draft
   }, [editing]);
 
   const save = () => {
@@ -173,7 +174,7 @@ export function StickyNote({ note, selected = false, editable = false, live = fa
 }
 
 /** The 10 px accent corner at the bottom right. */
-function Grip({ className }: { className?: string }) {
+function Grip({ className }: { className?: string | undefined }) {
   return (
     <span
       aria-hidden

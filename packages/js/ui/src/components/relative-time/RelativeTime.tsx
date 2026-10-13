@@ -35,8 +35,8 @@ export function relativeParts(diffMs: number): RelativeParts {
 export interface RelativeTimeProps {
   value: DateInput;
   /** The instant "now" is measured from. Defaults to the clock and refreshes every 30 seconds. Pass it in tests and stories. */
-  now?: DateInput;
-  className?: string;
+  now?: DateInput | undefined;
+  className?: string | undefined;
 }
 
 /** "5 minutes ago", "in 2 hours": Intl relative time, with the exact ISO timestamp on hover. */

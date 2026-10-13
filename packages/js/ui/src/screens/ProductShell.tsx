@@ -20,13 +20,13 @@ export type ShellSection = 'flows' | 'executions' | 'attention' | 'settings';
 
 export interface ProductShellProps {
   /** The section being shown. */
-  current?: ShellSection;
+  current?: ShellSection | undefined;
   /** Items waiting for a person. Shown on the bell and on the Attention entry. */
-  attentionCount?: number;
+  attentionCount?: number | undefined;
   /** The page content. Give it its own h1. */
   children: ReactNode;
   /** The shell fills the viewport and the content scrolls inside it. Used by the editor. */
-  fill?: boolean;
+  fill?: boolean | undefined;
 }
 
 /**

@@ -9,8 +9,8 @@ import { canvasMessages } from '../messages';
 
 export interface AddFirstStepProps {
   /** Opens the node palette filtered to triggers. */
-  onActivate?: () => void;
-  className?: string;
+  onActivate?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

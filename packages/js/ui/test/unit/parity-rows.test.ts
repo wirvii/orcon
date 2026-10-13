@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { ownedRows, parityRows } from '../../src/parity/rows';
+import { must } from '../../src/lib/must';
 
 // The parity table lives in the skill. The list in code must say the same, row for row.
 const markdown = readFileSync(resolve(__dirname, '../../../../../.agents/skills/orcon-ui/references/canvas.md'), 'utf8');
@@ -14,8 +15,8 @@ const section = markdown.slice(markdown.indexOf('## Parity'));
 const table = [...section.matchAll(/^\| (P-\d{2}) \| ([^|]*)\| ([^|]*)\| ([^|]*)\| ([^|]*)\|$/gm)].map((match) => ({
   id: match[1],
   // "1 per move", "0 (visible)", "as each row": the number that starts the cell.
-  max: /^\d+/.exec(match[4]!.trim())?.[0] ?? '1',
-  owner: match[5]!.trim(),
+  max: /^\d+/.exec(must(match[4]).trim())?.[0] ?? '1',
+  owner: must(match[5]).trim(),
 }));
 
 describe('parity rows', () => {

@@ -83,15 +83,15 @@ export interface ApprovalOutcome {
 }
 
 export interface ApprovalScreenProps {
-  request?: ApprovalRequest;
+  request?: ApprovalRequest | undefined;
   /** The person lacks `execution:read-data`: the arguments are shown as hidden and cannot be edited. */
-  argumentsHidden?: boolean;
+  argumentsHidden?: boolean | undefined;
   /** The instant relative times are measured from. */
-  now?: string;
+  now?: string | undefined;
   /** A 409 answer: someone else decided first. Shows the decision in effect instead of a generic error. */
-  conflict?: { problem: ProblemDetails; outcome: ApprovalOutcome };
-  onApprove?: (argumentsJson?: string) => void;
-  onDeny?: (reason: string) => void;
+  conflict?: { problem: ProblemDetails; outcome: ApprovalOutcome } | undefined;
+  onApprove?: ((argumentsJson?: string) => void) | undefined;
+  onDeny?: ((reason: string) => void) | undefined;
 }
 
 type Mode = 'review' | 'deny' | 'edit' | 'done';

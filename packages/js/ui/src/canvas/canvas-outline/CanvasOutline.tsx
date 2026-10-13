@@ -15,14 +15,14 @@ import { readingOrder, type Graph, type GraphEdge, type GraphNode } from '../mod
 export interface CanvasOutlineProps {
   graph: Graph;
   /** Shows the actions that change the flow (remove a connection, delete a node). */
-  editable?: boolean;
+  editable?: boolean | undefined;
   /** Moves keyboard focus to the node on the canvas. */
-  onFocusNode?: (id: string) => void;
-  onDisconnect?: (edgeId: string) => void;
-  onDeleteNode?: (id: string) => void;
+  onFocusNode?: ((id: string) => void) | undefined;
+  onDisconnect?: ((edgeId: string) => void) | undefined;
+  onDeleteNode?: ((id: string) => void) | undefined;
   /** Heading level of the title, to keep the page outline correct. */
-  headingLevel?: 2 | 3 | 4;
-  className?: string;
+  headingLevel?: 2 | 3 | 4 | undefined;
+  className?: string | undefined;
 }
 
 /** Outline buttons carry the names of nodes, so their labels wrap instead of running out of the panel. */

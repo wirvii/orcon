@@ -12,21 +12,21 @@ import { cn } from '../lib/cn';
 import { canvasMessages } from './messages';
 
 export interface CanvasToolsProps {
-  editable?: boolean;
-  canUndo?: boolean;
-  canRedo?: boolean;
-  canDelete?: boolean;
+  editable?: boolean | undefined;
+  canUndo?: boolean | undefined;
+  canRedo?: boolean | undefined;
+  canDelete?: boolean | undefined;
   /** The flow outline is visible. Reflected by the outline button. */
-  outlineOpen?: boolean;
-  onAdd?: () => void;
-  onConnect?: () => void;
-  onAddSticky?: () => void;
-  onDelete?: () => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  onToggleOutline?: () => void;
-  onShortcuts?: () => void;
-  className?: string;
+  outlineOpen?: boolean | undefined;
+  onAdd?: (() => void) | undefined;
+  onConnect?: (() => void) | undefined;
+  onAddSticky?: (() => void) | undefined;
+  onDelete?: (() => void) | undefined;
+  onUndo?: (() => void) | undefined;
+  onRedo?: (() => void) | undefined;
+  onToggleOutline?: (() => void) | undefined;
+  onShortcuts?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

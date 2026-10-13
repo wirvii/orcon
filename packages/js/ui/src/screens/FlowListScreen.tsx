@@ -63,13 +63,13 @@ const messages = defineMessages({
 });
 
 export interface FlowListScreenProps {
-  flows?: readonly FlowRow[];
-  status?: 'ready' | 'loading' | 'error';
+  flows?: readonly FlowRow[] | undefined;
+  status?: 'ready' | 'loading' | 'error' | undefined;
   /** The instant relative times are measured from. */
-  now?: string;
-  onCreate?: () => void;
-  onRetry?: () => void;
-  onToggle?: (id: string, enabled: boolean) => void;
+  now?: string | undefined;
+  onCreate?: (() => void) | undefined;
+  onRetry?: (() => void) | undefined;
+  onToggle?: ((id: string, enabled: boolean) => void) | undefined;
 }
 
 /**

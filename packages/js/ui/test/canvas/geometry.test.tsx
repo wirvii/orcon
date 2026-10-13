@@ -16,6 +16,7 @@ import { nodeTypes, type TileFlowNode } from '../../src/canvas/FlowNodes';
 import type { GraphNode } from '../../src/canvas/model';
 import { Providers } from '../../src/providers/Providers';
 import type { StatusKey } from '../../src/components/status-badge/status-map';
+import { must } from '../../src/lib/must';
 
 beforeAll(async () => {
   await page.viewport(1440, 900);
@@ -34,8 +35,8 @@ const stage = (theme: 'light' | 'dark', children: ReactNode) =>
   );
 
 const plain: GraphNode = { ...exampleNodes.http, status: undefined };
-const tile = (container: HTMLElement) => container.querySelector<HTMLElement>('[data-canvas-node]')!;
-const surface = (container: HTMLElement) => container.querySelector<HTMLElement>('[data-tile-surface]')!;
+const tile = (container: HTMLElement) => must(container.querySelector<HTMLElement>('[data-canvas-node]'));
+const surface = (container: HTMLElement) => must(container.querySelector<HTMLElement>('[data-tile-surface]'));
 const rect = (element: Element) => element.getBoundingClientRect();
 const px = (value: string) => Number.parseFloat(value);
 
@@ -63,7 +64,7 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
 
   it('puts a 36 px icon in a 40 px box, centered', () => {
     const { container } = stage(theme, <CanvasNode node={plain} labelled editable={false} />);
-    const icon = tile(container).querySelector('svg')!;
+    const icon = must(tile(container).querySelector('svg'));
     expect(rect(icon).width).toBe(36);
     const outer = rect(tile(container));
     const inner = rect(icon);
@@ -79,7 +80,7 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
     expect(px(style.borderBottomLeftRadius)).toBe(50);
     expect(px(style.borderTopRightRadius)).toBe(18);
     expect(element.querySelector('[data-port="input"]')).toBeNull();
-    const mark = element.querySelector<HTMLElement>('[data-trigger-mark]')!;
+    const mark = must(element.querySelector<HTMLElement>('[data-trigger-mark]'));
     expect(rect(mark).width).toBe(22);
     // The mark is centered on the left edge: it overlaps the tile by half its width.
     expect(Math.round(rect(element).left - rect(mark).left)).toBe(11);
@@ -88,20 +89,20 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
 
   it('places the label 6 px under the tile, at most 150 px wide, with the name and the operation', () => {
     const { container } = stage(theme, <CanvasNode node={{ ...plain, name: 'A very long node name that wraps over two lines and then gets cut off with an ellipsis' }} labelled editable={false} />);
-    const label = container.querySelector<HTMLElement>('[data-node-label]')!;
+    const label = must(container.querySelector<HTMLElement>('[data-node-label]'));
     expect(Math.round(rect(label).top - rect(tile(container)).bottom)).toBe(6);
     expect(rect(label).width).toBeLessThanOrEqual(150);
-    const name = container.querySelector<HTMLElement>('[data-node-name]')!;
+    const name = must(container.querySelector<HTMLElement>('[data-node-name]'));
     expect(px(getComputedStyle(name).fontSize)).toBe(13);
     expect(getComputedStyle(name).fontWeight).toBe('600');
     // At most two lines, then an ellipsis.
     expect(rect(name).height).toBeLessThanOrEqual(36.5);
-    expect(px(getComputedStyle(container.querySelector('[data-node-subtitle]')!).fontSize)).toBe(12);
+    expect(px(getComputedStyle(must(container.querySelector('[data-node-subtitle]'))).fontSize)).toBe(12);
   });
 
   it('puts a 22 px status badge on the top-right corner, offset by -8 / -8', () => {
     const { container } = stage(theme, <CanvasNode node={{ ...plain, status: 'FAILED' }} labelled editable={false} />);
-    const badge = container.querySelector<HTMLElement>('[data-node-badge]')!;
+    const badge = must(container.querySelector<HTMLElement>('[data-node-badge]'));
     expect(rect(badge).width).toBe(22);
     expect(Math.round(rect(badge).right - rect(tile(container)).right)).toBe(8);
     expect(Math.round(rect(tile(container)).top - rect(badge).top)).toBe(8);
@@ -110,9 +111,9 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
 
   it('draws 10 px ports that grow to 24 px with a plus on hover and on focus', async () => {
     const { container } = stage(theme, <CanvasNode node={plain} labelled editable />);
-    const input = container.querySelector<HTMLElement>('[data-port="input"]')!;
-    const output = container.querySelector<HTMLElement>('[data-port="output"]')!;
-    const dot = output.querySelector<HTMLElement>('[data-port-dot]')!;
+    const input = must(container.querySelector<HTMLElement>('[data-port="input"]'));
+    const output = must(container.querySelector<HTMLElement>('[data-port="output"]'));
+    const dot = must(output.querySelector<HTMLElement>('[data-port-dot]'));
     expect(rect(input).width).toBe(10);
     expect(rect(dot).width).toBe(10);
     // The control around the dot is at least the target size.
@@ -121,7 +122,7 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(Math.round(rect(dot).width)).toBe(24);
     expect(dot.querySelector('svg')).not.toBeNull();
-    expect(Number(getComputedStyle(dot.querySelector('svg')!).opacity)).toBe(1);
+    expect(Number(getComputedStyle(must(dot.querySelector('svg'))).opacity)).toBe(1);
   });
 
   it('labels the outputs of an if node inside the tile at 24 and 76, in mono text', () => {
@@ -148,11 +149,11 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
 
   it('draws the dangling output as a 30 px dashed line ending in a 22 px dashed square with a plus', () => {
     const { container } = stage(theme, <CanvasNode node={plain} labelled editable dangling={['main']} />);
-    const stub = container.querySelector<HTMLElement>('[data-output-stub]')!;
+    const stub = must(container.querySelector<HTMLElement>('[data-output-stub]'));
     const line = stub.firstElementChild as HTMLElement;
     expect(rect(line).width).toBe(30);
     expect(getComputedStyle(line).borderTopStyle).toBe('dashed');
-    const square = stub.querySelector<HTMLElement>('[data-stub-box]')!;
+    const square = must(stub.querySelector<HTMLElement>('[data-stub-box]'));
     expect(rect(square).width).toBe(22);
     expect(getComputedStyle(square).borderTopStyle).toBe('dashed');
     expect(square.querySelector('svg')).not.toBeNull();
@@ -164,7 +165,7 @@ describe.each(['light', 'dark'] as const)('the style A tile in the %s theme', (t
     expect(rect(tile(container)).width).toBe(200);
     const blocks = container.querySelectorAll('[data-ai-block]');
     expect(blocks).toHaveLength(2);
-    expect(rect(blocks[0]!.querySelector('button')!).width).toBe(48);
+    expect(rect(must(must(blocks[0]).querySelector('button'))).width).toBe(48);
   });
 
   it('draws a placeholder with a dashed warning border, always disabled, with no run button', () => {
@@ -231,7 +232,7 @@ describe('execution states (canvas.md#execution-states)', () => {
 
   it('draws the run ring 6 px outside a running node, and only then', () => {
     const { container, rerender } = stage('light', <CanvasNode node={{ ...plain, status: 'RUNNING' }} labelled editable={false} />);
-    const ring = container.querySelector<HTMLElement>('[data-run-ring]')!;
+    const ring = must(container.querySelector<HTMLElement>('[data-run-ring]'));
     expect(Math.round(rect(tile(container)).left - rect(ring).left)).toBe(6);
     rerender(
       <Providers theme="light" density="comfortable" locale="en">
@@ -243,7 +244,7 @@ describe('execution states (canvas.md#execution-states)', () => {
 
   it('draws a pinned node with a pin badge on the top-left corner and a Pinned chip', () => {
     const { container } = stage('light', <CanvasNode node={{ ...plain, status: 'SUCCEEDED', pinned: true }} labelled editable={false} />);
-    const badge = container.querySelector<HTMLElement>('[data-pinned-badge]')!;
+    const badge = must(container.querySelector<HTMLElement>('[data-pinned-badge]'));
     expect(rect(badge).width).toBe(22);
     expect(Math.round(rect(tile(container)).left - rect(badge).left)).toBe(8);
     expect(container.querySelector('[data-node-chips]')).toHaveTextContent('Pinned');
@@ -347,7 +348,7 @@ describe('the connection label', () => {
 
   it('is a pill of at least 20 px, in the state color, with a 12 px text', () => {
     const { container } = stage('light', <EdgeLabel items={3} state="failed" />);
-    const label = container.querySelector<HTMLElement>('[data-edge-label]')!;
+    const label = must(container.querySelector<HTMLElement>('[data-edge-label]'));
     expect(rect(label).height).toBeGreaterThanOrEqual(20);
     expect(getComputedStyle(label).color).toBe(tokenColor('--orcon-status-danger-fg'));
     expect(px(getComputedStyle(label).fontSize)).toBe(12);

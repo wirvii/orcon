@@ -168,7 +168,7 @@ describe('switchers', () => {
     expect(screen.getByRole('radio', { name: 'Oscuro' })).toBeInTheDocument();
   });
 
-  it('LocaleSwitcher lists each language by its own name', async () => {
+  it('LocaleSwitcher lists each language by its own name', () => {
     expect(languageName('en')).toBe('English');
     expect(languageName('es')).toBe('Español');
     const onChange = vi.fn();

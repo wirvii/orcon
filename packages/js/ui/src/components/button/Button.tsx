@@ -34,11 +34,11 @@ export const buttonVariants = cva(
 );
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  ref?: Ref<HTMLButtonElement>;
+  ref?: Ref<HTMLButtonElement> | undefined;
   /** Render the child element (for example a router link) with the button styling. */
-  asChild?: boolean;
+  asChild?: boolean | undefined;
   /** Busy: the button stays focusable and announces the busy state, but ignores clicks. */
-  loading?: boolean;
+  loading?: boolean | undefined;
 }
 
 export function Button({ className, variant, size, asChild = false, loading = false, children, onClick, ref, ...props }: ButtonProps) {

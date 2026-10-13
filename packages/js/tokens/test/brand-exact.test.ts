@@ -54,6 +54,7 @@ describe('exact brand hues', () => {
     const values = { 'x.fg': '#22c55e', 'x.bg': '#ffffff' };
     const bad: Pair[] = [{ fg: 'x.fg', bg: 'x.bg', kind: 'text', min: 4.5 }];
     expect(brandTextViolations(bad, values, restrictedHex)).toEqual(['x.fg on x.bg']);
-    expect(brandTextViolations([{ ...bad[0], kind: 'ui' } as Pair], values, restrictedHex)).toEqual([]);
+    const ui: Pair = { fg: 'x.fg', bg: 'x.bg', kind: 'ui', min: 3 };
+    expect(brandTextViolations([ui], values, restrictedHex)).toEqual([]);
   });
 });

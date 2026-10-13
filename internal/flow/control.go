@@ -22,7 +22,89 @@ func (v *validator) control(g *graph) {
 	v.loops()
 	v.waitTimeouts(g)
 	v.splitsAndJoins(g)
+	v.joinOptions(g)
 	v.boundaries(g)
+}
+
+// CodeV14 is rule V14, the options of a join: remaining applies to FIRST only,
+// LET_FINISH needs a corresponding split, and the data modes MATCH_FIELD and
+// MATCH_POSITION (and matchField) are rejected until ADR-0010 section 3 defines
+// them. The rule is semantic, so the values stay in the JSON Schema.
+const CodeV14 = "V14"
+
+// CorrespondingSplits returns, for every join of a valid document, the split
+// node whose branches the join brings together: the nearest node that
+// dominates the join and reaches it through at least two of its outgoing edges
+// (ADR-0010 section 3). A FIRST join discriminates the branches of that split;
+// any join drops it from the fork lineage of its continuation. A join without
+// such a split is absent from the result.
+// Publication validation and the engine compiler both use this one function,
+// so the editor, V14 and the engine agree on the split.
+func CorrespondingSplits(d *Document) map[NodeID]NodeID {
+	g := newGraph(d)
+	out := make(map[NodeID]NodeID)
+	for i := range d.Nodes {
+		n := &d.Nodes[i]
+		if n.Join == nil {
+			continue
+		}
+		if s, ok := g.correspondingSplit(i); ok {
+			out[n.ID] = d.Nodes[s].ID
+		}
+	}
+	return out
+}
+
+// correspondingSplit walks the immediate dominators of join j, nearest first.
+func (g *graph) correspondingSplit(j int) (int, bool) {
+	idom := g.dominators()
+	root := len(g.succ)
+	for x := idom[j]; x >= 0 && x != root; x = idom[x] {
+		branches := 0
+		for _, ei := range g.outEdges[x] {
+			to := g.index[g.doc.Edges[ei].To]
+			if to == j || g.reaches(to, j) {
+				branches++
+			}
+		}
+		if branches >= 2 {
+			return x, true
+		}
+	}
+	return -1, false
+}
+
+// joinOptions implements V14.
+func (v *validator) joinOptions(g *graph) {
+	for i := range v.doc.Nodes {
+		n := &v.doc.Nodes[i]
+		j := n.Join
+		if j == nil {
+			continue
+		}
+		if j.Data == JoinDataMatchField || j.Data == JoinDataMatchPosition {
+			v.r.errorf(CodeV14, ptr("nodes", i, "join", "data"),
+				"join data mode %s of node %q is not defined yet; only %s is supported", j.Data, n.ID, JoinDataAppend)
+		}
+		if j.MatchField != "" {
+			v.r.errorf(CodeV14, ptr("nodes", i, "join", "matchField"),
+				"matchField of node %q is not supported yet; only data %s is", n.ID, JoinDataAppend)
+		}
+		if j.Remaining == "" {
+			continue
+		}
+		if j.Mode != JoinFirst {
+			v.r.errorf(CodeV14, ptr("nodes", i, "join", "remaining"),
+				"remaining applies to FIRST joins only, but node %q has mode %s", n.ID, j.Mode)
+			continue
+		}
+		if j.Remaining == RemainingLetFinish {
+			if _, ok := g.correspondingSplit(i); !ok {
+				v.r.errorf(CodeV14, ptr("nodes", i, "join", "remaining"),
+					"let-finish needs a split that dominates the join: no node dominates %q and reaches it through two outgoing edges", n.ID)
+			}
+		}
+	}
 }
 
 // elementShapes checks the edge counts that define the BPMN element classes.

@@ -55,6 +55,7 @@
     "routing": { "enum": ["EXCLUSIVE", "INCLUSIVE"] },
     "joinMode": { "enum": ["ALL", "ACTIVATED", "FIRST"] },
     "joinData": { "enum": ["APPEND", "MATCH_FIELD", "MATCH_POSITION"] },
+    "joinRemaining": { "enum": ["CANCEL", "LET_FINISH"] },
     "onError": { "enum": ["STOP_EXECUTION", "CONTINUE_WITH_ERROR", "ERROR_OUTPUT"] },
     "callMode": { "enum": ["WAIT", "FIRE_AND_FORGET"] },
     "waitKind": { "enum": ["TIMER", "SIGNAL", "HUMAN"] },
@@ -155,7 +156,8 @@
           "properties": {
             "mode": { "$ref": "#/$defs/joinMode" },
             "data": { "$ref": "#/$defs/joinData" },
-            "matchField": { "$ref": "#/$defs/text" }
+            "matchField": { "$ref": "#/$defs/text" },
+            "remaining": { "$ref": "#/$defs/joinRemaining" }
           }
         },
         "loop": {

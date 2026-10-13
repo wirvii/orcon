@@ -12,19 +12,19 @@ export interface NodePortProps {
   /** Port id inside the node. A connection names its two ports. */
   id: string;
   /** Vertical position on the tile edge, in px from the top of the tile. */
-  top?: number;
+  top?: number | undefined;
   /** Renders the interactive React Flow handle. Without it the port is only drawn (stories). */
-  live?: boolean;
+  live?: boolean | undefined;
   /** The port can start or end a connection by pointer. False in read-only mode. */
-  connectable?: boolean;
+  connectable?: boolean | undefined;
   /** Outputs: the accessible name of the plus button. */
-  label?: string;
-  tabbable?: boolean;
-  selected?: boolean;
+  label?: string | undefined;
+  tabbable?: boolean | undefined;
+  selected?: boolean | undefined;
   /** Inputs while a connection is dragged: why this input cannot receive it. */
-  invalidReason?: string;
-  onAdd?: () => void;
-  className?: string;
+  invalidReason?: string | undefined;
+  onAdd?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

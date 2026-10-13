@@ -32,6 +32,9 @@
         "coverage/**"
       ]
     },
-    "i18n:check": {}
+    "i18n:check": {},
+    "generate": {
+      "cache": false
+    }
   }
 }
