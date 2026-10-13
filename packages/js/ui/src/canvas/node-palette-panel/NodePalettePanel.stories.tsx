@@ -4,7 +4,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 
-import { MatrixTable } from '../../stories/MatrixTable';
 import { exampleCatalog } from '../fixtures';
 
 import { NodePalettePanel } from './NodePalettePanel';
@@ -48,18 +47,18 @@ export const FocusVisible: Story = { args: { className: 'pseudo-focus-visible' }
 export const Matrix: Story = {
   decorators: [],
   render: () => (
-    <MatrixTable
-      caption="Node palette panel"
-      columns={['all nodes', 'triggers only']}
-      rows={[
-        {
-          label: 'panel',
-          cells: [
-            <div key="a" className="bg-canvas relative h-screen w-canvas-palette-w overflow-hidden rounded-lg"><NodePalettePanel items={exampleCatalog} onPick={() => undefined} onClose={() => undefined} /></div>,
-            <div key="b" className="bg-canvas relative h-screen w-canvas-palette-w overflow-hidden rounded-lg"><NodePalettePanel items={exampleCatalog} filter="triggers" onPick={() => undefined} onClose={() => undefined} /></div>,
-          ],
-        },
-      ]}
-    />
+    <div role="group" aria-label="Node palette panel" className="flex flex-wrap items-start gap-6 p-4">
+      {[
+        { label: 'all nodes', filter: undefined },
+        { label: 'triggers only', filter: 'triggers' as const },
+      ].map(({ label, filter }) => (
+        <figure key={label} className="m-0 flex shrink-0 flex-col gap-2">
+          <figcaption className="text-fg-muted text-sm font-medium">{label}</figcaption>
+          <div className="bg-canvas relative h-screen w-canvas-palette-w shrink-0 overflow-hidden rounded-lg">
+            <NodePalettePanel items={exampleCatalog} filter={filter} onPick={() => undefined} onClose={() => undefined} />
+          </div>
+        </figure>
+      ))}
+    </div>
   ),
 };

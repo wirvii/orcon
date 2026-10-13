@@ -364,6 +364,21 @@ function Canvas({
     requestAnimationFrame(() => containerRef.current?.setAttribute('data-fitted', 'true'));
   }, [nodesReady, fitFlow]);
 
+  // Where focus was inside the canvas, so a dialog opened from the keyboard hands it back when it closes.
+  const dialogOpen = shortcutsOpen || connectOpen || pendingDelete !== undefined;
+  const wasDialogOpen = useRef(false);
+  useEffect(() => {
+    if (wasDialogOpen.current && !dialogOpen) {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        const target = lastFocus.current?.isConnected ? lastFocus.current : containerRef.current;
+        target?.focus({ preventScroll: true });
+      });
+    }
+    wasDialogOpen.current = dialogOpen;
+  }, [dialogOpen]);
+
   // A canvas without nodes has nothing to fit.
   useEffect(() => {
     if (graph.nodes.length === 0) containerRef.current?.setAttribute('data-fitted', 'true');
@@ -415,12 +430,10 @@ function Canvas({
 
   const focusNode = useCallback((id: string) => {
     setActiveId(id);
-    // Wait for the roving tab stop to move, then focus the element React Flow renders.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        containerRef.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: false });
-      }),
-    );
+    const focus = () => containerRef.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: false });
+    // Focus now, so a held arrow key never acts on the node focus is leaving, and again once the roving tab stop has moved.
+    focus();
+    requestAnimationFrame(() => requestAnimationFrame(focus));
   }, []);
 
   const nameOf = (id: string) => graphRef.current.nodes.find((node) => node.id === id)?.name ?? id;
@@ -438,11 +451,18 @@ function Canvas({
     [wide, onOpenDetails],
   );
 
+  const lastFocus = useRef<HTMLElement | null>(null);
   const closePalette = useCallback(() => {
     setPalette(undefined);
     const origin = paletteOrigin.current;
     paletteOrigin.current = null;
-    if (origin && origin.isConnected) setTimeout(() => origin.focus(), 0);
+    // Back to where the person was; when that element has been replaced, to the last focused item or the canvas itself.
+    setTimeout(() => {
+      const edgeId = origin?.closest<HTMLElement>('.react-flow__edge')?.dataset.id;
+      const replaced = edgeId ? containerRef.current?.querySelector<HTMLElement>(`.react-flow__edge[data-id="${CSS.escape(edgeId)}"]`) : null;
+      const target = origin?.isConnected ? origin : replaced ?? (lastFocus.current?.isConnected ? lastFocus.current : containerRef.current);
+      target?.focus({ preventScroll: true });
+    }, 0);
   }, []);
 
   const openPalette = useCallback((target: PaletteTarget) => {
@@ -716,7 +736,10 @@ function Canvas({
         openPalette({ mode: 'edge', edgeId });
       } else if (key === 'Delete' || key === 'Backspace') {
         event.preventDefault();
+        // The connection is gone, so focus goes to the node it left.
+        const source = graphRef.current.edges.find((candidate) => candidate.id === edgeId)?.source;
         disconnect(edgeId);
+        if (source) focusNode(source);
       } else if (key === 'Escape') {
         setFocusedEdgeId(undefined);
       }
@@ -952,6 +975,7 @@ function Canvas({
           onKeyDown={onKeyDown}
           onFocus={(event) => {
             const target = event.target as HTMLElement;
+            lastFocus.current = target;
             const id = target.closest<HTMLElement>('.react-flow__node')?.dataset.id;
             if (id) {
               setFocusedId(id);

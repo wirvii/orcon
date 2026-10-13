@@ -207,6 +207,22 @@ describe('every graph operation works from the keyboard', () => {
     expect(within(dialog).getByText('Add a sticky note')).toBeVisible();
   });
 
+  it('gives focus back to the node when the shortcuts list closes', async () => {
+    const { user } = renderCanvas();
+    const element = await focusNode('HTTP Request');
+    await user.keyboard('?');
+    await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(document.activeElement).toBe(element));
+  });
+
+  it('moves through the nodes with arrow keys pressed one after another, each from the node focus reached', async () => {
+    const { user } = renderCanvas();
+    await focusNode('Webhook');
+    for (const key of ['{ArrowRight}', '{ArrowRight}', '{ArrowDown}']) await user.keyboard(key);
+    expect(document.activeElement?.getAttribute('aria-label')).toMatch(nodeName('Gmail'));
+  });
+
   it('does not react to shortcuts typed in a field', async () => {
     const { user } = renderCanvas();
     await focusNode('HTTP Request');
@@ -235,7 +251,7 @@ describe('the tools and the outline are keyboard paths too', () => {
     expect(within(outline).getByText('Output main goes to Merge, input a, uncertain')).toBeVisible();
 
     await user.click(within(outline).getByRole('button', { name: 'Go to Gmail' }));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: nodeName('Gmail') })));
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toMatch(nodeName('Gmail')));
 
     await user.click(within(outline).getByRole('button', { name: 'Remove connection from Webhook to Validate order' }));
     await waitFor(() => expect(last(onGraphChange).edges.some((edge) => edge.id === 'e1')).toBe(false));
@@ -276,6 +292,8 @@ describe('connections are focusable and have the same actions as the bar', () =>
     act(() => edge.focus());
     await user.keyboard('{Delete}');
     expect(last(onGraphChange).edges.some((candidate) => candidate.id === 'e3')).toBe(false);
+    // Focus goes to the node the connection left, never to the page.
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
   });
 });
 
