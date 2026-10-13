@@ -22,7 +22,7 @@ const (
 	SeverityWarning Severity = "WARNING"
 )
 
-// Issue codes. V1..V12 are the static rules of ADR-0010 section 11; the
+// Issue codes. V1..V13 are the static rules of ADR-0010 section 11; the
 // others group the checks of the remaining validation levels.
 const (
 	// CodeStructure marks a document that does not have the orcon/flow@1 shape.
@@ -65,6 +65,9 @@ const (
 	CodeV11 = "V11"
 	// CodeV12 is rule V12: node names are unique.
 	CodeV12 = "V12"
+	// CodeV13 is rule V13, a warning: the condition that ends a loop reads
+	// nothing the loop body writes.
+	CodeV13 = "V13"
 )
 
 // Issue is one finding of a validation.
