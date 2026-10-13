@@ -206,10 +206,8 @@ jobs:
             echo "::error title=Visual baselines missing::packages/js/ui/visual/__screenshots__ has no screenshots. Run the 'Visual baselines' workflow (workflow_dispatch), download its artifact, commit the folder, then re-run this job."
             exit 1
           fi
-      - name: Build Storybook on the host
-        run: pnpm --filter @orcon/ui build-storybook
-      - name: Run the visual suite in the pinned Playwright container
-        run: sh packages/js/ui/visual/run-docker.sh
+      - name: Build Storybook on the host and run the visual suite in the pinned Playwright container
+        run: pnpm --filter @orcon/ui test:visual:docker
       - name: Upload the difference report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
