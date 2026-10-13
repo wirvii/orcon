@@ -37,11 +37,17 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: make pr-title-lint
-      - name: Commits of the pull request
+      # The pull request is squash-merged with its title, so only the title reaches main
+      # and must pass. Intermediate commits are reported as warnings; fixing them is
+      # optional (the pre-push hook and `make commit-lint` still check them locally).
+      - name: Commits of the pull request (warnings only)
         env:
           FROM: ${{ github.event.pull_request.base.sha }}
           TO: ${{ github.event.pull_request.head.sha }}
-        run: make commit-lint
+        run: |
+          if ! make commit-lint; then
+            echo "::warning title=commit-lint::Some commits of this pull request do not follow the commit format. The squash merge uses the pull request title, so this does not block the merge."
+          fi
   pr-advisory:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

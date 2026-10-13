@@ -35,5 +35,8 @@ export default {
     'body-max-line-length': [1, 'always', 100],
     'footer-max-line-length': [1, 'always', 100],
   },
+  // Merge commits from updating a branch ("merge origin/main into ...") are not messages
+  // anyone writes; only the pull request title reaches main (squash merge).
+  ignores: [(message) => /^merge\b/i.test(message)],
   helpUrl: 'https://github.com/wirvii/orcon/blob/main/CONTRIBUTING.md#commit-messages',
 };
