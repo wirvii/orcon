@@ -17,17 +17,6 @@
       "group": "ACTION",
       "parameters": [
         {
-          "name": "resource",
-          "type": "OPTIONS",
-          "required": true,
-          "default": "contact",
-          "options": [
-            { "value": "contact", "label": "Contact" },
-            { "value": "message", "label": "Message" }
-          ],
-          "description": "The kind of record to work with."
-        },
-        {
           "name": "contactId",
           "type": "RESOURCE_LOCATOR",
           "required": true,
@@ -187,7 +176,6 @@
             "name": "n8n-nodes-base.acme",
             "typeVersions": [1],
             "parameterMap": {
-              "resource": "resource",
               "operation": { "contact:create": "contact.create", "contact:get": "contact.get", "contact:getAll": "contact.getMany", "contact:update": "contact.update", "contact:delete": "contact.delete", "message:send": "message.send" },
               "contactId": "contactId",
               "email": "email",

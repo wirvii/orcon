@@ -18,7 +18,7 @@ K1 makes declarative connectors the default: most integrations are REST APIs who
 `http { baseUrl: template, headers?: { name: template }, timeout?: duration (default 30 s), encoding?: "JSON" }`. `baseUrl` must resolve to a granted domain (ADR-0029 §8); otherwise the request fails as `PERMANENT` with `EgressDenied`.
 
 ### 3. Parameters
-Parameter schema per node/operation: `name`, `type` (`STRING`, `NUMBER`, `BOOLEAN`, `OPTIONS`, `MULTI_OPTIONS`, `COLLECTION`, `FIXED_COLLECTION`, `JSON`, `DATE_TIME`, `RESOURCE_LOCATOR`, `BINARY_PROPERTY`), `required`, `default`, `options[]`, `displayWhen` (conditions on other parameters), `sensitive`, `description`. Defaults are explicit values; a default change between versions is a recorded change (ADR-0034). Option values a connector defines for its own parameters are connector data, not values of this schema.
+Parameter schema per node/operation: `name`, `type` (`STRING`, `NUMBER`, `BOOLEAN`, `OPTIONS`, `MULTI_OPTIONS`, `COLLECTION`, `FIXED_COLLECTION`, `JSON`, `DATE_TIME`, `RESOURCE_LOCATOR`, `BINARY_PROPERTY`), `required`, `default`, `options[]`, `displayWhen` (conditions on other parameters), `sensitive`, `description`. Defaults are explicit values; a default change between versions is a recorded change (ADR-0034). Option values a connector defines for its own parameters are connector data, not values of this schema. The names `operation` and `resource` are reserved for operation selection (ADR-0029 §4) and are never declared in a parameter schema.
 
 ### 4. Authentication schemes (applied by the host)
 `NONE`; `API_KEY { in: HEADER|QUERY|COOKIE, name, prefix? }`; `BASIC`; `BEARER`; `OAUTH2 { grant: AUTHORIZATION_CODE|PKCE|CLIENT_CREDENTIALS, authUrl, tokenUrl, scopes[], tokenPlacement }` (flows and refresh owned by the security design); `CUSTOM_HEADERS { name: template }`; `AWS_SIG_V4 { service, region: template }`; `SESSION_TOKEN { login: opName, extract: path, ttl, placement }`. Templates in schemes may reference `$credentials.<field>`; these templates are evaluated by the host and their results never enter items, logs or history.
@@ -62,3 +62,8 @@ Most connectors are data, reviewable without code review and executed by one wel
 
 ## Alternatives considered
 OpenAPI-only import (rejected as the sole format: lacks pagination, auth flows, safety, item mapping; an OpenAPI-to-declarative generator may come later); inline JavaScript hooks (rejected: reintroduces code review and sandboxing for every connector); a single recorded exchange per test (rejected by ADR-0079 §3: cannot cover pagination, OAuth refresh or error sequences).
+
+## Amendments
+Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
+
+- **SPEC-003 (Amendment 8).** §3: operation selection through the reserved parameter `operation`; `operation` and `resource` are reserved parameter names.
