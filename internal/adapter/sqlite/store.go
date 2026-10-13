@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
@@ -83,6 +84,11 @@ type Store struct {
 	readDB  *sql.DB
 	writer  *writer
 	reads   *sqlcgen.Queries
+
+	// mu orders Close after the operations in flight: every operation holds a
+	// read lock for its whole duration, Close takes the write lock.
+	mu     sync.RWMutex
+	closed bool
 }
 
 // Open takes the process lock, opens the writer and the readers, applies the
@@ -194,6 +200,12 @@ func escapePath(p string) string {
 // Close stops the writer, closes the connections and releases the process
 // lock. It is safe to call twice.
 func (s *Store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
 	return s.closeResources(context.Background())
 }
 
@@ -229,7 +241,7 @@ func (s *Store) closeResources(ctx context.Context) error {
 
 // Writer returns the single write connection pool, for the checks that inspect
 // connections (internal/adapter/storetest/dbrules). Application code uses the
-// port methods.
+// port methods. The pool is valid until Close.
 func (s *Store) Writer() *sql.DB { return s.writeDB }
 
 // Reader returns the read-only connection pool, for the same checks.
@@ -237,7 +249,9 @@ func (s *Store) Reader() *sql.DB { return s.readDB }
 
 // write runs fn in the writer under the group commit.
 func (s *Store) write(ctx context.Context, op string, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
-	if s.writer == nil {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
 	err := s.writer.submit(ctx, func(ctx context.Context, tx *sql.Tx) error {
@@ -248,7 +262,9 @@ func (s *Store) write(ctx context.Context, op string, fn func(ctx context.Contex
 
 // read runs fn on a read connection.
 func (s *Store) read(ctx context.Context, op string, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
-	if s.readDB == nil {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
 	return annotate(op, fn(ctx, s.reads))

@@ -34,6 +34,9 @@ var (
 	// ErrReference means a referenced row does not exist, or a row that is still
 	// referenced cannot be removed.
 	ErrReference = errors.New("referenced row missing or still in use")
+	// ErrClosed means the store was closed; an operation that was in flight when
+	// Close was called finishes first, one that starts after it fails with this.
+	ErrClosed = errors.New("store is closed")
 	// ErrInvalidRecord means a database constraint rejected the values
 	// (a CHECK: unknown enumeration value, empty name, wrong format tag).
 	ErrInvalidRecord = errors.New("record violates a database constraint")

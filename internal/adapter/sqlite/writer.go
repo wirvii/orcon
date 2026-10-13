@@ -10,10 +10,12 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+
+	"github.com/wirvii/orcon/internal/flow"
 )
 
 // ErrClosed is returned by operations on a closed store.
-var ErrClosed = errors.New("sqlite store is closed")
+var ErrClosed = flow.ErrClosed
 
 // maxGroup bounds the jobs one transaction commits together.
 const maxGroup = 64

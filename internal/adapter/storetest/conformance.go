@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,14 +27,15 @@ import (
 	"github.com/wirvii/orcon/internal/platform/id"
 )
 
-// Store is every port the flow area declares for storage.
-type Store interface {
+// Store is every port the storage adapters implement, and Close.
+type Store interface { //nolint:interfacebloat // the suite exercises every port of the adapters through one value
 	flow.InstanceStore
 	flow.ProjectStore
 	flow.Store
 	flow.VersionStore
 	flow.SnapshotStore
 	execution.WorkerStore
+	io.Closer
 }
 
 // Factory returns a store on a fresh, migrated database and registers its
@@ -132,6 +134,7 @@ func Conformance(t *testing.T, newStore Factory) {
 		{"OrganizationIsolation", isolationCase},
 		{"InstantsAndBytesRoundTrip", roundTripCase},
 		{"ConcurrentWriters", concurrencyCase},
+		{"CloseWhileOperationsRun", closeCase},
 	}
 	for i := range cases {
 		c := &cases[i]
@@ -588,4 +591,69 @@ func concurrencyCase(t *testing.T, newStore Factory) {
 	if landed.Load() != 4*writers {
 		t.Fatalf("%d of %d independent writes landed", landed.Load(), 4*writers)
 	}
+}
+
+// closeCase closes the store while writers and readers are running: every
+// operation either completes or fails with flow.ErrClosed, nothing panics,
+// nothing else is returned, and a second Close is harmless (run under -race).
+func closeCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	f := newFixture(t, newStore)
+	rec := f.flow(f.orgA, f.projA, "closing")
+	const workers = 12
+	var warm, finished sync.WaitGroup
+	warm.Add(workers)
+	var completed, refused atomic.Int64
+	classify := func(err error) bool {
+		switch {
+		case err == nil:
+			completed.Add(1)
+			return true
+		case errors.Is(err, flow.ErrClosed):
+			refused.Add(1)
+			return false
+		default:
+			t.Errorf("an operation around Close failed with %v", err)
+			return false
+		}
+	}
+	for w := range workers {
+		finished.Go(func() {
+			warmed := false
+			for i := 0; ; i++ {
+				var err error
+				if w%2 == 0 {
+					err = f.s.CreateFlow(f.ctx(), flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgA, ProjectID: f.projA,
+						Name: fmt.Sprintf("closing-%d-%d", w, i), Draft: []byte(`{}`), CreatedAt: base, UpdatedAt: base})
+				} else {
+					_, err = f.s.GetFlow(f.ctx(), f.orgA, rec.ID)
+				}
+				if !classify(err) {
+					if !warmed {
+						warm.Done() // never completed one: do not hold the closer back
+					}
+					return
+				}
+				if !warmed {
+					warmed = true
+					warm.Done()
+				}
+			}
+		})
+	}
+	warm.Wait() // every worker completed at least one operation
+	if err := f.s.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	finished.Wait()
+	if refused.Load() != workers {
+		t.Errorf("%d workers saw ErrClosed, want %d", refused.Load(), workers)
+	}
+	if err := f.s.Close(); err != nil {
+		t.Errorf("a second close: %v", err)
+	}
+	_, err := f.s.GetFlow(f.ctx(), f.orgA, rec.ID)
+	wantErr(t, "an operation after Close", err, flow.ErrClosed)
+	err = f.s.CreateFlow(f.ctx(), flow.Record{ID: next[flow.FlowID](f.ids), OrgID: f.orgA, ProjectID: f.projA, Name: "late", Draft: []byte(`{}`)})
+	wantErr(t, "a write after Close", err, flow.ErrClosed)
 }

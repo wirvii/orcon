@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -31,7 +32,7 @@ import (
 const ApplicationRole = "orcon_application"
 
 // ErrClosed is returned by operations on a closed store.
-var ErrClosed = errors.New("postgres store is closed")
+var ErrClosed = flow.ErrClosed
 
 // Options configure [Open].
 type Options struct {
@@ -64,6 +65,11 @@ type Store struct {
 	opts  Options
 	clock clock.Clock
 	pool  *pgxpool.Pool
+
+	// mu orders Close after the operations in flight: every operation holds a
+	// read lock for its whole duration, Close takes the write lock.
+	mu     sync.RWMutex
+	closed bool
 }
 
 // Open applies the pending migrations and opens the runtime pool. It refuses
@@ -147,10 +153,13 @@ func NewPool(ctx context.Context, opts Options) (*pgxpool.Pool, error) {
 
 // Close closes the pool.
 func (s *Store) Close() error {
-	if s.pool != nil {
-		s.pool.Close()
-		s.pool = nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
 	}
+	s.closed = true
+	s.pool.Close()
 	return nil
 }
 
@@ -161,7 +170,9 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 // inOrg runs fn in a READ COMMITTED transaction whose organization context is
 // org (orcon-db TI-6: a transaction-local setting, never a session one).
 func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
-	if s.pool == nil {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
 	mode := pgx.ReadWrite
@@ -178,6 +189,9 @@ func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly
 			_ = tx.Rollback(context.WithoutCancel(ctx))
 		}
 	}()
+	if err := assertFreshSession(ctx, tx); err != nil {
+		return mapError(op, err)
+	}
 	if _, err := tx.Exec(ctx, "SELECT set_config('orcon.org_id', $1, true)", org.String()); err != nil {
 		return mapError(op, err)
 	}
@@ -194,7 +208,9 @@ func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly
 // instance runs fn for statements on instance tables, which row-level security
 // does not scope.
 func (s *Store) instance(ctx context.Context, op string, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
-	if s.pool == nil {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
 	return mapError(op, fn(ctx, sqlcgen.New(s.pool)))
@@ -208,3 +224,25 @@ var (
 	_ flow.SnapshotStore    = (*Store)(nil)
 	_ execution.WorkerStore = (*Store)(nil)
 )
+
+// ErrSession means a pooled connection is not in the state every transaction
+// must start from; the transaction is not run.
+var ErrSession = errors.New("postgres session is not in the expected state")
+
+// assertFreshSession checks, at the start of each transaction, that the
+// connection runs as orcon_application and that no organization context is left
+// over from an earlier transaction (orcon-db CN-8, TI-6): a leaked context would
+// let a transaction read another organization's rows.
+func assertFreshSession(ctx context.Context, tx pgx.Tx) error {
+	var user, orgContext string
+	if err := tx.QueryRow(ctx, "SELECT current_user::text, coalesce(current_setting('orcon.org_id', true), '')").Scan(&user, &orgContext); err != nil {
+		return err
+	}
+	if user != ApplicationRole {
+		return fmt.Errorf("%w: the role is %q, want %q", ErrSession, user, ApplicationRole)
+	}
+	if orgContext != "" {
+		return fmt.Errorf("%w: the organization context is %q at the start of a transaction, want empty", ErrSession, orgContext)
+	}
+	return nil
+}

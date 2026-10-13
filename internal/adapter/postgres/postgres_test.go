@@ -185,18 +185,6 @@ func TestChecksumMismatch(t *testing.T) {
 	}
 }
 
-func TestPostgresSessionSettings(t *testing.T) {
-	s := open(t, newPostgresDatabase(t))
-	tx, err := s.Pool().Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(context.WithoutCancel(t.Context())) //nolint:errcheck // read-only transaction
-	for _, f := range dbrules.CheckPostgresSession(t.Context(), tx) {
-		t.Errorf("%s", f)
-	}
-}
-
 func TestLintSchema(t *testing.T) {
 	dsn := newPostgresDatabase(t)
 	open(t, dsn)

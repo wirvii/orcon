@@ -10,7 +10,7 @@
 #     column without a default) outside a contract migration: the planted
 #     violation is detected and the checker's own tests pass.
 #  2. Floor verification. For every distinct floor F declared by a migration
-#     header (other than "self"), the checkout of release tag vF runs the smoke
+#     header (other than "self"; written with or without a leading v), the checkout of release tag vF runs the smoke
 #     subset of the storetest suite (TestFloorSmoke) against databases the
 #     current code migrated, on SQLite and, with a container runtime, on
 #     PostgreSQL. A floor without its release tag fails: the floor must name a
@@ -61,7 +61,7 @@ echo "test-compat-floor: the expand/contract control rejects a dropped column"
 
 # --- 2. floors ------------------------------------------------------------------
 floors=$(cat internal/adapter/sqlite/migrations/*.sql internal/adapter/postgres/migrations/*.sql |
-  sed -n 's/^-- orcon:compatibility-floor //p' | sed 's/[[:space:]]*$//' | grep -v '^self$' | sort -u || true)
+  sed -n 's/^-- orcon:compatibility-floor //p' | sed 's/[[:space:]]*$//' | grep -v '^self$' | sed 's/^v//' | sort -u || true)
 list=""
 for floor in $floors; do
   tag="v$floor"
