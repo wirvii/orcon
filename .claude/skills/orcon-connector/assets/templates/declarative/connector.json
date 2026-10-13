@@ -1,0 +1,74 @@
+{
+  "format": "orcon/declarative@1",
+  "http": {
+    "baseUrl": "https://api.acme.example/v1",
+    "headers": { "Accept": "application/json" },
+    "timeout": "30s",
+    "encoding": "JSON"
+  },
+  "operations": {
+    "contact.create": {
+      "request": {
+        "method": "POST",
+        "path": "/contacts",
+        "body": { "type": "JSON", "template": { "email": "{{ $parameter.email }}" } },
+        "itemMode": "PER_ITEM"
+      },
+      "response": {
+        "select": "$.data",
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "when": { "status": [409] }, "class": "PERMANENT", "code": "Conflict", "message": "A contact with this e-mail address already exists in Acme." }
+        ]
+      }
+    },
+    "contact.get": {
+      "request": { "method": "GET", "path": "/contacts/{{ $parameter.contactId }}", "itemMode": "PER_ITEM" },
+      "response": { "select": "$.data", "empty": "NO_ITEMS" }
+    },
+    "contact.getMany": {
+      "request": {
+        "method": "GET",
+        "path": "/contacts",
+        "query": { "updated_after": "{{ $parameter.updatedAfter }}" },
+        "itemMode": "PER_ITEM"
+      },
+      "response": { "split": "$.data", "empty": "NO_ITEMS" },
+      "pagination": {
+        "strategy": { "type": "CURSOR", "from": "PATH", "path": "$.next", "param": "cursor", "in": "QUERY" },
+        "pageSize": { "param": "limit", "value": 200 },
+        "maxPages": 1000,
+        "emit": "STREAM"
+      }
+    },
+    "contact.update": {
+      "request": {
+        "method": "PATCH",
+        "path": "/contacts/{{ $parameter.contactId }}",
+        "body": { "type": "JSON", "template": "{{ $parameter.updateFields }}" },
+        "itemMode": "PER_ITEM"
+      },
+      "response": { "select": "$.data", "empty": "ONE_EMPTY_ITEM" }
+    },
+    "contact.delete": {
+      "request": { "method": "DELETE", "path": "/contacts/{{ $parameter.contactId }}", "itemMode": "PER_ITEM" },
+      "response": { "map": { "id": "{{ $parameter.contactId }}", "deleted": true }, "empty": "ONE_EMPTY_ITEM" }
+    },
+    "message.send": {
+      "request": {
+        "method": "POST",
+        "path": "/messages",
+        "body": { "type": "JSON", "template": { "to": "{{ $parameter.to }}", "text": "{{ $parameter.text }}" } },
+        "itemMode": "PER_ITEM"
+      },
+      "response": {
+        "select": "$.data",
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "when": { "status": [429] }, "class": "TRANSIENT", "code": "RateLimited" },
+          { "when": { "status": ["500-599"] }, "class": "UNCERTAIN", "code": "ServiceUnavailable", "message": "Acme answered with a server error after the message was sent; check whether it was delivered." }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "format": "orcon/cassette@1",
+  "operation": "contact.update",
+  "case": "ok",
+  "example": true,
+  "parameters": { "contactId": "c_1", "updateFields": { "name": "Person 2" } },
+  "items": [ {} ],
+  "credential": { "type": "apiKey", "fixture": "default" },
+  "interactions": [
+    {
+      "request": {
+        "method": "PATCH",
+        "url": "https://api.acme.example/v1/contacts/c_1",
+        "headers": { "Authorization": "[REDACTED:credential.apiKey]", "Content-Type": "application/json" },
+        "body": { "name": "Person 2" }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "data": { "id": "c_1", "name": "Person 2", "email": "person1@example.com", "updatedAt": "2026-10-13T00:00:01Z" } }
+      }
+    }
+  ],
+  "expect": { "items": [ { "id": "c_1", "name": "Person 2", "email": "person1@example.com", "updatedAt": "2026-10-13T00:00:01Z" } ] },
+  "recorded": { "at": "2026-10-13T00:00:00Z", "orconVersion": "0.0.0", "scrubber": { "version": 1, "rulesDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000" } }
+}

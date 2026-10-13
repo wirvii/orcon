@@ -1,0 +1,13 @@
+{
+  "format": "orcon/connector-authoring@1",
+  "kind": {
+    "chosen": "NATIVE",
+    "gap": "DG-1",
+    "explanation": "message.send and message.getMany use the Acme Queue binary protocol over TCP, which the declarative HTTP format cannot express."
+  },
+  "verbExceptions": [],
+  "resourceExceptions": [],
+  "rawAccessReason": "The Acme Queue protocol authenticates inside its own handshake, so the connector reads the username and password from the credential handle.",
+  "networkReason": "Acme Queue listens on TCP port 5671, not on HTTPS.",
+  "rateLimitSources": []
+}

@@ -1,0 +1,7 @@
+{
+  "format": "orcon/connector-live@1",
+  "sandbox": { "available": false, "reasonUnavailable": "example service" },
+  "secrets": { "username": "ORCON_LIVE_ACME_QUEUE_USERNAME", "password": "ORCON_LIVE_ACME_QUEUE_PASSWORD" },
+  "operations": [],
+  "writes": false
+}
