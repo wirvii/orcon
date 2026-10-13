@@ -1,12 +1,21 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { chunkModules } from './build/chunk-modules';
+import { thirdParty } from './build/third-party';
 import { routes } from './src/app/routes';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = resolve(here, '../..');
+const outDir = resolve(here, 'dist');
 
 // The build is embedded in the Go binary and served from its root, so asset paths stay absolute.
 // The router plugin must come before the React plugin: it generates the committed route tree
@@ -26,6 +35,9 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
+    // The bundle checks read what is inside each chunk. The license plugin below writes the notices
+    // and the list of bundled packages the license check reads.
+    chunkModules(repositoryRoot),
   ],
-  build: { outDir: 'dist' },
+  build: { outDir, manifest: true, rollupOptions: { plugins: [thirdParty(outDir, resolve(repositoryRoot, 'packages/js/ui'))] } },
 });

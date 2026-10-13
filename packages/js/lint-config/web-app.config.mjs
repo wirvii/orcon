@@ -27,6 +27,7 @@ const toolingFiles = [
   '**/*.{test,spec}.{ts,tsx}',
   '**/*.stories.tsx',
   'test/**',
+  'build/**',
   'e2e/**',
   'perf/**',
   'visual/**',
