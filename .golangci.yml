@@ -214,10 +214,12 @@ linters:
           files:
             - "$all"
             - "!**/internal/adapter/storetest/**"
+            - "!**/internal/adapter/sqlite/*_test.go"
+            - "!**/internal/adapter/postgres/*_test.go"
             - "!**/cmd/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/storetest
-              desc: only cmd/orcon wires adapters (AL-8)
+              desc: only cmd/orcon wires adapters (AL-8); the tests of the sqlite and postgres adapters run the database rule checks of storetest/dbrules (SPEC-001 C2, SPEC-009 4.4)
         banned-everywhere:
           files:
             - "$all"
