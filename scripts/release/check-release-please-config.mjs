@@ -4,6 +4,7 @@
 // (orcon-contributing RL-2, ADR 0081). No dependencies: Node standard library only.
 // Usage: node scripts/release/check-release-please-config.mjs
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,6 +19,26 @@ function readJson(name) {
     problems.push(`${name}: ${err.message}`);
     return undefined;
   }
+}
+
+// isAncestorOfMain reports whether sha is reachable from origin/main (or main when
+// there is no remote). A checkout without that history cannot prove it, so it fails:
+// CI checks out with fetch-depth 0.
+function isAncestorOfMain(sha) {
+  for (const ref of ['origin/main', 'main']) {
+    try {
+      execFileSync('git', ['-C', root, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { stdio: 'ignore' });
+    } catch {
+      continue;
+    }
+    try {
+      execFileSync('git', ['-C', root, 'merge-base', '--is-ancestor', sha, ref], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 const config = readJson('release-please-config.json');
@@ -39,8 +60,11 @@ if (config) {
       problems.push(`release-please-config.json: ${key} must be ${JSON.stringify(value)}, got ${JSON.stringify(config[key])}`);
     }
   }
-  if (!/^[0-9a-f]{40}$/.test(config['bootstrap-sha'] ?? '')) {
+  const bootstrap = config['bootstrap-sha'] ?? '';
+  if (!/^[0-9a-f]{40}$/.test(bootstrap)) {
     problems.push('release-please-config.json: bootstrap-sha must be a 40-character commit hash');
+  } else if (!isAncestorOfMain(bootstrap)) {
+    problems.push(`release-please-config.json: bootstrap-sha ${bootstrap} is not an ancestor of main (origin/main or main); set it to a commit on main`);
   }
   const sections = config['changelog-sections'];
   if (!Array.isArray(sections)) {
