@@ -56,7 +56,7 @@ export function AppearanceScreen() {
           {sections.map((name) => (
             <li key={name}>
               <Link asChild>
-                <RouterLink to="/settings/appearance" search={{ section: name }} aria-current={section === name ? 'location' : undefined}>
+                <RouterLink to="/settings/appearance" search={{ section: name }}>
                   {intl.formatMessage(navMessages[name])}
                 </RouterLink>
               </Link>

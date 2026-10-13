@@ -15,7 +15,9 @@
     "i18n:write": "node scripts/i18n.mjs write",
     "generate": "node scripts/generate-routes.mjs",
     "test": "vitest run",
-    "test:unit": "vitest run --project unit"
+    "test:unit": "vitest run --project unit",
+    "test:coverage": "vitest run --coverage",
+    "test:screens": "vitest run --project screens"
   },
   "dependencies": {
     "@hookform/resolvers": "^5",
