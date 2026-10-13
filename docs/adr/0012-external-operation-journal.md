@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0012 — External operation journal: per-item EOSC tracking with group commit
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -60,3 +60,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-003.** §1: the full contract schema is ADR-0029 §5. Suspension for `UNCERTAIN` of an `UNSAFE` operation emits the human-attention notification of ADR-0073; its actions are the existing supervised resolution (ADR-0029 §5). The values of the runtime contract of §1 are UPPER_SNAKE, as in the connector manifest.
 - **SPEC-004.** §4 adds: "Journal batches spanning several organisations are written as one transaction with per-organisation statements (ADR-0047 §3)." Credential use is audited at the confirmation point (ADR-0048 §2).
 - **SPEC-006.** §3: the correlation key gains the optional components `agentRunId | stepNo | callIndex`.
+- **SPEC-014 (ADR-0082, 2026-10-13, owner decision).** §4: in an execution of mode `TEST`, an activation of an `EFFECT` operation stops after step 1. The transaction that inserts its `PREPARED` items also writes the effect preview (the requests rendered before authentication, with the masking set applied), the `EFFECT_CONFIRMATION` wait, its expiry timer and `effect.preview_opened` (ADR-0010 §8). Step 4 (`PREPARED` and `DISPATCHING` in the same batch) never applies to a gated activation. Step 2 starts only after a later transaction records `DISPATCH` or an automatic confirmation; it uses the same `PREPARED` rows and correlation keys, so §5 to §7 apply unchanged. With "first item only" the other items become `NOT_DISPATCHED`. A substitution or an expired preview moves every item from `PREPARED` to `NOT_DISPATCHED` (§2). Executions of every other mode are unchanged. No exactly-once claim is added.

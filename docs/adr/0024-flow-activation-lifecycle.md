@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0024 — Flow activation lifecycle: draft, publish, activate, deactivate, rollback, deletion and test sessions
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-002.
 
@@ -47,3 +47,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-004.** Publishing requires `flow:publish` and activating requires `flow:activate`; rule T-V3 verifies credential sharing.
 - **SPEC-005.** Publish, activate, deactivate, rollback and test sessions are exposed as operations of ADR-0052. In a protected project in `GIT_LEADS` mode, publishing happens only by applying from Git (ADR-0057 §7). Actions of an `apiKey` principal in a protected project go through confirmation when the policy requires it (ADR-0059 §5).
+- **SPEC-014 (ADR-0082, 2026-10-13, owner decision).** §6: "Run with sample/past event" starts a test run (ADR-0082 §1) of the editor's document instead of a separate test execution: a retained `ingress_event` is used with `trigger.kind = PAST_EVENT` and its `ingressEventId`; sample JSON is pinned on the trigger node and used with `trigger.kind = PINNED`. Masked fields remain masked, with a warning. Test sessions are unchanged.

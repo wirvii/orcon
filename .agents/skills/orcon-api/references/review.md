@@ -38,17 +38,17 @@ The same list is in `assets/pr-api-checklist.md` for pasting into a pull request
 
 | Check | Tool (license) | Command | Where it runs | What it verifies | How to fix |
 |---|---|---|---|---|---|
-| Built-in lint | Redocly CLI (MIT) | `make api-lint` | CI job `api-contract`, local | structure, unique and URL-safe operation ids, defined path parameters, no ambiguous paths, valid examples, no unused components, defined security, problem-details 4xx | fix the contract at the reported location; no rule is disabled for the real contract |
+| Built-in lint | Redocly CLI (MIT) | `make api-lint` | CI job `api-contract`, local | structure, unique and URL-safe operation ids, defined path parameters, no ambiguous paths, valid examples, no unused components, defined security, a declared 4xx response | fix the contract at the reported location; the only built-in rule turned off is `operation-4xx-problem-details-rfc7807` (protocol operations answer errors in their standard's format; `orcon/problem-responses` covers every other operation, ERR-1), and no other rule is disabled |
 | Orcon lint plugin | plugin `orcon` (Apache-2.0) on Redocly CLI | `make api-lint` | CI job `api-contract`, local | the 31 `orcon/<rule>` rules named in brackets in this rulebook | read the rule ID in the message, apply the rule in its reference file |
 | Plugin self-tests | `node --test` | `make api-lint` (runs `pnpm --filter @orcon/openapi-tools test`) | CI job `api-contract`, local | the good fixture has 0 problems, each planted case fails with its rule, `plugin/verbs.js` equals the PATH-5 table, templates pass | keep `verbs.js`, the PATH-5 table and the fixtures in step in the same pull request |
 | Generated drift | git | `make api-lint` | CI job `api-contract`, local | committed bundle, `docs/reference/api/README.md` and `docs/reference/problem-codes.md` match the contract | run `make api-lint` locally and commit the regenerated files |
-| Compatibility | oasdiff (Apache-2.0) | `make api-compat` | CI job `api-contract`, local | no breaking change on stable/beta against the latest `v*` tag (VER-2, VER-4) | revert the break, or move it to a new major (VER-5) |
-| Compatibility self-test | oasdiff (Apache-2.0) | `make api-compat-selftest` | CI job `api-contract`, local | each fixed breaking pair fails and each additive pair passes | update the pairs when ADR-0054 §3 changes |
+| Compatibility | oasdiff (Apache-2.0) | `make api-compat` | CI job `api-contract`, local | no breaking change on stable/beta against the latest `v*` tag, event payloads included (VER-2, VER-4) | revert the break, or move it to a new major (VER-5) |
+| Compatibility self-test | oasdiff (Apache-2.0) | `make api-compat-selftest` | CI job `api-contract`, local | each fixed breaking pair fails and each additive pair passes, including event pairs and one pair per entry of the severity file | update the pairs when ADR-0054 §3 changes |
 | Examples on SQLite | examples runner (Apache-2.0), jsonschema (Apache-2.0, tests only) | `make api-examples` | CI job `api-contract` (required), local | every example runs against the real binary and matches status, schema and values | fix the example, the scenario or the server, never the comparison |
 | Examples on PostgreSQL | same | `make api-examples DB=postgres` | nightly workflow (not required) | the same examples on PostgreSQL | reproduce locally with `DB=postgres`; fix before other API work (DOC-10) |
 | Examples runner self-test | Go test | `make api-examples` | CI job `api-contract`, local | the runner fails on each planted mismatch | fix the runner |
-| Reference site | Scalar API Reference (MIT) | `make api-reference` | CI job `api-contract`, release job `api-release`, local | the site builds, loads no external resource and stays within 3 MiB compressed | remove the external URL; a larger budget amends ADR-0080 |
-| Reference served | Orcon binary | handler tests of the HTTP adapter | CI | `/api/reference` is served by the `api` and `standalone` roles with a `default-src 'self'` content security policy | fix the handler or its embedded files |
+| Reference site | Scalar API Reference (MIT) | `make api-reference` | CI job `api-contract`, release job `api-release`, local | the site builds, loads no external resource, stays within 3 MiB compressed and ships `LICENSE-scalar.txt` and `third-party-notices.txt` with only allowed licenses | remove the external URL; a larger budget amends ADR-0080 |
+| Reference served | Orcon binary | handler tests of the HTTP adapter | CI | `/api/reference/` is served by the `api` and `standalone` roles with the content security policy of ADR-0080 §10, and `/api/reference` answers `301` to `/api/reference/` | fix the handler or its embedded files |
 | API changelog | oasdiff (Apache-2.0) | `make api-changelog VERSION=…`, `make api-changelog-check`, `make api-changelog-selftest` | release job `api-release`, CI job `api-contract` | each release has its changelog and it matches the contract | regenerate with `make api-changelog` in the release preparation pull request |
 | Skill copy | git, Agent Skills validator | `make skill-check` | CI | the generated copy of this skill is identical to `.agents/skills/orcon-api/` | run `make skill-sync` |
 | Provenance | `tools/provenance` | `make provenance` | CI | no assistant names or authorship marks | remove them |
@@ -61,13 +61,13 @@ Each lint rule has one fixture in `packages/js/openapi-tools/testdata/bad/` that
 
 The design that builds the API contract (SPEC-005) inherits these checks:
 
-- **H-API1-1** the real contract passes `make api-lint` with no finding and no disabled rule; the bundle for the Go generator is produced by `@orcon/openapi-tools`.
+- **H-API1-1** the real contract passes `make api-lint` with no finding and no disabled rule other than the built-in `operation-4xx-problem-details-rfc7807` (ADR-0054 §1); the bundle for the Go generator is produced by `@orcon/openapi-tools`.
 - **H-API1-2** `make api-compat` runs in the job `api-contract`.
-- **H-API1-3** `/api/reference` and `/api/reference/*` serve the embedded site in the `api` and `standalone` roles with a `default-src 'self'; connect-src 'self'` policy, no external resource, excluded from the router parity test; `make build` builds the site first.
+- **H-API1-3** `/api/reference` and `/api/reference/*` serve the embedded site in the `api` and `standalone` roles with the content security policy of ADR-0080 §10, `/api/reference` redirecting with `301` to `/api/reference/`, no external resource, excluded from the router parity test; `make build` builds the site first.
 - **H-API1-4** every registered response follows [responses.md](responses.md); no handler writes a 2xx body outside its declared schema.
 - **H-API2-1** every operation has `x-orcon-examples` with a registered scenario.
 - **H-API3-1** `make api-examples` runs every example against the real binary on SQLite in the required job and on PostgreSQL nightly, with zero failures.
-- **H-API5-1** every event type of ADR-0055 §2 is in `webhooks` with `x-orcon-event`; if oasdiff does not cover `webhooks`, an event compatibility check is delivered instead.
+- **H-API5-1** every event type of ADR-0055 §2 is in `webhooks` with `x-orcon-event`; event payload compatibility is checked by `make api-compat`, which compares events as responses (VER-4).
 - **H-API7-1** the CLI coverage test reads `x-orcon-cli` and accepts only the three exemption categories.
 - **H-API10-1** the MCP catalog is produced from `x-orcon-mcp.level`; confirmation is required exactly for `destructive`.
 - **H-REL-1** the first published release has `docs/reference/api/changelog/<version>.md` and the job `api-release` passed.
