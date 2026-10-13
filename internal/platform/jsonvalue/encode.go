@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // ErrNotEncodable marks a value that has no JSON text: the absent value, or
@@ -48,7 +49,7 @@ func write(b *strings.Builder, v Value, canonical bool) error {
 	case KindNumber:
 		return writeNumber(b, v.text, canonical)
 	case KindString:
-		writeString(b, v.text)
+		return writeString(b, v.text)
 	case KindArray:
 		return writeArray(b, v.items, canonical)
 	case KindObject:
@@ -69,6 +70,9 @@ func writeNumber(b *strings.Builder, text string, canonical bool) error {
 	f, err := strconv.ParseFloat(text, 64)
 	if err != nil || math.IsInf(f, 0) {
 		return fmt.Errorf("%w: number %q is outside the double range", ErrNotEncodable, text)
+	}
+	if !RoundTrips(text) {
+		return fmt.Errorf("%w: number %q does not round-trip through a double (integers beyond ±2^53-1 and digits beyond double precision would collide)", ErrNotEncodable, text)
 	}
 	b.WriteString(formatES6(f))
 	return nil
@@ -98,7 +102,9 @@ func writeObject(b *strings.Builder, members []Member, canonical bool) error {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		writeString(b, m.Key)
+		if err := writeString(b, m.Key); err != nil {
+			return err
+		}
 		b.WriteByte(':')
 		if err := write(b, m.Value, canonical); err != nil {
 			return err
@@ -117,8 +123,12 @@ func compareUTF16(a, b string) int {
 const hexDigits = "0123456789abcdef"
 
 // writeString writes s as a JSON string using the minimal escaping that RFC
-// 8785 section 3.2.2.2 prescribes. Invalid UTF-8 becomes U+FFFD.
-func writeString(b *strings.Builder, s string) {
+// 8785 section 3.2.2.2 prescribes. A string that is not well-formed UTF-8 has
+// no JSON text: replacing it would make two different strings share one text.
+func writeString(b *strings.Builder, s string) error {
+	if !utf8.ValidString(s) {
+		return fmt.Errorf("%w: string is not valid UTF-8", ErrNotEncodable)
+	}
 	b.WriteByte('"')
 	for _, r := range s {
 		switch {
@@ -145,6 +155,7 @@ func writeString(b *strings.Builder, s string) {
 		}
 	}
 	b.WriteByte('"')
+	return nil
 }
 
 // formatES6 formats f as ECMAScript Number.prototype.toString does, which is

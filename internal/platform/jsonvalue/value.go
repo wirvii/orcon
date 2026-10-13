@@ -144,13 +144,21 @@ func (v Value) NumberText() (string, bool) {
 }
 
 // Int64 returns the number as an integer. It reports false when v is not a
-// number or its text is not an integer in the int64 range.
+// number, or its value is not an integer that fits an int64. An integral value
+// written with a fraction or exponent (2.0, 1e3) counts; it must be exact
+// (see [ExactNumber]), so no precision is lost to reach the integer.
 func (v Value) Int64() (int64, bool) {
 	if v.kind != KindNumber {
 		return 0, false
 	}
-	n, err := strconv.ParseInt(v.text, 10, 64)
-	return n, err == nil
+	if n, err := strconv.ParseInt(v.text, 10, 64); err == nil {
+		return n, true
+	}
+	f, err := strconv.ParseFloat(v.text, 64)
+	if err != nil || f != math.Trunc(f) || math.Abs(f) > MaxSafeInteger || !ExactNumber(v.text) {
+		return 0, false
+	}
+	return int64(f), true
 }
 
 // Float64 returns the number as a float64. It reports false when v is not a

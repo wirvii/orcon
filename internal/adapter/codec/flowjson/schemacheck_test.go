@@ -31,7 +31,7 @@ var supportedKeywords = map[string]bool{
 	"$schema": true, "$id": true, "$comment": true, "title": true, "description": true, "$defs": true,
 	"$ref": true, "type": true, "properties": true, "required": true, "additionalProperties": true,
 	"items": true, "minItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true, "if": true, "then": true,
-	"minimum": true, "format": true, "oneOf": true, "allOf": true, "not": true, "propertyNames": true,
+	"minimum": true, "maximum": true, "format": true, "oneOf": true, "allOf": true, "not": true, "propertyNames": true,
 }
 
 func newSchemaChecker(t *testing.T, data []byte) *schemaChecker {
@@ -209,6 +209,11 @@ func (c *schemaChecker) checkNumber(schema, inst jsonvalue.Value, path string) [
 	f, isNum := inst.Float64()
 	if !isNum {
 		return nil
+	}
+	if m, ok := schema.Get("maximum"); ok {
+		if highest, _ := m.Float64(); f > highest {
+			return []string{fmt.Sprintf("%s: %v is above the maximum %v", path, f, highest)}
+		}
 	}
 	if m, ok := schema.Get("minimum"); ok {
 		if lowest, _ := m.Float64(); f < lowest {

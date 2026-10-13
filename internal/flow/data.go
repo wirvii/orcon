@@ -143,18 +143,14 @@ func (v *validator) selfConcurrent(g *graph, w int) bool {
 }
 
 // mayRunTogether reports whether activations of nodes a and b can overlap:
-// some split releases tokens on two different outgoing edges, one of which
-// reaches a and the other b before any join. When a == b this means the node
-// is reached by two concurrent paths, the "uncontrolled merge" case.
+// some node releases tokens on two different paths (see [graph.fanOut]), one
+// of which reaches a and the other b before any join. When a == b this means
+// the node is reached by two concurrent paths, the "uncontrolled merge" case.
 func (g *graph) mayRunTogether(a, b int) bool {
 	for s := range g.doc.Nodes {
-		n := &g.doc.Nodes[s]
-		if !g.releasesSeveralTokens(s, n) {
-			continue
-		}
-		succs := g.succ[s]
-		for i, p := range succs {
-			for j, q := range succs {
+		targets := g.fanOut(s)
+		for i, p := range targets {
+			for j, q := range targets {
 				if p == q || (a == b && j < i) {
 					continue
 				}
@@ -167,15 +163,28 @@ func (g *graph) mayRunTogether(a, b int) bool {
 	return false
 }
 
-// releasesSeveralTokens reports whether a node can put live tokens on more
-// than one outgoing edge at once. XOR gateways and event-based gateways choose
-// one path; every other node with several successors fans out, and item
-// routing nodes may fill several ports with different items.
-func (g *graph) releasesSeveralTokens(i int, n *Node) bool {
+// fanOut lists the distinct nodes that node i can start at the same time. An
+// ordinary node starts the targets of all its outgoing edges (item routing
+// nodes may fill several ports with different items); XOR and event-based
+// gateways choose one path and start none together. A non-interrupting
+// boundary event is another branch of its host: the host's continuation and
+// the boundary path run side by side, whereas an interrupting boundary event
+// replaces the continuation and is not concurrent with it.
+func (g *graph) fanOut(i int) []int {
+	n := &g.doc.Nodes[i]
 	if n.Element == ElementExclusiveGateway || n.Element == ElementEventBasedGateway {
-		return false
+		return nil
 	}
-	return len(g.outEdges[i]) > 1 && len(distinct(g.succ[i])) > 1
+	targets := make([]int, 0, len(g.outEdges[i])+len(g.nonInterrupting[i]))
+	for _, ei := range g.outEdges[i] {
+		targets = append(targets, g.index[g.doc.Edges[ei].To])
+	}
+	targets = append(targets, g.nonInterrupting[i]...)
+	targets = distinct(targets)
+	if len(targets) < 2 {
+		return nil
+	}
+	return targets
 }
 
 func distinct(xs []int) []int {

@@ -198,3 +198,21 @@ func mustMember(t *testing.T, v jsonvalue.Value, key string) jsonvalue.Value {
 	}
 	return m
 }
+
+func TestUpgradeStepMustReturnAnObject(t *testing.T) {
+	t.Parallel()
+	for name, result := range map[string]jsonvalue.Value{
+		"string": jsonvalue.String("x"), "array": jsonvalue.Array(), "null": jsonvalue.Null(), "absent": {},
+	} {
+		step := func(jsonvalue.Value) (jsonvalue.Value, error) { return result, nil }
+		u, err := flow.NewUpgrader(2, map[int]flow.UpgradeStep{1: step})
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, _ := jsonvalue.Parse([]byte(`{"format":"orcon/flow@1"}`))
+		_, err = u.Upgrade(doc)
+		if err == nil || !strings.Contains(err.Error(), "not an object") {
+			t.Errorf("%s: Upgrade error = %v, want it to say the step did not return an object", name, err)
+		}
+	}
+}

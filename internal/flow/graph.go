@@ -20,6 +20,8 @@ type graph struct {
 	// outEdges and inEdges hold indices into doc.Edges, forward edges only.
 	outEdges, inEdges [][]int
 	starts            []int
+	// nonInterrupting holds, per host node, its non-interrupting boundary events.
+	nonInterrupting [][]int
 
 	reachMemo  map[int][]bool
 	blockedMem map[int][]bool
@@ -29,14 +31,15 @@ type graph struct {
 func newGraph(d *Document) *graph {
 	n := len(d.Nodes)
 	g := &graph{
-		doc:        d,
-		index:      make(map[NodeID]int, n),
-		succ:       make([][]int, n),
-		pred:       make([][]int, n),
-		outEdges:   make([][]int, n),
-		inEdges:    make([][]int, n),
-		reachMemo:  map[int][]bool{},
-		blockedMem: map[int][]bool{},
+		doc:             d,
+		index:           make(map[NodeID]int, n),
+		succ:            make([][]int, n),
+		pred:            make([][]int, n),
+		outEdges:        make([][]int, n),
+		inEdges:         make([][]int, n),
+		nonInterrupting: make([][]int, n),
+		reachMemo:       map[int][]bool{},
+		blockedMem:      map[int][]bool{},
 	}
 	for i := range d.Nodes {
 		node := &d.Nodes[i]
@@ -59,6 +62,9 @@ func newGraph(d *Document) *graph {
 		if node.Element == ElementBoundaryEvent {
 			if from, ok := g.index[node.AttachedTo]; ok {
 				g.link(from, i)
+				if node.CancelActivity != nil && !*node.CancelActivity {
+					g.nonInterrupting[from] = append(g.nonInterrupting[from], i)
+				}
 			}
 		}
 		if node.Compensation != nil {

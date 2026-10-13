@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"unicode/utf8"
 )
 
@@ -24,6 +25,9 @@ var (
 	ErrDuplicateKey = errors.New("jsonvalue: duplicate object key")
 	// ErrTooDeep marks input nested deeper than [MaxDepth].
 	ErrTooDeep = errors.New("jsonvalue: nesting too deep")
+	// ErrLoneSurrogate marks a string with a \\uD800-\\uDFFF escape that is not
+	// half of a valid surrogate pair (RFC 8785 and RFC 7493 forbid it).
+	ErrLoneSurrogate = errors.New("jsonvalue: lone surrogate escape")
 )
 
 // Parse reads exactly one JSON text. It is stricter than encoding/json: the
@@ -33,6 +37,9 @@ var (
 func Parse(data []byte) (Value, error) {
 	if !utf8.Valid(data) {
 		return Value{}, fmt.Errorf("%w: input is not valid UTF-8", ErrSyntax)
+	}
+	if err := checkSurrogates(data); err != nil {
+		return Value{}, err
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -114,4 +121,52 @@ func parseObject(dec *json.Decoder, depth int) (Value, error) {
 		return Value{}, fmt.Errorf("%w: %w", ErrSyntax, err)
 	}
 	return Value{kind: KindObject, members: members}, nil
+}
+
+// checkSurrogates rejects unpaired \\u surrogate escapes inside strings.
+// The standard decoder would turn each into U+FFFD, so "a\\ud800b" and "a<U+FFFD>b"
+// would parse to the same string and share a canonical text and a hash.
+func checkSurrogates(data []byte) error {
+	inString := false
+	for i := 0; i < len(data); i++ {
+		c := data[i]
+		switch {
+		case !inString:
+			inString = c == '"'
+		case c == '"':
+			inString = false
+		case c == '\\' && i+1 < len(data):
+			if data[i+1] != 'u' {
+				i++ // skip the escaped character
+				continue
+			}
+			unit, ok := hex4(data, i+2)
+			if !ok {
+				return nil // malformed escape: the decoder reports it
+			}
+			i += 5
+			switch {
+			case unit >= 0xDC00 && unit <= 0xDFFF:
+				return fmt.Errorf("%w: low surrogate without a high surrogate", ErrLoneSurrogate)
+			case unit >= 0xD800 && unit <= 0xDBFF:
+				next, paired := uint16(0), false
+				if i+6 < len(data) && data[i+1] == '\\' && data[i+2] == 'u' {
+					next, paired = hex4(data, i+3)
+				}
+				if !paired || next < 0xDC00 || next > 0xDFFF {
+					return fmt.Errorf("%w: high surrogate without a low surrogate", ErrLoneSurrogate)
+				}
+				i += 6
+			}
+		}
+	}
+	return nil
+}
+
+func hex4(data []byte, at int) (uint16, bool) {
+	if at+4 > len(data) {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(string(data[at:at+4]), 16, 16)
+	return uint16(n), err == nil
 }

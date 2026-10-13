@@ -338,3 +338,123 @@ func mustNumber(t *testing.T, text string) jsonvalue.Value {
 	}
 	return v
 }
+
+func TestExactNumber(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		text string
+		want bool
+	}{
+		{"0", true}, {"-0", true}, {"1", true}, {"-1", true},
+		{"9007199254740991", true}, {"-9007199254740991", true},
+		{"9007199254740992", false}, {"9007199254740993", false}, {"-9007199254740993", false},
+		{"123456789012345678901234567890", false},
+		{"0.1", true}, {"1.5", true}, {"2.0", true}, {"1e3", true}, {"1E+3", true}, {"1e21", true}, {"5e-324", true},
+		{"1.7976931348623157e308", true}, {"9007199254740993.0", false},
+		{"1.00000000000000001", false}, {"0.30000000000000004", true}, {"0.1000000000000000055511151231257827", false},
+		{"1e999", false}, {"-1e999", false}, {"1e-400", false}, {"0e-400", true}, {"0.000", true},
+	}
+	for _, tt := range tests {
+		if got := jsonvalue.ExactNumber(tt.text); got != tt.want {
+			t.Errorf("ExactNumber(%q) = %v, want %v", tt.text, got, tt.want)
+		}
+	}
+}
+
+// Two integers beyond 2^53 share a double, so they would share a canonical
+// text and a hash. The canonical form refuses them instead.
+func TestCanonicalRefusesNumbersThatWouldCollide(t *testing.T) {
+	t.Parallel()
+	for _, text := range []string{"9007199254740993", "9007199254740995", "1.00000000000000001", "-9007199254740993", "123456789012345678901234567891"} {
+		v, err := jsonvalue.Parse([]byte(`{"n":` + text + `}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := jsonvalue.Canonical(v); !errors.Is(err, jsonvalue.ErrNotEncodable) {
+			t.Errorf("Canonical with %s error = %v, want ErrNotEncodable", text, err)
+		}
+		if _, err := jsonvalue.Marshal(v); err != nil {
+			t.Errorf("Marshal keeps the text of %s but failed: %v", text, err)
+		}
+	}
+}
+
+func TestInexactNumbersLocatesThem(t *testing.T) {
+	t.Parallel()
+	v, err := jsonvalue.Parse([]byte(`{"a":1,"b/c":[2,9007199254740993],"d":{"e~f":1.00000000000000001}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := jsonvalue.InexactNumbers(v, 10)
+	want := []jsonvalue.NumberIssue{{Pointer: "/b~1c/1", Text: "9007199254740993"}, {Pointer: "/d/e~0f", Text: "1.00000000000000001"}}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("InexactNumbers = %v, want %v", got, want)
+	}
+	if limited := jsonvalue.InexactNumbers(v, 1); len(limited) != 1 {
+		t.Errorf("limit 1 returned %d issues", len(limited))
+	}
+}
+
+func TestInt64AcceptsIntegralSpellings(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		text string
+		want int64
+		ok   bool
+	}{
+		{"2", 2, true}, {"2.0", 2, true}, {"1e3", 1000, true}, {"1E3", 1000, true}, {"-4.0", -4, true},
+		{"1.5", 0, false}, {"1e-1", 0, false}, {"1e999", 0, false}, {"2.0000000000000000001", 0, false},
+		{"1e300", 0, false},
+	}
+	for _, tt := range tests {
+		v, err := jsonvalue.Number(tt.text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := v.Int64(); got != tt.want || ok != tt.ok {
+			t.Errorf("Int64(%s) = %d, %v, want %d, %v", tt.text, got, ok, tt.want, tt.ok)
+		}
+	}
+}
+
+// RFC 8785 and RFC 7493 forbid unpaired surrogates. The standard decoder would turn them
+// into U+FFFD, which would give "a\ud800b" and "a<U+FFFD>b" one hash.
+func TestParseRejectsLoneSurrogates(t *testing.T) {
+	t.Parallel()
+	bad := []string{
+		`"a\ud800b"`, `"\ud800"`, `"\udc00"`, `"x\udfffy"`, `"\ud83dx"`, `"\ud83d\u0041"`,
+		`"\ude00\ud83d"`, `{"k\ud800":1}`, `["ok","\ud800"]`, `"\ud83d\ud83d\ude00"`,
+	}
+	for _, in := range bad {
+		if _, err := jsonvalue.Parse([]byte(in)); !errors.Is(err, jsonvalue.ErrLoneSurrogate) {
+			t.Errorf("Parse(%s) error = %v, want ErrLoneSurrogate", in, err)
+		}
+	}
+	good := []string{`"\ud83d\ude00"`, `"a\\ud800"`, `"\\ud800"`, `"\u0041"`, "\"a\ufffdb\"", `"\ud83d\ude00\ud83d\ude00"`}
+	for _, in := range good {
+		if _, err := jsonvalue.Parse([]byte(in)); err != nil {
+			t.Errorf("Parse(%s) error = %v, want success", in, err)
+		}
+	}
+	// The two spellings the bug confused are no longer both readable.
+	a, errA := jsonvalue.Parse([]byte(`"a\ud800b"`))
+	b, errB := jsonvalue.Parse([]byte("\"a\ufffdb\""))
+	if errA == nil || errB != nil || jsonvalue.Equal(a, b) {
+		t.Errorf("lone surrogate and U+FFFD must not parse alike: %v %v", errA, errB)
+	}
+}
+
+func TestEncodeRefusesInvalidUTF8Strings(t *testing.T) {
+	t.Parallel()
+	v := jsonvalue.String("a\xffb")
+	if _, err := jsonvalue.Marshal(v); !errors.Is(err, jsonvalue.ErrNotEncodable) {
+		t.Errorf("Marshal error = %v, want ErrNotEncodable", err)
+	}
+	obj, err := jsonvalue.Object(jsonvalue.Member{Key: "k\xff", Value: jsonvalue.Null()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := jsonvalue.Canonical(obj); !errors.Is(err, jsonvalue.ErrNotEncodable) {
+		t.Errorf("Canonical error = %v, want ErrNotEncodable", err)
+	}
+}

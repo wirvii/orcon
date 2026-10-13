@@ -47,9 +47,6 @@ Every enumerated value is UPPER_SNAKE (ADR-0007 §11), because the API returns t
 | `nodes[].call.mode` | `WAIT`, `FIRE_AND_FORGET` |
 | `nodes[].wait.kind` | `TIMER`, `SIGNAL`, `HUMAN` |
 | `nodes[].attention.notify` | `DEFAULT`, `ON`, `OFF` |
-| `nodes[].effect.effect` | `READ`, `WRITE`, `DELETE`, `UNKNOWN` |
-| `nodes[].effect.idempotency.mode` | `PROVIDER_KEY`, `NATURAL_KEY`, `NONE` |
-| `nodes[].effect.onUncertain` | `RESEND_WITH_KEY`, `RECONCILE`, `SUSPEND` |
 | `edges[].kind` | `SEQUENCE`, `BACK` |
 
 The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`, `RESEND_WITH_KEY`, ...) belong to node types, not to flow documents; see "Node types and safety contracts".
@@ -70,8 +67,10 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 | durations | ISO 8601 with weeks, days, hours, minutes and seconds only (`PT30S`, `PT1H30M`, `P2D`; weeks are not mixed with other units); years and months are not allowed because their length varies. The schema marks them `format: duration` and enforces the pattern |
 | timer `date` | RFC 3339 date-time in UTC written with `Z` (`2026-10-12T10:00:00Z`), enforced by pattern in the schema and by the reader |
 | timer `cycle` | repeating interval, `R/PT10M` or `R5/PT10M` |
-| integers | at least 1 where a count or limit is meant (`maxIterations`, `batchSize`, `maxAttempts`, `concurrency`, `callDepthLimit`); `edges[].order` also starts at 1 |
-| `settings.memoryLimit` | integer number of bytes, at least 1; the instance maximum is checked at publication with the instance configuration (cut C12), not by the schema |
+| integers | whole numbers from 1 to 2147483647 where a count or limit is meant (`maxIterations`, `batchSize`, `maxAttempts`, `concurrency`, `callDepthLimit`, `edges[].order`); `2.0` and `1e3` are the same integer as `2` and `1000` and are read as such |
+| `settings.memoryLimit` | whole number of bytes from 1 to 9007199254740991 (2^53-1); the instance maximum is checked at publication with the instance configuration (cut C12), not by the schema |
+| all numbers | every number in a document, including inside `parameters`, `ext`, `editor` and forms, must survive the canonical form exactly (RFC 7493, I-JSON): integers written without a fraction or exponent lie within ±(2^53-1), and decimals have no more digits than a double keeps. Larger values are written as strings. Otherwise two different numbers, for example 9007199254740992 and 9007199254740993, would share one `contentHash` |
+| strings | well-formed Unicode: a `\uD800`-`\uDFFF` escape must be half of a valid pair; a lone surrogate is refused rather than replaced by U+FFFD (RFC 8785) |
 
 ## Node blocks
 
@@ -116,7 +115,7 @@ Validation runs in levels; the first level that has errors is reported alone so 
 | V6 | 3 | a join has at least two incoming edges | error |
 | V7 | 3 | a boundary event is attached to an activity | error |
 | V8 | 4 | (expressions in `orcon.variables` values are scanned like any other) a node reads only nodes that dominate it, or that a join upstream merged; reads of unknown, own, sibling or downstream nodes are errors; a read through an `ACTIVATED` or `FIRST` join without `.isExecuted` is a warning | error / warning |
-| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; writers are the variables named by `parameters.assignments[].variable` of `orcon.variables@1` nodes (`writersOf`); two such nodes that can run at the same time and name the same plain variable are an error, sequential writes are fine | error |
+| V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; writers are the variables named by `parameters.assignments[].variable` of `orcon.variables@1` nodes (`writersOf`); two such nodes that can run at the same time and name the same plain variable are an error, sequential writes are fine. A non-interrupting boundary event runs beside the continuation of its host, so writers on both paths are concurrent; an interrupting one replaces the continuation and is not | error |
 | V10 | 5 | with a node-type catalog: every node type is known, and the contract of an effect type is valid (ADR-0029 §5); `attention.notify: OFF` is refused on a node whose type writes | error |
 | V11 | 6 | a call activity has a call block and does not call its own flow without `intentionalRecursion`; dynamic targets without `allowedTargets` are warned about; across flows, a call cycle with an unmarked edge blocks publication (`CheckCallGraph`) | error / warning |
 

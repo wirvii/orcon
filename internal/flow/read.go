@@ -32,6 +32,9 @@ func Read(v jsonvalue.Value) (Document, error) {
 // [*ValidationError] listing every problem found.
 func FromValue(v jsonvalue.Value) (Document, error) {
 	d := &decoder{}
+	for _, n := range jsonvalue.InexactNumbers(v, maxStructureIssues) {
+		d.failf(n.Pointer, "number %s cannot be hashed without loss: integers must lie within ±%d and decimals within double precision (write larger values as strings)", n.Text, jsonvalue.MaxSafeInteger)
+	}
 	doc := d.document(v)
 	if len(d.issues) > 0 {
 		return Document{}, &ValidationError{Report: Report{Issues: d.issues}}
@@ -110,8 +113,10 @@ func (o *obj) integer(key string, required bool) int {
 	return int(o.integerBetween(key, required, 1, math.MaxInt32))
 }
 
+// integer64 reads a byte count: at least 1 and at most 2^53-1, the largest
+// integer a JSON number carries exactly.
 func (o *obj) integer64(key string) int64 {
-	return o.integerBetween(key, false, 1, math.MaxInt64)
+	return o.integerBetween(key, false, 1, jsonvalue.MaxSafeInteger)
 }
 
 func (o *obj) integerBetween(key string, required bool, lowest, highest int64) int64 {
@@ -121,7 +126,7 @@ func (o *obj) integerBetween(key string, required bool, lowest, highest int64) i
 	}
 	n, isInt := v.Int64()
 	if !isInt || n < lowest || n > highest {
-		o.d.failf(o.at(key), "must be an integer of at least %d", lowest)
+		o.d.failf(o.at(key), "must be an integer from %d to %d", lowest, highest)
 		return 0
 	}
 	return n
@@ -401,7 +406,7 @@ func (d *decoder) intOrKeyword(o *obj, key string) *IntOrKeyword {
 	}
 	n, ok := v.Int64()
 	if !ok || n < 1 || n > math.MaxInt32 {
-		d.failf(o.at(key), "must be an integer of at least 1 or a keyword string")
+		d.failf(o.at(key), "must be an integer from 1 to %d or a keyword string", math.MaxInt32)
 		return &IntOrKeyword{}
 	}
 	return &IntOrKeyword{N: int(n)}

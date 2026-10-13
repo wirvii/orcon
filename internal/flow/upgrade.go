@@ -72,6 +72,9 @@ func (u *Upgrader) Upgrade(v jsonvalue.Value) (jsonvalue.Value, error) {
 		if err != nil {
 			return jsonvalue.Value{}, fmt.Errorf("upgrade flow from %s%d to %s%d: %w", formatPrefix, n, formatPrefix, n+1, err)
 		}
+		if next.Kind() != jsonvalue.KindObject {
+			return jsonvalue.Value{}, fmt.Errorf("upgrade flow from %s%d to %s%d: the step returned %s, not an object", formatPrefix, n, formatPrefix, n+1, next.Kind())
+		}
 		v = next.With("format", jsonvalue.String(formatPrefix+strconv.Itoa(n+1)))
 	}
 	return v, nil

@@ -4,6 +4,8 @@
 package flowjson_test
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -235,6 +237,13 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"missing nodes", "linear", "/nodes", ""},
 		{"unknown top-level member", "linear", "/surprise", `1`},
 		{"unknown setting", "effects-calls-and-settings", "/settings/turbo", `true`},
+		{"memory limit beyond the safe integers", "effects-calls-and-settings", "/settings/memoryLimit", `9007199254740992`},
+		{"memory limit that would share a hash", "effects-calls-and-settings", "/settings/memoryLimit", `9007199254740993`},
+		{"concurrency above the maximum", "effects-calls-and-settings", "/settings/concurrency", `2147483648`},
+		{"concurrency far above the maximum", "effects-calls-and-settings", "/settings/concurrency", `3000000000`},
+		{"concurrency in exponent form above the maximum", "effects-calls-and-settings", "/settings/concurrency", `1e10`},
+		{"loop iterations above the maximum", "loop", "/nodes/1/loop/maxIterations", `2147483648`},
+		{"edge order above the maximum", "effects-calls-and-settings", "/edges/0/order", `2147483648`},
 		{"memory limit zero", "effects-calls-and-settings", "/settings/memoryLimit", `0`},
 		{"concurrency decimal", "effects-calls-and-settings", "/settings/concurrency", `1.5`},
 		{"bad executionActive", "effects-calls-and-settings", "/settings/timeouts/executionActive", `"30 minutes"`},
@@ -498,4 +507,60 @@ func enumIssues(t *testing.T, v jsonvalue.Value) []string {
 		}
 	}
 	return out
+}
+
+// A conforming JSON Schema validator reads 2.0 and 1e3 as integers. The Go
+// reader must agree, and a document written either way must have one meaning.
+func TestSchemaAndReaderAgreeOnIntegralSpellings(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	base := conformanceValue(t, "effects-calls-and-settings")
+	want, err := flowjson.Decode(mustMarshal(t, set(t, base, "/settings/concurrency", parse(t, "1000"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCanonical, err := flowjson.Canonical(&want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, spelling := range []string{"1000", "1000.0", "1e3", "1E3", "100e1"} {
+		v := set(t, base, "/settings/concurrency", parse(t, spelling))
+		if !c.valid(v) {
+			t.Errorf("the schema rejects %s: %v", spelling, c.errors(v))
+		}
+		got, err := flowjson.Decode(mustMarshal(t, v))
+		if err != nil {
+			t.Errorf("the reader rejects %s: %v", spelling, err)
+			continue
+		}
+		gotCanonical, err := flowjson.Canonical(&got)
+		if err != nil || !bytes.Equal(gotCanonical, wantCanonical) {
+			t.Errorf("%s does not read as 1000 (err %v)", spelling, err)
+		}
+	}
+}
+
+// The schema describes shape only; numbers that cannot be hashed exactly are
+// refused by the reader wherever they appear, even where the schema leaves the
+// content open (parameters, ext, editor, forms).
+func TestReaderRefusesInexactNumbersInOpenContent(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	v := set(t, conformanceValue(t, "linear"), "/nodes/1/parameters/n", parse(t, "9007199254740993"))
+	if !c.valid(v) {
+		t.Fatalf("the schema should leave parameters open: %v", c.errors(v))
+	}
+	if _, err := flowjson.Decode(mustMarshal(t, v)); err == nil {
+		t.Error("Decode accepted an integer that would share its hash with its neighbor")
+	}
+}
+
+// RFC 8785 forbids lone surrogates; Decode refuses them before they can
+// collapse into U+FFFD.
+func TestDecodeRefusesLoneSurrogates(t *testing.T) {
+	t.Parallel()
+	_, err := flowjson.Decode([]byte(`{"format":"orcon/flow@1","description":"a\ud800b"}`))
+	if !errors.Is(err, jsonvalue.ErrLoneSurrogate) {
+		t.Errorf("Decode error = %v, want ErrLoneSurrogate", err)
+	}
 }

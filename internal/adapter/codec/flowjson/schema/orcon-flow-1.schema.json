@@ -41,7 +41,8 @@
       "type": "string",
       "pattern": "^R\\d*/P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
     },
-    "positiveInteger": { "type": "integer", "minimum": 1 },
+    "positiveInteger": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "byteCount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "ext": {
       "type": "object",
       "propertyNames": {
@@ -98,7 +99,7 @@
           "properties": { "executionActive": { "$ref": "#/$defs/duration" } }
         },
         "retention": { "$ref": "#/$defs/retention" },
-        "memoryLimit": { "$ref": "#/$defs/positiveInteger" },
+        "memoryLimit": { "$ref": "#/$defs/byteCount" },
         "errorFlow": { "$ref": "#/$defs/uuid" },
         "callDepthLimit": { "$ref": "#/$defs/positiveInteger" },
         "importedFrom": {
