@@ -41,6 +41,7 @@ Every enumerated value is UPPER_SNAKE (ADR-0007 §11), because the API returns t
 | `nodes[].routing` | `EXCLUSIVE`, `INCLUSIVE` |
 | `nodes[].join.mode` | `ALL`, `ACTIVATED`, `FIRST` |
 | `nodes[].join.data` | `APPEND`, `MATCH_FIELD`, `MATCH_POSITION` |
+| `nodes[].join.remaining` | `CANCEL`, `LET_FINISH` |
 | `nodes[].onError` | `STOP_EXECUTION`, `CONTINUE_WITH_ERROR`, `ERROR_OUTPUT` |
 | `nodes[].concurrency`, `nodes[].multiInstance.concurrency` | a number ≥ 1, or `ALL` |
 | `nodes[].call.version` | a number ≥ 1, or `CURRENT` |
@@ -77,7 +78,7 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 A node has `id`, `name`, `element`, `type` and `parameters` (an object whose string values starting with `=` are expressions). Optional behaviour blocks:
 
 - `routing` for `orcon.if` and `orcon.switch` nodes.
-- `join` `{ mode, data, matchField? }`; `matchField` is required exactly when `data` is `MATCH_FIELD`.
+- `join` `{ mode, data, matchField?, remaining? }`; `remaining` only with `mode: FIRST` (absent = `CANCEL`); `MATCH_FIELD`, `MATCH_POSITION` and `matchField` are rejected at publication until defined (V14).
 - `loop` `{ maxIterations, carry? }` on `orcon.loop` nodes only.
 - `multiInstance` `{ sequential, concurrency?, inputCollection?, batchSize, completionCondition? }`.
 - `retry` `{ maxAttempts, initialInterval?, factor?, maxInterval?, respectRetryAfter? }`; `factor` is at least 1.
@@ -119,6 +120,7 @@ Validation runs in levels; the first level that has errors is reported alone so 
 | V10 | 5 | with a node-type catalog: every node type is known, and the contract of an effect type is valid (ADR-0029 §5); `attention.notify: OFF` is refused on a node whose type writes | error |
 | V11 | 6 | a call activity has a call block and does not call its own flow without `intentionalRecursion`; dynamic targets without `allowedTargets` are warned about; across flows, a call cycle with an unmarked edge blocks publication (`CheckCallGraph`) | error / warning |
 | V13 | 4 | the condition that ends a loop reads something the loop body writes: the output of a node inside the body, the data flowing through it (`$json`, `$input`, `$prevNode`, `$binary`, `$items`), the iteration counter (`$runIndex`) or an execution variable (`$execution.variables.<name>`) that a node inside the body writes or that the loop carries. The expressions examined are those of the body node that sends tokens out of the body and the conditions of its exit edges. A loop with no edge leaving its body is warned about too. An expression the analysis cannot classify (syntax error, unknown name, node chosen at run time) counts as a read, so the warning appears only when every name is known to come from outside the body. Stored with the version; never blocks | warning |
+| V14 | 3 | join options: `remaining` only with `FIRST`; `LET_FINISH` needs a split that dominates the join; `MATCH_FIELD`/`MATCH_POSITION`/`matchField` rejected | error |
 
 ### Node types and safety contracts
 
