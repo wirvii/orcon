@@ -144,7 +144,35 @@ func RandomGraph(data []byte) *Builder {
 			b.Remaining(id, flow.RemainingLetFinish)
 		}
 	}
+	// Sometimes the whole graph is the body of a loop: its last node becomes the
+	// test that sends items back to the loop control, so a body full of
+	// uncontrolled merges, splits and joins returns several tokens in one
+	// iteration.
+	if src.flag() {
+		wrapInLoop(b, src, "n"+strconv.Itoa(count))
+	}
 	return b
+}
+
+// wrapInLoop makes the graph the body of a loop. The start leads to the loop
+// control, which leads to what the start led to, and the last node, an end
+// event without outgoing edges, becomes the test that goes back to the loop
+// or out.
+func wrapInLoop(b *Builder, src *byteSource, last string) {
+	b.Loop("loop", 1+src.intn(3)).End("done")
+	b.Modify(last, func(n *flow.Node) {
+		n.Element = flow.ElementExclusiveGateway
+		n.Type = "orcon.if@1"
+		n.Routing = flow.RoutingExclusive
+	})
+	for i := range b.doc.Edges {
+		if e := &b.doc.Edges[i]; e.From.Node == "n0" {
+			e.From = flow.Endpoint{Node: "loop", Port: "loop"}
+		}
+	}
+	b.Edge("n0", "loop")
+	b.Edge(last, "loop", Port("again"), Back())
+	b.Edge(last, "done", Port("out"), Default())
 }
 
 func edgeExists(b *Builder, from, to int) bool {

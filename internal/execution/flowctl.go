@@ -416,6 +416,12 @@ func (r *run) drain(ctx context.Context) error {
 					return err
 				}
 			}
+		case len(r.dirtyIters) > 0:
+			scope := r.dirtyIters[0]
+			r.dirtyIters = r.dirtyIters[1:]
+			if err := r.startNextIteration(ctx, scope); err != nil {
+				return err
+			}
 		case len(r.dirtyLoops) > 0:
 			key := r.dirtyLoops[0]
 			r.dirtyLoops = r.dirtyLoops[1:]
@@ -472,6 +478,9 @@ func (r *run) releaseSiblings(g *seqGroup) error {
 // belongs to that iteration.
 func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 	back := t.inEdge >= 0 && r.plan.edges[t.inEdge].back
+	if back && n.mergeReturns && !t.merged {
+		return nil, r.collectReturn(t, n)
+	}
 	outer, entry, iteration := t.scope, t.id, 0
 	if back {
 		var frame ScopeFrame
@@ -493,13 +502,12 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 			fmt.Sprintf("the loop would start iteration %d; maxIterations is %d", iteration, n.maxIterations))
 	}
 	scope := outer.Push(LoopFrame(n.node.ID, entry, iteration))
-	// Two tokens returning in the same iteration of one instance would share a
-	// scope: ADR-0010 names an instance by its entry token only, so the
-	// situation has no defined meaning yet and stops the run instead of mixing
-	// the trackers of the two.
+	// Loops that can return several tokens in an iteration merge them before
+	// they get here (collectReturn), and the others return at most one, so an
+	// iteration scope starts once. A second start is a bug of the engine or of
+	// the analysis that chose the path, not a state of the flow.
 	if r.iterations[scope] {
-		return nil, fmt.Errorf("%w: two tokens returned to loop %q in the same iteration (%q) of one loop instance",
-			ErrUnsupported, n.node.ID, scope)
+		return nil, internalf("iteration scope %q of loop %q started twice", scope, n.node.ID)
 	}
 	r.iterations[scope] = true
 	r.moveScope(t, scope)
@@ -631,4 +639,58 @@ func (r *run) splitNode(n *planNode) flow.NodeID {
 		return ""
 	}
 	return r.plan.nodes[n.splitFor].node.ID
+}
+
+// collectReturn takes a token that came back by a back edge of a loop that
+// merges its returns. The token is consumed; the next iteration starts once,
+// when no token is left in the iteration it ends (amendment 9, section C-1).
+func (r *run) collectReturn(t *token, n *planNode) error {
+	rec := r.returns[t.scope]
+	if rec == nil {
+		rec = &loopReturns{loop: t.node}
+		r.returns[t.scope] = rec
+	}
+	rec.arrived = append(rec.arrived, loopReturn{edge: t.inEdge, token: t.id, payload: t.payload, lineage: slices.Clone(t.lineage)})
+	r.event(Event{Type: EventTokenConsumed, Token: t.id, Node: n.node.ID, Scope: t.scope, Detail: "LOOP_RETURN"})
+	return r.setToken(t, TokenConsumed)
+}
+
+// startNextIteration starts the next iteration of a loop instance once the
+// current one is over: no token is left in its scope. The returned batches are
+// concatenated in back-edge order, then arrival order, and the lineages keep
+// what the returning tokens share. The new token has a deterministic id derived
+// from the loop and the scope of the new iteration; it counts as one iteration
+// whatever number of tokens returned.
+func (r *run) startNextIteration(ctx context.Context, iteration ScopePath) error {
+	rec := r.returns[iteration]
+	if rec == nil || rec.started || r.scopeLive[iteration] > 0 || r.failure != nil {
+		return nil
+	}
+	rec.started = true
+	arrived := slices.Clone(rec.arrived)
+	slices.SortStableFunc(arrived, func(a, b loopReturn) int { return a.edge - b.edge })
+	batches := make([]Batch, len(arrived))
+	arrivals := make([]joinArrival, len(arrived))
+	for i, a := range arrived {
+		b, err := r.load(ctx, a.payload)
+		if err != nil {
+			return err
+		}
+		batches[i] = b
+		arrivals[i] = joinArrival{Lineage: a.lineage}
+	}
+	outer, frame, ok := iteration.Pop()
+	if !ok {
+		return internalf("loop iteration scope %q has no frame", iteration)
+	}
+	next := outer.Push(LoopFrame(frame.Node, frame.Entry, frame.Index+1))
+	id := TokenID(hashID(string(r.req.Execution), string(frame.Node), string(next)))
+	ref := joinedRef(id)
+	if err := r.payloads.Put(ctx, ref, concat(batches)); err != nil {
+		return fmt.Errorf("store merged returns of loop %q: %w", frame.Node, err)
+	}
+	t := r.spawn(id, TokenRunnable, rec.loop, arrived[0].edge, iteration, continuationLineage(arrivals, ""), ref)
+	t.merged = true
+	r.queue = append(r.queue, t)
+	return nil
 }

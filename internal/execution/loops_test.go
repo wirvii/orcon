@@ -4,7 +4,6 @@
 package execution_test
 
 import (
-	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -276,35 +275,5 @@ func TestLoopBackEdgeFromAGatewayWithConditions(t *testing.T) {
 	}
 	if got := executiontest.Executed(res, "work"); got != 3 {
 		t.Errorf("body ran %d times, want 3", got)
-	}
-}
-
-func TestLoopWithTwoTokensReturningInOneIterationStopsTheRun(t *testing.T) {
-	t.Parallel()
-	// In iteration 0 the test sends the item through two back edges: two tokens
-	// would start iteration 1 of the same instance. The interpreter reports it
-	// instead of mixing the trackers of the two.
-	b := executiontest.NewFlow("two-back").
-		Start("s").Loop("L", 5).Task("work").If("c", flow.RoutingInclusive).End("e").
-		Edge("s", "L").Edge("L", "work", executiontest.Port("loop")).Edge("work", "c").
-		Edge("c", "L", executiontest.Port("again"), executiontest.Back()).
-		Edge("c", "L", executiontest.Port("also"), executiontest.Back()).
-		Edge("c", "e", executiontest.Port("exit"))
-	router := executiontest.RouterFunc(func(_ *flow.Node, it execution.Item) []string {
-		if v, ok := it.JSON.Get("n"); ok {
-			if n, _ := v.Int64(); n >= 2 {
-				return []string{"exit"}
-			}
-		}
-		return []string{"again", "also"}
-	})
-	deps := execution.Deps{
-		Router: router,
-		Runner: &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"work": executiontest.Increment("n")}},
-	}
-	plan := executiontest.MustCompile(t, b)
-	_, err := execution.NewInterpreter(deps).Run(t.Context(), plan, execution.Request{Execution: "x", Input: executiontest.Batch(`{"n":0}`)})
-	if !errors.Is(err, execution.ErrUnsupported) {
-		t.Errorf("Run() = %v, want ErrUnsupported", err)
 	}
 }

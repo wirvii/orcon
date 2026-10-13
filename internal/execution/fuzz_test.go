@@ -58,9 +58,9 @@ func checkChaos(t *testing.T, doc *flow.Document) {
 	case execution.ExecSucceeded:
 	case execution.ExecFailed:
 		switch first.Failure.Code {
-		case execution.CodeNoPathTaken, execution.CodeJoinRequirementNotMet:
+		case execution.CodeNoPathTaken, execution.CodeJoinRequirementNotMet, execution.CodeLoopLimitExceeded:
 		default:
-			t.Fatalf("failure %+v: only NoPathTaken and JoinRequirementNotMet are expected\n%s", first.Failure, executiontest.Trace(first))
+			t.Fatalf("failure %+v: only NoPathTaken, JoinRequirementNotMet and LoopLimitExceeded are expected\n%s", first.Failure, executiontest.Trace(first))
 		}
 	case execution.ExecQueued, execution.ExecRunning, execution.ExecWaiting, execution.ExecSuspended,
 		execution.ExecCanceling, execution.ExecCompensating, execution.ExecCanceled:
@@ -208,4 +208,39 @@ func FuzzRunFlow(f *testing.F) {
 		}
 		checkChaos(t, &doc)
 	})
+}
+
+// TestLoopReturnInvariantUnreachable runs random graphs, many of them the body
+// of a loop, and requires that none reaches the internal invariant that an
+// iteration scope starts once: the analysis that decides which loops merge
+// their returns must never miss one that returns several tokens. It also
+// requires that the graphs do exercise the merge.
+func TestLoopReturnInvariantUnreachable(t *testing.T) {
+	t.Parallel()
+	merged, runs := 0, uint64(3000)
+	if testing.Short() {
+		runs = 400
+	}
+	for seed := range runs {
+		doc := executiontest.RandomGraph(seeded(2_000_000+seed, 60)).Doc()
+		plan, err := execution.Compile(&doc)
+		if err != nil {
+			t.Fatalf("seed %d: Compile() = %v", seed, err)
+		}
+		res, err := execution.NewInterpreter(executiontest.ChaosDeps(&doc)).Run(t.Context(), plan, execution.Request{
+			Execution: "inv", Input: executiontest.Batch(`{"a":1}`, `{"a":2}`),
+		})
+		if err != nil {
+			t.Fatalf("seed %d: Run() = %v; the iteration invariant is reachable", seed, err)
+		}
+		for i := range res.Events {
+			if e := &res.Events[i]; e.Type == execution.EventTokenConsumed && e.Detail == "LOOP_RETURN" {
+				merged++
+				break
+			}
+		}
+	}
+	if merged == 0 {
+		t.Error("no random graph merged the returns of a loop; the generator no longer exercises the merge")
+	}
 }

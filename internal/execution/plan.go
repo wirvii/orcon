@@ -44,6 +44,11 @@ type planNode struct {
 	defaultEdge int
 	// maxIterations is the limit of a loop control.
 	maxIterations int
+	// mergeReturns is set on a loop whose body can return several live tokens
+	// in one iteration (flow.LoopsReturningSeveral): the tokens returning by the
+	// back edges are merged into one start of the next iteration. A loop that
+	// returns at most one keeps no merge state.
+	mergeReturns bool
 	// closing lists the exit edges that complete when this loop's instance
 	// closes: the edges whose outermost exited loop is this one.
 	closing []int
@@ -128,6 +133,12 @@ func Compile(doc *flow.Document) (*Plan, error) {
 		return nil, &UnsupportedError{Issues: c.issues}
 	}
 	c.splits(flow.CorrespondingSplits(doc))
+	several := flow.LoopsReturningSeveral(doc)
+	for i := range c.plan.nodes {
+		if pn := &c.plan.nodes[i]; pn.kind == kindLoop {
+			pn.mergeReturns = several[pn.node.ID]
+		}
+	}
 	return c.plan, nil
 }
 

@@ -93,11 +93,31 @@ func (r *run) instances(scope ScopePath) []nodeKey {
 	return keys
 }
 
+// countScopes adds delta to the live count of every scope path the given one
+// contains, itself included. When an iteration scope that has collected returns
+// empties, the next iteration is due.
+func (r *run) countScopes(scope ScopePath, delta int) {
+	for scope != "" {
+		r.scopeLive[scope] += delta
+		if delta < 0 && r.scopeLive[scope] == 0 {
+			if rec := r.returns[scope]; rec != nil && !rec.started {
+				r.dirtyIters = append(r.dirtyIters, scope)
+			}
+		}
+		parent, _, ok := scope.Pop()
+		if !ok {
+			return
+		}
+		scope = parent
+	}
+}
+
 func (r *run) track(t *token) {
 	if t.tracked {
 		return
 	}
 	t.tracked = true
+	r.countScopes(t.scope, 1)
 	for _, k := range r.instances(t.scope) {
 		r.loopOf(k).live++
 	}
@@ -111,6 +131,7 @@ func (r *run) untrack(t *token) {
 		return
 	}
 	t.tracked = false
+	r.countScopes(t.scope, -1)
 	for _, k := range r.instances(t.scope) {
 		r.loopOf(k).live--
 		r.dirtyLoops = append(r.dirtyLoops, k)
@@ -138,7 +159,10 @@ func (r *run) moveScope(t *token, scope ScopePath) {
 		r.loopOf(k).live--
 		r.dirtyLoops = append(r.dirtyLoops, k)
 	}
+	old := t.scope
 	t.scope = scope
+	r.countScopes(scope, 1)
+	r.countScopes(old, -1)
 	for _, k := range r.instances(scope) {
 		r.loopOf(k).live++
 	}

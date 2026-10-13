@@ -50,6 +50,9 @@ type token struct {
 	passed bool
 	// tracked is set while the token counts toward loop and branch counters.
 	tracked bool
+	// merged marks the token that starts the next iteration of a loop whose
+	// returns were merged: it is not collected again.
+	merged bool
 	// roundHeld is set until the token reaches a terminal state; it keeps the
 	// rounds of its split instances open.
 	roundHeld bool
@@ -82,6 +85,21 @@ type loopInstance struct {
 	// armed is set once the entry is complete: no more tokens will enter.
 	armed  bool
 	closed bool
+}
+
+// loopReturn is a token that came back to a loop control by a back edge.
+type loopReturn struct {
+	edge    int
+	token   TokenID
+	payload PayloadRef
+	lineage []ForkRef
+}
+
+// loopReturns are the returns of one iteration of a loop instance.
+type loopReturns struct {
+	loop    int
+	arrived []loopReturn
+	started bool
 }
 
 // seqGroup holds the sibling tokens of one fork in SEQUENTIAL branch mode.
@@ -146,6 +164,13 @@ type run struct {
 	dirtyJoins []nodeKey
 	// iterations holds the loop iteration scopes already started.
 	iterations map[ScopePath]bool
+	// scopeLive counts the active tokens in each scope path, nested scopes
+	// included: an iteration is over when no token is left in its scope.
+	scopeLive map[ScopePath]int
+	// returns collects, per loop iteration scope, the tokens that came back by
+	// the back edges of a loop that merges its returns.
+	returns    map[ScopePath]*loopReturns
+	dirtyIters []ScopePath
 	nodeExecs  map[NodeExecutionID]*nodeExec
 	execOrder  []*nodeExec
 
@@ -181,6 +206,8 @@ func newRun(in *Interpreter, plan *Plan, req Request) *run {
 		splitLive:      make(map[NodeExecutionID]int),
 		roundJoins:     make(map[NodeExecutionID][]nodeKey),
 		iterations:     make(map[ScopePath]bool),
+		scopeLive:      make(map[ScopePath]int),
+		returns:        make(map[ScopePath]*loopReturns),
 		nodeExecs:      make(map[NodeExecutionID]*nodeExec),
 	}
 }
