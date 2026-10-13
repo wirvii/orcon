@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0068 — Data redaction with placeholders, PII detection, untrusted content and approval policy
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: vault table per ADR-0077; UPPER_SNAKE values per ADR-0080 §3)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: vault table per ADR-0077; UPPER_SNAKE values per ADR-0080 §3) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-006.
 
@@ -18,7 +18,7 @@ Per execution (and per conversation): values of connector `sensitiveFields`, use
 (a) Template provenance: the expression engine (ADR-0018) in "render for model" mode returns the placeholder when it resolves a sensitive path. (b) Final sweep: an Aho–Corasick automaton over all known sensitive values rewrites the complete request and every tool result before it reaches the model. Placeholders are `[KIND_n]`, `n` stable per value within the scope.
 
 ### 3. Vault and re-hydration
-`ai_redaction_entry(org_id, id, scope_kind: execution|conversation, execution_id?, ai_conversation_id?, placeholder, value_ciphertext, kind)`, with a check that exactly the column named by `scope_kind` is set, encrypted under the execution DEK (crypto-shredded at termination, ADR-0017 §3) or the conversation DEK (ADR-0064 §6). Before dispatching a tool call, the worker substitutes placeholders in arguments with real values; unknown placeholders stay literal; recorded steps keep placeholder form.
+`ai_redaction_entry(org_id, id, scope_kind: EXECUTION|CONVERSATION, execution_id?, ai_conversation_id?, placeholder, value_ciphertext, kind)`, with a check that exactly the column named by `scope_kind` is set, encrypted under the execution DEK (crypto-shredded at termination, ADR-0017 §3) or the conversation DEK (ADR-0064 §6). Before dispatching a tool call, the worker substitutes placeholders in arguments with real values; unknown placeholders stay literal; recorded steps keep placeholder form.
 
 ### 4. Reveal rule
 Text shown to the end user re-hydrates only placeholders whose values that user supplied in the same conversation or that come from fields marked `revealToUser`; third-party data the agent retrieved stays in placeholder form. Node outputs keep placeholders unless `rehydrateOutput: true`.
@@ -44,3 +44,8 @@ Providers never receive marked sensitive values; injection cannot trigger sensit
 
 ## Alternatives considered
 Reversible encryption tokens instead of placeholders (rejected: meaningless to the model, leaks length/structure); redaction by the model itself (rejected: the provider sees the data); trusting delimiters alone (rejected: principle 8).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 K19 (2026-10-13, owner decision).** §3 (`ai_redaction_entry.scope_kind`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
