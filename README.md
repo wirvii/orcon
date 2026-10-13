@@ -102,6 +102,7 @@ Each skill packages a set of accepted standards for contributors and their tools
 - [Architecture decision records](docs/adr)
 - [Engineering summaries](docs/engineering)
 - [Reference pages](docs/reference)
+- [User documentation](docs/user/README.md)
 - [Design system](docs/design-system/README.md)
 - [Verifying a release](docs/releases/verifying.md)
 - [Brand](brand/README.md)

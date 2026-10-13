@@ -16,6 +16,7 @@ turbo.json  # JSON has no comment syntax
 pnpm-lock.yaml  # generated lock file
 internal/adapter/webui/dist/**  # build output of the web app, replaced by make web
 tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it carries the SPDX lines as comments)
+tools/licenses/npm-exceptions.txt  # plain-text data file read by the web license check (it carries the SPDX lines as comments)
 
 **/tsconfig*.json  # JSON has no comment syntax
 packages/js/tokens/src/**/*.json  # design token sources in the W3C format; JSON has no comment syntax

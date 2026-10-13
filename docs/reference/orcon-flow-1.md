@@ -41,6 +41,7 @@ Every enumerated value is UPPER_SNAKE (ADR-0007 §11), because the API returns t
 | `nodes[].routing` | `EXCLUSIVE`, `INCLUSIVE` |
 | `nodes[].join.mode` | `ALL`, `ACTIVATED`, `FIRST` |
 | `nodes[].join.data` | `APPEND`, `MATCH_FIELD`, `MATCH_POSITION` |
+| `nodes[].join.remaining` | `CANCEL`, `LET_FINISH` |
 | `nodes[].onError` | `STOP_EXECUTION`, `CONTINUE_WITH_ERROR`, `ERROR_OUTPUT` |
 | `nodes[].concurrency`, `nodes[].multiInstance.concurrency` | a number ≥ 1, or `ALL` |
 | `nodes[].call.version` | a number ≥ 1, or `CURRENT` |
@@ -77,7 +78,7 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 A node has `id`, `name`, `element`, `type` and `parameters` (an object whose string values starting with `=` are expressions). Optional behaviour blocks:
 
 - `routing` for `orcon.if` and `orcon.switch` nodes.
-- `join` `{ mode, data, matchField? }`; `matchField` is required exactly when `data` is `MATCH_FIELD`.
+- `join` `{ mode, data, matchField?, remaining? }`; `remaining` only with `mode: FIRST` (absent = `CANCEL`); `MATCH_FIELD`, `MATCH_POSITION` and `matchField` are rejected at publication until defined (V14).
 - `loop` `{ maxIterations, carry? }` on `orcon.loop` nodes only.
 - `multiInstance` `{ sequential, concurrency?, inputCollection?, batchSize, completionCondition? }`.
 - `retry` `{ maxAttempts, initialInterval?, factor?, maxInterval?, respectRetryAfter? }`; `factor` is at least 1.
@@ -118,6 +119,7 @@ Validation runs in levels; the first level that has errors is reported alone so 
 | V9 | 4 | a variable without `accumulator` has no writers that can run at the same time; writers are the variables named by `parameters.assignments[].variable` of `orcon.variables@1` nodes (`writersOf`); two such nodes that can run at the same time and name the same plain variable are an error, sequential writes are fine. A non-interrupting boundary event runs beside the continuation of its host, so writers on both paths are concurrent; an interrupting one replaces the continuation and is not | error |
 | V10 | 5 | with a node-type catalog: every node type is known, and the contract of an effect type is valid (ADR-0029 §5); `attention.notify: OFF` is refused on a node whose type writes | error |
 | V11 | 6 | a call activity has a call block and does not call its own flow without `intentionalRecursion`; dynamic targets without `allowedTargets` are warned about; across flows, a call cycle with an unmarked edge blocks publication (`CheckCallGraph`) | error / warning |
+| V14 | 3 | join options: `remaining` only with `FIRST`; `LET_FINISH` needs a split that dominates the join; `MATCH_FIELD`/`MATCH_POSITION`/`matchField` rejected | error |
 
 ### Node types and safety contracts
 
