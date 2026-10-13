@@ -29,6 +29,37 @@ const (
 	loadSlack = 5 * time.Millisecond
 )
 
+// schedulerBound is the owner's bound (2026-10-13) on how late the 1 ms
+// heartbeat may run and on the longest garbage-collection pause while hostile
+// calls run. A single miss fails: there is no retry. It holds until BL-033
+// moves the sandbox to a separate process, a gate before the first release.
+const schedulerBound = 15 * time.Millisecond
+
+// startHeartbeat runs a 1 ms timer and returns a function that stops it and
+// reports the latest it ran.
+func startHeartbeat() (stop func() time.Duration) {
+	done := make(chan struct{})
+	res := make(chan time.Duration, 1)
+	go func() {
+		var worst time.Duration
+		last := time.Now()
+		for {
+			select {
+			case <-done:
+				res <- worst
+				return
+			case <-time.After(time.Millisecond):
+			}
+			now := time.Now()
+			if d := now.Sub(last) - time.Millisecond; d > worst {
+				worst = d
+			}
+			last = now
+		}
+	}()
+	return func() time.Duration { close(done); return <-res }
+}
+
 // gcPauses reads the longest stop-the-world pause the runtime has recorded.
 func gcPauses() *metrics.Float64Histogram {
 	s := []metrics.Sample{{Name: "/sched/pauses/total/gc:seconds"}}
@@ -125,7 +156,7 @@ func runLoad(t *testing.T, procs, slots int) (loadStats, []string) {
 	defer debug.SetGCPercent(oldGC)
 	stop := make(chan struct{})
 	var bg sync.WaitGroup
-	bg.Add(2)
+	bg.Add(1)
 	go func() {
 		defer bg.Done()
 		var keep [][]byte
@@ -142,23 +173,7 @@ func runLoad(t *testing.T, procs, slots int) (loadStats, []string) {
 			runtime.GC()
 		}
 	}()
-	var worstBeat time.Duration
-	go func() {
-		defer bg.Done()
-		last := time.Now()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-time.After(time.Millisecond):
-			}
-			now := time.Now()
-			if d := now.Sub(last) - time.Millisecond; d > worstBeat {
-				worstBeat = d
-			}
-			last = now
-		}
-	}()
+	stopBeat := startHeartbeat()
 	time.Sleep(20 * time.Millisecond)
 	pausesBefore := gcPauses()
 
@@ -187,6 +202,7 @@ func runLoad(t *testing.T, procs, slots int) (loadStats, []string) {
 	pausesAfter := gcPauses()
 	close(stop)
 	bg.Wait()
+	worstBeat := stopBeat()
 
 	var problems []string
 	stats := loadStats{Calls: calls, Heartbeat: worstBeat, GCPause: maxPauseSince(pausesBefore, pausesAfter)}
@@ -215,11 +231,13 @@ func runLoad(t *testing.T, procs, slots int) (loadStats, []string) {
 	if timeouts != slots || saturated != calls-slots {
 		problems = append(problems, fmt.Sprintf("%d timeouts and %d refusals, want %d and %d", timeouts, saturated, slots, calls-slots))
 	}
-	if worstBeat > loadSlack {
-		problems = append(problems, fmt.Sprintf("the heartbeat ran %v late, more than %v", worstBeat, loadSlack))
-	}
-	if p := maxPauseSince(pausesBefore, pausesAfter); p > loadSlack {
-		problems = append(problems, fmt.Sprintf("a garbage-collection pause of %v, more than %v", p, loadSlack))
+	if defaultTestTimeout < time.Second {
+		if worstBeat > schedulerBound {
+			t.Errorf("procs=%d slots=%d: the heartbeat ran %v late, more than %v", procs, slots, worstBeat, schedulerBound)
+		}
+		if p := stats.GCPause; p > schedulerBound {
+			t.Errorf("procs=%d slots=%d: a garbage-collection pause of %v, more than %v", procs, slots, p, schedulerBound)
+		}
 	}
 
 	// Saturation is a refusal that drains by itself: no restart of the
@@ -259,8 +277,9 @@ func runLoad(t *testing.T, procs, slots int) (loadStats, []string) {
 // processors, the calls that hold a slot have their timeout at the deadline,
 // the others are refused at the slot-wait limit, the process keeps serving
 // timers (a heartbeat) and its pauses stay short, and nothing waits for a call
-// it cannot stop. The timing bounds hold on a machine that runs other work:
-// a configuration that misses one is run again, up to three times.
+// it cannot stop. The heartbeat and the pauses are held to schedulerBound
+// with no retry; the other timing bounds hold on a machine that runs other
+// work, so a configuration that misses one is run again, up to three times.
 func TestAbandonUnderLoad(t *testing.T) {
 	for _, procs := range []int{2, 4} {
 		seenDefault := false

@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/wazero"
 	"github.com/wirvii/orcon/internal/expr"
@@ -103,6 +104,12 @@ func FuzzSandboxAbandon(f *testing.F) {
 	sb := sharedSandbox(wazero.ModeCooperativeAbandon)
 	f.Fuzz(func(t *testing.T, a, b string, loop bool) {
 		src := fuzzSource(pick(calls, a), pick(calls, b), loop)
+		stopBeat := startHeartbeat()
 		runAbandonCaseOpt(t, sb, ev.SandboxConfig(), src, true, loop, true)
+		// The collector is held off during a run (see driveCase), so the
+		// scheduler bound here is the heartbeat's; a single miss fails.
+		if late := stopBeat(); defaultTestTimeout < time.Second && late > schedulerBound {
+			t.Errorf("the heartbeat ran %v late, more than %v", late, schedulerBound)
+		}
 	})
 }

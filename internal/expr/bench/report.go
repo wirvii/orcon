@@ -413,7 +413,7 @@ func writeAbandon(b *strings.Builder, heading string, a *AbandonResult) {
 		for _, r := range n.Worst {
 			w("| %s | %s |\n", r.Name, dur(r.Overshoot))
 		}
-		w("\nThe guest returns to the host at least every millisecond of native work, so that Go can run a timer or stop the world; the longest it went without doing so over these runs was %s (p99 %s). The tests hold the cases of the first table to 2 ms and the natives to 5 ms.\n\n", dur(n.StretchMax), dur(n.StretchP99))
+		w("\nThe guest returns to the host after a millisecond of native work where it can, so that Go can run a timer or stop the world; the longest it went without doing so over these runs was %s (p99 %s). The tests hold the cases of the first table to 2 ms and the natives to 5 ms.\n\n", dur(n.StretchMax), dur(n.StretchP99))
 		w("| Longest without a host call | Stretch |\n|---|---|\n")
 		for _, r := range n.WorstStretch {
 			w("| %s | %s |\n", r.Name, dur(r.Overshoot))
@@ -432,7 +432,7 @@ func writeLoad(b *strings.Builder, heading string, l *LoadResult) {
 	for _, r := range l.Throughput {
 		w("| %d | %d | %.0f | %s | %s |\n", r.Procs, r.Slots, r.CallsPerSec, dur(r.WaitP50), dur(r.WaitP99))
 	}
-	w("\nHostile calls: 2 x slots + 2 calls that run for seconds unstopped, started together, with a deadline of 100 ms, at most 2 abandoned calls, a slot wait of 50 ms, the garbage collector running in a loop and a heartbeat of 1 ms. \"Held\" is the longest wait of a call that had a slot and \"refused\" of one that did not; the heartbeat is how late the 1 ms timer ran at worst. The tests hold the held wait to the deadline plus 5 ms, the refused wait to the slot wait plus 5 ms, and the heartbeat and the pauses to 5 ms (`TestAbandonUnderLoad`).\n\n")
+	w("\nHostile calls: 2 x slots + 2 calls that run for seconds unstopped, started together, with a deadline of 100 ms, at most 2 abandoned calls, a slot wait of 50 ms, the garbage collector running in a loop and a heartbeat of 1 ms. \"Held\" is the longest wait of a call that had a slot and \"refused\" of one that did not; the heartbeat is how late the 1 ms timer ran at worst. The tests hold the held wait to the deadline plus 5 ms, the refused wait to the slot wait plus 5 ms, and the heartbeat and the pauses to 15 ms with no retry (`TestAbandonUnderLoad`; owner ruling of 2026-10-13, valid until BL-033).\n\n")
 	w("| GOMAXPROCS | Slots | Calls | Held | Refused | Held wait (max) | Refused wait (max) | Heartbeat late (max) | GC pause (max) |\n|---|---|---|---|---|---|---|---|---|\n")
 	for _, r := range l.Hostile {
 		w("| %d | %d | %d | %d | %d | %s | %s | %s | %s |\n", r.Procs, r.Slots, r.Calls, r.Holders, r.Refused, dur(r.HeldMax), dur(r.RefusedMax), dur(r.Heartbeat), dur(r.GCPause))
