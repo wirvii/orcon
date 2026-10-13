@@ -101,6 +101,7 @@ func validate(d *Document, cfg validatorConfig) Report {
 	g := newGraph(d)
 	v.control(g)
 	v.data(g)
+	v.loopExits(g)
 	v.safety()
 	v.calls()
 	return c.report()

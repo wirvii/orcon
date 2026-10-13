@@ -22,7 +22,7 @@ WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
 	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
-	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom
+	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
 check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
@@ -199,6 +199,40 @@ bench:
 # bench-compare runs the regression gate locally (performance.md PERF-2); see scripts/bench-compare.sh.
 bench-compare:
 	sh scripts/bench-compare.sh
+
+# ---------------------------------------------------------------------------
+# Expression engine measurements (SPEC-001 E-EXPR-2 and E-EXPR-3, ADR-0018
+# sections 4 and 6). They need the network and are not part of `make check`.
+# ---------------------------------------------------------------------------
+
+# N8N_VERSION is the n8n release the expression corpus is measured against:
+# the latest stable release when the Orcon release is cut, re-pinned explicitly
+# with every release (SPEC-001 decision P8).
+N8N_VERSION ?= 2.43.4
+EXPR_CORPUS ?= $(CURDIR)/.cache/expr-corpus
+EXPR_CORPUS_LIMIT ?= 600
+EXPR_REPORT ?= $(CURDIR)/internal/expr/bench/REPORT.md
+EXPR_HARDWARE ?= $(shell { sysctl -n machdep.cpu.brand_string 2>/dev/null || sed -n "s/^model name[^:]*: //p" /proc/cpuinfo 2>/dev/null | head -n 1; uname -sm; } | paste -sd, -)
+EXPR_COMMIT ?= $(shell git rev-parse --short HEAD)
+
+# expr-corpus downloads the most viewed templates of the public n8n library
+# into $(EXPR_CORPUS), which is outside version control, and extracts their
+# expressions. Only counts, the corpus digest and scores are ever committed.
+expr-corpus:
+	cd tools && $(TOOLS_ENV) go run ./n8ncorpus -n8n $(N8N_VERSION) -dir $(EXPR_CORPUS) -limit $(EXPR_CORPUS_LIMIT)
+
+# expr-compat runs the compatibility gate (95 % of the corpus runs unchanged)
+# and rewrites the measurement report $(EXPR_REPORT).
+expr-compat: expr-corpus
+	ORCON_EXPR_CORPUS=$(EXPR_CORPUS) N8N_VERSION=$(N8N_VERSION) ORCON_EXPR_REPORT=$(EXPR_REPORT) \
+		ORCON_EXPR_COMMIT="$(EXPR_COMMIT)" ORCON_EXPR_HARDWARE="$(EXPR_HARDWARE)" \
+		go test -count=1 -v ./internal/adapter/wazero -run 'TestExprCompat|TestExprCorpusParity|TestExprMeasurementReport'
+
+# expr-report rewrites the report from the corpus already downloaded, without the gate.
+expr-report:
+	ORCON_EXPR_CORPUS=$(EXPR_CORPUS) N8N_VERSION=$(N8N_VERSION) ORCON_EXPR_REPORT=$(EXPR_REPORT) \
+		ORCON_EXPR_COMMIT="$(EXPR_COMMIT)" ORCON_EXPR_HARDWARE="$(EXPR_HARDWARE)" \
+		go test -count=1 -v ./internal/adapter/wazero -run 'TestExprMeasurementReport'
 
 # ---------------------------------------------------------------------------
 # Skill

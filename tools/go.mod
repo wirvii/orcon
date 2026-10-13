@@ -16,7 +16,10 @@ tool (
 	golang.org/x/vuln/cmd/govulncheck
 )
 
-require golang.org/x/tools v0.52.0
+require (
+	go.uber.org/goleak v1.3.0
+	golang.org/x/tools v0.52.0
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect

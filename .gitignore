@@ -20,4 +20,8 @@ playwright-report/
 packages/js/ui/visual/report/
 .bin/
 bin/
+.cache/
+
+# A binary built by `go build ./cmd/orcon` at the repository root.
+/orcon
 build/goreleaser/

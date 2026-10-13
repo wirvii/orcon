@@ -158,6 +158,17 @@ func writeString(b *strings.Builder, s string) error {
 	return nil
 }
 
+// FormatNumber formats the finite number f as ECMAScript
+// Number.prototype.toString does (RFC 8785 section 3.2.2.3), folding negative
+// zero to "0". The result is valid JSON number text. NaN and the infinities
+// have no JSON form; callers handle them before formatting.
+func FormatNumber(f float64) string { return formatES6(f) }
+
+// CompareUTF16 orders strings by their UTF-16 code units, the order of
+// JavaScript's < on strings and of RFC 8785 member sorting. It returns a
+// negative number, zero or a positive number.
+func CompareUTF16(a, b string) int { return compareUTF16(a, b) }
+
 // formatES6 formats f as ECMAScript Number.prototype.toString does, which is
 // the number form RFC 8785 section 3.2.2.3 requires.
 func formatES6(f float64) string {

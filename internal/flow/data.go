@@ -10,6 +10,7 @@ import (
 // data runs the data-access rules of ADR-0008 section 4: V8 and V9.
 func (v *validator) data(g *graph) {
 	v.reads(g)
+	v.variableReads()
 	v.concurrentWriters(g)
 }
 

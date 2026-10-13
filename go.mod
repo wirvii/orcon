@@ -12,9 +12,11 @@ ignore node_modules
 require go.uber.org/goleak v1.3.0
 
 require (
+	github.com/dop251/goja v0.0.0-20261001165353-dc0ad5d0dc92
 	github.com/google/go-cmp v0.7.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/testcontainers/testcontainers-go v0.44.0
+	github.com/tetratelabs/wazero v1.11.0
 	golang.org/x/sys v0.47.0
 	modernc.org/sqlite v1.59.0
 )
@@ -40,6 +42,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
