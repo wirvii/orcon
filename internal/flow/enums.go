@@ -105,6 +105,22 @@ func JoinDataModes() []JoinData {
 	return []JoinData{JoinDataAppend, JoinDataMatchField, JoinDataMatchPosition}
 }
 
+// JoinRemaining says what a FIRST join does with the branches that did not win
+// (ADR-0007 section 3, ADR-0010 section 3).
+type JoinRemaining string
+
+// Join remaining options.
+const (
+	// RemainingCancel cancels the branches that have not reached the join.
+	RemainingCancel JoinRemaining = "CANCEL"
+	// RemainingLetFinish lets the other branches run to the end; their arrivals
+	// are consumed and recorded without a continuation.
+	RemainingLetFinish JoinRemaining = "LET_FINISH"
+)
+
+// JoinRemainings returns every valid [JoinRemaining].
+func JoinRemainings() []JoinRemaining { return []JoinRemaining{RemainingCancel, RemainingLetFinish} }
+
 // OnError is the error routing of a node (ADR-0011).
 type OnError string
 

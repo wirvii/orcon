@@ -22,7 +22,7 @@
       "element": "task",
       "type": "orcon.merge@1",
       "parameters": {},
-      "join": { "mode": "FIRST", "data": "MATCH_FIELD", "matchField": "id" }
+      "join": { "mode": "FIRST", "data": "APPEND" }
     },
     { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
   ],

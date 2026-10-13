@@ -40,10 +40,10 @@ export function applyTheme(preference: ThemePreference, root: HTMLElement = docu
 export interface ThemeProviderProps {
   children: ReactNode;
   /** Preference used when nothing is stored. */
-  defaultPreference?: ThemePreference;
+  defaultPreference?: ThemePreference | undefined;
   /** Controlled preference (Storybook globals, tests). Disables persistence. */
-  preference?: ThemePreference;
-  onPreferenceChange?: (preference: ThemePreference) => void;
+  preference?: ThemePreference | undefined;
+  onPreferenceChange?: ((preference: ThemePreference) => void) | undefined;
 }
 
 export function ThemeProvider({

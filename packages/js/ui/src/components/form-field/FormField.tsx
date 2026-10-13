@@ -28,24 +28,24 @@ const messages = defineMessages({
 export interface FormFieldProps {
   label: string;
   /** Helper text shown under the label and linked to the control. */
-  description?: ReactNode;
+  description?: ReactNode | undefined;
   /** Error text. When set the control is marked invalid and the text is linked to it. */
-  error?: ReactNode;
-  required?: boolean;
+  error?: ReactNode | undefined;
+  required?: boolean | undefined;
   /**
    * The field is a group (radio group, checkbox group): the label becomes a
    * legend and no single control id is needed.
    */
-  group?: boolean;
+  group?: boolean | undefined;
   /**
    * Field name: a JSON pointer such as "/title" or a plain name. A server error
    * whose pointer equals the name appears on this field (see ProblemErrorsProvider),
    * and the control gets the id `fieldIdForName(name)` so an ErrorSummary can link to it.
    */
-  name?: string;
+  name?: string | undefined;
   /** Fixed control id. Defaults to one built from `name`, else a generated one. */
-  id?: string;
-  className?: string;
+  id?: string | undefined;
+  className?: string | undefined;
   children: ReactNode;
 }
 

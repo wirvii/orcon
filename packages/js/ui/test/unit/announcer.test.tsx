@@ -34,7 +34,7 @@ describe('polite coalesced announcements', () => {
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(screen.getByRole('status').textContent?.trim()).toBe('Added Check stock');
+    expect(screen.getByRole('status').textContent.trim()).toBe('Added Check stock');
   });
 
   it('joins what arrives inside the interval into one announcement', () => {
@@ -51,11 +51,11 @@ describe('polite coalesced announcements', () => {
     act(() => {
       vi.advanceTimersByTime(ANNOUNCE_INTERVAL_MS - 100);
     });
-    expect(screen.getByRole('status').textContent?.trim()).toBe('One');
+    expect(screen.getByRole('status').textContent.trim()).toBe('One');
     act(() => {
       vi.advanceTimersByTime(200);
     });
-    expect(screen.getByRole('status').textContent?.trim()).toBe('Two. Three');
+    expect(screen.getByRole('status').textContent.trim()).toBe('Two. Three');
   });
 
   it('announces at most once every five seconds', () => {

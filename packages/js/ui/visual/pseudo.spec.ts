@@ -27,7 +27,7 @@ test.describe('pseudo-locale xx-LS', () => {
             // Visually hidden text is for screen readers and is not drawn.
             if (element.clientWidth <= 1 && element.clientHeight <= 1) continue;
             if (element.scrollWidth > element.clientWidth + 1 && element.clientWidth > 0) {
-              found.push(`${element.tagName.toLowerCase()} "${element.textContent?.trim().slice(0, 40)}" (${element.scrollWidth} > ${element.clientWidth})`);
+              found.push(`${element.tagName.toLowerCase()} "${element.textContent.trim().slice(0, 40)}" (${element.scrollWidth} > ${element.clientWidth})`);
             }
           }
           return found;

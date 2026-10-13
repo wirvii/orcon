@@ -257,3 +257,6 @@ build: web build-go
 
 smoke:
 	bash scripts/smoke.sh
+
+# Area targets live in mk/<area>.mk, one file per area (owner decision 2026-10-13).
+-include mk/*.mk

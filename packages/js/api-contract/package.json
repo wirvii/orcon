@@ -1,0 +1,39 @@
+{
+  "name": "@orcon/api-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Zod schemas, example data and Mock Service Worker handlers generated from the Orcon OpenAPI document.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./zod": "./src/gen/zod/index.ts",
+    "./msw": "./src/gen/msw/index.ts",
+    "./faker": "./src/gen/faker/index.ts"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10",
+    "@kubb/cli": "4",
+    "@kubb/core": "4",
+    "@kubb/plugin-faker": "4",
+    "@kubb/plugin-msw": "4",
+    "@kubb/plugin-oas": "4",
+    "@kubb/plugin-ts": "4",
+    "@kubb/plugin-zod": "4",
+    "@orcon/lint-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.20.0",
+    "jsdom": "^26.1.0",
+    "msw": "^2",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}

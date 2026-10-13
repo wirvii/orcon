@@ -327,6 +327,7 @@ func (v *validator) nodeBlocks(base string, n *Node) {
 	if j := n.Join; j != nil {
 		checkEnum(r, base+"/join/mode", j.Mode, JoinModes())
 		checkEnum(r, base+"/join/data", j.Data, JoinDataModes())
+		checkOptEnum(r, base+"/join/remaining", j.Remaining, JoinRemainings())
 		if j.Data == JoinDataMatchField && j.MatchField == "" {
 			r.errorf(CodeValue, base+"/join/matchField", "matchField is required when data is %s", JoinDataMatchField)
 		}
