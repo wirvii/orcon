@@ -12,6 +12,7 @@ import { parityEnv, ParityStage } from '../../src/parity/ParityStage';
 import { ownedRows } from '../../src/parity/rows';
 import { parityScripts } from '../../src/parity/scripts';
 import { Providers } from '../../src/providers/Providers';
+import { must } from '../../src/lib/must';
 
 // Real input in a real browser: the pointer scripts need it (a drag is a real press, move and release).
 const driver: Driver = {
@@ -51,7 +52,7 @@ describe('every parity row of this repository has a script', () => {
 // the steps the table allows (the `unit` of each script checks that).
 describe.each(['light', 'dark'] as const)('parity in the %s theme', (theme) => {
   describe.each(ownedRows.map((row) => [row.id, row.title] as const))('%s %s', (id) => {
-    const script = parityScripts[id]!;
+    const script = must(parityScripts[id]);
     const variants = (['pointer', 'keyboard'] as const).filter((kind) => typeof script[kind] === 'function');
 
     it.each(variants)('%s script', async (kind) => {
@@ -61,7 +62,7 @@ describe.each(['light', 'dark'] as const)('parity in the %s theme', (theme) => {
         </Providers>,
       );
       const env = parityEnv(driver, view.container, id);
-      await script[kind]!(env);
+      await must(script[kind])(env);
       await script.verify(env);
       expect(env.units.length, `${id} ${kind} measured no unit`).toBeGreaterThan(0);
       for (const unit of env.units) expect(unit.steps, `${id} ${kind} ${unit.label}`).toBeLessThanOrEqual(unit.max);

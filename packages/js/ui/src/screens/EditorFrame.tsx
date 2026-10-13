@@ -29,21 +29,21 @@ const docks = ['input', 'output'] as const;
 
 export interface EditorFrameProps {
   /** The flow to edit. */
-  graph?: Graph;
-  catalog?: readonly CatalogItem[];
+  graph?: Graph | undefined;
+  catalog?: readonly CatalogItem[] | undefined;
   /** The state of the nodes and connections to start with, from an earlier run. */
-  overlay?: ExecutionOverlay;
+  overlay?: ExecutionOverlay | undefined;
   /** Data that nodes already produced. */
-  outputs?: NodeOutputs;
-  readOnly?: boolean;
+  outputs?: NodeOutputs | undefined;
+  readOnly?: boolean | undefined;
   /** Milliseconds a step takes in the sample runs. */
-  runDelay?: number;
+  runDelay?: number | undefined;
   /** Open the details view of this node on load. */
-  defaultDetailsId?: string;
-  executionHref?: (nodeId: string) => string;
+  defaultDetailsId?: string | undefined;
+  executionHref?: ((nodeId: string) => string) | undefined;
   /** Called after every change of the flow, for tests and stories. */
-  onGraphChange?: (graph: Graph) => void;
-  className?: string;
+  onGraphChange?: ((graph: Graph) => void) | undefined;
+  className?: string | undefined;
 }
 
 /** The state of the last run, from the nodes shown: failed and uncertain win over running, which wins over succeeded. */
@@ -118,7 +118,7 @@ export function EditorFrame({
     const source = edge ? shown.nodes.find((node) => node.id === edge.source) : undefined;
     return items && source ? { items, from: source.name, run: { index: 1, total: 1 } } : undefined;
   };
-  const outputOf = (nodeId: string): { data?: PaneData; ports?: { id: string; label: string; count: number }[]; port?: string } => {
+  const outputOf = (nodeId: string): { data?: PaneData; ports?: { id: string; label: string; count: number }[] | undefined; port?: string } => {
     const node = shown.nodes.find((candidate) => candidate.id === nodeId);
     const produced = run.outputs[nodeId];
     if (!node || !produced) return {};

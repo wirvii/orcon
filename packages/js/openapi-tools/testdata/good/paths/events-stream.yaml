@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: stream
+get:
+  operationId: streamEvents
+  summary: Stream the events of the caller
+  description: >-
+    Opens a server-sent events stream with the events the caller may see. Send Last-Event-ID
+    to resume after a disconnect; the server sends a heartbeat comment every fifteen seconds.
+  tags: [events]
+  x-orcon-permission: authenticated
+  x-orcon-rate-class: stream
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - unauthenticated
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: events tail
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: followPublishedFlows
+      scenario: flow-with-valid-draft
+      request: {}
+      response:
+        status: 200
+      stream:
+        trigger: publishValidDraft
+        expectTypes: [flow.published]
+        within: 10s
+  parameters:
+    - $ref: '../openapi.yaml#/components/parameters/LastEventId'
+  responses:
+    '200':
+      description: The event stream.
+      headers:
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+      content:
+        text/event-stream:
+          schema:
+            type: string
+            description: Server-sent events; each event has the id of its position in the stream.
+            maxLength: 1048576
+            examples: ["id: 12346\nevent: flow.published\ndata: {}\n\n"]
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

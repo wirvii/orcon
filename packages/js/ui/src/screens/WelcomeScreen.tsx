@@ -46,16 +46,17 @@ const messages = defineMessages({
 });
 
 export interface WelcomeScreenProps {
-  onCreateFlow?: () => void;
+  onCreateFlow?: (() => void) | undefined;
   /** Where the documentation link goes. */
-  docsHref?: string;
+  docsHref?: string | undefined;
 }
 
 /**
- * S1: the shell and the first-run welcome. The mascot placeholder is allowed here
- * (welcome and onboarding), and the page says what to do next.
+ * The first-run welcome without the shell, for an app that provides its own frame.
+ * The mascot placeholder is allowed here (welcome and onboarding), and the page says
+ * what to do next.
  */
-export function WelcomeScreen({ onCreateFlow, docsHref = '#docs' }: WelcomeScreenProps) {
+export function WelcomeContent({ onCreateFlow, docsHref = '#docs' }: WelcomeScreenProps) {
   const intl = useIntl();
   const steps: { icon: LucideIcon; title: string; text: string }[] = [
     { icon: Workflow, title: intl.formatMessage(messages.stepCreateTitle), text: intl.formatMessage(messages.stepCreateText) },
@@ -63,35 +64,44 @@ export function WelcomeScreen({ onCreateFlow, docsHref = '#docs' }: WelcomeScree
     { icon: Play, title: intl.formatMessage(messages.stepRunTitle), text: intl.formatMessage(messages.stepRunText) },
   ];
   return (
-    <ProductShell current="flows" attentionCount={0}>
-      <div className="mx-auto flex max-w-screen-md flex-col items-center gap-6 py-8 text-center">
-        <Mascot pose="welcome" />
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
-          <p className="text-fg-muted text-md wrap-anywhere">{intl.formatMessage(messages.subtitle)}</p>
-          <p className="wrap-anywhere">{intl.formatMessage(messages.intro)}</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button onClick={onCreateFlow}>{intl.formatMessage(messages.create)}</Button>
-          <Link href={docsHref} className="inline-flex min-h-target items-center">
-            {intl.formatMessage(messages.docs)}
-          </Link>
-        </div>
-        <section aria-labelledby="welcome-steps" className="w-full text-left">
-          <h2 id="welcome-steps" className="text-lg font-semibold wrap-anywhere">
-            {intl.formatMessage(messages.stepsTitle)}
-          </h2>
-          <ol className="mt-3 grid gap-3 md:grid-cols-3">
-            {steps.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="bg-surface border-border flex flex-col gap-1 rounded-lg border p-4">
-                <Icon aria-hidden className="text-fg-muted size-icon-24" />
-                <p className="font-semibold wrap-anywhere">{title}</p>
-                <p className="text-fg-muted wrap-anywhere">{text}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
+  <div className="mx-auto flex max-w-screen-md flex-col items-center gap-6 py-8 text-center">
+      <Mascot pose="welcome" />
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
+        <p className="text-fg-muted text-md wrap-anywhere">{intl.formatMessage(messages.subtitle)}</p>
+        <p className="wrap-anywhere">{intl.formatMessage(messages.intro)}</p>
       </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Button onClick={onCreateFlow}>{intl.formatMessage(messages.create)}</Button>
+        <Link href={docsHref} className="inline-flex min-h-target items-center">
+          {intl.formatMessage(messages.docs)}
+        </Link>
+      </div>
+      <section aria-labelledby="welcome-steps" className="w-full text-left">
+        <h2 id="welcome-steps" className="text-lg font-semibold wrap-anywhere">
+          {intl.formatMessage(messages.stepsTitle)}
+        </h2>
+        <ol className="mt-3 grid gap-3 md:grid-cols-3">
+          {steps.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="bg-surface border-border flex flex-col gap-1 rounded-lg border p-4">
+              <Icon aria-hidden className="text-fg-muted size-icon-24" />
+              <p className="font-semibold wrap-anywhere">{title}</p>
+              <p className="text-fg-muted wrap-anywhere">{text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * S1: the shell and the first-run welcome.
+ */
+export function WelcomeScreen(props: WelcomeScreenProps) {
+  return (
+    <ProductShell current="flows" attentionCount={0}>
+      <WelcomeContent {...props} />
     </ProductShell>
   );
 }

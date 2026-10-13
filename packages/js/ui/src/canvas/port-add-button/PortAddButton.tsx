@@ -13,19 +13,19 @@ export interface PortAddButtonProps {
   /** Accessible name: "Add node after <name>, output <output>". */
   label: string;
   /** Vertical position on the right edge of the tile, in px from its top. */
-  top?: number;
+  top?: number | undefined;
   /** Renders the interactive React Flow handle. Without it the button is only drawn (stories). */
-  live?: boolean;
+  live?: boolean | undefined;
   /** The port can start a connection by pointer. False in read-only mode. */
-  connectable?: boolean;
+  connectable?: boolean | undefined;
   /** Reachable with Tab. Only the node that holds the roving tab stop sets it. */
-  tabbable?: boolean;
+  tabbable?: boolean | undefined;
   /** The port can be used. False in read-only mode: it is only a dot. */
-  interactive?: boolean;
-  selected?: boolean;
+  interactive?: boolean | undefined;
+  selected?: boolean | undefined;
   /** Activation by click, Enter or Space: opens the node palette to insert a node after this output. */
-  onAdd?: () => void;
-  className?: string;
+  onAdd?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 // The control is the target size (24 px, 44 px with a coarse pointer) centered on the tile edge; the

@@ -31,9 +31,10 @@ export interface RunSimulation {
 function executionOrder(graph: Graph, startId: string): string[] {
   const seen = new Set<string>([startId]);
   const order = [startId];
-  for (let index = 0; index < order.length; index += 1) {
+  // The loop also visits the nodes pushed while it runs: that is the breadth-first walk.
+  for (const current of order) {
     for (const edge of graph.edges) {
-      if (edge.source === order[index] && !edge.loopBack && !seen.has(edge.target)) {
+      if (edge.source === current && !edge.loopBack && !seen.has(edge.target)) {
         seen.add(edge.target);
         order.push(edge.target);
       }

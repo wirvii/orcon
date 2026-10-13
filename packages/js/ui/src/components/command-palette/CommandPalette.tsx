@@ -29,23 +29,23 @@ export interface PaletteCommand {
   id: string;
   label: string;
   /** Heading the command is listed under. */
-  group?: string;
+  group?: string | undefined;
   /** Keys, shown on the right, for a command that has a shortcut. */
-  shortcut?: readonly string[];
+  shortcut?: readonly string[] | undefined;
   /** Extra words that also match the search. */
-  keywords?: readonly string[];
+  keywords?: readonly string[] | undefined;
   onSelect: () => void;
 }
 
 export interface CommandPaletteProps {
   commands: readonly PaletteCommand[];
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   /** Open and close with Ctrl+K or Cmd+K. Default true. */
-  enableShortcut?: boolean;
+  enableShortcut?: boolean | undefined;
   /** Text typed in the search box when it opens. Only for stories and tests. */
-  defaultSearch?: string;
+  defaultSearch?: string | undefined;
 }
 
 /**
@@ -75,6 +75,7 @@ export function CommandPalette({ commands, open: controlledOpen, defaultOpen = f
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setOpen is rebuilt from the listed values every render
   }, [enableShortcut, open, controlledOpen, onOpenChange]);
 
   const groups = Array.from(new Set(commands.map((command) => command.group ?? '')));
@@ -112,7 +113,7 @@ export function CommandPalette({ commands, open: controlledOpen, defaultOpen = f
                         <Command.Item
                           key={command.id}
                           value={command.label}
-                          keywords={command.keywords ? [...command.keywords] : undefined}
+                          {...(command.keywords ? { keywords: [...command.keywords] } : {})}
                           onSelect={() => {
                             setOpen(false);
                             command.onSelect();

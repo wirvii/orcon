@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: item
+parameters:
+  - $ref: '../openapi.yaml#/components/parameters/OperationId'
+get:
+  operationId: getOperation
+  summary: Get a long-running operation
+  description: >-
+    Returns the progress of work that continues in the background, such as a synchronization.
+    Poll it until the status is SUCCEEDED, FAILED or CANCELED.
+  tags: [operations]
+  x-orcon-permission: authenticated
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - unauthenticated
+    - not-found
+    - validation-failed
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: operations get
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: getRunningOperation
+      scenario: project-with-git-binding
+      request:
+        pathParams:
+          operationId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72
+      response:
+        status: 200
+        body: getRunningOperation
+  responses:
+    '200':
+      description: The operation.
+      headers:
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+        RateLimit:
+          $ref: '../openapi.yaml#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '../openapi.yaml#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/Operation'
+          examples:
+            getRunningOperation:
+              summary: A running synchronization
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72
+                kind: GIT_SYNC
+                status: RUNNING
+                createdAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/NotFound'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

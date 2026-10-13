@@ -8,6 +8,7 @@ import { MatrixTable } from '../../stories/MatrixTable';
 import { mixedItems, orderItems } from '../fixtures';
 
 import { JsonTreeView } from './JsonTreeView';
+import { must } from '../../lib/must';
 
 const meta = {
   title: 'Editor/JsonTreeView',
@@ -29,7 +30,7 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const tree = within(canvasElement).getByRole('tree', { name: 'Data as JSON' });
     // One tab stop; arrows move between rows and collapse or expand.
-    const first = within(tree).getAllByRole('treeitem')[0]!;
+    const first = must(within(tree).getAllByRole('treeitem')[0]);
     first.focus();
     await userEvent.keyboard('{ArrowDown}');
     await waitFor(() => expect(within(tree).getAllByRole('treeitem')[1]).toHaveFocus());
@@ -40,8 +41,8 @@ export const Default: Story = {
 export const Collapsed: Story = { args: { defaultExpandedDepth: 0 } };
 export const Protected: Story = { args: { value: mixedItems } };
 export const FocusVisible: Story = {
-  play: async ({ canvasElement }) => {
-    within(canvasElement).getAllByRole('treeitem')[1]!.focus();
+  play: ({ canvasElement }) => {
+    must(within(canvasElement).getAllByRole('treeitem')[1]).focus();
   },
 };
 

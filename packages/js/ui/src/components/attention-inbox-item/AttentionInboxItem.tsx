@@ -41,15 +41,15 @@ export interface AttentionInboxItemProps {
   flowName: string;
   createdAt: DateInput;
   /** The instant "now" is measured from. Pass it in stories and tests. */
-  now?: DateInput;
+  now?: DateInput | undefined;
   /** Escalation level, starting at 1. Omit when the item was not escalated. */
-  escalationLevel?: number;
+  escalationLevel?: number | undefined;
   /** Who acknowledged it. Omit when nobody did. */
-  acknowledgedBy?: string;
-  overdue?: boolean;
-  selected?: boolean;
-  onSelectedChange?: (selected: boolean) => void;
-  className?: string;
+  acknowledgedBy?: string | undefined;
+  overdue?: boolean | undefined;
+  selected?: boolean | undefined;
+  onSelectedChange?: ((selected: boolean) => void) | undefined;
+  className?: string | undefined;
 }
 
 /**

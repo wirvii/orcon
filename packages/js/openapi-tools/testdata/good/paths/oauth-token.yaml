@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A protocol-tagged operation: it follows RFC 6749, so it is outside the path grammar, the
+# problem+json rules and the executable examples. Open point: the built-in
+# operation-4xx-problem-details-rfc7807 rule (required by the toolchain) demands problem+json
+# on every 4xx, including this one, whereas RFC 6749 section 5.2 prescribes its own JSON error
+# body. The fixture follows the toolchain; the real contract needs a decision (ADR 0080).
+post:
+  operationId: issueToken
+  summary: Issue an OAuth access token
+  description: >-
+    The OAuth 2.0 token endpoint (RFC 6749). Exchange client credentials for a short-lived
+    access token that you then send as a bearer credential.
+  tags: [protocol]
+  security: []
+  x-orcon-permission: anonymous
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: auth.token_issued
+  x-orcon-cli:
+    none:
+      category: protocol
+      reason: Standard OAuth endpoint used by OAuth libraries, not by people.
+  x-orcon-mcp:
+    level: none
+  requestBody:
+    required: true
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/TokenRequest'
+  responses:
+    '200':
+      description: The issued token.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/TokenResponse'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'

@@ -14,6 +14,7 @@ import { Switch } from '../../src/components/switch/Switch';
 import { Textarea } from '../../src/components/textarea/Textarea';
 
 import { renderWithProviders } from './helpers';
+import { must } from '../../src/lib/must';
 
 describe('FormField', () => {
   it('names the control with the label and links the description', () => {
@@ -153,7 +154,7 @@ describe('ErrorSummary', () => {
   });
 
   it('uses the singular form for one error and the Spanish plural rules', () => {
-    renderWithProviders(<ErrorSummary errors={[errors[0]!]} />, { locale: 'es' });
+    renderWithProviders(<ErrorSummary errors={[must(errors[0])]} />, { locale: 'es' });
     expect(screen.getByRole('heading', { name: 'Hay 1 problema por corregir' })).toBeInTheDocument();
   });
 

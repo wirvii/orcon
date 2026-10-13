@@ -4,7 +4,10 @@
 import type { Preview } from '@storybook/react-vite';
 
 import '../src/styles/index.css';
+import type { Locale } from '../src/i18n/locales';
+import type { Density } from '../src/providers/DensityProvider';
 import { Providers } from '../src/providers/Providers';
+import type { ThemePreference } from '../src/providers/ThemeProvider';
 
 const preview: Preview = {
   initialGlobals: {
@@ -68,9 +71,9 @@ const preview: Preview = {
   decorators: [
     (Story, context) => (
       <Providers
-        theme={context.globals.theme}
-        density={context.globals.density}
-        locale={context.globals.locale}
+        theme={context.globals['theme'] as ThemePreference}
+        density={context.globals['density'] as Density}
+        locale={context.globals['locale'] as Locale}
       >
         <div className="bg-app text-fg min-h-screen p-4">
           <Story />

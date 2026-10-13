@@ -24,7 +24,7 @@ export function nodeAriaLabel(intl: IntlShape, node: GraphNode): string {
 }
 
 /** The label a port shows. Several ports on one side always show one, falling back to the port id. */
-export function portLabel(ports: readonly { id: string; label?: string }[], port: { id: string; label?: string }): string | undefined {
+export function portLabel(ports: readonly { id: string; label?: string | undefined }[], port: { id: string; label?: string | undefined }): string | undefined {
   return port.label ?? (ports.length > 1 ? port.id : undefined);
 }
 

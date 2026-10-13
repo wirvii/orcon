@@ -34,11 +34,15 @@ export class ParityEnv {
   /** The units that ran, with their step counts, for the report. */
   readonly units: { label: string; steps: number; max: number }[] = [];
 
-  constructor(
-    readonly driver: Driver,
-    readonly root: HTMLElement,
-    private readonly graph: () => Graph,
-  ) {}
+  readonly driver: Driver;
+  readonly root: HTMLElement;
+  private readonly graph: () => Graph;
+
+  constructor(driver: Driver, root: HTMLElement, graph: () => Graph) {
+    this.driver = driver;
+    this.root = root;
+    this.graph = graph;
+  }
 
   get body(): HTMLElement {
     return this.root.ownerDocument.body;
@@ -58,7 +62,7 @@ export class ParityEnv {
     this.steps = 0;
     await fn();
     this.units.push({ label, steps: this.steps, max });
-    expect(this.steps, `${label}: ${this.steps} steps, at most ${max} allowed`).toBeLessThanOrEqual(max);
+    await expect(this.steps, `${label}: ${this.steps} steps, at most ${max} allowed`).toBeLessThanOrEqual(max);
   }
 
   /** Reaching a target: moving the pointer or the focus onto it. Not a step. */
@@ -91,9 +95,10 @@ export class ParityEnv {
     await this.driver.keyboard('{/Shift}');
   }
   /** A wheel gesture on the canvas: one step. */
-  async wheel(element: Element, delta: { x?: number; y?: number; ctrl?: boolean }) {
+  wheel(element: Element, delta: { x?: number; y?: number; ctrl?: boolean }): Promise<void> {
     this.steps += 1;
     element.dispatchEvent(new WheelEvent('wheel', { deltaX: delta.x ?? 0, deltaY: delta.y ?? 0, ctrlKey: delta.ctrl ?? false, bubbles: true, cancelable: true }));
+    return Promise.resolve();
   }
 
   async hover(element: Element) {
@@ -117,9 +122,9 @@ export class ParityEnv {
     return node.querySelector<HTMLElement>('[data-canvas-node]') as HTMLElement;
   }
   async edge(id: string): Promise<HTMLElement> {
-    return waitFor(() => {
+    return waitFor(async () => {
       const element = this.root.querySelector<HTMLElement>(`.react-flow__edge[data-id="${id}"]`);
-      expect(element, `connection ${id}`).not.toBeNull();
+      await expect(element, `connection ${id}`).not.toBeNull();
       return element as HTMLElement;
     });
   }
@@ -141,6 +146,6 @@ export class ParityEnv {
     return this.root.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
   }
   zoom(): number {
-    return Number(this.root.querySelector<HTMLElement>('[data-zoom]')?.dataset.zoom ?? '100');
+    return Number(this.root.querySelector<HTMLElement>('[data-zoom]')?.dataset['zoom'] ?? '100');
   }
 }

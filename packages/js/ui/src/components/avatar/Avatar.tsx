@@ -9,9 +9,9 @@ export interface AvatarProps {
   /** Full name. It is the accessible name and the source of the initials. */
   name: string;
   /** Image URL. When it is missing or fails to load, the initials show. */
-  src?: string;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
+  src?: string | undefined;
+  size?: 'sm' | 'md' | 'lg' | undefined;
+  className?: string | undefined;
 }
 
 const sizeClass = { sm: 'size-icon-24 text-xs', md: 'size-connector-icon text-sm', lg: 'size-row text-base' } as const;

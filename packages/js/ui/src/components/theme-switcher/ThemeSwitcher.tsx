@@ -16,9 +16,9 @@ const messages = defineMessages({
 
 export interface ThemeSwitcherProps {
   /** Controlled value. Without it the switcher reads and sets the ThemeProvider preference. */
-  value?: ThemePreference;
-  onValueChange?: (value: ThemePreference) => void;
-  className?: string;
+  value?: ThemePreference | undefined;
+  onValueChange?: ((value: ThemePreference) => void) | undefined;
+  className?: string | undefined;
 }
 
 /** Chooses system, light or dark. The choice is stored and applied by ThemeProvider. */
