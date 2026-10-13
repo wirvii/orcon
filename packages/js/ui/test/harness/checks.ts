@@ -87,7 +87,7 @@ export function targetsBelow(min: number, root: ParentNode = document.body): str
       element.blur();
     }
     if (rect.width < min - 0.5 || rect.height < min - 0.5) {
-      const name = element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 24) ?? '';
+      const name = element.getAttribute('aria-label') ?? element.textContent.trim().slice(0, 24);
       tooSmall.push(`${element.tagName.toLowerCase()}[${name}] is ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`);
     }
   }

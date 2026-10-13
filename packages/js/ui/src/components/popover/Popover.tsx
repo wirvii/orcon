@@ -13,9 +13,9 @@ export interface PopoverProps extends Pick<ComponentProps<typeof PopoverPrimitiv
   /** Accessible name of the popover panel. */
   label: string;
   children: ReactNode;
-  side?: ComponentProps<typeof PopoverPrimitive.Content>['side'];
-  align?: ComponentProps<typeof PopoverPrimitive.Content>['align'];
-  className?: string;
+  side?: ComponentProps<typeof PopoverPrimitive.Content>['side'] | undefined;
+  align?: ComponentProps<typeof PopoverPrimitive.Content>['align'] | undefined;
+  className?: string | undefined;
 }
 
 /**

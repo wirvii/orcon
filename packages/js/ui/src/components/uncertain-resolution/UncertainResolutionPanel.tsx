@@ -53,24 +53,24 @@ export interface UncertainResolutionAction {
    */
   kind: 'repeat' | 'mark-applied' | 'mark-not-applied' | 'other';
   /** A lasting effect is possible: the action stays disabled until the person ticks the acknowledgment. */
-  requiresRiskAck?: boolean;
+  requiresRiskAck?: boolean | undefined;
   /** The risk the acknowledgment states. */
-  riskText?: string;
+  riskText?: string | undefined;
 }
 
 export interface UncertainResolutionPanelProps {
   /** Node name, for the heading. */
   nodeName: string;
   /** The connector's instructions for checking by hand. Shown as plain text, exactly as received. */
-  manualCheck?: string;
+  manualCheck?: string | undefined;
   /** The supervised resolutions the attention request offers, received as data. The panel invents none. */
   actions: readonly UncertainResolutionAction[];
-  onResolve?: (actionId: string) => void;
-  onCancel?: () => void;
-  className?: string;
+  onResolve?: ((actionId: string) => void) | undefined;
+  onCancel?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
-function ResolutionRow({ action, onResolve }: { action: UncertainResolutionAction; onResolve?: (id: string) => void }) {
+function ResolutionRow({ action, onResolve }: { action: UncertainResolutionAction; onResolve?: ((id: string) => void) | undefined }) {
   const intl = useIntl();
   const [acknowledged, setAcknowledged] = useState(false);
   const locked = action.requiresRiskAck === true && !acknowledged;

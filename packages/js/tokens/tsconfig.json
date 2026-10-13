@@ -1,13 +1,8 @@
 {
+  "extends": "@orcon/lint-config/tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "types": ["node"],
-    "strict": true,
-    "skipLibCheck": true,
-    "noEmit": true,
     "allowJs": true,
     "checkJs": false
   },

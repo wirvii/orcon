@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Pull request title, commit format and advisory checks (orcon-contributing; ADR 0081).
+# In the merge queue there is no pull request title to read (the merge message is the
+# title that already passed), so both jobs are skipped there; a skipped job counts as
+# passed for a required check.
+name: PR
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+permissions:
+  contents: read
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  commit-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: make pr-title-lint
+      - name: Commits of the pull request
+        env:
+          FROM: ${{ github.event.pull_request.base.sha }}
+          TO: ${{ github.event.pull_request.head.sha }}
+        run: make commit-lint
+  pr-advisory:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: tools/go.mod
+          cache-dependency-path: tools/go.sum
+      - name: Size, Spec line, branch name and skill checklists (warnings only)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          FROM: ${{ github.event.pull_request.base.sha }}
+          TO: ${{ github.event.pull_request.head.sha }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # FROM, TO and BRANCH reach make through the environment (mk/contributing.mk
+          # reads them with ?=), so no value from the pull request is spliced into a command line.
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          BODY="$RUNNER_TEMP/pr-body.md" make pr-check

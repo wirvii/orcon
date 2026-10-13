@@ -19,9 +19,9 @@ async function css(classes: string[]): Promise<string> {
   const theme = emitTailwindTheme(model);
   const compiler = await compile(`@import "tailwindcss/theme.css" layer(theme);\n@tailwind utilities;\n${theme}`, {
     base: dirname(require.resolve('tailwindcss/package.json')),
-    loadStylesheet: async (id: string, base: string) => {
+    loadStylesheet: (id: string, base: string) => {
       const path = id === 'tailwindcss/theme.css' ? require.resolve('tailwindcss/theme.css') : require.resolve(id, { paths: [base] });
-      return { path, base: dirname(path), content: readFileSync(path, 'utf8') };
+      return Promise.resolve({ path, base: dirname(path), content: readFileSync(path, 'utf8') });
     },
   });
   return compiler.build(classes);

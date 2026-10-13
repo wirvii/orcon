@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+post:
+  operationId: flowPublishedEvent
+  summary: Receive a flow published event
+  description: >-
+    Sent when a new version of a flow is published from its draft. The payload is thin: it
+    carries the ids, the version and the publishing principal, never the flow document;
+    fetch the version through the API when you need its content.
+  tags: [flows]
+  x-orcon-event:
+    type: flow.published
+    cloudEventsType: dev.orcon.flow.published.v1
+    permission: flow:read
+    stability: stable
+    since: 1.0.0
+  x-orcon-stability: stable
+  requestBody:
+    required: true
+    description: The event in CloudEvents structured JSON form.
+    content:
+      application/cloudevents+json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/FlowPublishedEvent'
+        examples:
+          flowPublished:
+            summary: Version 8 of a flow was published
+            value:
+              specversion: '1.0'
+              id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a65
+              source: /api/v1/flows/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+              type: dev.orcon.flow.published.v1
+              time: '2026-10-12T15:04:05Z'
+              datacontenttype: application/json
+              data:
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                version: 8
+                publishedByPrincipalId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+  responses:
+    '204':
+      description: The receiver accepted the event; any 2xx status is accepted.

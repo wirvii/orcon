@@ -17,9 +17,9 @@ export default defineConfig({
   snapshotPathTemplate: '{testDir}/__screenshots__/{arg}{ext}',
   outputDir: './test-results',
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  ...(process.env['CI'] ? { workers: 2 } : {}),
   retries: 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: './report' }]] : 'list',
+  reporter: process.env['CI'] ? [['list'], ['html', { open: 'never', outputFolder: './report' }]] : 'list',
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.001, animations: 'disabled', caret: 'hide' } },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
@@ -38,7 +38,7 @@ export default defineConfig({
     command: `node visual/serve.mjs ${PORT}`,
     cwd: '..',
     url: `http://127.0.0.1:${PORT}/index.json`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env['CI'],
     timeout: 30_000,
   },
 });

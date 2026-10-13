@@ -1,0 +1,5 @@
+chore(deps): bump the sqlite driver to the latest patch
+
+The patch release fixes a checkpoint bug.
+
+Refs: #12

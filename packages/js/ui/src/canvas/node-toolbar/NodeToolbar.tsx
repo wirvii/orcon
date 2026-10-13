@@ -13,24 +13,24 @@ export interface NodeToolbarProps {
   /** The node name: it names the toolbar. */
   name: string;
   /** A trigger node starts with "Execute workflow". */
-  trigger?: boolean;
+  trigger?: boolean | undefined;
   /** The node is disabled: the power button turns it back on. */
-  disabled?: boolean;
-  pinned?: boolean;
+  disabled?: boolean | undefined;
+  pinned?: boolean | undefined;
   /** A node that cannot run (an unsupported node) has no run button. */
-  canRun?: boolean;
+  canRun?: boolean | undefined;
   /** Reachable with Tab. Only the node that holds the roving tab stop sets it. */
-  tabbable?: boolean;
-  onExecuteWorkflow?: () => void;
-  onRunStep?: () => void;
-  onToggleDisabled?: () => void;
-  onDelete?: () => void;
-  onRename?: () => void;
-  onDuplicate?: () => void;
-  onTogglePin?: () => void;
-  onCopy?: () => void;
-  onOpenDetails?: () => void;
-  className?: string;
+  tabbable?: boolean | undefined;
+  onExecuteWorkflow?: (() => void) | undefined;
+  onRunStep?: (() => void) | undefined;
+  onToggleDisabled?: (() => void) | undefined;
+  onDelete?: (() => void) | undefined;
+  onRename?: (() => void) | undefined;
+  onDuplicate?: (() => void) | undefined;
+  onTogglePin?: (() => void) | undefined;
+  onCopy?: (() => void) | undefined;
+  onOpenDetails?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 const buttonLook =
@@ -39,11 +39,11 @@ const buttonLook =
 interface ToolbarButtonProps {
   icon: LucideIcon;
   label: string;
-  shortcut?: string;
+  shortcut?: string | undefined;
   tabbable: boolean;
-  onClick?: () => void;
-  danger?: boolean;
-  primary?: boolean;
+  onClick?: (() => void) | undefined;
+  danger?: boolean | undefined;
+  primary?: boolean | undefined;
 }
 
 function ToolbarButton({ icon: Icon, label, shortcut, tabbable, onClick, danger, primary }: ToolbarButtonProps) {

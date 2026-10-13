@@ -9,11 +9,21 @@ import { parityScripts } from './scripts';
 
 /** Synthetic input for Storybook. It cannot drag; the keyboard scripts do not need to. */
 export const storybookDriver: Driver = {
-  click: async (element) => void (await userEvent.click(element)),
-  dblClick: async (element) => void (await userEvent.dblClick(element)),
-  hover: async (element) => void (await userEvent.hover(element)),
-  keyboard: async (keys) => void (await userEvent.keyboard(keys)),
-  type: async (element, text) => void (await userEvent.type(element, text)),
+  click: async (element) => {
+    await userEvent.click(element);
+  },
+  dblClick: async (element) => {
+    await userEvent.dblClick(element);
+  },
+  hover: async (element) => {
+    await userEvent.hover(element);
+  },
+  keyboard: async (keys) => {
+    await userEvent.keyboard(keys);
+  },
+  type: async (element, text) => {
+    await userEvent.type(element, text);
+  },
 };
 
 /** The play function of a parity story: the keyboard script, then the end state check. */

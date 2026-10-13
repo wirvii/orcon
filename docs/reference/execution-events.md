@@ -22,7 +22,7 @@ Event types are identifiers and keep their dotted lowercase form (`execution.suc
 `execution.created`, `execution.started`, `execution.waiting`, `execution.resumed`, `execution.suspended`, `execution.cancel_requested`, `execution.canceled`, `execution.compensation_started`, `execution.compensation_step`, `execution.compensation_finished`, `execution.succeeded`, `execution.failed`, `execution.retry_requested`, `execution.timeout`.
 
 ### Tokens and control flow
-`token.forked`, `token.deferred`, `token.consumed`, `edge.closed` (`live: bool`; persisted only when it reaches a join or merge tracker; streamed live to the editor otherwise), `join.fired`, `join.failed`, `loop.iteration_started`, `loop.limit_exceeded`, `mi.instance_started`, `mi.completed`.
+`token.forked`, `token.deferred`, `token.consumed`, `edge.closed` (`live: bool`; persisted only when it reaches a join or merge tracker; streamed live to the editor otherwise), `join.fired` (`data.round`), `join.failed` (`data.round`), `join.reset` (`data.round`, `data.liveArrivalCount`, `data.arrivalCount`), `loop.iteration_started`, `loop.limit_exceeded`, `mi.instance_started`, `mi.completed`.
 
 ### Nodes
 `node.started`, `node.succeeded`, `node.failed`, `node.items_errored` (aggregated counts), `attempt.started`, `attempt.finished`, `retry.scheduled`.

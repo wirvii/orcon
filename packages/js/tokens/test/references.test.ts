@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 import { model, type Token } from './helpers/model';
 
+function componentToken(key: string, reference: string | null): Token {
+  return { key, path: key.split('.'), cssName: `--${key.replaceAll('.', '-')}`, layer: 'component', type: 'color', value: '', css: '', reference, role: null };
+}
+
 const lower = new Set(['primitive', 'brand']);
 
 /** Component tokens that hold a raw value or reference a layer other than semantic or density. */
@@ -31,8 +35,8 @@ describe('token layers', () => {
   });
 
   it('flags a component token with a raw value or a primitive reference', () => {
-    const raw = { key: 'component.x', reference: null } as Token;
-    const prim = { key: 'component.y', reference: 'color.green.500' } as Token;
+    const raw = componentToken('component.x', null);
+    const prim = componentToken('component.y', 'color.green.500');
     expect(componentViolations([raw, prim], upper)).toHaveLength(2);
   });
 

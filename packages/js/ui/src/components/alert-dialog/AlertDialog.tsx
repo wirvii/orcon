@@ -11,10 +11,10 @@ import { commonMessages } from '../../lib/messages';
 import { Button } from '../button/Button';
 
 export interface AlertDialogProps {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  trigger?: ReactElement;
+  open?: boolean | undefined;
+  defaultOpen?: boolean | undefined;
+  onOpenChange?: ((open: boolean) => void) | undefined;
+  trigger?: ReactElement | undefined;
   /** The question, for example "Delete this flow?". */
   title: string;
   /**
@@ -25,10 +25,10 @@ export interface AlertDialogProps {
   /** Names the action, for example "Delete flow". Never just "OK" or "Yes". */
   confirmLabel: string;
   /** Defaults to "Cancel". */
-  cancelLabel?: string;
+  cancelLabel?: string | undefined;
   onConfirm: () => void;
   /** Use the danger style for the confirm button. Default true. */
-  destructive?: boolean;
+  destructive?: boolean | undefined;
 }
 
 /**

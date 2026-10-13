@@ -349,7 +349,7 @@ func (d *decoder) node(o *obj) Node {
 // nodeBlocks reads the optional behavior blocks of a node.
 func (d *decoder) nodeBlocks(o *obj, n *Node) {
 	if c, ok := o.child("join", false); ok {
-		n.Join = &Join{Mode: JoinMode(c.str("mode", true)), Data: JoinData(c.str("data", true)), MatchField: c.str("matchField", false)}
+		n.Join = &Join{Mode: JoinMode(c.str("mode", true)), Data: JoinData(c.str("data", true)), MatchField: c.str("matchField", false), Remaining: JoinRemaining(c.str("remaining", false))}
 		c.done()
 	}
 	if c, ok := o.child("loop", false); ok {

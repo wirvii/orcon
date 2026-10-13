@@ -12,8 +12,8 @@ export interface ConnectorIconProps {
    * `frame` (default) is the Orcon frame with the logo in its safe area. `tile` is the bare image for the
    * icon box of a canvas node, which draws its own tile around it.
    */
-  variant?: 'frame' | 'tile';
-  className?: string;
+  variant?: 'frame' | 'tile' | undefined;
+  className?: string | undefined;
 }
 
 /**

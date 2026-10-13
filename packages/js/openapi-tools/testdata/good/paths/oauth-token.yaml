@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A protocol-tagged operation: it follows RFC 6749, so it is outside the path grammar, the
+# problem+json rules and the executable examples. Its 400 is the OAuth error response of
+# RFC 6749 section 5.2 (application/json with error and error_description); the built-in
+# rule operation-4xx-problem-details-rfc7807 is off for this reason (ADR-0054 section 1).
+post:
+  operationId: issueToken
+  summary: Issue an OAuth access token
+  description: >-
+    The OAuth 2.0 token endpoint (RFC 6749). Exchange client credentials for a short-lived
+    access token that you then send as a bearer credential.
+  tags: [protocol]
+  security: []
+  x-orcon-permission: anonymous
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: auth.token_issued
+  x-orcon-cli:
+    none:
+      category: protocol
+      reason: Standard OAuth endpoint used by OAuth libraries, not by people.
+  x-orcon-mcp:
+    level: none
+  requestBody:
+    required: true
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/TokenRequest'
+  responses:
+    '200':
+      description: The issued token.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/TokenResponse'
+    '400':
+      description: The request is invalid; the body is the OAuth error response of RFC 6749 section 5.2.
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/OAuthError'

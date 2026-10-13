@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: singleton
+parameters:
+  - $ref: '../openapi.yaml#/components/parameters/FlowId'
+get:
+  operationId: getDraft
+  summary: Get the draft of a flow
+  description: >-
+    Returns the editable draft of a flow, including the flow document. Use it to read what
+    the next publication will contain; the published versions are not affected by the draft.
+  tags: [flows]
+  x-orcon-permission: flow:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - unauthenticated
+    - forbidden
+    - not-found
+    - validation-failed
+    - rate-limited
+    - internal-error
+  x-orcon-cli:
+    command: flows pull
+  x-orcon-mcp:
+    level: read
+    tool: get_draft
+    description: Get the editable draft of a flow.
+  x-orcon-examples:
+    - name: getDraftOfFlow
+      scenario: flow-with-valid-draft
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      response:
+        status: 200
+        body: getDraftOfFlow
+  responses:
+    '200':
+      description: The draft of the flow.
+      headers:
+        Orcon-Request-Id:
+          $ref: '../openapi.yaml#/components/headers/OrconRequestId'
+        RateLimit:
+          $ref: '../openapi.yaml#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '../openapi.yaml#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/FlowDraft'
+          examples:
+            getDraftOfFlow:
+              summary: A draft with one trigger node
+              value:
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                revision: 7
+                document:
+                  schema: orcon/flow@1
+                  nodes:
+                    - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                      kind: TRIGGER
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: '../openapi.yaml#/components/responses/ValidationFailed'
+    '401':
+      $ref: '../openapi.yaml#/components/responses/Unauthenticated'
+    '403':
+      $ref: '../openapi.yaml#/components/responses/Forbidden'
+    '404':
+      $ref: '../openapi.yaml#/components/responses/NotFound'
+    '429':
+      $ref: '../openapi.yaml#/components/responses/RateLimited'
+    '500':
+      $ref: '../openapi.yaml#/components/responses/InternalError'

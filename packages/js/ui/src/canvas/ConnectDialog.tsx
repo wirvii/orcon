@@ -18,7 +18,7 @@ export interface ConnectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The node the form starts with as the source, usually the one that has focus. */
-  initialSource?: string;
+  initialSource?: string | undefined;
   onConnect: (request: ConnectRequest) => void;
 }
 
@@ -36,7 +36,7 @@ function ConnectForm({ graph, initialSource, onConnect, onDone }: Pick<ConnectDi
   const targets = graph.nodes.filter((node) => node.inputs.length > 0);
   const start = sources.find((node) => node.id === initialSource) ?? sources[0];
   const [source, setSource] = useState(start?.id ?? '');
-  const [sourceOutput, setSourceOutput] = useState(start && start.outputs.length === 1 ? (start.outputs[0]?.id ?? '') : '');
+  const [sourceOutput, setSourceOutput] = useState(start?.outputs.length === 1 ? (start.outputs[0]?.id ?? '') : '');
   const [target, setTarget] = useState('');
   const [targetInput, setTargetInput] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -48,13 +48,13 @@ function ConnectForm({ graph, initialSource, onConnect, onDone }: Pick<ConnectDi
   const pickSource = (id: string) => {
     setSource(id);
     const node = graph.nodes.find((candidate) => candidate.id === id);
-    setSourceOutput(node && node.outputs.length === 1 ? (node.outputs[0]?.id ?? '') : '');
+    setSourceOutput(node?.outputs.length === 1 ? (node.outputs[0]?.id ?? '') : '');
     setError(undefined);
   };
   const pickTarget = (id: string) => {
     setTarget(id);
     const node = graph.nodes.find((candidate) => candidate.id === id);
-    setTargetInput(node && node.inputs.length === 1 ? (node.inputs[0]?.id ?? '') : '');
+    setTargetInput(node?.inputs.length === 1 ? (node.inputs[0]?.id ?? '') : '');
     setError(undefined);
   };
 

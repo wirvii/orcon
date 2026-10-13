@@ -26,7 +26,7 @@ function overflowing(root: ParentNode): string[] {
     // Visually hidden text (sr-only, 1 px) is for screen readers and is not drawn.
     if (element.clientWidth <= 1 && element.clientHeight <= 1) continue;
     if (element.scrollWidth > element.clientWidth + 1 && element.clientWidth > 0) {
-      found.push(`${element.tagName.toLowerCase()}.${String(element.className).split(' ').slice(0, 3).join('.')} "${element.textContent?.trim().slice(0, 40)}" (${element.scrollWidth} > ${element.clientWidth})`);
+      found.push(`${element.tagName.toLowerCase()}.${(element.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')} "${element.textContent.trim().slice(0, 40)}" (${element.scrollWidth} > ${element.clientWidth})`);
     }
   }
   return found;
@@ -72,7 +72,7 @@ describe.each([
     const wide = Array.from(document.body.querySelectorAll<HTMLElement>('*'))
       .filter((el) => el.getBoundingClientRect().right > root.clientWidth + 1 && !el.closest('[data-truncate]'))
       .slice(0, 4)
-      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)} in ${[...Array(4)].reduce<[HTMLElement | null, string[]]>(([n, a]) => [n?.parentElement ?? null, [...a, n ? `${n.tagName.toLowerCase()}.${String(n.className).slice(0, 30)}` : '']], [el, []])[1].join('<')}`);
+      .map((el) => `${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)} in ${Array.from({ length: 4 }).reduce<[HTMLElement | null, string[]]>(([n, a]) => [n?.parentElement ?? null, [...a, n ? `${n.tagName.toLowerCase()}.${(n.getAttribute('class') ?? '').slice(0, 30)}` : '']], [el, []])[1].join('<')}`);
     expect(root.scrollWidth, `the page scrolls horizontally: ${wide.join(' | ')}`).toBeLessThanOrEqual(root.clientWidth);
   });
 });
