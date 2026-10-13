@@ -22,7 +22,7 @@ WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
 	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
-	build-go web build smoke test-postgres fuzz bench bench-compare sbom
+	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
 check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
@@ -172,6 +172,14 @@ test-postgres:
 		echo "test-postgres: $$image"; \
 		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/...; \
 	done
+
+# test-compat-floor proves the compatibility floor of every migration and the
+# expand/contract control (ADR-0015 section 4, E-STO-5); see
+# scripts/test-compat-floor.sh. It runs PostgreSQL through testcontainers unless
+# ORCON_TEST_POSTGRES=0.
+test-compat-floor:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	sh scripts/test-compat-floor.sh
 
 # db-fixtures runs the planted database violations (SPEC-009 4.4.6) in both
 # engines; the PostgreSQL cases need a container runtime or
