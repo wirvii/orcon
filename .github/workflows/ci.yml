@@ -4,11 +4,17 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
   merge_group:
     types: [checks_requested]
 permissions:
   contents: read
+# A newer push to a pull request supersedes the run in flight; main and the merge
+# queue are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   # ---------------------------------------------------------------------------
   # SPEC-008 G5 block: Go gate (tooling.md TOOL-3). Required jobs: check, provenance.
