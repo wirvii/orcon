@@ -2,8 +2,9 @@
 # SPDX-FileCopyrightText: The Orcon Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Proves that every rule detects what it is meant to detect: it plants 17
-# violations (SPEC-008 Annex E.6) in a scratch copy of the module and fails
+# Proves that every rule detects what it is meant to detect: it plants 19
+# violations (SPEC-008 Annex E.6; 18 and 19 are the orgscope analyzer of
+# SPEC-004) in a scratch copy of the module and fails
 # unless each one is reported by the expected tool. A rule that exists but
 # detects nothing is the failure this guards against.
 #
@@ -155,6 +156,25 @@ ai=Cla
 ai=${ai}ude
 mkdir -p "$tmp/internal/zzfixture17"
 printf '%s\n// Package zzfixture17 is a planted lint fixture.\n//\n// Co-Authored-By: %s <noreply@example.com>\npackage zzfixture17\n' "$header" "$ai" > "$tmp/internal/zzfixture17/a.go"
+# 18: a SQL driver call outside the data-access layer (orgscope).
+fixture internal/zzfixture18 a.go 'import "database/sql"
+
+// Wipe is planted.
+func Wipe(db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM flow")
+	return err
+}'
+# 19: SQL text built by concatenation inside the data-access layer (orgscope).
+fixture internal/adapter/sqlite/zzfixture19 a.go 'import (
+	"context"
+	"database/sql"
+)
+
+// Wipe is planted.
+func Wipe(ctx context.Context, db *sql.DB, table string) error {
+	_, err := db.ExecContext(ctx, "DELETE FROM "+table)
+	return err
+}'
 
 # One golangci-lint run covers the lint-detected cases. golangci-lint exits 1
 # when it finds issues, which is the expected outcome here.
@@ -200,7 +220,7 @@ expect_lint 12 "slog message that is not constant" internal/zzfixture12 sloglint
 expect_lint 13 "error compared with ==" internal/zzfixture13 errorlint
 expect_lint 14 "http.ListenAndServe without timeouts" internal/adapter/zzfixture14 gosec
 
-# 15-17 are detected by the project tools, run from the scratch module.
+# 15-19 are detected by the project tools, run from the scratch module.
 if (cd "$tmp" && "$BIN/spdxcheck" internal/zzfixture15/a.go) 2>&1 | grep -q 'missing SPDX'; then
   pass 15 "Go file without SPDX header"
 else
@@ -216,10 +236,20 @@ if (cd "$tmp" && "$BIN/provenance" files internal/zzfixture17/a.go) 2>&1 | grep 
 else
   fail 17 "AI authorship mark in a comment (provenance reported nothing)"
 fi
+if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/zzfixture18/ 2>&1) | grep -q 'outside the data-access layer'; then
+  pass 18 "SQL driver call outside the data-access layer"
+else
+  fail 18 "SQL driver call outside the data-access layer (orconvet orgscope reported nothing)"
+fi
+if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/adapter/sqlite/zzfixture19/ 2>&1) | grep -q 'SQL text is built at run time'; then
+  pass 19 "SQL text built by concatenation"
+else
+  fail 19 "SQL text built by concatenation (orconvet orgscope reported nothing)"
+fi
 
 if [ "$failed" -ne 0 ]; then
-  echo "lint-fixtures: $failed of 17 planted violations were not detected; lint output follows" >&2
+  echo "lint-fixtures: $failed of 19 planted violations were not detected; lint output follows" >&2
   cat "$lint_out" >&2
   exit 1
 fi
-echo "lint-fixtures: all 17 planted violations detected"
+echo "lint-fixtures: all 19 planted violations detected"

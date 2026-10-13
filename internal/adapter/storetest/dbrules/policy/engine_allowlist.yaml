@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Reviewed statements of the engine plane (tenant-isolation.md TI-9, ADR-0047
+# section 2): the only queries allowed to carry "-- orcon:scope engine", that is,
+# to touch organization data without an org_id restriction. tools/sqlcheck
+# rejects a scope engine query that is not listed here and an entry that matches
+# no query. Every addition is reviewed on its own: say why the statement must
+# cross organizations.
+#
+# Format (a restricted YAML that sqlcheck reads without a YAML library):
+#
+#   - dialect: postgres        # sqlite or postgres
+#     query: ClaimDueTimer     # the name after "-- name:"
+#     reason: cross-organization scan of due timers (ADR-0047 section 2)
+#
+# No entries yet.
+[]
