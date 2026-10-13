@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createConfig } from '@orcon/lint-config';
@@ -10,7 +10,7 @@ import { createWebAppConfig } from '@orcon/lint-config/web-app';
 const here = dirname(fileURLToPath(import.meta.url));
 
 export default [
-  ...createConfig({ cwd: here }),
+  ...createConfig({ cwd: here, tailwindEntryPoint: resolve(here, 'src/styles.css') }),
   ...createWebAppConfig({ appRoot: here }),
   {
     // The service worker free browser scripts under public/ run as plain scripts, not modules.
