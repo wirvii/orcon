@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Columns named *_id that are not foreign keys (naming.md NM-5, integrity.md
+# IN-1). Format: <table>.<column>  # reason. A table of * means any table.
+*.node_id  # identifier of a node inside a stored flow document
+*.edge_id  # identifier of an edge inside a stored flow document
+*.provider_request_id  # identifier issued by an external model provider
