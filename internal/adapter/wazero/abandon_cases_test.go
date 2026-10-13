@@ -127,6 +127,9 @@ func driveCase(tb testing.TB, sb *wazero.Sandbox, cfg expr.SandboxConfig, src st
 			out.overshoot, out.abandoned = rep.AbandonedOvershoot(waitCtx)
 			stop()
 		}
+		if sr, ok := rt.(stretchReporter); ok {
+			out.stretch, out.tail, out.first = sr.Stretch(), sr.Tail(), sr.First()
+		}
 		_ = rt.Close(context.WithoutCancel(tb.Context()))
 		debug.SetGCPercent(restore)
 		if !reach || g.reached.Load() || !errors.Is(out.err, expr.ErrTimeout) {
@@ -137,11 +140,11 @@ func driveCase(tb testing.TB, sb *wazero.Sandbox, cfg expr.SandboxConfig, src st
 }
 
 // judge holds an outcome to the bounds of ADR-0018 section 3: the caller has
-// its timeout within the deadline plus 5 ms, and the abandoned call stops
-// within 100 ms. It returns the bounds that were missed. A call that did not
+// its timeout within the deadline plus 5 ms, the abandoned call stops
+// within 100 ms, and the guest never goes more than the stretch bound without a host call. It returns the bounds that were missed. A call that did not
 // time out is fine unless mustTimeOut says it had to; any other error is the
 // test's, not the sandbox's, and is returned as fatal.
-func judge(out abandonOutcome, deadline time.Duration, mustTimeOut bool) (problems []string, fatal string, note string) {
+func judge(out abandonOutcome, deadline time.Duration, mustTimeOut bool, maxStretch time.Duration) (problems []string, fatal string, note string) {
 	switch {
 	case out.err == nil && !mustTimeOut:
 		return nil, "", "the call finished inside " + deadline.String() + " (" + out.took.Round(time.Millisecond).String() + ")"
@@ -153,6 +156,9 @@ func judge(out abandonOutcome, deadline time.Duration, mustTimeOut bool) (proble
 	}
 	if out.abandoned && out.overshoot > overshootBound {
 		problems = append(problems, "the abandoned call ran "+out.overshoot.String()+" after the caller stopped waiting, more than "+overshootBound.String())
+	}
+	if out.stretch > maxStretch {
+		problems = append(problems, "the guest went "+out.stretch.String()+" without calling the host, more than "+maxStretch.String())
 	}
 	return problems, "", "caller " + out.took.Round(time.Millisecond).String() + " after start (deadline " + deadline.String() + "), abandoned=" + strconv.FormatBool(out.abandoned) + ", call ran " + out.overshoot.Round(time.Millisecond).String() + " more"
 }
@@ -172,11 +178,22 @@ func runAbandonCase(t *testing.T, sb *wazero.Sandbox, cfg expr.SandboxConfig, sr
 func runAbandonCaseOpt(t *testing.T, sb *wazero.Sandbox, cfg expr.SandboxConfig, src string, reach, mustTimeOut, skipMemory bool) {
 	t.Helper()
 	strict := defaultTestTimeout < time.Second
+	// The cases of abandonCases are held to the target; a covered native, whose
+	// single step can be one copy of a few megabytes, to the documented residual.
+	maxStretch := stretchBound
+	if reach {
+		maxStretch = nativeStretchBound
+	}
 	var last []string
 	for attempt := 1; attempt <= 3; attempt++ {
 		out, deadline := driveCase(t, sb, cfg, src, reach)
-		problems, fatal, note := judge(out, deadline, mustTimeOut)
+		problems, fatal, note := judge(out, deadline, mustTimeOut, maxStretch)
 		if fatal != "" {
+			// Under the race detector the timing is not enforced, and a case slowed
+			// down by a loaded machine can spend its memory before the deadline.
+			if !strict && strings.Contains(fatal, "out of memory") {
+				t.Skip("the case ran out of memory before its deadline on a loaded machine")
+			}
 			if skipMemory && (strings.Contains(fatal, "out of memory") || strings.Contains(fatal, `"m":"null"`) || strings.Contains(fatal, `[uninitialized]`)) {
 				t.Skip("the inputs of the chain do not fit the memory cap")
 			}

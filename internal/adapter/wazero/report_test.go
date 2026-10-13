@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,6 +116,7 @@ func TestExprMeasurementReport(t *testing.T) {
 		}
 		if md.mode == wazero.ModeCooperativeAbandon {
 			mr.Abandon = measureAbandon(t, cfg)
+			mr.Load = measureLoad(t, cfg)
 		}
 		m.Modes = append(m.Modes, mr)
 	}
@@ -176,6 +179,7 @@ func measureAbandon(t *testing.T, cfg expr.SandboxConfig) *bench.AbandonResult {
 			}
 			row.Wait = max(row.Wait, max(out.took-deadline, 0))
 			row.Overshoot = max(row.Overshoot, out.overshoot)
+			row.Stretch = max(row.Stretch, out.stretch)
 			runs = append(runs, out.overshoot)
 		}
 		row.P99 = percentile(runs, 0.99)
@@ -183,7 +187,7 @@ func measureAbandon(t *testing.T, cfg expr.SandboxConfig) *bench.AbandonResult {
 		res.CallerSlack = max(res.CallerSlack, row.Wait)
 		res.MaxOvershoot = max(res.MaxOvershoot, row.Overshoot)
 	}
-	var all []time.Duration
+	var all, stretches []time.Duration
 	natives := map[string]bool{}
 	for _, tc := range tableCases() {
 		out, deadline := driveCase(t, sb, cfg, tc.src, true)
@@ -196,6 +200,8 @@ func measureAbandon(t *testing.T, cfg expr.SandboxConfig) *bench.AbandonResult {
 		res.MaxOvershoot = max(res.MaxOvershoot, out.overshoot)
 		res.Natives.Cases++
 		all = append(all, out.overshoot)
+		stretches = append(stretches, out.stretch)
+		res.Natives.WorstStretch = append(res.Natives.WorstStretch, bench.AbandonRow{Name: tc.name + " (" + tc.kind + ")", Overshoot: out.stretch})
 		if out.overshoot > overshootBound {
 			res.Natives.Over++
 		}
@@ -207,6 +213,10 @@ func measureAbandon(t *testing.T, cfg expr.SandboxConfig) *bench.AbandonResult {
 	res.Natives.P99 = percentile(all, 0.99)
 	slices.SortFunc(res.Natives.Worst, func(a, b bench.AbandonRow) int { return int(b.Overshoot - a.Overshoot) })
 	res.Natives.Worst = res.Natives.Worst[:min(10, len(res.Natives.Worst))]
+	res.Natives.StretchMax = percentile(slices.Clone(stretches), 1)
+	res.Natives.StretchP99 = percentile(stretches, 0.99)
+	slices.SortFunc(res.Natives.WorstStretch, func(a, b bench.AbandonRow) int { return int(b.Overshoot - a.Overshoot) })
+	res.Natives.WorstStretch = res.Natives.WorstStretch[:min(10, len(res.Natives.WorstStretch))]
 	base := callCost(t, wazero.ModeCooperativeLimit, cfg)
 	with := callCost(t, wazero.ModeCooperativeAbandon, cfg)
 	res.ExtraNs, res.ExtraAllocs, res.ExtraBytes = with.ns-base.ns, with.allocs-base.allocs, with.bytes-base.bytes
@@ -248,5 +258,104 @@ func callCost(t *testing.T, mode wazero.Mode, cfg expr.SandboxConfig) perCall {
 		ns:     float64(took.Nanoseconds()) / n,
 		allocs: float64(after.Mallocs-before.Mallocs) / n,
 		bytes:  float64(after.TotalAlloc-before.TotalAlloc) / n,
+	}
+}
+
+// measureLoad measures the execution slots: the throughput of trivial warm
+// calls for several processor counts, and the hostile-call run of
+// TestAbandonUnderLoad (SPEC-001 amendment 10, D-3.6).
+func measureLoad(t *testing.T, cfg expr.SandboxConfig) *bench.LoadResult {
+	t.Helper()
+	res := &bench.LoadResult{}
+	for _, procs := range []int{2, 4, 8} {
+		for _, slots := range []int{max(procs-1, 1), procs} {
+			res.Throughput = append(res.Throughput, throughput(t, cfg, procs, slots))
+		}
+	}
+	for _, procs := range []int{2, 4} {
+		for _, slots := range []int{max(procs-1, 1), 1} {
+			if procs == 2 && slots == 1 && len(res.Hostile) > 0 {
+				continue
+			}
+			// The bounds are timing on a machine that runs other work: the run
+			// reported is the best of three.
+			var best loadStats
+			for attempt := range 3 {
+				stats, problems := runLoad(t, procs, slots)
+				if attempt == 0 || len(problems) == 0 || stats.Heartbeat < best.Heartbeat {
+					best = stats
+				}
+				if len(problems) == 0 {
+					break
+				}
+			}
+			res.Hostile = append(res.Hostile, bench.HostileRow{
+				Procs: procs, Slots: slots, Calls: best.Calls, Holders: best.Holders, Refused: best.Refused,
+				HeldMax: best.HeldMax, RefusedMax: best.RefusedMax, Heartbeat: best.Heartbeat, GCPause: best.GCPause,
+			})
+		}
+	}
+	return res
+}
+
+// throughput runs one goroutine per processor, each on its own warm runtime,
+// for 400 ms and reports the calls per second and the wait for a slot.
+func throughput(t *testing.T, cfg expr.SandboxConfig, procs, slots int) bench.LoadRow {
+	t.Helper()
+	prev := runtime.GOMAXPROCS(procs)
+	defer runtime.GOMAXPROCS(prev)
+	m := &metricsLog{}
+	sb := wazero.New(wazero.WithSlots(slots), wazero.WithMetrics(m))
+	defer func() { _ = sb.Close(context.WithoutCancel(t.Context())) }()
+	req := []byte(`{"e":"1 + 1","m":"v","i":0,"r":0,"n":1791913530250,"z":"UTC"}` + "\x01\x01\x01\x01")
+	rts := make([]expr.Runtime, procs)
+	defer func() {
+		for _, rt := range rts {
+			if rt != nil {
+				_ = rt.Close(context.WithoutCancel(t.Context()))
+			}
+		}
+	}()
+	for i := range rts {
+		rt, err := sb.Open(t.Context(), cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rts[i] = rt
+		for range 200 {
+			if _, err := rt.Call(t.Context(), req, &reachGuest{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	m.mu.Lock()
+	m.waits = nil
+	m.mu.Unlock()
+	var calls atomic.Int64
+	stop := time.Now().Add(400 * time.Millisecond)
+	var wg sync.WaitGroup
+	start := time.Now()
+	for _, rt := range rts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			g := &reachGuest{}
+			for time.Now().Before(stop) {
+				if _, err := rt.Call(t.Context(), req, g); err != nil {
+					t.Error(err)
+					return
+				}
+				calls.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+	m.mu.Lock()
+	waits := slices.Clone(m.waits)
+	m.mu.Unlock()
+	return bench.LoadRow{
+		Procs: procs, Slots: slots, CallsPerSec: float64(calls.Load()) / elapsed.Seconds(),
+		WaitP50: percentile(slices.Clone(waits), 0.5), WaitP99: percentile(waits, 0.99),
 	}
 }

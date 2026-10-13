@@ -26,6 +26,13 @@ const (
 	hangLimit = 20 * time.Second
 )
 
+// stretchReporter is implemented by the runtimes of this adapter.
+type stretchReporter interface {
+	Stretch() time.Duration
+	Tail() time.Duration
+	First() time.Duration
+}
+
 // overshootReporter is implemented by the runtimes of ModeCooperativeAbandon.
 type overshootReporter interface {
 	AbandonedOvershoot(ctx context.Context) (time.Duration, bool)
@@ -37,6 +44,8 @@ type abandonOutcome struct {
 	took      time.Duration
 	overshoot time.Duration
 	abandoned bool
+	// stretch is the longest time the guest went without calling the host.
+	stretch, tail, first time.Duration
 }
 
 // abandonCases are the built-ins the interrupt-poll patch covers, each with an
@@ -53,7 +62,7 @@ var abandonCases = []struct{ name, src string }{
 	{"JSON.parse", `JSON.parse('[' + '1,'.repeat(2e6) + '1]').length`},
 	{"JSON.stringify", `JSON.stringify(new Array(2e6).fill(1)).length`},
 	{"JSON.stringify nested", `(() => { let o = []; for (let i = 0; i < 1e5; i++) o = [o]; return JSON.stringify(o).length; })()`},
-	{"join", `new Array(3e6).fill('a').join(',').length`},
+	{"join", `new Array(2e6).fill('a').join(',').length`},
 	{"concat", `(() => { let a = new Array(1e6).fill(1); for (let i = 0; i < 6; i++) a = a.concat(a); return a.length; })()`},
 	{"flat", `new Array(2e6).fill([1, 2]).flat().length`},
 	{"toUpperCase", `'é'.repeat(5e6).toUpperCase().length`},

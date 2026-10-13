@@ -40,7 +40,12 @@ type instance struct {
 	track            *tracker
 	// abandoned is set, before the caller returns, once the call was given up;
 	// the host functions read it to refuse the guest from then on.
-	abandoned   atomic.Bool
+	abandoned atomic.Bool
+	// stretch is the longest time between two calls of the guest to the host
+	// in the last call, in nanoseconds.
+	stretch     atomic.Int64
+	tail        atomic.Int64
+	first       atomic.Int64
 	stateMu     sync.Mutex
 	callDone    bool
 	abandonedAt time.Time
@@ -294,13 +299,23 @@ func (in *instance) Call(ctx context.Context, request []byte, guest expr.Guest) 
 	if in.answerAtDeadline {
 		return in.callAndAbandon(ctx, request, guest)
 	}
+	if d := expr.TimeoutFrom(ctx); d > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d)
+		defer cancel()
+	}
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	if in.broken {
 		return nil, fmt.Errorf("%w: the runtime failed earlier and must be reopened", expr.ErrSandbox)
 	}
-	st := &callState{guest: guest, inst: in}
+	st := &callState{guest: guest, inst: in, begun: time.Now()}
+	st.deadline, st.hasDeadline = ctx.Deadline()
 	out, err := in.callLocked(withCall(ctx, st), request)
+	st.finish()
+	in.stretch.Store(int64(st.longest))
+	in.tail.Store(int64(st.tail))
+	in.first.Store(int64(st.first))
 	if err == nil {
 		err = st.err
 	}
@@ -317,18 +332,29 @@ type callResult struct {
 }
 
 // callAndAbandon runs the call on its own goroutine and answers the caller
-// when the call returns or the context is done, whichever comes first. On the
-// deadline the call is abandoned: it keeps the runtime locked until it ends
-// (its next poll of the interrupt handler sees the done context), then the
-// runtime is closed and never used again. SPEC-001 amendment 10, A.2 and A.4.
+// when the call returns or its deadline passes, whichever comes first; the
+// caller never waits for its call. It first takes an execution slot, which the
+// goroutine returns when the guest returns, abandoned or not, and the deadline
+// counts from the moment the slot is held. On the deadline the call is
+// abandoned: it keeps the runtime locked and the slot until it ends (its next
+// consult of the host sees the deadline by the clock), then the runtime is
+// closed and never used again. SPEC-001 amendment 10, A.2, A.4 and D.
 func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest expr.Guest) ([]byte, error) {
 	if err := in.track.admit(ctx); err != nil {
+		return nil, err
+	}
+	if err := in.track.acquireSlot(ctx); err != nil {
 		return nil, err
 	}
 	in.mu.Lock()
 	if in.broken {
 		in.mu.Unlock()
+		in.track.releaseSlot()
 		return nil, fmt.Errorf("%w: the runtime failed earlier and must be reopened", expr.ErrSandbox)
+	}
+	callCtx, cancel := ctx, context.CancelFunc(func() {})
+	if d := expr.TimeoutFrom(ctx); d > 0 {
+		callCtx, cancel = context.WithTimeout(ctx, d)
 	}
 	started := time.Now()
 	in.ended = make(chan struct{})
@@ -336,9 +362,14 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 	in.abandoned.Store(false)
 	var gave *abandonment // set by the caller, under stateMu, when it gives up
 	done := make(chan callResult, 1)
-	st := &callState{guest: guest, inst: in}
+	st := &callState{guest: guest, inst: in, begun: time.Now()}
+	st.deadline, st.hasDeadline = callCtx.Deadline()
 	go func() {
-		out, err := in.callLocked(withCall(ctx, st), request)
+		out, err := in.callLocked(withCall(callCtx, st), request)
+		st.finish()
+		in.stretch.Store(int64(st.longest))
+		in.tail.Store(int64(st.tail))
+		in.first.Store(int64(st.first))
 		if err == nil {
 			err = st.err
 		}
@@ -356,14 +387,16 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 			_ = in.mod.Close(context.WithoutCancel(ctx))
 			given.ended()
 		}
+		in.track.releaseSlot()
 		close(in.ended)
 		done <- callResult{out, err}
 		in.mu.Unlock()
+		cancel()
 	}()
 	select {
 	case r := <-done:
 		return r.out, r.err
-	case <-ctx.Done():
+	case <-callCtx.Done():
 		in.stateMu.Lock()
 		if in.callDone {
 			in.stateMu.Unlock()
@@ -372,25 +405,23 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 		}
 		in.abandoned.Store(true) // from now on the guest is refused, whatever happens next
 		in.abandonedAt = time.Now()
-		a, ok := in.track.abandon(ctx, in.abandonedAt.Sub(started), expired(ctx))
-		if !ok {
-			// At the limit of abandoned calls the caller keeps waiting, so the
-			// memory held by calls nobody waits for stays bounded.
-			in.stateMu.Unlock()
-			<-done
-			// The call has ended; the runtime was marked abandoned, so it is
-			// not reused. Close it here, as an abandoned call would have.
-			in.mu.Lock()
-			in.broken = true
-			in.mu.Unlock()
-			_ = in.mod.Close(context.WithoutCancel(ctx))
-			return nil, stopError(ctx)
-		}
-		gave = a
+		gave = in.track.abandon(callCtx, in.abandonedAt.Sub(started), expired(callCtx))
 		in.stateMu.Unlock()
-		return nil, stopError(ctx)
+		return nil, stopError(callCtx)
 	}
 }
+
+// Stretch reports the longest time the guest went without calling the host
+// during the last call. It exists for the tests and the report.
+func (in *instance) Stretch() time.Duration { return time.Duration(in.stretch.Load()) }
+
+// Tail reports the part of the stretch after the last call of the guest to the
+// host: the time from the last consult to the return of the guest.
+func (in *instance) Tail() time.Duration { return time.Duration(in.tail.Load()) }
+
+// First reports the time from the start of the last call to its first call of
+// the guest to the host.
+func (in *instance) First() time.Duration { return time.Duration(in.first.Load()) }
 
 // AbandonedOvershoot waits for an abandoned call to end, or for ctx, and
 // reports how long it kept running after the caller stopped waiting. The second result is false
@@ -445,8 +476,15 @@ func (in *instance) callLocked(ctx context.Context, request []byte) ([]byte, err
 		}
 		return []byte(text), nil
 	default:
-		if cause := context.Cause(ctx); cause != nil && strings.Contains(text, "interrupted") {
-			return nil, stopError(ctx)
+		if strings.Contains(text, "interrupted") {
+			if cause := context.Cause(ctx); cause != nil {
+				return nil, stopError(ctx)
+			}
+			if st := stateOf(ctx); st != nil && st.deadlinePassed() {
+				// The handler saw the deadline by the clock before the timer of
+				// the context ran.
+				return nil, fmt.Errorf("%w: %w", expr.ErrTimeout, context.DeadlineExceeded)
+			}
 		}
 		return nil, classifyScript(text)
 	}

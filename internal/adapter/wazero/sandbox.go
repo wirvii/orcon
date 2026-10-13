@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"sync"
 	"time"
 
@@ -91,6 +92,14 @@ func WithMode(m Mode) Option { return func(s *Sandbox) { s.mode = m } }
 // earlier, with [config.ValidSandboxMaxAbandoned]).
 func WithMaxAbandoned(n int) Option { return func(s *Sandbox) { s.maxAbandoned = n } }
 
+// WithSlots sets how many calls may execute guest code at once (default
+// GOMAXPROCS - 1, at least 1). Every live call holds a slot until its guest
+// returns, abandoned calls included.
+func WithSlots(n int) Option { return func(s *Sandbox) { s.slots = n } }
+
+// WithSlotWait bounds the wait for a slot; the default is [DefaultSlotWait].
+func WithSlotWait(d time.Duration) Option { return func(s *Sandbox) { s.slotWait = d } }
+
 // WithStuckAfter sets how long an abandoned call may keep running before it
 // counts as stuck. The default is [DefaultStuckAfter].
 func WithStuckAfter(d time.Duration) Option { return func(s *Sandbox) { s.stuckAfter = d } }
@@ -108,6 +117,8 @@ type Sandbox struct {
 	cache wazero.CompilationCache
 
 	maxAbandoned int
+	slots        int
+	slotWait     time.Duration
 	stuckAfter   time.Duration
 	log          *slog.Logger
 	metrics      Metrics
@@ -147,7 +158,10 @@ func New(opts ...Option) *Sandbox {
 	for _, o := range opts {
 		o(s)
 	}
-	s.track = newTracker(s.maxAbandoned, s.stuckAfter, s.log, s.metrics)
+	if s.slots <= 0 {
+		s.slots = max(runtime.GOMAXPROCS(0)-1, 1)
+	}
+	s.track = newTracker(s.maxAbandoned, s.slots, s.slotWait, s.stuckAfter, s.log, s.metrics)
 	return s
 }
 
@@ -202,6 +216,13 @@ func (s *Sandbox) Open(ctx context.Context, cfg expr.SandboxConfig) (expr.Runtim
 	e, err := s.engineFor(ctx, pages)
 	if err != nil {
 		return nil, err
+	}
+	if s.mode == ModeCooperativeAbandon {
+		// Opening runs a little guest code, so it takes a slot like a call.
+		if err := s.track.acquireSlot(ctx); err != nil {
+			return nil, err
+		}
+		defer s.track.releaseSlot()
 	}
 	return e.open(ctx, cfg, limit)
 }

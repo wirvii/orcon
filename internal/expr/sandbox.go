@@ -50,9 +50,11 @@ type Script struct {
 // [ErrTimeout], [ErrMemory] or [ErrSandbox] it must not be used again: the
 // caller closes it and opens a new one.
 type Runtime interface {
-	// Call runs the entry point with request and returns its answer. The
-	// context deadline is the time limit of the call. guest serves what the
-	// code asks of the host while the call runs.
+	// Call runs the entry point with request and returns its answer. The time
+	// limit of the call is the context deadline, or the duration that
+	// [TimeoutFrom] reads from the context, which the runtime starts to count
+	// when the call begins to run (a runtime that queues calls does not count
+	// the wait). guest serves what the code asks of the host while the call runs.
 	Call(ctx context.Context, request []byte, guest Guest) ([]byte, error)
 	// MemoryUsage reports the bytes the JavaScript heap currently holds.
 	MemoryUsage(ctx context.Context) int64
@@ -143,8 +145,9 @@ type HealthReport struct {
 	// AbandonedRunning and Stuck are the abandoned calls still running now and
 	// the part of them that has run longer than the stuck limit.
 	AbandonedRunning, Stuck int
-	// MaxAbandoned is the limit of abandoned calls still running.
-	MaxAbandoned int
+	// MaxAbandoned is the limit of abandoned calls still running, and Slots
+	// the number of calls that may execute guest code at once.
+	MaxAbandoned, Slots int
 	// Abandoned and Saturated count, since the process started, the calls
 	// abandoned at their deadline and the calls refused because of the limit.
 	Abandoned, Saturated uint64
@@ -157,6 +160,20 @@ type CallIdentity struct {
 }
 
 type callIdentityKey struct{}
+
+type callTimeoutKey struct{}
+
+// WithTimeout returns a context that asks the runtime for a time limit of d
+// for the call, counted from the moment the call begins to run.
+func WithTimeout(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, callTimeoutKey{}, d)
+}
+
+// TimeoutFrom returns the duration [WithTimeout] stored, or zero.
+func TimeoutFrom(ctx context.Context) time.Duration {
+	d, _ := ctx.Value(callTimeoutKey{}).(time.Duration)
+	return d
+}
 
 // WithCallIdentity returns a context that carries id to the sandbox adapter.
 func WithCallIdentity(ctx context.Context, id CallIdentity) context.Context {

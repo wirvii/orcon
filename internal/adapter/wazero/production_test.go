@@ -51,11 +51,17 @@ type metricsLog struct {
 	running              atomic.Int64
 	mu                   sync.Mutex
 	overruns             []time.Duration
+	waits                []time.Duration
 }
 
 func (m *metricsLog) Abandoned()             { m.abandoned.Add(1) }
 func (m *metricsLog) AbandonedRunning(d int) { m.running.Add(int64(d)) }
 func (m *metricsLog) Saturated()             { m.saturated.Add(1) }
+func (m *metricsLog) SlotWait(d time.Duration) {
+	m.mu.Lock()
+	m.waits = append(m.waits, d)
+	m.mu.Unlock()
+}
 func (m *metricsLog) AbandonOverrun(d time.Duration) {
 	m.mu.Lock()
 	m.overruns = append(m.overruns, d)
@@ -322,13 +328,16 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// TestAbandonCapHoldsUnderConcurrency checks that the limit of abandoned calls
-// is never exceeded, however many calls reach their deadline at once: past the
-// limit the caller keeps waiting for its call instead of leaving it behind.
+// TestAbandonCapHoldsUnderConcurrency checks that the calls that execute guest
+// code, and so the abandoned ones, never exceed the slots, however many calls
+// reach their deadline at once, and that no caller waits for its call: those
+// that cannot get a slot fail with ErrSandboxSaturated after the slot wait,
+// those that have one get ErrTimeout at their deadline (SPEC-001 amendment 10,
+// section D).
 func TestAbandonCapHoldsUnderConcurrency(t *testing.T) {
-	const limit, calls = 2, 12
+	const slots, calls = 2, 12
 	m := &metricsLog{}
-	sb, open := openProduction(t, wazero.WithMaxAbandoned(limit), wazero.WithMetrics(m))
+	sb, open := openProduction(t, wazero.WithMaxAbandoned(slots), wazero.WithSlots(slots), wazero.WithSlotWait(200*time.Millisecond), wazero.WithMetrics(m))
 	var peak atomic.Int64
 	stop := make(chan struct{})
 	sampled := make(chan struct{})
@@ -353,34 +362,45 @@ func TestAbandonCapHoldsUnderConcurrency(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	errs := make([]error, calls)
+	took := make([]time.Duration, calls)
 	for i := range calls {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			start := time.Now()
 			errs[i] = abandonHeld(t, rts[i], guests[i])
+			took[i] = time.Since(start)
 		}()
 	}
-	time.Sleep(300 * time.Millisecond) // every deadline has passed; nothing can end the held calls
-	if n := sb.HealthReport().AbandonedRunning; n > limit {
-		t.Errorf("%d abandoned calls running with a limit of %d", n, limit)
+	wg.Wait() // every caller has its answer while every guest is still held
+	timeouts, saturated := 0, 0
+	for i, err := range errs {
+		switch {
+		case errors.Is(err, expr.ErrTimeout):
+			timeouts++
+		case errors.Is(err, expr.ErrSandboxSaturated):
+			saturated++
+		default:
+			t.Errorf("call %d: got %v", i, err)
+		}
+		if limit := 30*time.Millisecond + 200*time.Millisecond + 100*time.Millisecond; took[i] > limit && defaultTestTimeout < time.Second {
+			t.Errorf("call %d waited %v for its answer", i, took[i])
+		}
+	}
+	if timeouts != slots || saturated != calls-slots {
+		t.Errorf("%d calls timed out and %d were refused, want %d and %d", timeouts, saturated, slots, calls-slots)
+	}
+	if n := sb.HealthReport().AbandonedRunning; n > slots {
+		t.Errorf("%d abandoned calls running with %d slots", n, slots)
 	}
 	for _, g := range guests {
 		close(g.release)
 	}
-	wg.Wait()
 	eventually(t, "the abandoned calls to end", func() bool { return sb.HealthReport().AbandonedRunning == 0 })
 	close(stop)
 	<-sampled
-	if peak.Load() > limit {
-		t.Errorf("the abandoned calls peaked at %d with a limit of %d", peak.Load(), limit)
-	}
-	if got := m.abandoned.Load(); got > limit {
-		t.Errorf("%d abandons counted, more than the limit %d allows at once", got, limit)
-	}
-	for i, err := range errs {
-		if !errors.Is(err, expr.ErrTimeout) {
-			t.Errorf("call %d: got %v, want ErrTimeout", i, err)
-		}
+	if peak.Load() > slots {
+		t.Errorf("the abandoned calls peaked at %d with %d slots", peak.Load(), slots)
 	}
 }
 
@@ -391,8 +411,8 @@ func TestAbandonCapHoldsUnderConcurrency(t *testing.T) {
 func TestCancellationIsNotATimeout(t *testing.T) {
 	var buf lockedBuffer
 	m := &metricsLog{}
-	sb, open := openProduction(t, wazero.WithMetrics(m), wazero.WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
 	const storm = 24
+	sb, open := openProduction(t, wazero.WithMetrics(m), wazero.WithSlots(storm), wazero.WithMaxAbandoned(storm), wazero.WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
 	guests := make([]*holdingGuest, storm)
 	var wg sync.WaitGroup
 	errs := make([]error, storm)
@@ -418,8 +438,8 @@ func TestCancellationIsNotATimeout(t *testing.T) {
 	})
 	cancel()
 	time.Sleep(100 * time.Millisecond)
-	if n := sb.HealthReport().AbandonedRunning; n > 8 {
-		t.Errorf("%d runs held after cancellation, over the default limit of 8", n)
+	if n := sb.HealthReport().AbandonedRunning; n > storm {
+		t.Errorf("%d runs held after cancellation, over the %d slots", n, storm)
 	}
 	for _, g := range guests {
 		close(g.release)

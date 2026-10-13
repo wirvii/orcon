@@ -5,6 +5,7 @@ package wazero
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ const (
 	MetricAbandonedTotal        = "orcon_expr_sandbox_abandoned_total"
 	MetricAbandonedRunning      = "orcon_expr_sandbox_abandoned_running"
 	MetricAbandonOverrunSeconds = "orcon_expr_sandbox_abandon_overrun_seconds"
+	MetricSlotWaitSeconds       = "orcon_expr_sandbox_slot_wait_seconds"
 	MetricSaturatedTotal        = "orcon_expr_sandbox_saturated_total"
 )
 
@@ -41,6 +43,9 @@ type Metrics interface {
 	// Saturated counts a call refused because the limit of abandoned calls
 	// still running was reached (orcon_expr_sandbox_saturated_total).
 	Saturated()
+	// SlotWait records how long a call waited for an execution slot, zero when
+	// one was free (orcon_expr_sandbox_slot_wait_seconds).
+	SlotWait(d time.Duration)
 }
 
 type noMetrics struct{}
@@ -49,6 +54,7 @@ func (noMetrics) Abandoned()                   {}
 func (noMetrics) AbandonedRunning(int)         {}
 func (noMetrics) AbandonOverrun(time.Duration) {}
 func (noMetrics) Saturated()                   {}
+func (noMetrics) SlotWait(time.Duration)       {}
 
 // tracker accounts for the abandoned calls of one sandbox, which is one
 // process in production. It enforces the limit of abandoned calls still
@@ -57,8 +63,14 @@ func (noMetrics) Saturated()                   {}
 type tracker struct {
 	max        int
 	stuckAfter time.Duration
-	log        *slog.Logger
-	metrics    Metrics
+	// slots is a semaphore: a call holds one from before it enters the guest
+	// until the guest returns, abandoned calls included, so at most cap(slots)
+	// calls execute guest code and one scheduler slot stays free for timers,
+	// callers and the API (amendment 10, section D).
+	slots    chan struct{}
+	slotWait time.Duration
+	log      *slog.Logger
+	metrics  Metrics
 
 	mu        sync.Mutex
 	running   int
@@ -76,9 +88,19 @@ type tracker struct {
 
 var _ expr.Health = (*Sandbox)(nil)
 
-func newTracker(maxAbandoned int, stuckAfter time.Duration, log *slog.Logger, m Metrics) *tracker {
+// DefaultSlotWait is how long a call waits for an execution slot before it
+// fails with [expr.ErrSandboxSaturated].
+const DefaultSlotWait = time.Second
+
+func newTracker(maxAbandoned, slots int, slotWait, stuckAfter time.Duration, log *slog.Logger, m Metrics) *tracker {
 	if !config.ValidSandboxMaxAbandoned(maxAbandoned) {
 		maxAbandoned = min(max(maxAbandoned, config.SandboxMaxAbandonedMin), config.SandboxMaxAbandonedMax)
+	}
+	slots = max(slots, 1)
+	// Every live call holds a slot, so no more than that many can be abandoned.
+	maxAbandoned = min(maxAbandoned, slots)
+	if slotWait <= 0 {
+		slotWait = DefaultSlotWait
 	}
 	if stuckAfter <= 0 {
 		stuckAfter = DefaultStuckAfter
@@ -89,8 +111,42 @@ func newTracker(maxAbandoned int, stuckAfter time.Duration, log *slog.Logger, m 
 	if m == nil {
 		m = noMetrics{}
 	}
-	return &tracker{max: maxAbandoned, stuckAfter: stuckAfter, log: log, metrics: m, degraded: make(chan struct{})}
+	return &tracker{
+		max: maxAbandoned, stuckAfter: stuckAfter, log: log, metrics: m, degraded: make(chan struct{}),
+		slots: make(chan struct{}, slots), slotWait: slotWait,
+	}
 }
+
+// acquireSlot takes an execution slot. The wait does not count in the
+// deadline of the evaluation and is bounded: when it runs out, or the outer
+// context ends first, the call fails with [expr.ErrSandboxSaturated], an error
+// of the infrastructure that does not mark the process degraded by itself.
+func (t *tracker) acquireSlot(ctx context.Context) error {
+	select {
+	case t.slots <- struct{}{}:
+		t.metrics.SlotWait(0)
+		return nil
+	default:
+	}
+	began := time.Now()
+	timer := time.NewTimer(t.slotWait)
+	defer timer.Stop()
+	select {
+	case t.slots <- struct{}{}:
+		t.metrics.SlotWait(time.Since(began))
+		return nil
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+	t.mu.Lock()
+	t.saturated++
+	t.mu.Unlock()
+	t.metrics.Saturated()
+	return fmt.Errorf("%w: no execution slot was free within %v", expr.ErrSandboxSaturated, t.slotWait)
+}
+
+// releaseSlot returns the slot of a call whose guest has returned.
+func (t *tracker) releaseSlot() { <-t.slots }
 
 // admit decides whether a new sandbox call may start. With the limit of
 // abandoned calls reached it refuses and counts the refusal. The process is
@@ -155,17 +211,13 @@ type abandonment struct {
 // ids and the deadline, never the expression or its data) and measured;
 // one abandoned because its context was canceled holds a slot but is not an
 // abandon at the deadline.
-func (t *tracker) abandon(ctx context.Context, deadline time.Duration, atDeadline bool) (*abandonment, bool) {
+func (t *tracker) abandon(ctx context.Context, deadline time.Duration, atDeadline bool) *abandonment {
 	id := expr.CallIdentityFrom(ctx)
 	t.mu.Lock()
-	if t.running >= t.max {
-		t.watchSaturationLocked()
-		t.mu.Unlock()
-		t.log.ErrorContext(context.WithoutCancel(ctx), "expression sandbox at its abandon limit: the caller waits for its call to finish",
-			"organization_id", id.OrganizationID, "execution_id", id.ExecutionID, "node_id", id.NodeID, "max_abandoned", t.max)
-		return nil, false
-	}
 	t.running++
+	if t.running >= t.max {
+		t.watchSaturationLocked() // the process is saturated: new calls are refused from now on
+	}
 	if atDeadline {
 		t.abandoned++
 	}
@@ -180,7 +232,7 @@ func (t *tracker) abandon(ctx context.Context, deadline time.Duration, atDeadlin
 	}
 	a := &abandonment{t: t, at: time.Now(), counted: atDeadline}
 	a.timer = time.AfterFunc(t.stuckAfter, a.markStuck)
-	return a, true
+	return a
 }
 
 func (a *abandonment) markStuck() {
@@ -231,7 +283,7 @@ func (s *Sandbox) HealthReport() expr.HealthReport {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return expr.HealthReport{
-		AbandonedRunning: t.running, Stuck: t.stuck, MaxAbandoned: t.max,
+		AbandonedRunning: t.running, Stuck: t.stuck, MaxAbandoned: t.max, Slots: cap(t.slots),
 		Abandoned: t.abandoned, Saturated: t.saturated,
 	}
 }

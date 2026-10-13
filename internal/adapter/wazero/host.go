@@ -26,6 +26,57 @@ type callState struct {
 	inst  *instance
 	// err is the first failure of a host function; Call returns it.
 	err error
+
+	// deadline is the absolute deadline of the call, read from the clock by the
+	// host functions: the timer of the context needs a free scheduler slot to
+	// run, and compiled code is not a preemption point (ADR-0018 section 3,
+	// amendment 10 section D).
+	deadline    time.Time
+	hasDeadline bool
+
+	// last is when the guest last called the host, and longest the longest
+	// time between two such calls (the stretch).
+	last    time.Time
+	longest time.Duration
+	// tail is the time from the last call to the host to the return of the guest.
+	tail time.Duration
+	// begun is when the call started and first the time until its first call
+	// to the host.
+	begun time.Time
+	first time.Duration
+}
+
+// finish records the stretch from the last call of the guest to the host up to
+// the return of the guest.
+func (st *callState) finish() {
+	if !st.last.IsZero() {
+		st.tail = time.Since(st.last)
+		st.longest = max(st.longest, st.tail)
+	}
+}
+
+// touch records a call of the guest to the host.
+func (st *callState) touch() {
+	now := time.Now()
+	if !st.last.IsZero() {
+		st.longest = max(st.longest, now.Sub(st.last))
+	}
+	if st.first == 0 {
+		st.first = now.Sub(st.begun)
+	}
+	st.last = now
+}
+
+// deadlinePassed reports whether the deadline of the call has passed by the
+// clock, whatever the timer of the context did.
+func (st *callState) deadlinePassed() bool {
+	return st.hasDeadline && !time.Now().Before(st.deadline)
+}
+
+// stop reports whether the guest must stop: its runtime was abandoned, its
+// context is done, or its deadline has passed by the clock.
+func (st *callState) stop(ctx context.Context) bool {
+	return st.inst.refuses(ctx) || st.deadlinePassed()
 }
 
 type callKey struct{}
@@ -142,8 +193,11 @@ func fdWrite(_ context.Context, mod api.Module, stack []uint64) {
 // done, which includes its deadline.
 func interrupt(ctx context.Context, _ api.Module, stack []uint64) {
 	stack[0] = 0
-	if st := stateOf(ctx); st != nil && st.inst.refuses(ctx) {
-		stack[0] = 1
+	if st := stateOf(ctx); st != nil {
+		st.touch()
+		if st.stop(ctx) {
+			stack[0] = 1
+		}
 	}
 }
 
@@ -152,7 +206,11 @@ func hostCall(ctx context.Context, mod api.Module, stack []uint64) {
 	op, ptr, n := api.DecodeI32(stack[0]), api.DecodeU32(stack[1]), api.DecodeU32(stack[2])
 	st := stateOf(ctx)
 	stack[0] = 0
-	if st == nil || st.inst.refuses(ctx) {
+	if st == nil {
+		return
+	}
+	st.touch()
+	if st.stop(ctx) {
 		return // an abandoned call is refused without reading execution data
 	}
 	payload, ok := mod.Memory().Read(ptr, n)

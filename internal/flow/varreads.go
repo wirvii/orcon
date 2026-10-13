@@ -62,8 +62,8 @@ func (v *validator) valueVariableReads(path string, val jsonvalue.Value, declare
 // expressionVariableReads checks one field that may hold an expression: a
 // template string, or for an edge condition the bare code.
 func (v *validator) expressionVariableReads(path, s string, declared []string) {
-	if !strings.Contains(s, "$execution") {
-		return // cheap exit: no expression names $execution
+	if !mentionsExecution(s) {
+		return // cheap exit: nothing that could reach $execution
 	}
 	a := analyzeCondition(s)
 	for _, f := range a.Findings {
@@ -76,4 +76,15 @@ func (v *validator) expressionVariableReads(path, s string, declared []string) {
 			v.r.errorf(CodeV8, path, "the expression reads $execution.variables.%s, but no variable named %q is declared in variables[]", name, name)
 		}
 	}
+}
+
+// mentionsExecution is the cheap test before parsing: the text names
+// $execution, or one of the ways to reach it without naming it whole.
+func mentionsExecution(s string) bool {
+	for _, w := range []string{"$exec", "globalThis", "eval", "Function", "this"} {
+		if strings.Contains(s, w) {
+			return true
+		}
+	}
+	return false
 }

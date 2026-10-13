@@ -32,6 +32,11 @@ func TestValidateVariableReads(t *testing.T) {
 		{"keys of $execution", "={{ Object.keys($execution) }}"},
 		{"passing $execution to a function", "={{ JSON.stringify($execution) }}"},
 		{"an unknown member of $execution", "={{ $execution.customData }}"},
+		{"this.$execution", "={{ (function () { return this.$execution.variables.total; })() }}"},
+		{"globalThis.$execution", "={{ globalThis.$execution.variables.total }}"},
+		{"globalThis with a built key", "={{ globalThis['$exec' + 'ution'].variables.total }}"},
+		{"eval", "={{ eval('$execution.variables.total') }}"},
+		{"new Function", "={{ new Function('return $execution.variables')() }}"},
 	}
 	for _, tc := range bad {
 		t.Run(tc.name, func(t *testing.T) {

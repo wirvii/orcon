@@ -5,7 +5,7 @@
 JS_AddIntrinsicDOMException 1 0 0 0 unchecked
 JS_AddModuleExportList 1 0 0 0 unchecked
 JS_AtomIsNumericIndex1 0 1 0 0 unchecked
-JS_CallInternal 4 0 12 0 checked
+JS_CallInternal 4 0 8 0 checked
 JS_ComputeMemoryUsage 7 0 0 0 unchecked
 JS_ConcatString1 0 2 0 0 unchecked
 JS_ConcatString2 0 2 0 0 unchecked
@@ -138,8 +138,8 @@ js_array_reduce 1 0 2 0 checked
 js_array_reverse 2 0 2 0 checked
 js_array_slice 4 0 4 0 checked
 js_array_sort 5 0 5 0 checked
-js_array_toSpliced 2 0 0 0 unchecked
-js_array_with 2 0 1 0 checked
+js_array_toSpliced 2 0 4 0 checked
+js_array_with 2 0 3 0 checked
 js_async_module_execution_fulfilled 1 0 0 0 unchecked
 js_async_module_execution_rejected 1 0 0 0 unchecked
 js_atob 2 0 2 0 checked
@@ -172,6 +172,8 @@ js_create_function 4 5 0 0 unchecked
 js_create_module_bytecode_function 1 0 0 0 unchecked
 js_create_module_function 2 0 0 0 unchecked
 js_date_constructor 1 0 0 0 unchecked
+js_def_calloc 1 1 0 0 unchecked
+js_def_realloc 0 1 0 0 unchecked
 js_default_module_normalize_name 0 1 0 0 unchecked
 js_disposable_stack_clear 1 0 0 0 unchecked
 js_disposable_stack_mark 1 0 0 0 unchecked
@@ -193,13 +195,13 @@ js_global_escape 1 0 1 0 checked
 js_global_unescape 1 0 1 0 checked
 js_inner_module_evaluation 1 0 0 0 unchecked
 js_inner_module_linking 5 0 0 0 unchecked
-js_iterator_concat 1 0 1 0 checked
+js_iterator_concat 1 0 0 0 unchecked
 js_iterator_concat_finalizer 1 0 0 0 unchecked
 js_iterator_concat_mark 1 0 0 0 unchecked
-js_iterator_concat_return 1 0 1 0 checked
+js_iterator_concat_return 1 0 0 0 unchecked
 js_iterator_helper_finalizer 1 0 0 0 unchecked
 js_iterator_helper_mark 1 0 0 0 unchecked
-js_iterator_helper_next 2 1 2 0 checked
+js_iterator_helper_next 2 1 0 0 unchecked
 js_json_to_str 2 0 3 0 checked
 js_limb_to_a 2 0 0 0 unchecked
 js_map_read 1 0 0 0 unchecked
@@ -250,7 +252,8 @@ js_string_codePointRange 1 0 0 0 unchecked
 js_string_concat 0 2 3 0 checked
 js_string_isWellFormed 1 0 1 0 checked
 js_string_localeCompare 1 0 0 0 unchecked
-js_string_memcmp 0 1 0 0 unchecked
+js_string_memcmp 1 1 0 0 unchecked
+js_string_memcmp_chunk 0 1 0 0 unchecked
 js_string_memcmp_pos 0 1 0 0 unchecked
 js_string_pad 1 0 1 0 checked
 js_string_raw 1 0 1 0 checked
@@ -269,8 +272,8 @@ js_typed_array_find 1 0 1 0 checked
 js_typed_array_from 1 0 2 0 checked
 js_typed_array_join 2 0 2 0 checked
 js_typed_array_set_internal 1 1 1 1 checked
-js_typed_array_slice 2 1 1 1 checked
-js_typed_array_sort 5 1 4 1 checked
+js_typed_array_slice 2 1 2 1 checked
+js_typed_array_sort 5 1 5 1 checked
 js_typed_array_with 0 1 0 1 checked
 json_free_parse_record 2 0 0 0 unchecked
 json_parse_record_find 1 0 0 0 unchecked
@@ -290,7 +293,7 @@ set_array_length 4 0 2 0 checked
 set_date_field 1 0 0 0 unchecked
 simple_next_token 1 0 0 0 unchecked
 skip_dead_code 1 0 0 0 unchecked
-string_buffer_fill 1 0 0 0 unchecked
+string_buffer_fill 2 1 2 0 checked
 string_buffer_widen 1 0 0 0 unchecked
 string_buffer_write16 2 1 0 0 unchecked
 string_buffer_write8 1 1 0 0 unchecked
@@ -305,4 +308,4 @@ u8a_hex_decode 1 0 1 0 checked
 u8a_hex_encode 1 0 1 0 checked
 value_buffer_append 0 1 0 0 unchecked
 value_buffer_free 1 0 0 0 unchecked
-# 303 functions, 221 unchecked
+# 306 functions, 225 unchecked

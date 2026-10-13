@@ -46,7 +46,7 @@ func TestAnalyzeNames(t *testing.T) {
 		{name: "bound context name is not the context", code: `[1].map($json => $json.x)`, methods: []string{"map"}},
 		{name: "assignment", code: `(x = 1, y += 2)`, identifiers: []string{"x", "y"}, kinds: []expr.FindingKind{expr.FindingUnknownIdentifier, expr.FindingUnknownIdentifier}},
 		{name: "class in an expression", code: `(class extends Base {})`, identifiers: []string{"Base"}, kinds: []expr.FindingKind{expr.FindingUnknownIdentifier}},
-		{name: "with and eval are dynamic", code: `eval('1')`, identifiers: []string{"eval"}},
+		{name: "with and eval are dynamic", code: `eval('1')`, identifiers: []string{"eval"}, kinds: []expr.FindingKind{expr.FindingExecutionVariables}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

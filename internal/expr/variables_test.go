@@ -49,6 +49,18 @@ func TestAnalyzeExecutionVariables(t *testing.T) {
 		{name: "$execution as a callback argument", code: `[1].map(() => $execution)`, whole: 1},
 		{name: "the in operator on $execution", code: `'variables' in $execution`, whole: 1},
 		{name: "typeof $execution", code: `typeof $execution`, whole: 1},
+		{name: "this.$execution", code: `(function () { return this.$execution.variables.total; })()`, whole: 1},
+		{name: "this with a computed key", code: `(function () { return this["$exec" + "ution"]; })()`, whole: 1},
+		{name: "this with another literal key", code: `(function () { return this.x; })()`},
+		{name: "globalThis.$execution", code: `globalThis.$execution.variables.total`, whole: 1},
+		{name: "globalThis with a built key", code: `globalThis["$exec" + "ution"].variables.total`, whole: 1},
+		{name: "globalThis with a literal $execution key", code: `globalThis["$execution"].id`, whole: 1},
+		{name: "globalThis as a value", code: `Object.keys(globalThis)`, whole: 1},
+		{name: "globalThis with another literal key", code: `globalThis.Math.max(1, 2)`},
+		{name: "eval", code: `eval('$execution.variables.total')`, whole: 1},
+		{name: "indirect eval", code: `(0, eval)('$execution')`, whole: 1},
+		{name: "new Function", code: `new Function('return $execution.variables')()`, whole: 1},
+		{name: "Function called", code: `Function('return $execution')()`, whole: 1},
 		{name: "a local named $execution", code: `(($execution) => $execution.variables.total)({})`},
 	}
 	for _, tc := range tests {

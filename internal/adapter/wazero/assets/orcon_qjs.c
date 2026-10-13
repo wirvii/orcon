@@ -188,6 +188,9 @@ int32_t orcon_eval(const char *req, size_t len) {
     int32_t code = 0;
     if (JS_IsException(res)) {
         JSValue ex = JS_GetException(ctx);
+        /* The call failed, maybe because the host asked it to stop: formatting the
+           exception must not be stopped again by the same handler. */
+        JS_SetInterruptHandler(rt, NULL, NULL);
         res = JS_ToString(ctx, ex);
         JS_FreeValue(ctx, ex);
         code = 1;

@@ -524,7 +524,59 @@ func (w *walker) contextMember(e ast.Expression) bool {
 	if w.executionMember(e) {
 		return true
 	}
+	if w.globalMember(e) {
+		return true
+	}
 	return w.jsonMember(e)
+}
+
+// isGlobalBase reports whether e is globalThis or this, the two ways to reach
+// the global object by member access.
+func (w *walker) isGlobalBase(e ast.Expression) bool {
+	switch n := unwrapOptional(e).(type) {
+	case *ast.Identifier:
+		return string(n.Name) == "globalThis" && !w.bound("globalThis")
+	case *ast.ThisExpression:
+		return true
+	}
+	return false
+}
+
+// globalMember handles a member access on globalThis or on this: $execution
+// reached through them (by name or by a computed key) would go around the
+// checks of $execution, so it is a finding. A literal key that is not
+// $execution is an ordinary read.
+func (w *walker) globalMember(e ast.Expression) bool {
+	var left, member ast.Expression
+	var name string
+	lit := true
+	switch n := e.(type) {
+	case *ast.DotExpression:
+		left, name = n.Left, n.Identifier.Name.String()
+	case *ast.BracketExpression:
+		left, member = n.Left, n.Member
+		name, lit = stringLiteral(n.Member)
+	default:
+		return false
+	}
+	if !w.isGlobalBase(left) {
+		return false
+	}
+	if id, ok := unwrapOptional(left).(*ast.Identifier); ok {
+		w.use(string(id.Name), id.Idx)
+	}
+	w.size++
+	if lit && name != "$execution" {
+		return true
+	}
+	w.findings = append(w.findings, Finding{
+		Kind: FindingExecutionVariables, Name: "$execution", Offset: w.offset(e.Idx0()),
+		Message: "the global object is read with a computed key or for $execution, which could reach $execution around its checks; use $execution directly",
+	})
+	if !lit {
+		w.expr(member)
+	}
+	return true
 }
 
 // executionFields are the members of $execution an expression may read besides
@@ -574,6 +626,46 @@ func (w *walker) wholeVariables(e ast.Expression) {
 	})
 }
 
+// identifier reports the identifiers that could reach $execution around the
+// checks, and records the use of the name.
+func (w *walker) identifier(n *ast.Identifier) {
+	if name := string(n.Name); (name == "globalThis" || name == "eval" || name == "Function") && !w.bound(name) {
+		// The global object as a value, eval and the Function constructor can
+		// build any name at run time, $execution included.
+		w.findings = append(w.findings, Finding{
+			Kind: FindingExecutionVariables, Name: name, Offset: w.offset(n.Idx),
+			Message: name + " can reach $execution around its checks and is not allowed in an expression",
+		})
+	}
+	if string(n.Name) == "$execution" && !w.bound("$execution") {
+		// $execution used as a value (aliased, spread, destructured,
+		// enumerated or passed on) could reach the variables around the
+		// literal-name check.
+		w.findings = append(w.findings, Finding{
+			Kind: FindingExecutionVariables, Name: "$execution", Offset: w.offset(n.Idx),
+			Message: "$execution is used as a whole; read .id, .mode, .resumeUrl, .resumeFormUrl or a literal .variables.name",
+		})
+	}
+	w.use(string(n.Name), n.Idx)
+}
+
+// nodeIndex records the node read by $node["X"], or a finding when the name
+// is computed.
+func (w *walker) nodeIndex(n *ast.BracketExpression) {
+	id, ok := n.Left.(*ast.Identifier)
+	if !ok || string(id.Name) != "$node" || w.bound("$node") {
+		return
+	}
+	if name, lit := stringLiteral(n.Member); lit {
+		w.refs = append(w.refs, NodeRef{Name: name, Offset: w.offset(n.Idx0())})
+		return
+	}
+	w.findings = append(w.findings, Finding{
+		Kind: FindingDynamicReference, Name: "$node", Offset: w.offset(n.Idx0()),
+		Message: "the node read by $node[...] is computed, so which node it reads cannot be determined",
+	})
+}
+
 func (w *walker) expr(e ast.Expression) {
 	if e != nil {
 		w.size++
@@ -581,16 +673,7 @@ func (w *walker) expr(e ast.Expression) {
 	switch n := e.(type) {
 	case nil:
 	case *ast.Identifier:
-		if string(n.Name) == "$execution" && !w.bound("$execution") {
-			// $execution used as a value (aliased, spread, destructured,
-			// enumerated or passed on) could reach the variables around the
-			// literal-name check.
-			w.findings = append(w.findings, Finding{
-				Kind: FindingExecutionVariables, Name: "$execution", Offset: w.offset(n.Idx),
-				Message: "$execution is used as a whole; read .id, .mode, .resumeUrl, .resumeFormUrl or a literal .variables.name",
-			})
-		}
-		w.use(string(n.Name), n.Idx)
+		w.identifier(n)
 	case *ast.CallExpression:
 		w.call(n)
 	case *ast.DotExpression:
@@ -605,16 +688,7 @@ func (w *walker) expr(e ast.Expression) {
 		if w.contextMember(n) {
 			return
 		}
-		if id, ok := n.Left.(*ast.Identifier); ok && string(id.Name) == "$node" && !w.bound("$node") {
-			if name, lit := stringLiteral(n.Member); lit {
-				w.refs = append(w.refs, NodeRef{Name: name, Offset: w.offset(n.Idx0())})
-			} else {
-				w.findings = append(w.findings, Finding{
-					Kind: FindingDynamicReference, Name: "$node", Offset: w.offset(n.Idx0()),
-					Message: "the node read by $node[...] is computed, so which node it reads cannot be determined",
-				})
-			}
-		}
+		w.nodeIndex(n)
 		w.expr(n.Left)
 		w.expr(n.Member)
 	case *ast.BinaryExpression:
