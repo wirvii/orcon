@@ -37,3 +37,6 @@ internal/adapter/storetest/dbrules/policy/*.txt  # policy declaration files (SPE
 **/migrations.sum  # migration checksum list read by dbcheck (migrations.md MG-5)
 tools/dbcheck/testdata/**/expect.txt  # planted-case expectation read by the dbcheck tests
 internal/adapter/storetest/dbrules/testdata/**/expect.txt  # planted-case expectation read by the dbrules tests
+
+# Egress test corpus read by the egress tests; the format has no room for a header.
+internal/adapter/egress/testdata/ssrf-corpus.txt  # SSRF URL corpus (SPEC-003 E-EGR-1)
