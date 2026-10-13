@@ -48,9 +48,10 @@ export type DataView = 'table' | 'json' | 'schema';
 /** A JSON-like value of an item, with protected values and files recognised. */
 export type JsonLike = unknown;
 
-/** Text for a value that is not a string, number or boolean: a bigint or symbol prints as itself, anything else as JSON. */
+/** The text a leaf value shows: strings, numbers, booleans, bigints and symbols print as themselves (as `String` does), a function as nothing. */
 export function plainText(value: unknown): string {
-  if (typeof value === 'bigint' || typeof value === 'symbol') return value.toString();
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint' || typeof value === 'symbol') return value.toString();
   return typeof value === 'function' ? '' : JSON.stringify(value);
 }
 
