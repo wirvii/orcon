@@ -19,3 +19,7 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 **/tsconfig*.json  # JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+
+internal/expr/prelude/luxon.min.js  # Luxon 3.7.2 (MIT), vendored byte for byte and unmodified; its licence is in internal/expr/prelude/LICENSE.luxon
+internal/expr/prelude/LICENSE.luxon  # licence text of Luxon, must stay byte-identical
+internal/adapter/wazero/assets/LICENSE.quickjs  # licence text of QuickJS-ng, must stay byte-identical

@@ -197,6 +197,15 @@ func (v Value) Items() []Value {
 	return slices.Clone(v.items)
 }
 
+// At returns the item at index i of an array, without copying the array. It
+// reports false for any other kind and for an index out of range.
+func (v Value) At(i int) (Value, bool) {
+	if v.kind != KindArray || i < 0 || i >= len(v.items) {
+		return Value{}, false
+	}
+	return v.items[i], true
+}
+
 // Members returns a copy of the members of an object in insertion order, or
 // nil for any other kind.
 func (v Value) Members() []Member {

@@ -124,6 +124,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/execution
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/expr
+              desc: platform packages are leaves (AL-1)
         pgx-confined:
           files:
             - "$all"
@@ -191,6 +193,14 @@ linters:
             - "!**/cmd/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/webui
+              desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-wazero:
+          files:
+            - "$all"
+            - "!**/internal/adapter/wazero/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/wazero
               desc: only cmd/orcon wires adapters (AL-8)
         banned-everywhere:
           files:
