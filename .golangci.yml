@@ -132,6 +132,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/connector
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/trigger
+              desc: platform packages are leaves (AL-1)
         pgx-confined:
           files:
             - "$all"
