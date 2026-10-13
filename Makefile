@@ -21,11 +21,11 @@ GOTOOL := $(TOOLS_ENV) go tool -modfile=$(CURDIR)/tools/go.mod
 WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
-	generate generate-check tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
+	generate generate-check db-check db-sum tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
 	build-go web build smoke test-postgres fuzz bench bench-compare sbom
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
-check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check tidy-check test cover goleak-check vuln licenses skill-check build-go
+check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -38,6 +38,7 @@ tools: $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION) $(BIN)/.sqlc-$(SQLC_VERSIO
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/spdxcheck ./spdxcheck
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/benchgate ./benchgate
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/licensecheck ./licenses
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
 
 $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION):
 	mkdir -p $(BIN)
@@ -102,6 +103,19 @@ generate:
 generate-check:
 	sh scripts/generate.sh --check
 
+# db-check runs the static database checks (orcon-db checks.md CK-1) on the
+# migrations and queries of both adapters. DBCHECK_BASE names the base revision of
+# the immutability check (CI passes the pull request base).
+db-check:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	$(BIN)/dbcheck all
+
+# db-sum appends the lines of new migrations to both migrations.sum files and
+# never rewrites an existing line (migrations.md MG-5).
+db-sum:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	$(BIN)/dbcheck sum
+
 # tidy-check fails when go.mod or go.sum of any module, tools included, is not tidy.
 tidy-check:
 	set -e; for dir in $(WORKSPACE_DIRS); do \
@@ -165,8 +179,11 @@ bench-compare:
 # Skill
 # ---------------------------------------------------------------------------
 
+# skill-sync copies each canonical skill to its generated copy. orcon-db joins
+# when its scripts exist (SPEC-009 D5).
 skill-sync:
 	sh .agents/skills/orcon-go/scripts/project.sh
+	if [ -f .agents/skills/orcon-db/scripts/project.sh ]; then sh .agents/skills/orcon-db/scripts/project.sh; fi
 
 skill-check:
 	sh scripts/check-skill.sh

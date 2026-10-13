@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Words that mark an enumerated column (naming.md NM-8). A column equal to one
+# of them, or ending in _<word>, needs a CHECK constraint (IN-3).
+# Format: <word>  # meaning
+status  # lifecycle state
+kind  # variant of an entity
+mode  # operating mode
+state  # state of a process
+level  # severity or depth
+role  # role of an actor
+format  # format tag of a stored document (JS-3)

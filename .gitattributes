@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: The Orcon Authors
 # SPDX-License-Identifier: Apache-2.0
-
-# >>> mneme (SPEC-140): finales de línea de los ficheros que mneme escribe y vuelve a leer >>>
-.mneme/**        text eol=lf
-.claude/agents/** text eol=lf
-.codex/agents/**  text eol=lf
-# <<< mneme (SPEC-140) <<<
+#
+# SQL files are LF on every platform so the checksums in migrations.sum stay
+# stable (migrations.md MG-5).
+*.sql text eol=lf

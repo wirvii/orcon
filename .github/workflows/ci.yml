@@ -25,8 +25,15 @@ jobs:
         go: [oldstable, stable]
     env:
       GOTOOLCHAIN: local
+      # Base revision of the migration immutability check (dbcheck migration-immutable).
+      # Empty on pushes: dbcheck then uses the merge base with origin/main.
+      DBCHECK_BASE: ${{ github.event.pull_request.base.sha }}
     steps:
+      # Full history: db-check compares migrations.sum with the base revision and
+      # looks for release tags.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ matrix.go }}

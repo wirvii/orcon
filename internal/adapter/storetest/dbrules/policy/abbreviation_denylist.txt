@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The checked definition of an abbreviation (naming rule NM-3, naming.md). A
+# token of a database or query name that appears here is rejected. Single
+# source of the decision: tools/dbcheck and dbrules both read this file.
+#
+# Format, one entry per line, in alphabetical order:
+#   <token>  # <full word(s)>
+# The token matches ^[a-z][a-z0-9]*$ and must not appear in
+# allowed_acronyms.txt. Adding a token tightens the rule and needs only
+# ordinary review; a reviewer who finds an abbreviation the checker missed adds
+# it here in the same change.
+ack  # acknowledgement
+addr  # address
+admin  # administrator
+app  # application
+attr  # attribute
+auth  # authentication or authorization
+avg  # average
+cfg  # configuration
+ck  # check; constraint prefix only
+cnt  # count
+compat  # compatibility
+conf  # configuration
+config  # configuration
+ctx  # context
+cur  # current
+curr  # current
+dedupe  # deduplication
+desc  # description
+doc  # document
+docs  # documents
+dst  # destination
+dt  # date
+env  # environment
+err  # error
+exec  # execution
+fk  # foreign key; constraint prefix only
+fts  # full-text search; the SQLite module is fts5
+idx  # index
+info  # information
+ix  # index; index prefix only
+max  # maximum
+mi  # multi-instance
+micros  # microseconds or microdollars
+min  # minimum
+ms  # milliseconds
+msg  # message
+no  # number
+ns  # nanoseconds
+num  # number
+op  # operation
+ops  # operations
+param  # parameter
+params  # parameters
+pct  # percent
+pk  # primary key; constraint prefix only
+prev  # previous
+pwd  # password
+qty  # quantity
+ref  # reference
+refs  # references
+repo  # repository
+req  # request
+res  # result or response
+resp  # response
+seq  # sequence number
+spec  # specification
+src  # source
+temp  # temporary
+tm  # time
+tmp  # temporary
+ts  # timestamp; use _at
+ttl  # time to live
+tz  # time zone
+uid  # identifier; use id
+uq  # unique; constraint prefix only
+us  # microseconds
+val  # value
+ver  # version

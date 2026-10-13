@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Patterns of query names that are hot paths (queries rule QY-4): a matching
+# query must carry -- orcon:hot and passes the plan check. One regular
+# expression per line.
+^Claim
+^Renew
+^(List|Count)Executions?
+ExternalOperation
+^(List|Count)AttentionRequests?
+^(Get|Resolve)TriggerAddress
+^Append(Journal|ExecutionEvent)
