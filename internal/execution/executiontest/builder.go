@@ -127,6 +127,12 @@ func (b *Builder) IterationVariable(name string) *Builder {
 	return b
 }
 
+// Remaining sets the remaining option of an existing join block.
+func (b *Builder) Remaining(id string, remaining flow.JoinRemaining) *Builder {
+	b.mustNode(id).Join.Remaining = remaining
+	return b
+}
+
 // Modify applies fn to the node with the given id, for features the other
 // methods do not cover.
 func (b *Builder) Modify(id string, fn func(*flow.Node)) *Builder {

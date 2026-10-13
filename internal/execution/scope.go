@@ -11,11 +11,14 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 )
 
-// ScopePath identifies the loop iteration and multi-instance instance a token
-// runs in (ADR-0010 section 1). Entering a loop iteration appends
-// "L:<loopNodeId>#<i>", a multi-instance instance appends "MI:<nodeId>#<k>";
-// frames are separated by "/". Node ids never contain "/" or "#" (ADR-0007
-// section 3), so the text is unambiguous. The empty path is the top level.
+// ScopePath identifies the loop instance and iteration and the multi-instance
+// instance a token runs in (ADR-0010 section 1, amendment 9). Entering a loop
+// appends "L:<loopNodeId>@<entryTokenId>#<i>", where the entry token is the
+// live token that arrived on the loop's entry edge (every such token runs its
+// own instance) and i is the iteration; a multi-instance instance appends
+// "MI:<nodeId>#<k>". Frames are separated by "/". Node ids never contain "/",
+// "@" or "#" (ADR-0007 section 3) and token ids are canonical UUID text, so the
+// text is unambiguous. The empty path is the top level.
 //
 // Joins, merge trackers and data reads match only within one scope path. A
 // ScopePath is comparable and is built only with [ScopePath.Push].
@@ -37,13 +40,17 @@ type ScopeFrame struct {
 	Kind string
 	// Node is the loop control or multi-instance node that opened the frame.
 	Node flow.NodeID
+	// Entry is the token that entered a loop; it is empty for multi-instance
+	// frames.
+	Entry TokenID
 	// Index is the iteration or instance number, starting at 0.
 	Index int
 }
 
-// LoopFrame returns the frame of iteration i of a loop control node.
-func LoopFrame(node flow.NodeID, i int) ScopeFrame {
-	return ScopeFrame{Kind: ScopeLoop, Node: node, Index: i}
+// LoopFrame returns the frame of iteration i of the loop instance a token
+// started on a loop control node.
+func LoopFrame(node flow.NodeID, entry TokenID, i int) ScopeFrame {
+	return ScopeFrame{Kind: ScopeLoop, Node: node, Entry: entry, Index: i}
 }
 
 // MultiInstanceFrame returns the frame of instance k of a multi-instance node.
@@ -53,6 +60,9 @@ func MultiInstanceFrame(node flow.NodeID, k int) ScopeFrame {
 
 // String renders the frame as it appears in a scope path.
 func (f ScopeFrame) String() string {
+	if f.Kind == ScopeLoop {
+		return f.Kind + ":" + string(f.Node) + "@" + string(f.Entry) + "#" + strconv.Itoa(f.Index)
+	}
 	return f.Kind + ":" + string(f.Node) + "#" + strconv.Itoa(f.Index)
 }
 
@@ -142,14 +152,45 @@ func parseFrame(text string) (ScopeFrame, error) {
 	if !ok || (kind != ScopeLoop && kind != ScopeMultiInstance) {
 		return ScopeFrame{}, fmt.Errorf("scope frame %q: kind must be %s or %s", text, ScopeLoop, ScopeMultiInstance)
 	}
-	node, index, ok := strings.Cut(rest, "#")
-	if !ok || node == "" {
-		return ScopeFrame{}, fmt.Errorf("scope frame %q: want <kind>:<node>#<index>", text)
+	head, index, ok := strings.Cut(rest, "#")
+	if !ok || head == "" {
+		return ScopeFrame{}, fmt.Errorf("scope frame %q: want <kind>:<node>[@<entry>]#<index>", text)
+	}
+	node, entry, hasEntry := strings.Cut(head, "@")
+	switch {
+	case node == "":
+		return ScopeFrame{}, fmt.Errorf("scope frame %q: no node", text)
+	case kind == ScopeLoop && (!hasEntry || !canonicalID(entry)):
+		return ScopeFrame{}, fmt.Errorf("scope frame %q: a loop frame names its entry token as canonical id text after @", text)
+	case kind == ScopeMultiInstance && hasEntry:
+		return ScopeFrame{}, fmt.Errorf("scope frame %q: a multi-instance frame has no entry token", text)
 	}
 	n, err := strconv.Atoi(index)
 	// The index is written in its canonical form, so a path has one text.
 	if err != nil || n < 0 || strconv.Itoa(n) != index {
 		return ScopeFrame{}, fmt.Errorf("scope frame %q: index must be a non-negative integer without leading zeros or sign", text)
 	}
-	return ScopeFrame{Kind: kind, Node: flow.NodeID(node), Index: n}, nil
+	return ScopeFrame{Kind: kind, Node: flow.NodeID(node), Entry: TokenID(entry), Index: n}, nil
+}
+
+// canonicalID reports whether text is the canonical form of a deterministic id:
+// 36 characters of lowercase hexadecimal digits in the 8-4-4-4-12 grouping.
+func canonicalID(text string) bool {
+	if len(text) != 36 {
+		return false
+	}
+	for i := range len(text) {
+		c := text[i]
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		default:
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+				return false
+			}
+		}
+	}
+	return true
 }

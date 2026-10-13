@@ -156,9 +156,16 @@ func (r *run) arrive(ctx context.Context, t *token, n *planNode) error {
 	key := nodeKey{t.node, t.scope}
 	js := r.joinOf(key)
 	r.event(Event{Type: EventTokenConsumed, Token: t.id, Node: n.node.ID, Edge: e.edge.ID, Scope: t.scope, Detail: "JOIN"})
-	out := js.arrive(joinArrival{Slot: e.slot, Token: t.id, Payload: t.payload, Lineage: slices.Clone(t.lineage)})
+	arrival := joinArrival{Slot: e.slot, Token: t.id, Payload: t.payload, Lineage: slices.Clone(t.lineage)}
+	out := js.arrive(arrival)
+	if js.letFinish {
+		r.joinRound(key, n, js, arrival)
+	}
 	if err := r.setToken(t, TokenConsumed); err != nil {
 		return err
+	}
+	if js.letFinish {
+		return r.advanceRounds(ctx, key, n, js)
 	}
 	return r.applyJoin(ctx, key, n, js, out, t)
 }
@@ -170,7 +177,7 @@ func (r *run) applyJoin(ctx context.Context, key nodeKey, n *planNode, js *joinS
 	case joinFires:
 		return r.fireJoin(ctx, key, n, js, trigger)
 	case joinFails:
-		r.event(Event{Type: EventJoinFailed, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode)})
+		r.event(Event{Type: EventJoinFailed, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode), Round: 1})
 		return r.fail(&Failure{
 			Code: CodeJoinRequirementNotMet, Origin: FailureEngine, Node: n.node.ID, Scope: key.scope,
 			Message: fmt.Sprintf("an incoming edge of the %s join completed with no live token", js.mode),
@@ -179,6 +186,10 @@ func (r *run) applyJoin(ctx context.Context, key nodeKey, n *planNode, js *joinS
 		r.nodeOf(key).canceled = js.anyCanceled()
 		r.checkComplete(key)
 	case joinWaiting:
+		if js.letFinish {
+			// An edge closing can complete a join whose rounds all reset.
+			r.checkComplete(key)
+		}
 	}
 	return nil
 }
@@ -202,10 +213,6 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 	if err := r.payloads.Put(ctx, ref, concat(batches)); err != nil {
 		return fmt.Errorf("store combined input of join %q: %w", n.node.ID, err)
 	}
-	dominates := func(id flow.NodeID) bool {
-		i, ok := r.plan.index[id]
-		return ok && n.dominators != nil && n.dominators[i]
-	}
 	if r.abandoned(js) {
 		// Every live arrival descends from a split whose branches were
 		// canceled: this join is inside the abandoned region.
@@ -224,11 +231,11 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 			}
 		}
 	}
-	cont := r.spawn(contID, TokenRunnable, key.node, -1, key.scope, continuationLineage(js.combined(), dominates), ref)
+	cont := r.spawn(contID, TokenRunnable, key.node, -1, key.scope, continuationLineage(js.combined(), r.splitNode(n)), ref)
 	cont.passed = true
 	r.nodeOf(key).inflight++
 	r.queue = append(r.queue, cont)
-	r.event(Event{Type: EventJoinFired, Token: contID, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode), Tokens: canceled})
+	r.event(Event{Type: EventJoinFired, Token: contID, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode), Round: 1, Tokens: canceled})
 	return nil
 }
 
@@ -288,6 +295,7 @@ func (r *run) cancelBranches(ctx context.Context, split NodeExecutionID, join in
 	}
 	for _, key := range keys {
 		n := &r.plan.nodes[key.node]
+		r.nodeOf(key).canceled = true
 		if n.join != nil {
 			if js := r.joins[key]; js != nil {
 				if err := r.applyJoin(ctx, key, n, js, js.decide(), nil); err != nil {
@@ -296,7 +304,6 @@ func (r *run) cancelBranches(ctx context.Context, split NodeExecutionID, join in
 			}
 			continue
 		}
-		r.nodeOf(key).canceled = true
 		r.checkComplete(key)
 	}
 	return canceled, nil
@@ -336,7 +343,7 @@ func (r *run) checkComplete(key nodeKey) {
 	}
 	if n.join != nil {
 		js := r.joins[key]
-		if js == nil || (!js.fired && !js.empty) {
+		if js == nil || !js.done() {
 			return
 		}
 	} else if !ns.allSignaled() {
@@ -381,6 +388,14 @@ func (r *run) drain(ctx context.Context) error {
 			g.dirty = false
 			if err := r.releaseSiblings(g); err != nil {
 				return err
+			}
+		case len(r.dirtyJoins) > 0:
+			key := r.dirtyJoins[0]
+			r.dirtyJoins = r.dirtyJoins[1:]
+			if js := r.joins[key]; js != nil {
+				if err := r.advanceRounds(ctx, key, &r.plan.nodes[key.node], js); err != nil {
+					return err
+				}
 			}
 		case len(r.dirtyLoops) > 0:
 			key := r.dirtyLoops[0]
@@ -431,14 +446,16 @@ func (r *run) releaseSiblings(g *seqGroup) error {
 	return nil
 }
 
-// stepLoop activates a loop control (ADR-0010 section 6). A token arriving by
-// the entry edge starts iteration 0; a token returning by a back edge starts
-// the next iteration, and exceeding maxIterations raises LoopLimitExceeded.
-// The iteration frame is appended to the token's scope path, and the
-// control's own node execution belongs to that iteration.
+// stepLoop activates a loop control (ADR-0010 section 6, amendment 9). Every
+// token arriving by the entry edge starts its own loop instance at iteration 0,
+// named by that token in the scope path, with its own iteration budget; a token
+// returning by a back edge starts the next iteration of its instance, and
+// exceeding maxIterations raises LoopLimitExceeded. The iteration frame is
+// appended to the token's scope path, and the control's own node execution
+// belongs to that iteration.
 func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 	back := t.inEdge >= 0 && r.plan.edges[t.inEdge].back
-	outer, iteration := t.scope, 0
+	outer, entry, iteration := t.scope, t.id, 0
 	if back {
 		var frame ScopeFrame
 		var ok bool
@@ -446,27 +463,28 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 		if !ok || frame.Kind != ScopeLoop || frame.Node != n.node.ID {
 			return nil, internalf("token %s returned to loop %q from scope %q", t.id, n.node.ID, t.scope)
 		}
-		iteration = frame.Index + 1
+		entry, iteration = frame.Entry, frame.Index+1
 	}
 	if outer.Depth() != n.nesting {
 		return nil, internalf("token %s reached loop %q in scope %q, which has %d frames; the loop lies in %d loops",
 			t.id, n.node.ID, outer, outer.Depth(), n.nesting)
 	}
 	key := nodeKey{t.node, outer}
-	inst := r.loopOf(key)
-	if !back {
-		if inst.entered {
-			return nil, r.failLoop(t, n, outer, codeUnsupported,
-				"a second token entered the loop in the same scope; an uncontrolled merge before the loop entry is not supported")
-		}
-		inst.entered = true
-	}
 	if iteration >= n.maxIterations {
 		r.event(Event{Type: EventLoopLimitExceeded, Token: t.id, Node: n.node.ID, Scope: outer, Iteration: iteration})
 		return nil, r.failLoop(t, n, outer, CodeLoopLimitExceeded,
 			fmt.Sprintf("the loop would start iteration %d; maxIterations is %d", iteration, n.maxIterations))
 	}
-	scope := outer.Push(LoopFrame(n.node.ID, iteration))
+	scope := outer.Push(LoopFrame(n.node.ID, entry, iteration))
+	// Two tokens returning in the same iteration of one instance would share a
+	// scope: ADR-0010 names an instance by its entry token only, so the
+	// situation has no defined meaning yet and stops the run instead of mixing
+	// the trackers of the two.
+	if r.iterations[scope] {
+		return nil, fmt.Errorf("%w: two tokens returned to loop %q in the same iteration (%q) of one loop instance",
+			ErrUnsupported, n.node.ID, scope)
+	}
+	r.iterations[scope] = true
 	r.moveScope(t, scope)
 	r.event(Event{Type: EventLoopIterationStarted, Token: t.id, Node: n.node.ID, Scope: scope, Iteration: iteration})
 	ne, err := r.beginNode(t, n, scope)
@@ -488,7 +506,7 @@ func (r *run) stepLoop(t *token, n *planNode) (*token, error) {
 }
 
 func (r *run) failLoop(t *token, n *planNode, scope ScopePath, code, message string) error {
-	return r.fail(&Failure{Code: code, Origin: FailureEngine, Internal: code == codeUnsupported, Node: n.node.ID, Scope: scope, Message: message}, t)
+	return r.fail(&Failure{Code: code, Origin: FailureEngine, Node: n.node.ID, Scope: scope, Message: message}, t)
 }
 
 // armLoop marks that no more tokens will enter a loop instance.
@@ -511,4 +529,90 @@ func (r *run) closeLoop(key nodeKey) {
 	for _, ei := range r.plan.nodes[key.node].closing {
 		r.signals = append(r.signals, signal{edgeKey: edgeKey{ei, key.scope}, canceled: inst.canceled})
 	}
+}
+
+// joinRound files an arrival at a LET_FINISH join under the round of the split
+// instance in the arriving token's fork lineage (a token that carries none is
+// a round of its own), and registers the join to be looked at when a
+// descendant of that instance ends.
+func (r *run) joinRound(key nodeKey, n *planNode, js *joinState, a joinArrival) {
+	instance := NodeExecutionID("solo:" + string(a.Token))
+	if n.splitFor >= 0 {
+		if split, ok := correspondingSplit(a.Lineage, r.plan.nodes[n.splitFor].node.ID); ok {
+			instance = split
+		}
+	}
+	rd, created := js.round(instance)
+	rd.arrivals = append(rd.arrivals, a)
+	if created {
+		r.roundJoins[instance] = append(r.roundJoins[instance], key)
+	}
+}
+
+// advanceRounds settles the rounds of a LET_FINISH join. A round whose split
+// instance has no descendant left that can reach the join resets; the first
+// round that has arrivals, is not fired and follows only reset rounds fires on
+// its first arrival, in the same step that reset the one before it (the
+// blocking discriminator, WCP 28). A fired round that has not reset blocks the
+// rounds after it.
+func (r *run) advanceRounds(ctx context.Context, key nodeKey, n *planNode, js *joinState) error {
+	for changed := true; changed; {
+		changed = false
+		blocked := false
+		for _, rd := range js.rounds {
+			switch {
+			case rd.reset:
+			case rd.fired:
+				if r.splitLive[rd.split] > 0 {
+					blocked = true
+					continue
+				}
+				rd.reset = true
+				changed = true
+				r.event(Event{
+					Type: EventJoinReset, Node: n.node.ID, Scope: key.scope, Round: rd.number,
+					LiveArrivals: len(rd.arrivals), Arrivals: len(rd.arrivals),
+				})
+			case !blocked:
+				if err := r.fireRound(ctx, key, n, rd); err != nil {
+					return err
+				}
+				blocked, changed = true, true
+			}
+		}
+	}
+	r.checkComplete(key)
+	return nil
+}
+
+// fireRound creates the continuation of a round from its first arrival. The
+// other branches keep running; later arrivals of the round are consumed and
+// recorded without a continuation.
+func (r *run) fireRound(ctx context.Context, key nodeKey, n *planNode, rd *joinRound) error {
+	first := rd.arrivals[0]
+	batch, err := r.load(ctx, first.Payload)
+	if err != nil {
+		return err
+	}
+	contID := roundTokenID(r.req.Execution, n.node.ID, key.scope, rd.split)
+	ref := joinedRef(contID)
+	if err := r.payloads.Put(ctx, ref, batch); err != nil {
+		return fmt.Errorf("store input of join %q round %d: %w", n.node.ID, rd.number, err)
+	}
+	cont := r.spawn(contID, TokenRunnable, key.node, -1, key.scope, continuationLineage([]joinArrival{first}, r.splitNode(n)), ref)
+	cont.passed = true
+	rd.fired = true
+	r.nodeOf(key).inflight++
+	r.queue = append(r.queue, cont)
+	r.event(Event{Type: EventJoinFired, Token: contID, Node: n.node.ID, Scope: key.scope, Detail: string(flow.JoinFirst), Round: rd.number})
+	return nil
+}
+
+// splitNode returns the corresponding split node of a join, or "" when it has
+// none.
+func (r *run) splitNode(n *planNode) flow.NodeID {
+	if n.splitFor < 0 {
+		return ""
+	}
+	return r.plan.nodes[n.splitFor].node.ID
 }

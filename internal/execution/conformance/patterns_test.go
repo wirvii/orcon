@@ -99,7 +99,7 @@ func matrix() []pattern {
 		{6, "Multi-Choice", supported, "inclusiveGateway", wcp06MultiChoice},
 		{7, "Structured Synchronizing Merge", supported, "join ACTIVATED after an inclusive gateway", wcp07StructuredSynchronizingMerge},
 		{8, "Multi-Merge", supported, "uncontrolled merge after a parallel split", wcp08MultiMerge},
-		{9, "Structured Discriminator", later, "Enmienda 9 B.2: the remaining branches must be allowed to finish; join FIRST cancels them (WCP 29)", nil},
+		{9, "Structured Discriminator", supported, "join FIRST with remaining LET_FINISH", wcp09StructuredDiscriminator},
 		{10, "Arbitrary Cycles", supported, "cycles through an orcon.loop control, which may be left from several places of the body", wcp10ArbitraryCycles},
 		{11, "Implicit Termination", supported, "the execution ends when no live token is left", wcp11ImplicitTermination},
 		{12, "Multiple Instances without Synchronization", later, "cut C9", nil},
@@ -118,8 +118,8 @@ func matrix() []pattern {
 		{25, "Cancel Region", later, "cut C7 (cancellation)", nil},
 		{26, "Cancel Multiple Instance Activity", later, "cut C9", nil},
 		{27, "Complete Multiple Instance Activity", later, "cut C9 (completionCondition)", nil},
-		{28, "Blocking Discriminator", later, "Enmienda 9 B.2: waits for the owner decision on a discriminator that lets the other branches finish", nil},
-		{29, "Canceling Discriminator", supported, "join FIRST", wcp29CancelingDiscriminator},
+		{28, "Blocking Discriminator", supported, "join FIRST with remaining LET_FINISH: a second round waits for the first to reset", wcp28BlockingDiscriminator},
+		{29, "Canceling Discriminator", supported, "join FIRST with remaining CANCEL", wcp29CancelingDiscriminator},
 		{30, "Structured Partial Join", unsupported, "joins fire on all, any live or the first; N-of-M joins are not defined", nil},
 		{31, "Blocking Partial Join", unsupported, "N-of-M joins are not defined", nil},
 		{32, "Canceling Partial Join", unsupported, "N-of-M joins are not defined", nil},
@@ -324,17 +324,69 @@ func wcp08MultiMerge(t *testing.T) {
 func wcp09StructuredDiscriminator(t *testing.T) {
 	t.Helper()
 	runner := &executiontest.TraceRunner{}
-	res := runFlow(t, syncFlow(flow.JoinFirst), execution.Deps{Runner: runner}, one())
-	if got := executiontest.Executed(res, "after"); got != 1 {
-		t.Errorf("the node after the discriminator ran %d times, want 1", got)
+	res := runFlow(t, syncFlow(flow.JoinFirst).Remaining("j", flow.RemainingLetFinish), execution.Deps{Runner: runner}, one())
+	if diff := cmp.Diff([]string{"a", "after", "b"}, sorted(tasks(runner))); diff != "" {
+		t.Errorf("every branch runs and the continuation runs once (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"end:a>after"}, executiontest.Paths(res)); diff != "" {
+		t.Errorf("the continuation carries the first arrival only (-want +got):\n%s", diff)
+	}
+	if got := executiontest.TokenStates(res)[execution.TokenCanceled]; got != 0 {
+		t.Errorf("canceled tokens = %d, want none: LET_FINISH cancels nothing", got)
+	}
+	var reset *execution.Event
+	for i := range res.Events {
+		if res.Events[i].Type == execution.EventJoinReset {
+			reset = &res.Events[i]
+		}
+	}
+	if reset == nil || reset.Round != 1 || reset.Arrivals != 2 {
+		t.Errorf("join.reset = %+v, want round 1 after 2 arrivals", reset)
+	}
+}
+
+// wcp28Flow has an uncontrolled merge in front of a split, so the split runs
+// twice in the same scope and the discriminator sees two rounds.
+func wcp28Flow() *executiontest.Builder {
+	return executiontest.NewFlow("wcp28").
+		Start("s").Parallel("p0").Task("a").Task("b").Task("m").Parallel("sp").Task("x").Task("y").Parallel("j").Task("after").End("e").
+		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingLetFinish).
+		Chain("s", "p0").Edge("p0", "a").Edge("p0", "b").Edge("a", "m").Edge("b", "m").Edge("m", "sp").
+		Edge("sp", "x").Edge("sp", "y").Edge("x", "j").Edge("y", "j").Chain("j", "after", "e")
+}
+
+func wcp28BlockingDiscriminator(t *testing.T) {
+	t.Helper()
+	runner := &executiontest.TraceRunner{}
+	res := runFlow(t, wcp28Flow(), execution.Deps{Runner: runner}, one())
+	if got := executiontest.Executed(res, "after"); got != 2 {
+		t.Fatalf("the node after the join ran %d times, want 2: one per round", got)
+	}
+	seq := func(typ execution.EventType, round int) int {
+		for i := range res.Events {
+			if e := &res.Events[i]; e.Type == typ && e.Round == round {
+				return e.Sequence
+			}
+		}
+		return 0
+	}
+	fired1, reset1 := seq(execution.EventJoinFired, 1), seq(execution.EventJoinReset, 1)
+	fired2, reset2 := seq(execution.EventJoinFired, 2), seq(execution.EventJoinReset, 2)
+	if fired1 == 0 || reset1 == 0 || fired2 == 0 || reset2 == 0 {
+		t.Fatalf("join events missing: fired %d %d, reset %d %d", fired1, fired2, reset1, reset2)
+	}
+	if fired1 >= reset1 || reset1 >= fired2 || fired2 >= reset2 {
+		t.Errorf("round order wrong: fired1=%d reset1=%d fired2=%d reset2=%d; round 2 must wait until round 1 reset", fired1, reset1, fired2, reset2)
+	}
+	if executiontest.Count(res, execution.EventJoinFired) != 2 || executiontest.Count(res, execution.EventJoinReset) != 2 {
+		t.Errorf("join events: %d fired, %d reset, want 2 each", executiontest.Count(res, execution.EventJoinFired), executiontest.Count(res, execution.EventJoinReset))
 	}
 }
 
 func wcp29CancelingDiscriminator(t *testing.T) {
 	t.Helper()
-	wcp09StructuredDiscriminator(t) // a second test of the same join: one continuation
 	runner := &executiontest.TraceRunner{}
-	res := runFlow(t, syncFlow(flow.JoinFirst), execution.Deps{Runner: runner}, one())
+	res := runFlow(t, syncFlow(flow.JoinFirst).Remaining("j", flow.RemainingCancel), execution.Deps{Runner: runner}, one())
 	if diff := cmp.Diff([]string{"a", "after"}, tasks(runner)); diff != "" {
 		t.Errorf("the losing branch is canceled before it runs (-want +got):\n%s", diff)
 	}

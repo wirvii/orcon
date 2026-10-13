@@ -132,6 +132,18 @@ func RandomGraph(data []byte) *Builder {
 			setRandomJoin(b, src, "n"+strconv.Itoa(i))
 		}
 	}
+	// A FIRST join with a corresponding split may let the other branches finish.
+	doc := b.Doc()
+	splits := flow.CorrespondingSplits(&doc)
+	for i := 1; i <= count; i++ {
+		id := "n" + strconv.Itoa(i)
+		if j := b.mustNode(id).Join; j == nil || j.Mode != flow.JoinFirst {
+			continue
+		}
+		if _, ok := splits[flow.NodeID(id)]; ok && src.flag() {
+			b.Remaining(id, flow.RemainingLetFinish)
+		}
+	}
 	return b
 }
 

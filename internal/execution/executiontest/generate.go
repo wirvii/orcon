@@ -127,6 +127,8 @@ type (
 		id       string
 		branches []genNode
 		mode     flow.JoinMode
+		// remaining is the option of a FIRST join: CANCEL, LET_FINISH or absent.
+		remaining flow.JoinRemaining
 	}
 	xorN struct {
 		id       string
@@ -356,7 +358,8 @@ func (g *generator) element(depth int) any {
 	case choice < 30:
 		return taskN{id: "t" + id}
 	case choice < 45:
-		return parN{id: id, branches: g.branches(depth, 2, 3), mode: g.parMode()}
+		mode := g.parMode()
+		return parN{id: id, branches: g.branches(depth, 2, 3), mode: mode, remaining: g.remaining(mode)}
 	case choice < 60:
 		br := g.branches(depth, 2, 3)
 		return xorN{id: id, branches: br, verdicts: g.recordVerdicts("x"+id, g.bools(len(br)-1))}
@@ -376,6 +379,14 @@ func (g *generator) element(depth int) any {
 		g.loops = append(g.loops, loopSpec{id: id, limit: limit})
 		return loopN{id: id, body: g.sequence(depth + 1), limit: limit}
 	}
+}
+
+// remaining picks the option of a FIRST join: absent, CANCEL or LET_FINISH.
+func (g *generator) remaining(mode flow.JoinMode) flow.JoinRemaining {
+	if mode != flow.JoinFirst {
+		return ""
+	}
+	return []flow.JoinRemaining{"", flow.RemainingCancel, flow.RemainingLetFinish}[g.src.intn(3)]
 }
 
 func (g *generator) parMode() flow.JoinMode {
@@ -455,6 +466,9 @@ func (e *emitter) emitSeq(n seqN) (string, exit) {
 func (e *emitter) emitPar(n parN) (string, exit) {
 	split, join := "p"+n.id, "j"+n.id
 	e.b.Parallel(split).Parallel(join).Join(join, n.mode)
+	if n.remaining != "" {
+		e.b.Remaining(join, n.remaining)
+	}
 	exits := make([]exit, len(n.branches))
 	for i, br := range n.branches {
 		in, out := e.emit(br)

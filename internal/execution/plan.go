@@ -47,12 +47,11 @@ type planNode struct {
 	// closing lists the exit edges that complete when this loop's instance
 	// closes: the edges whose outermost exited loop is this one.
 	closing []int
-	// dominators marks, for a join, the nodes that dominate it.
-	dominators []bool
-	// splitFor is, for a FIRST join, the split node whose branches the join
-	// discriminates: the nearest dominating node from which the join is
-	// reachable through at least two of its outgoing edges. It is -1 when there
-	// is none, and then the join cancels nothing.
+	// splitFor is, for a join, the split node whose branches it brings together:
+	// the nearest dominating node from which the join is reachable through at
+	// least two of its outgoing edges (flow.CorrespondingSplits). A FIRST join
+	// discriminates its branches; any join drops it from the fork lineage of its
+	// continuation. It is -1 when there is none.
 	splitFor int
 	// nesting is the number of loops whose body contains the node.
 	nesting int
@@ -60,6 +59,9 @@ type planNode struct {
 
 type joinSpec struct {
 	mode flow.JoinMode
+	// letFinish is set on a FIRST join with remaining LET_FINISH: it cancels
+	// nothing and keeps one round per instance of its corresponding split.
+	letFinish bool
 }
 
 // planEdge is an edge of a compiled flow.
@@ -79,7 +81,7 @@ type planEdge struct {
 }
 
 // Plan is a flow document compiled for the interpreter: nodes and edges
-// resolved to indices, loop bodies, the dominators discriminator joins need,
+// resolved to indices, loop bodies, the corresponding split of every join,
 // and the check that the flow uses only features this interpreter runs. A Plan
 // is immutable and safe to share between executions; it can be cached by the
 // content hash of the revision it was compiled from (ADR-0007 section 7).
@@ -125,7 +127,7 @@ func Compile(doc *flow.Document) (*Plan, error) {
 	if len(c.issues) > 0 {
 		return nil, &UnsupportedError{Issues: c.issues}
 	}
-	c.dominators()
+	c.splits(flow.CorrespondingSplits(doc))
 	return c.plan, nil
 }
 
@@ -280,7 +282,7 @@ func (c *compiler) features(n *flow.Node, pn *planNode) {
 func (c *compiler) join(n *flow.Node, pn *planNode) {
 	// Validation already rejected the data modes the engine cannot run
 	// (flow.JoinDataRunnable), so APPEND is the only one left.
-	pn.join = &joinSpec{mode: n.Join.Mode}
+	pn.join = &joinSpec{mode: n.Join.Mode, letFinish: n.Join.Remaining == flow.RemainingLetFinish}
 }
 
 func (c *compiler) edges(edges []flow.Edge) {
@@ -480,159 +482,14 @@ func (c *compiler) exits(loopNodes []int) {
 	}
 }
 
-// dominators computes, for every join, the set of nodes that dominate it. The
-// split whose branches converge at a join is found among them: the join
-// continuation drops that split from its fork lineage, and a discriminator
-// cancels the other branches of that split instance (ADR-0010 section 3).
-func (c *compiler) dominators() {
+// splits records, for every join, the split node whose branches it brings
+// together. Publication validation and the compiler both take it from
+// flow.CorrespondingSplits.
+func (c *compiler) splits(splits map[flow.NodeID]flow.NodeID) {
 	p := c.plan
-	needed := false
 	for i := range p.nodes {
-		needed = needed || p.nodes[i].join != nil
-	}
-	if !needed {
-		return
-	}
-	idom := immediateDominators(p)
-	root := len(p.nodes)
-	for i := range p.nodes {
-		if p.nodes[i].join == nil {
-			continue
-		}
-		dom := make([]bool, len(p.nodes))
-		for x := idom[i]; x >= 0 && x != root; x = idom[x] {
-			dom[x] = true
-		}
-		p.nodes[i].dominators = dom
-		if p.nodes[i].join.mode == flow.JoinFirst {
-			p.nodes[i].splitFor = nearestSplit(p, idom, i)
+		if split, ok := splits[p.nodes[i].node.ID]; ok && p.nodes[i].join != nil {
+			p.nodes[i].splitFor = p.index[split]
 		}
 	}
-}
-
-// immediateDominators computes the immediate dominator of every node reachable
-// from a start event over the forward edges, with a virtual root joining all
-// start events (Cooper, Harvey and Kennedy, "A Simple, Fast Dominance
-// Algorithm"). The virtual root has index len(nodes); unreachable nodes get -1.
-func immediateDominators(p *Plan) []int {
-	n := len(p.nodes)
-	root := n
-	succ := make([][]int, n+1)
-	pred := make([][]int, n+1)
-	for _, e := range p.edges {
-		if e.back {
-			continue
-		}
-		succ[e.from] = append(succ[e.from], e.to)
-		pred[e.to] = append(pred[e.to], e.from)
-	}
-	for _, s := range p.starts {
-		succ[root] = append(succ[root], s)
-		pred[s] = append(pred[s], root)
-	}
-	order := reversePostorder(succ, root)
-	position := make([]int, n+1)
-	for i := range position {
-		position[i] = -1
-	}
-	for i, x := range order {
-		position[x] = i
-	}
-	idom := make([]int, n+1)
-	for i := range idom {
-		idom[i] = -1
-	}
-	idom[root] = root
-	for changed := true; changed; {
-		changed = false
-		for _, x := range order {
-			if x == root {
-				continue
-			}
-			next := -1
-			for _, q := range pred[x] {
-				if idom[q] == -1 {
-					continue
-				}
-				if next == -1 {
-					next = q
-				} else {
-					next = intersect(idom, position, q, next)
-				}
-			}
-			if next != idom[x] {
-				idom[x] = next
-				changed = true
-			}
-		}
-	}
-	return idom[:n+1]
-}
-
-func intersect(idom, position []int, a, b int) int {
-	for a != b {
-		for position[a] > position[b] {
-			a = idom[a]
-		}
-		for position[b] > position[a] {
-			b = idom[b]
-		}
-	}
-	return a
-}
-
-// reversePostorder lists the nodes reachable from root in reverse postorder,
-// walking iteratively so a deep flow cannot exhaust the stack.
-func reversePostorder(succ [][]int, root int) []int {
-	type frame struct{ node, next int }
-	visited := make([]bool, len(succ))
-	var post []int
-	visited[root] = true
-	stack := []frame{{node: root}}
-	for len(stack) > 0 {
-		f := &stack[len(stack)-1]
-		if f.next < len(succ[f.node]) {
-			y := succ[f.node][f.next]
-			f.next++
-			if !visited[y] {
-				visited[y] = true
-				stack = append(stack, frame{node: y})
-			}
-			continue
-		}
-		post = append(post, f.node)
-		stack = stack[:len(stack)-1]
-	}
-	slices.Reverse(post)
-	return post
-}
-
-// nearestSplit returns the nearest proper dominator of the join from which the
-// join is reachable through at least two outgoing forward edges, or -1. The
-// walk follows the immediate dominators, so the answer is computed once per
-// plan and does not depend on the tokens of a run.
-func nearestSplit(p *Plan, idom []int, join int) int {
-	succ := make([][]int, len(p.nodes))
-	for _, e := range p.edges {
-		if !e.back {
-			succ[e.from] = append(succ[e.from], e.to)
-		}
-	}
-	root := len(p.nodes)
-	for x := idom[join]; x >= 0 && x != root; x = idom[x] {
-		branches := 0
-		for _, ei := range p.nodes[x].out {
-			e := &p.edges[ei]
-			if e.back {
-				continue
-			}
-			if e.to == join || reach([]int{e.to}, succ, -1)[join] {
-				branches++
-			}
-		}
-		if branches >= 2 {
-			return x
-		}
-	}
-	return -1
 }

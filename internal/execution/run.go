@@ -73,14 +73,15 @@ func (ns *nodeState) allSignaled() bool {
 	return true
 }
 
-// loopInstance tracks one entry of a loop control in a scope.
+// loopInstance tracks every instance of a loop control in a scope: each token
+// that arrives on the entry edge runs its own instance (named in the scope
+// path), and the loop's exit edges close once all of them have finished.
 type loopInstance struct {
 	// live counts the active tokens inside the instance, every iteration.
 	live int
 	// armed is set once the entry is complete: no more tokens will enter.
-	armed   bool
-	closed  bool
-	entered bool
+	armed  bool
+	closed bool
 	// canceled is set when a canceled branch fed the loop: its exit edges close
 	// with cancellation signals.
 	canceled bool
@@ -140,8 +141,18 @@ type run struct {
 	// canceledSplits holds the split executions whose branches a discriminator
 	// canceled.
 	canceledSplits map[NodeExecutionID]bool
-	nodeExecs      map[NodeExecutionID]*nodeExec
-	execOrder      []*nodeExec
+	// splitLive counts the active tokens that descend from each split instance.
+	// It is the one descendant accounting behind SEQUENTIAL branch order and the
+	// reset of LET_FINISH rounds.
+	splitLive map[NodeExecutionID]int
+	// roundJoins lists, per split instance, the LET_FINISH joins that opened a
+	// round for it, to look at when a descendant ends.
+	roundJoins map[NodeExecutionID][]nodeKey
+	dirtyJoins []nodeKey
+	// iterations holds the loop iteration scopes already started.
+	iterations map[ScopePath]bool
+	nodeExecs  map[NodeExecutionID]*nodeExec
+	execOrder  []*nodeExec
 
 	signals    []signal
 	dirtyLoops []nodeKey
@@ -172,6 +183,9 @@ func newRun(in *Interpreter, plan *Plan, req Request) *run {
 		groups:   make(map[NodeExecutionID]*seqGroup),
 
 		canceledSplits: make(map[NodeExecutionID]bool),
+		splitLive:      make(map[NodeExecutionID]int),
+		roundJoins:     make(map[NodeExecutionID][]nodeKey),
+		iterations:     make(map[ScopePath]bool),
 		nodeExecs:      make(map[NodeExecutionID]*nodeExec),
 	}
 }
@@ -325,7 +339,7 @@ func (r *run) joinOf(key nodeKey) *joinState {
 	js, ok := r.joins[key]
 	if !ok {
 		n := &r.plan.nodes[key.node]
-		js = newJoinState(n.join.mode, len(n.in))
+		js = newJoinState(n.join, len(n.in))
 		r.joins[key] = js
 	}
 	return js

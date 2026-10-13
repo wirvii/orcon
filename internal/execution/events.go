@@ -33,6 +33,9 @@ const (
 	EventEdgeClosed EventType = "edge.closed"
 	// EventJoinFired marks a join that created its continuation token.
 	EventJoinFired EventType = "join.fired"
+	// EventJoinReset marks a round of a LET_FINISH join that reset: no token
+	// descending from its split instance can still reach the join.
+	EventJoinReset EventType = "join.reset"
 	// EventJoinFailed marks a join that failed with JoinRequirementNotMet.
 	EventJoinFailed EventType = "join.failed"
 	// EventLoopIterationStarted marks the start of a loop iteration.
@@ -67,6 +70,13 @@ type Event struct {
 	Live bool
 	// Iteration is the loop iteration of loop.* events.
 	Iteration int
+	// Round is the round of join.fired, join.failed and join.reset; it is 1
+	// except for a FIRST join with remaining LET_FINISH.
+	Round int
+	// LiveArrivals and Arrivals count the tokens that arrived in the round, on
+	// join.reset.
+	LiveArrivals int
+	Arrivals     int
 	// Tokens lists the children of token.forked, or the tokens a discriminator
 	// canceled in join.fired.
 	Tokens []TokenID
@@ -105,6 +115,14 @@ func (e Event) String() string {
 	if e.Detail != "" {
 		b.WriteString(" detail=")
 		b.WriteString(e.Detail)
+	}
+	if e.Round > 0 {
+		b.WriteString(" round=")
+		b.WriteString(strconv.Itoa(e.Round))
+	}
+	if e.Type == EventJoinReset {
+		b.WriteString(" arrivals=")
+		b.WriteString(strconv.Itoa(e.Arrivals))
 	}
 	if len(e.Tokens) > 0 {
 		b.WriteString(" tokens=")

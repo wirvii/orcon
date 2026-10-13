@@ -5,6 +5,7 @@ package executiontest
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -109,6 +110,12 @@ func Trace(res execution.Result) string {
 	return strings.Join(lines, "\n")
 }
 
+var entryPattern = regexp.MustCompile(`@[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+
+// MaskEntries removes the entry token ids from a scope path, so a test can
+// compare "L:loop@<token>#2" as "L:loop#2".
+func MaskEntries(scope string) string { return entryPattern.ReplaceAllString(scope, "") }
+
 // Violations checks the invariants every finished run must satisfy, whatever
 // the flow, and describes each one that does not hold:
 //
@@ -143,7 +150,7 @@ func Violations(res execution.Result) []string {
 		case execution.EventExecutionSucceeded, execution.EventExecutionFailed:
 			terminal++
 		case execution.EventExecutionStarted, execution.EventTokenForked, execution.EventTokenDeferred,
-			execution.EventTokenConsumed, execution.EventJoinFired, execution.EventJoinFailed,
+			execution.EventTokenConsumed, execution.EventJoinFired, execution.EventJoinReset, execution.EventJoinFailed,
 			execution.EventLoopIterationStarted, execution.EventLoopLimitExceeded:
 		}
 	}

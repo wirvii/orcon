@@ -132,7 +132,7 @@ func TestJoinRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			js := newJoinState(tt.mode, tt.edges)
+			js := newJoinState(&joinSpec{mode: tt.mode}, tt.edges)
 			for i, st := range tt.steps {
 				for _, s := range st.send {
 					js.send(s)
@@ -174,7 +174,7 @@ func TestJoinCanceledEdgesNeverFailAnAllJoin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			js := newJoinState(flow.JoinAll, 2)
+			js := newJoinState(&joinSpec{mode: flow.JoinAll}, 2)
 			for i, st := range tt.steps {
 				for _, s := range st.send {
 					js.send(s)
@@ -198,7 +198,7 @@ func TestJoinCanceledEdgesNeverFailAnAllJoin(t *testing.T) {
 
 func TestJoinCombinesByEdgeThenArrival(t *testing.T) {
 	t.Parallel()
-	js := newJoinState(flow.JoinAll, 2)
+	js := newJoinState(&joinSpec{mode: flow.JoinAll}, 2)
 	js.send(0)
 	js.send(0)
 	js.send(1)
@@ -219,54 +219,45 @@ func TestContinuationLineage(t *testing.T) {
 	fork := func(split string, branch int) ForkRef {
 		return ForkRef{SplitNodeExecution: NodeExecutionID("ne-" + split), SplitNode: flow.NodeID(split), Branch: branch}
 	}
-	dominators := func(ids ...string) func(flow.NodeID) bool {
-		return func(id flow.NodeID) bool {
-			for _, d := range ids {
-				if string(id) == d {
-					return true
-				}
-			}
-			return false
-		}
-	}
 	arrival := func(lineage ...ForkRef) joinArrival { return joinArrival{Lineage: lineage} }
 	tests := []struct {
 		name     string
 		arrivals []joinArrival
-		dom      func(flow.NodeID) bool
+		split    flow.NodeID
 		want     []ForkRef
 	}{
-		{"no arrival", nil, dominators("p"), nil},
+		{"no arrival", nil, "p", nil},
 		{
-			"branches of the dominating split converge",
-			[]joinArrival{arrival(fork("p", 0)), arrival(fork("p", 1))},
-			dominators("p"), nil,
+			"branches of the corresponding split converge",
+			[]joinArrival{arrival(fork("p", 0)), arrival(fork("p", 1))}, "p", nil,
 		},
-		{
-			"a single arrival drops the dominating split too",
-			[]joinArrival{arrival(fork("p", 0))},
-			dominators("p"), nil,
-		},
+		{"a single arrival drops the corresponding split too", []joinArrival{arrival(fork("p", 0))}, "p", nil},
 		{
 			"the outer split stays",
-			[]joinArrival{arrival(fork("o", 0), fork("q", 0)), arrival(fork("o", 0), fork("q", 1))},
-			dominators("q"), []ForkRef{fork("o", 0)},
+			[]joinArrival{arrival(fork("o", 0), fork("q", 0)), arrival(fork("o", 0), fork("q", 1))}, "q", []ForkRef{fork("o", 0)},
 		},
 		{
-			"a split that does not dominate the join stays",
-			[]joinArrival{arrival(fork("p", 0)), arrival(fork("p", 0))},
-			dominators(), []ForkRef{fork("p", 0)},
+			// The branches differ on the inner split only: the outer split is
+			// found on the full lineages and kept in the prefix.
+			"a split that is not the corresponding one stays",
+			[]joinArrival{arrival(fork("o", 0), fork("q", 0)), arrival(fork("o", 0), fork("q", 1))}, "other", []ForkRef{fork("o", 0)},
+		},
+		{"no corresponding split", []joinArrival{arrival(fork("p", 0))}, "", []ForkRef{fork("p", 0)}},
+		{
+			"the cut also removes what comes after the split",
+			[]joinArrival{arrival(fork("p", 0), fork("x", 1))}, "p", nil,
 		},
 		{
-			"the cut also removes what comes after the dominating split",
-			[]joinArrival{arrival(fork("p", 0), fork("x", 1))},
-			dominators("p"), nil,
+			// The token never forked at the corresponding split (an exclusive
+			// choice sent it down one branch): nothing to drop.
+			"the lineage has no entry of the split",
+			[]joinArrival{arrival(fork("o", 0))}, "q", []ForkRef{fork("o", 0)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := continuationLineage(tt.arrivals, tt.dom)
+			got := continuationLineage(tt.arrivals, tt.split)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("lineage mismatch (-want +got):\n%s", diff)
 			}

@@ -278,8 +278,8 @@ func TestValidateValueAndBlockRules(t *testing.T) {
 		{"join MATCH_FIELD is not runnable yet", "item-routing", func(d *flow.Document) {
 			node(d, "combine").Join.Data = flow.JoinDataMatchField
 			node(d, "combine").Join.MatchField = "id"
-		}, flow.CodeJoinData, flow.SeverityError},
-		{"join MATCH_POSITION is not runnable yet", "item-routing", func(d *flow.Document) { node(d, "combine").Join.Data = flow.JoinDataMatchPosition }, flow.CodeJoinData, flow.SeverityError},
+		}, flow.CodeV14, flow.SeverityError},
+		{"join MATCH_POSITION is not runnable yet", "item-routing", func(d *flow.Document) { node(d, "combine").Join.Data = flow.JoinDataMatchPosition }, flow.CodeV14, flow.SeverityError},
 		{"join field without MATCH_FIELD", "parallel-join", func(d *flow.Document) { node(d, "join").Join.MatchField = "id" }, flow.CodeValue, flow.SeverityError},
 		{"carry on an execution variable", "loop", func(d *flow.Document) { d.Variables[1].Carry = ptrTo(true) }, flow.CodeValue, flow.SeverityError},
 		{"bad variable name", "loop", func(d *flow.Document) { d.Variables[0].Name = "1total" }, flow.CodeValue, flow.SeverityError},

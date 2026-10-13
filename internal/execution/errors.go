@@ -53,17 +53,11 @@ const (
 	CodePanic = "Panic"
 )
 
-// Codes of failures that exist only inside this in-memory interpreter. They are
-// not in the closed list above: a failure carrying one reports Internal, and
+// The code NodeError is the only code of this interpreter outside the closed
+// list above: it marks the failure of a node whose runner returned an error
+// that carries no code of its own. A failure carrying it reports Internal, and
 // it is never emitted in an event nor persisted.
-const (
-	// The code NodeError marks the failure of a node whose runner returned an error
-	// that carries no code of its own.
-	codeNodeError = "NodeError"
-	// The code Unsupported marks the one situation of a run the interpreter cannot
-	// handle: two tokens entering the same loop in the same scope.
-	codeUnsupported = "Unsupported"
-)
+const codeNodeError = "NodeError"
 
 // ErrorClass is the class a node type gives its errors (ADR-0011 section 1).
 type ErrorClass string

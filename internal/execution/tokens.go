@@ -71,6 +71,7 @@ func (r *run) track(t *token) {
 	}
 	for _, f := range t.lineage {
 		r.forkLive[forkKey{f.SplitNodeExecution, f.Branch}]++
+		r.splitLive[f.SplitNodeExecution]++
 	}
 }
 
@@ -86,6 +87,8 @@ func (r *run) untrack(t *token) {
 	for _, f := range t.lineage {
 		fk := forkKey{f.SplitNodeExecution, f.Branch}
 		r.forkLive[fk]--
+		r.splitLive[f.SplitNodeExecution]--
+		r.dirtyJoins = append(r.dirtyJoins, r.roundJoins[f.SplitNodeExecution]...)
 		if g := r.groups[f.SplitNodeExecution]; g != nil && !g.dirty {
 			g.dirty = true
 			r.dirtyGroup = append(r.dirtyGroup, g)

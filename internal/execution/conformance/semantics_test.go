@@ -5,6 +5,7 @@ package conformance
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -231,7 +232,7 @@ func TestLoopLimitAndScopePaths(t *testing.T) {
 		var scopes []string
 		for _, ne := range res.NodeExecutions {
 			if ne.Node == "work" {
-				scopes = append(scopes, string(ne.Scope))
+				scopes = append(scopes, executiontest.MaskEntries(string(ne.Scope)))
 			}
 		}
 		want := []string{"L:L#0", "L:L#1", "L:L#2", "L:L#3"}
@@ -247,4 +248,94 @@ func TestLoopLimitAndScopePaths(t *testing.T) {
 			t.Fatalf("result = %s %+v, want FAILED with LoopLimitExceeded", res.Status, res.Failure)
 		}
 	})
+}
+
+// entriesBody builds start -> split -> {a, b} -> merge -> loop, whose body forks
+// into two threads and joins them with ALL before counting and testing. The
+// merge activates twice, so two tokens enter the loop in the same scope.
+func entriesBody() *executiontest.Builder {
+	return executiontest.NewFlow("entries").
+		Start("s").Parallel("p").Task("a").Task("b").Task("m").Loop("L", 3).
+		Parallel("p2").Task("x").Task("y").Parallel("j2").Task("work").If("more", flow.RoutingExclusive).
+		Join("j2", flow.JoinAll).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "m").Edge("b", "m").Edge("m", "L").
+		Edge("L", "p2", executiontest.Port("loop")).Edge("p2", "x").Edge("p2", "y").Edge("x", "j2").Edge("y", "j2").
+		Edge("j2", "work").Edge("work", "more").
+		Edge("more", "L", executiontest.Port("true"), executiontest.Back())
+}
+
+func loopDeps() execution.Deps {
+	return execution.Deps{
+		Router: executiontest.WhileLess("n", 3),
+		Runner: &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"work": executiontest.Increment("n")}},
+	}
+}
+
+// entryOf extracts the entry token id from a scope path of loop "L".
+func entryOf(scope string) string {
+	_, rest, _ := strings.Cut(scope, "L:L@")
+	id, _, _ := strings.Cut(rest, "#")
+	return id
+}
+
+func TestLoopTwoEntriesRunSeparateInstances(t *testing.T) {
+	t.Parallel()
+	requireStore(t)
+	b := entriesBody().End("e").Edge("more", "e", executiontest.Port("false"))
+	res := executiontest.Run(t, b, loopDeps(), executiontest.Batch(`{"n":0}`))
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v): two entries are two instances, not an error", res.Status, res.Failure)
+	}
+	// Run N of loop L: the ordinal of an instance is the order of its first
+	// iteration event.
+	runs := map[string]int{}
+	for i := range res.Events {
+		if e := &res.Events[i]; e.Type == execution.EventLoopIterationStarted && e.Iteration == 0 {
+			runs[entryOf(string(e.Scope))] = len(runs) + 1
+		}
+	}
+	if len(runs) != 2 {
+		t.Fatalf("loop instances = %v, want 2, one per entry token", runs)
+	}
+	perInstance := map[string]int{}
+	for _, ne := range res.NodeExecutions {
+		if ne.Node == "work" {
+			perInstance[entryOf(string(ne.Scope))]++
+		}
+	}
+	for entry, n := range perInstance {
+		if n != 3 {
+			t.Errorf("instance %s (run %d) ran the body %d times, want 3: each instance has its own iteration budget", entry, runs[entry], n)
+		}
+	}
+	// The body join fires once per iteration of each instance without colliding.
+	if got := executiontest.Count(res, execution.EventJoinFired); got != 6 {
+		t.Errorf("join.fired events = %d, want 6 (3 iterations of 2 instances)", got)
+	}
+	if len(res.Ends) != 2 {
+		t.Errorf("end arrivals = %d, want 2: the exits of the two instances arrive as two tokens", len(res.Ends))
+	}
+}
+
+func TestLoopExitsMergeDownstream(t *testing.T) {
+	t.Parallel()
+	requireStore(t)
+	// The exits of both instances reach join j as two live tokens on one edge,
+	// and j fires once, after both instances finished and the z branch arrived.
+	b := entriesBody().Parallel("j").Task("z").End("e").Join("j", flow.JoinActivated).Edge("more", "j", executiontest.Port("false")).Edge("p", "z").Edge("z", "j").Edge("j", "e")
+	res := executiontest.Run(t, b, loopDeps(), executiontest.Batch(`{"n":0}`))
+	if res.Status != execution.ExecSucceeded {
+		t.Fatalf("status = %s, want SUCCEEDED (failure %v)", res.Status, res.Failure)
+	}
+	if got := executiontest.Executed(res, "j"); got != 1 {
+		t.Fatalf("join ran %d times, want 1", got)
+	}
+	if len(res.Ends) != 1 {
+		t.Fatalf("end arrivals = %d, want 1", len(res.Ends))
+	}
+	// Two exit tokens (8 items each: the body doubles the items every
+	// iteration) and the z token with 1 item.
+	if got := res.Ends[0].Batch.Len(); got != 8+8+1 {
+		t.Errorf("joined items = %d, want 17", got)
+	}
 }

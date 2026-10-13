@@ -11,27 +11,33 @@ import (
 	"github.com/wirvii/orcon/internal/execution"
 )
 
+const (
+	entryA = execution.TokenID("0aa1b2c3-d4e5-4f60-8718-293a4b5c6d7e")
+	entryB = execution.TokenID("1bb1b2c3-d4e5-4f60-8718-293a4b5c6d7e")
+)
+
 func TestScopePathPushAndPop(t *testing.T) {
 	t.Parallel()
 	var s execution.ScopePath
 	if s.Depth() != 0 || s.Frames() != nil {
 		t.Fatalf("top-level scope has depth %d and frames %v, want none", s.Depth(), s.Frames())
 	}
-	s = s.Push(execution.LoopFrame("outer", 2)).Push(execution.MultiInstanceFrame("mi", 0)).Push(execution.LoopFrame("inner", 11))
-	if want := execution.ScopePath("L:outer#2/MI:mi#0/L:inner#11"); s != want {
+	s = s.Push(execution.LoopFrame("outer", entryA, 2)).Push(execution.MultiInstanceFrame("mi", 0)).Push(execution.LoopFrame("inner", entryB, 11))
+	want := execution.ScopePath("L:outer@" + string(entryA) + "#2/MI:mi#0/L:inner@" + string(entryB) + "#11")
+	if s != want {
 		t.Fatalf("path = %q, want %q", s, want)
 	}
 	if s.Depth() != 3 {
 		t.Errorf("Depth() = %d, want 3", s.Depth())
 	}
 	wantFrames := []execution.ScopeFrame{
-		execution.LoopFrame("outer", 2), execution.MultiInstanceFrame("mi", 0), execution.LoopFrame("inner", 11),
+		execution.LoopFrame("outer", entryA, 2), execution.MultiInstanceFrame("mi", 0), execution.LoopFrame("inner", entryB, 11),
 	}
 	if diff := cmp.Diff(wantFrames, s.Frames()); diff != "" {
 		t.Errorf("Frames() mismatch (-want +got):\n%s", diff)
 	}
 	parent, frame, ok := s.Pop()
-	if !ok || frame != execution.LoopFrame("inner", 11) || parent != "L:outer#2/MI:mi#0" {
+	if !ok || frame != execution.LoopFrame("inner", entryB, 11) || parent != "L:outer@"+execution.ScopePath(entryA)+"#2/MI:mi#0" {
 		t.Errorf("Pop() = (%q, %+v, %v), want the innermost frame removed", parent, frame, ok)
 	}
 	top, ok := s.PopN(3)
@@ -44,22 +50,32 @@ func TestScopePathPushAndPop(t *testing.T) {
 	if _, _, ok := execution.ScopePath("").Pop(); ok {
 		t.Error("Pop() on the top level succeeded, want false")
 	}
-	one := execution.ScopePath("").Push(execution.LoopFrame("a", 0))
-	if p, f, ok := one.Pop(); !ok || p != "" || f != execution.LoopFrame("a", 0) {
+	one := execution.ScopePath("").Push(execution.LoopFrame("a", entryA, 0))
+	if p, f, ok := one.Pop(); !ok || p != "" || f != execution.LoopFrame("a", entryA, 0) {
 		t.Errorf("Pop() of a single frame = (%q, %+v, %v)", p, f, ok)
 	}
 }
 
 func TestParseScopePath(t *testing.T) {
 	t.Parallel()
-	valid := []string{"", "L:a#0", "L:a#0/L:b#12", "MI:node-1#3/L:x_y#0"}
+	loop := func(node string, i string) string { return "L:" + node + "@" + string(entryA) + "#" + i }
+	valid := []string{"", loop("a", "0"), loop("a", "0") + "/" + loop("b", "12"), "MI:node-1#3/" + loop("x_y", "0")}
 	for _, text := range valid {
 		got, err := execution.ParseScopePath(text)
 		if err != nil || string(got) != text {
 			t.Errorf("ParseScopePath(%q) = (%q, %v), want it accepted", text, got, err)
 		}
 	}
-	invalid := []string{"x", "L:a", "L:#1", "L:a#x", "L:a#-1", "Z:a#0", "L:a#0/", "/L:a#0", "L:a#0//L:b#0", "L:a#00", "L:a#+1", "L:0#0/L:0#00"}
+	invalid := []string{
+		"x", "L:a", "L:#1", "Z:a#0", "/" + loop("a", "0"), loop("a", "0") + "/", loop("a", "0") + "//" + loop("b", "0"),
+		loop("a", "x"), loop("a", "-1"), loop("a", "00"), loop("a", "+1"),
+		"L:a#0",                // a loop frame needs its entry token
+		"L:a@#0",               // empty entry
+		"L:a@not-a-token-id#0", // not canonical id text
+		"L:a@0AA1B2C3-D4E5-4F60-8718-293A4B5C6D7E#0", // uppercase is not canonical
+		"MI:a@" + string(entryA) + "#0",              // multi-instance frames have no entry
+		"L:@" + string(entryA) + "#0",                // no node
+	}
 	for _, text := range invalid {
 		if got, err := execution.ParseScopePath(text); err == nil {
 			t.Errorf("ParseScopePath(%q) = %q, want an error", text, got)
@@ -76,7 +92,10 @@ func TestParseScopePath(t *testing.T) {
 // FuzzParseScopePath checks the parser of stored scope text: it must never
 // panic, and whatever it accepts must round-trip through its frames.
 func FuzzParseScopePath(f *testing.F) {
-	for _, seed := range []string{"", "L:a#0", "L:a#0/MI:b#3", "L:a", "///", "L:a#9999999999999999999"} {
+	for _, seed := range []string{
+		"", "L:a@" + string(entryA) + "#0", "L:a@" + string(entryA) + "#0/MI:b#3", "L:a", "///",
+		"L:a@" + string(entryA) + "#9999999999999999999", "L:a@" + string(entryA) + "#00", "L:a@#0",
+	} {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, text string) {

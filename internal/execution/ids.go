@@ -65,6 +65,13 @@ func joinTokenID(exec ID, join flow.NodeID, scope ScopePath) TokenID {
 	return TokenID(hashID(string(exec), string(join), string(scope)))
 }
 
+// roundTokenID is the continuation token of a round of a LET_FINISH join. It
+// derives from the id of the split instance, never from the round number: the
+// number depends on commit order, the id does not.
+func roundTokenID(exec ID, join flow.NodeID, scope ScopePath, split NodeExecutionID) TokenID {
+	return TokenID(hashID(string(exec), string(join), string(scope), "round", string(split)))
+}
+
 // nodeExecutionID is H(executionId, tokenId, nodeId, scopePath).
 func nodeExecutionID(exec ID, token TokenID, node flow.NodeID, scope ScopePath) NodeExecutionID {
 	return NodeExecutionID(hashID(string(exec), string(token), string(node), string(scope)))

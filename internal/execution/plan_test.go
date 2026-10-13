@@ -301,8 +301,8 @@ func TestCompileRejectsJoinDataModesTheEngineCannotRun(t *testing.T) {
 			// The check lives in flow.Validate, shared with publication, so
 			// Compile reports it as an invalid flow.
 			report := flow.Validate(&doc)
-			if !report.Has(flow.CodeJoinData, flow.SeverityError) {
-				t.Fatalf("Validate() issues = %v, want a %s error", report.Issues, flow.CodeJoinData)
+			if !report.Has(flow.CodeV14, flow.SeverityError) {
+				t.Fatalf("Validate() issues = %v, want a %s error", report.Issues, flow.CodeV14)
 			}
 			if _, err := execution.Compile(&doc); !errors.Is(err, execution.ErrInvalidFlow) {
 				t.Errorf("Compile() = %v, want ErrInvalidFlow", err)

@@ -549,3 +549,56 @@ func TestDiscriminatorCancelsOnlyTheNearestDominatingSplit(t *testing.T) {
 		t.Errorf("activities mismatch (-want +got): only b, the other branch of the inner split, is canceled\n%s", diff)
 	}
 }
+
+func TestLetFinishDoesNotAbsorbTheFailureOfAnotherBranch(t *testing.T) {
+	t.Parallel()
+	// The join fired on a's arrival, but b still runs and fails: with
+	// STOP_EXECUTION the execution fails, the join does not hide it.
+	b := executiontest.NewFlow("let-finish-fails").
+		Start("s").Parallel("p").Task("a").Task("b").Parallel("j").Task("after").End("e").
+		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingLetFinish).
+		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "j").Edge("b", "j").Chain("j", "after", "e")
+	fail := func(execution.NodeCall) (execution.NodeOutput, error) {
+		return execution.NodeOutput{}, executiontest.ErrBoom
+	}
+	runner := &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"b": fail}}
+	res := executiontest.Run(t, b, execution.Deps{Runner: runner}, executiontest.Batch(`{}`))
+	if res.Status != execution.ExecFailed || res.Failure == nil || res.Failure.Node != "b" {
+		t.Fatalf("result = %s %+v, want FAILED at node b", res.Status, res.Failure)
+	}
+	if executiontest.Count(res, execution.EventJoinFired) != 1 {
+		t.Error("the join did not fire on the first arrival before b failed")
+	}
+}
+
+func TestLetFinishRoundsGetIdsFromTheirSplitInstance(t *testing.T) {
+	t.Parallel()
+	// The continuation ids of the two rounds of the join differ, and they are
+	// the same in two runs: they derive from the split instance, not from the
+	// order in which the rounds were numbered.
+	run := func() []execution.TokenID {
+		res := executiontest.Run(t, wcp28Like(), execution.Deps{Runner: &executiontest.TraceRunner{}}, executiontest.Batch(`{}`))
+		var ids []execution.TokenID
+		for i := range res.Events {
+			if e := &res.Events[i]; e.Type == execution.EventJoinFired {
+				ids = append(ids, e.Token)
+			}
+		}
+		return ids
+	}
+	first, second := run(), run()
+	if len(first) != 2 || first[0] == first[1] {
+		t.Fatalf("continuation ids = %v, want two different ids", first)
+	}
+	if diff := cmp.Diff(first, second); diff != "" {
+		t.Errorf("continuation ids differ between runs (-first +second):\n%s", diff)
+	}
+}
+
+func wcp28Like() *executiontest.Builder {
+	return executiontest.NewFlow("rounds").
+		Start("s").Parallel("p0").Task("a").Task("b").Task("m").Parallel("sp").Task("x").Task("y").Parallel("j").Task("after").End("e").
+		Join("j", flow.JoinFirst).Remaining("j", flow.RemainingLetFinish).
+		Chain("s", "p0").Edge("p0", "a").Edge("p0", "b").Edge("a", "m").Edge("b", "m").Edge("m", "sp").
+		Edge("sp", "x").Edge("sp", "y").Edge("x", "j").Edge("y", "j").Chain("j", "after", "e")
+}

@@ -67,17 +67,78 @@ type joinArrival struct {
 // so the durability cut can persist it as the join_instance edge-state
 // document and run the same rules inside its transaction.
 type joinState struct {
-	mode     flow.JoinMode
-	edges    []joinEdge
-	arrivals []joinArrival
+	mode flow.JoinMode
+	// letFinish keeps rounds instead of firing once (remaining LET_FINISH).
+	letFinish bool
+	rounds    []*joinRound
+	edges     []joinEdge
+	arrivals  []joinArrival
 	// fired, failed and empty record the decision taken; a join decides once.
 	fired  bool
 	failed bool
 	empty  bool
 }
 
-func newJoinState(mode flow.JoinMode, incoming int) *joinState {
-	return &joinState{mode: mode, edges: make([]joinEdge, incoming)}
+// joinRound is one round of a LET_FINISH join: the arrivals that descend from
+// one instance of the join's corresponding split.
+type joinRound struct {
+	// number counts the rounds of the join from 1, in the order of their first
+	// arrival. It serves ordering and display; ids never derive from it.
+	number int
+	// split is the split instance the round belongs to, or the arriving token
+	// when the token carries none.
+	split    NodeExecutionID
+	arrivals []joinArrival
+	fired    bool
+	reset    bool
+}
+
+func newJoinState(spec *joinSpec, incoming int) *joinState {
+	return &joinState{mode: spec.mode, letFinish: spec.letFinish, edges: make([]joinEdge, incoming)}
+}
+
+// round returns the round of a split instance, creating it when the arrival is
+// the first of the instance.
+func (j *joinState) round(split NodeExecutionID) (*joinRound, bool) {
+	for _, rd := range j.rounds {
+		if rd.split == split {
+			return rd, false
+		}
+	}
+	rd := &joinRound{number: len(j.rounds) + 1, split: split}
+	j.rounds = append(j.rounds, rd)
+	return rd, true
+}
+
+// complete reports whether every incoming edge is complete.
+func (j *joinState) complete() bool {
+	for _, e := range j.edges {
+		if !e.complete() {
+			return false
+		}
+	}
+	return true
+}
+
+// done reports whether the join has settled for good, so that it may complete
+// its outgoing edges once its continuations have run. A LET_FINISH join is done
+// when every incoming edge is complete and every round has reset.
+func (j *joinState) done() bool {
+	if j.empty {
+		return true
+	}
+	if !j.letFinish {
+		return j.fired
+	}
+	if !j.complete() || len(j.rounds) == 0 {
+		return false
+	}
+	for _, rd := range j.rounds {
+		if !rd.reset {
+			return false
+		}
+	}
+	return true
 }
 
 func (j *joinState) settled() bool { return j.fired || j.failed || j.empty }
@@ -130,6 +191,14 @@ func (j *joinState) decide() joinOutcome {
 }
 
 func (j *joinState) rule() joinOutcome {
+	if j.letFinish {
+		// Rounds fire and reset the join; only a join that no token ever
+		// reached is decided here.
+		if len(j.arrivals) == 0 && j.complete() {
+			return joinEmpty
+		}
+		return joinWaiting
+	}
 	allComplete, anyLive, anyDead := true, len(j.arrivals) > 0, false
 	for _, e := range j.edges {
 		if !e.complete() {
@@ -186,39 +255,35 @@ func (j *joinState) combined() []joinArrival {
 }
 
 // continuationLineage returns the fork lineage of the continuation token: the
-// longest prefix the arrivals share, cut at the last entry whose split
-// dominates the join. Such a split's branches converge at the join, so the
-// continuation no longer descends from one of them. The dominates function
-// answers whether a split node dominates the join; the plan precomputes it.
-func continuationLineage(arrivals []joinArrival, dominates func(flow.NodeID) bool) []ForkRef {
+// longest prefix the arrivals share, without the entry of the join's
+// corresponding split and whatever follows it. That split's branches converge
+// at the join, so the continuation no longer descends from one of them. A
+// lineage without the entry (the split did not fork on this run) is kept.
+func continuationLineage(arrivals []joinArrival, split flow.NodeID) []ForkRef {
 	if len(arrivals) == 0 {
 		return nil
 	}
 	prefix := slices.Clone(arrivals[0].Lineage)
-	for _, a := range arrivals[1:] {
+	keep := len(prefix)
+	for _, a := range arrivals {
 		n := 0
 		for n < len(prefix) && n < len(a.Lineage) && prefix[n] == a.Lineage[n] {
 			n++
 		}
 		prefix = prefix[:n]
+		// The entry to drop is found on the full lineage of each arrival: the
+		// branches of the split are what differs between the arrivals.
+		if i := lastEntryOf(a.Lineage, split); i >= 0 {
+			keep = min(keep, i)
+		}
 	}
-	return cutAtDominator(prefix, dominates)
+	return prefix[:min(len(prefix), keep)]
 }
 
-// cutAtDominator drops the last lineage entry whose split dominates the join,
-// and everything after it.
-func cutAtDominator(lineage []ForkRef, dominates func(flow.NodeID) bool) []ForkRef {
-	if i := lastDominating(lineage, dominates); i >= 0 {
-		return lineage[:i]
-	}
-	return lineage
-}
-
-// lastDominating returns the index of the last lineage entry whose split node
-// dominates the join, or -1.
-func lastDominating(lineage []ForkRef, dominates func(flow.NodeID) bool) int {
+// lastEntryOf returns the index of the last lineage entry of a split node, or -1.
+func lastEntryOf(lineage []ForkRef, split flow.NodeID) int {
 	for i := len(lineage) - 1; i >= 0; i-- {
-		if dominates(lineage[i].SplitNode) {
+		if lineage[i].SplitNode == split {
 			return i
 		}
 	}

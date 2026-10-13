@@ -4,6 +4,7 @@
 package execution_test
 
 import (
+	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -37,7 +38,7 @@ func scopesOf(res execution.Result, node string) []string {
 	var out []string
 	for _, ne := range res.NodeExecutions {
 		if ne.Node == flow.NodeID(node) {
-			out = append(out, string(ne.Scope))
+			out = append(out, executiontest.MaskEntries(string(ne.Scope)))
 		}
 	}
 	return out
@@ -263,7 +264,7 @@ func TestLoopBackEdgeFromAGatewayWithConditions(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		asked++
-		scopes = append(scopes, string(env.Scope))
+		scopes = append(scopes, executiontest.MaskEntries(string(env.Scope)))
 		return asked <= 2, nil
 	})
 	res := executiontest.Run(t, b, execution.Deps{Runner: &executiontest.TraceRunner{}, Conditions: conds}, executiontest.Batch(`{}`))
@@ -278,23 +279,32 @@ func TestLoopBackEdgeFromAGatewayWithConditions(t *testing.T) {
 	}
 }
 
-func TestLoopEnteredTwiceInTheSameScopeFails(t *testing.T) {
+func TestLoopWithTwoTokensReturningInOneIterationStopsTheRun(t *testing.T) {
 	t.Parallel()
-	b := executiontest.NewFlow("double-entry").
-		Start("s").Parallel("p").Task("a").Task("b").Task("m").Loop("L", 3).Task("work").If("more", flow.RoutingExclusive).End("e").
-		Chain("s", "p").Edge("p", "a").Edge("p", "b").Edge("a", "m").Edge("b", "m").Edge("m", "L").
-		Edge("L", "work", executiontest.Port("loop")).Edge("work", "more").
-		Edge("more", "L", executiontest.Port("true"), executiontest.Back()).Edge("more", "e", executiontest.Port("false"))
-	res := executiontest.Run(t, b, counterDeps(2), executiontest.Batch(`{"n":0}`))
-	if res.Status != execution.ExecFailed {
-		t.Fatalf("status = %s, want FAILED", res.Status)
-	}
-	if f := res.Failure; f == nil || f.Code != "Unsupported" || !f.Internal || f.Node != "L" {
-		t.Errorf("failure = %+v, want the internal Unsupported failure at loop L", f)
-	}
-	for _, e := range res.Events {
-		if e.Type == execution.EventExecutionFailed && e.Detail != "" {
-			t.Errorf("execution.failed carries detail %q; an internal code is never emitted", e.Detail)
+	// In iteration 0 the test sends the item through two back edges: two tokens
+	// would start iteration 1 of the same instance. The interpreter reports it
+	// instead of mixing the trackers of the two.
+	b := executiontest.NewFlow("two-back").
+		Start("s").Loop("L", 5).Task("work").If("c", flow.RoutingInclusive).End("e").
+		Edge("s", "L").Edge("L", "work", executiontest.Port("loop")).Edge("work", "c").
+		Edge("c", "L", executiontest.Port("again"), executiontest.Back()).
+		Edge("c", "L", executiontest.Port("also"), executiontest.Back()).
+		Edge("c", "e", executiontest.Port("exit"))
+	router := executiontest.RouterFunc(func(_ *flow.Node, it execution.Item) []string {
+		if v, ok := it.JSON.Get("n"); ok {
+			if n, _ := v.Int64(); n >= 2 {
+				return []string{"exit"}
+			}
 		}
+		return []string{"again", "also"}
+	})
+	deps := execution.Deps{
+		Router: router,
+		Runner: &executiontest.TraceRunner{Behaviors: map[flow.NodeID]func(execution.NodeCall) (execution.NodeOutput, error){"work": executiontest.Increment("n")}},
+	}
+	plan := executiontest.MustCompile(t, b)
+	_, err := execution.NewInterpreter(deps).Run(t.Context(), plan, execution.Request{Execution: "x", Input: executiontest.Batch(`{"n":0}`)})
+	if !errors.Is(err, execution.ErrUnsupported) {
+		t.Errorf("Run() = %v, want ErrUnsupported", err)
 	}
 }
