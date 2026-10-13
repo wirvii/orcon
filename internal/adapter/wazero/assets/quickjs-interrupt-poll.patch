@@ -1,28 +1,833 @@
+--- a/libregexp.c
++++ b/libregexp.c
+@@ -97,6 +97,7 @@
+     int total_capture_count; /* -1 = not computed yet */
+     int has_named_captures; /* -1 = don't know, 0 = no, 1 = yes */
+     void *opaque;
++    unsigned orcon_terms; /* Orcon patch: terms parsed, to poll the embedder */
+     DynBuf group_names;
+     union {
+         char error_msg[TMP_BUF_SIZE];
+@@ -2431,6 +2432,9 @@
+             break;
+         if (*p == '|' || *p == ')')
+             break;
++        /* Orcon patch: let the embedder stop the compilation of a huge pattern */
++        if ((++s->orcon_terms & 1023) == 0 && lre_check_timeout(s->opaque))
++            return re_parse_error(s, "interrupted");
+         term_start = s->byte_code.size;
+         ret = re_parse_term(s, is_backward_dir);
+         if (ret)
+@@ -2464,6 +2468,8 @@
+         return -1;
+     while (*s->buf_ptr == '|') {
+         s->buf_ptr++;
++        if (lre_check_timeout(s->opaque))
++            return re_parse_error(s, "interrupted");
+ 
+         len = s->byte_code.size - start;
+ 
+--- a/libunicode.c
++++ b/libunicode.c
+@@ -973,8 +973,18 @@
+     }
+ }
+ 
+-static void sort_cc(int *buf, int len)
++/* Orcon patch: the long loops of the normalizer call this hook, which asks the
++   embedder whether to stop (SPEC-001 amendment 10, section C). It returns
++   non-zero to stop; unicode_normalize then fails with -1. */
++int (*unicode_poll_hook)(void *opaque, int units);
++
++static int unicode_poll(int units)
+ {
++    return unicode_poll_hook && unicode_poll_hook(NULL, units);
++}
++
++static int sort_cc(int *buf, int len)
++{
+     int i, j, k, cc, cc1, start, ch1;
+ 
+     for(i = 0; i < len; i++) {
+@@ -995,21 +1005,26 @@
+                     k--;
+                 }
+                 buf[k + 1] = ch1;
++                if (unicode_poll(j - k))
++                    return -1;
+                 j++;
+             }
+             i = j;
+         }
+     }
++    return 0;
+ }
+ 
+-static void to_nfd_rec(DynBuf *dbuf,
+-                       const int *src, int src_len, int is_compat)
++static int to_nfd_rec(DynBuf *dbuf,
++                      const int *src, int src_len, int is_compat)
+ {
+     uint32_t c, v;
+     int i, l;
+     uint32_t res[UNICODE_DECOMP_LEN_MAX];
+ 
+     for(i = 0; i < src_len; i++) {
++        if ((i & 255) == 255 && unicode_poll(256))
++            return -1;
+         c = src[i];
+         if (c >= 0xac00 && c < 0xd7a4) {
+             /* Hangul decomposition */
+@@ -1022,12 +1037,14 @@
+         } else {
+             l = unicode_decomp_char(res, c, is_compat);
+             if (l) {
+-                to_nfd_rec(dbuf, (int *)res, l, is_compat);
++                if (to_nfd_rec(dbuf, (int *)res, l, is_compat))
++                    return -1;
+             } else {
+                 dbuf_put_u32(dbuf, c);
+             }
+         }
+     }
++    return 0;
+ }
+ 
+ /* return 0 if not found */
+@@ -1068,6 +1085,8 @@
+     /* common case: latin1 is unaffected by NFC */
+     if (n_type == UNICODE_NFC) {
+         for(i = 0; i < src_len; i++) {
++            if ((i & 4095) == 4095 && unicode_poll(256))
++                goto fail;
+             if (src[i] >= 0x100)
+                 goto not_latin1;
+         }
+@@ -1078,7 +1097,8 @@
+     not_latin1: ;
+     }
+ 
+-    to_nfd_rec(dbuf, (const int *)src, src_len, is_compat);
++    if (to_nfd_rec(dbuf, (const int *)src, src_len, is_compat))
++        goto fail;
+     if (dbuf_error(dbuf)) {
+     fail:
+         *pdst = NULL;
+@@ -1087,7 +1107,8 @@
+     buf = (int *)dbuf->buf;
+     buf_len = dbuf->size / sizeof(int);
+ 
+-    sort_cc(buf, buf_len);
++    if (sort_cc(buf, buf_len))
++        goto fail;
+ 
+     if (buf_len <= 1 || (n_type & 1) != 0) {
+         /* NFD / NFKD */
+@@ -1098,6 +1119,8 @@
+     i = 1;
+     out_len = 1;
+     while (i < buf_len) {
++        if ((i & 1023) == 1023 && unicode_poll(256))
++            goto fail;
+         /* find the starter character and test if it is blocked from
+            the character at 'i' */
+         last_cc = unicode_get_cc(buf[i]);
+--- a/libunicode.h
++++ b/libunicode.h
+@@ -109,6 +109,9 @@
+ bool lre_is_id_continue(uint32_t c);
+ bool lre_is_white_space(uint32_t c);
+ 
++/* Orcon patch: set by the embedder; called by the long loops of the normalizer. */
++extern int (*unicode_poll_hook)(void *opaque, int units);
++
+ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
+                       UnicodeNormalizationEnum n_type,
+                       void *opaque, void *(*realloc_func)(void *opaque, void *ptr, size_t size));
 --- a/quickjs.c
 +++ b/quickjs.c
-@@ -8666,6 +8666,21 @@
- static inline __exception int js_poll_interrupts(JSContext *ctx)
- {
-     if (unlikely(--ctx->interrupt_counter <= 0)) {
+@@ -618,6 +618,82 @@
+                              const char *filename, int line, int flags, int scope_idx);
+     void *user_opaque;
+ };
++
++/* Orcon patch (SPEC-001 amendment 10): polling and charging of the interrupt
++   counter. They sit here, after JSContext, so every function can use them. */
++static no_inline __exception int __js_poll_interrupts(JSContext *ctx);
++
++static inline __exception int js_poll_interrupts(JSContext *ctx)
++{
++    if (unlikely(--ctx->interrupt_counter <= 0)) {
 +        return __js_poll_interrupts(ctx);
 +    } else {
 +        return 0;
 +    }
 +}
 +
-+/* Orcon patch: poll the interrupt handler from a native loop. units is the
-+   work done since the previous poll, in the same scale as the bytecode
-+   operations that js_poll_interrupts counts, so a long native loop reaches the
-+   handler as often as a long bytecode loop does. Returns -1 with the
-+   "interrupted" exception set when the handler asks to stop. */
++/* Poll the interrupt handler from a native loop. units is the work done since
++   the previous poll, in the same scale as the bytecode operations that
++   js_poll_interrupts counts (about 10-20 ns each), so a long native loop
++   reaches the handler as often as a long bytecode loop does. Returns -1 with
++   the "interrupted" exception set when the handler asks to stop. */
 +static inline __exception int js_poll_work(JSContext *ctx, int units)
 +{
 +    ctx->interrupt_counter -= units;
 +    if (unlikely(ctx->interrupt_counter <= 0)) {
-         return __js_poll_interrupts(ctx);
++        return __js_poll_interrupts(ctx);
++    } else {
++        return 0;
++    }
++}
++
++/* Helpers that have no context (the multi-precision loops, the encoders, the
++   Unicode normalizer) poll through the context of the runtime they run in. A
++   runtime has one context in Orcon. orcon_poll_tripped tells the caller that
++   the helper stopped because the handler asked to, with the "interrupted"
++   exception already set. */
++static JSContext *orcon_poll_ctx;
++static int orcon_poll_tripped;
++
++static inline int orcon_poll(int units)
++{
++    if (orcon_poll_ctx && js_poll_work(orcon_poll_ctx, units)) {
++        orcon_poll_tripped = 1;
++        return -1;
++    }
++    return 0;
++}
++
++static int orcon_unicode_poll(void *opaque, int units)
++{
++    return orcon_poll(units);
++}
++
++/* length of a string value, flat or rope */
++#define ORCON_STR_LEN(v) (JS_VALUE_GET_TAG(v) == JS_TAG_STRING ? \
++                          (int)JS_VALUE_GET_STRING(v)->len : (int)JS_VALUE_GET_STRING_ROPE(v)->len)
++
++/* Charge native work to the interrupt counter without calling the handler. It
++   never throws and may be used anywhere, the allocator included: when the
++   counter reaches zero the next poll that already exists (a backward jump or
++   a call in the interpreter, or a js_poll_work) calls the handler. This is
++   what makes an interpreted loop that calls an expensive native function
++   reach the handler after a bounded amount of work, not after a fixed number
++   of bytecode operations. The counter is kept far from overflow. */
++static inline void js_charge_work(JSContext *ctx, size_t units)
++{
++    int c = ctx->interrupt_counter;
++    if (c > -(1 << 30))
++        ctx->interrupt_counter = c - (int)(units > (1u << 24) ? (1u << 24) : units);
++}
++
++/* The same for code that only has the runtime: the charge goes to its first
++   context. */
++static inline void js_charge_work_rt(JSRuntime *rt, size_t units)
++{
++    if (likely(!list_empty(&rt->context_list)))
++        js_charge_work(list_entry(rt->context_list.next, JSContext, link), units);
++}
+ 
+ typedef union JSFloat64Union {
+     double d;
+@@ -1981,6 +2057,8 @@
+     void *ptr;
+     JSMallocState *s;
+ 
++    js_charge_work_rt(rt, (count * size) >> 7);
++
+     /* Do not allocate zero bytes: behavior is platform dependent */
+     assert(count != 0 && size != 0);
+ 
+@@ -2007,6 +2085,8 @@
+     void *ptr;
+     JSMallocState *s;
+ 
++    js_charge_work_rt(rt, size >> 7);
++
+     /* Do not allocate zero bytes: behavior is platform dependent */
+     if (unlikely(size == 0))
+         return NULL;
+@@ -2047,6 +2127,8 @@
+ {
+     size_t old_size;
+     JSMallocState *s;
++
++    js_charge_work_rt(rt, size >> 7);
+ 
+     if (!ptr) {
+         if (size == 0)
+@@ -2863,6 +2945,10 @@
+     }
+     ctx->rt = rt;
+     list_add_tail(&ctx->link, &rt->context_list);
++    if (!orcon_poll_ctx) {
++        orcon_poll_ctx = ctx;
++        unicode_poll_hook = orcon_unicode_poll;
++    }
+     for(i = 0; i < rt->class_count; i++)
+         ctx->class_proto[i] = JS_NULL;
+     ctx->array_ctor = JS_NULL;
+@@ -3105,6 +3191,10 @@
+     js_free_shape_null(ctx->rt, ctx->regexp_shape);
+     js_free_shape_null(ctx->rt, ctx->regexp_result_shape);
+ 
++    if (orcon_poll_ctx == ctx) {
++        orcon_poll_ctx = NULL;
++        unicode_poll_hook = NULL;
++    }
+     list_del(&ctx->link);
+     remove_gc_object(&ctx->header);
+     js_free_rt(ctx->rt, ctx);
+@@ -4343,6 +4433,8 @@
+         int i;
+         uint16_t c = 0;
+         for (i = start; i < end; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             c |= str16(p)[i];
+         }
+         if (c > 0xFF)
+@@ -4352,6 +4444,8 @@
+         if (!str)
+             return JS_EXCEPTION;
+         for (i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             str8(str)[i] = str16(p)[start + i];
+         }
+         str8(str)[len] = '\0';
+@@ -8661,15 +8755,6 @@
+         }
+     }
+     return 0;
+-}
+-
+-static inline __exception int js_poll_interrupts(JSContext *ctx)
+-{
+-    if (unlikely(--ctx->interrupt_counter <= 0)) {
+-        return __js_poll_interrupts(ctx);
+-    } else {
+-        return 0;
+-    }
+ }
+ 
+ /* return -1 (exception) or true/false */
+@@ -8864,6 +8949,8 @@
+     proto = JS_VALUE_GET_OBJ(obj_proto);
+     p = JS_VALUE_GET_OBJ(val);
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         proto1 = p->shape->proto;
+         if (!proto1) {
+             /* slow case if proxy in the prototype chain */
+@@ -8871,6 +8958,8 @@
+                 JSValue obj1;
+                 obj1 = js_dup(JS_MKPTR(JS_TAG_OBJECT, (JSObject *)p));
+                 for(;;) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     obj1 = JS_GetPrototypeFree(ctx, obj1);
+                     if (JS_IsException(obj1)) {
+                         ret = -1;
+@@ -9163,6 +9252,8 @@
+     }
+ 
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         prs = find_own_property(&pr, p, prop);
+         if (prs) {
+             /* found */
+@@ -9537,6 +9628,8 @@
+     tab_exotic = NULL;
+     sh = p->shape;
+     for(i = 0, prs = get_shape_prop(sh); i < sh->prop_count; i++, prs++) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         atom = prs->atom;
+         if (atom != JS_ATOM_NULL) {
+             is_enumerable = ((prs->flags & JS_PROP_ENUMERABLE) != 0);
+@@ -9580,6 +9673,8 @@
+                                                JS_MKPTR(JS_TAG_OBJECT, p)))
+                     return -1;
+                 for(i = 0; i < exotic_count; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     atom = tab_exotic[i].atom;
+                     kind = JS_AtomGetKind(ctx, atom);
+                     if (((flags >> kind) & 1) != 0) {
+@@ -9624,6 +9719,8 @@
+     num_sorted = true;
+     sh = p->shape;
+     for(i = 0, prs = get_shape_prop(sh); i < sh->prop_count; i++, prs++) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         atom = prs->atom;
+         if (atom != JS_ATOM_NULL) {
+             is_enumerable = ((prs->flags & JS_PROP_ENUMERABLE) != 0);
+@@ -9656,6 +9753,8 @@
+                 len = js_string_obj_get_length(ctx, JS_MKPTR(JS_TAG_OBJECT, p));
+             add_array_keys:
+                 for(i = 0; i < len; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     tab_atom[num_index].atom = __JS_AtomFromUInt32(i);
+                     if (tab_atom[num_index].atom == JS_ATOM_NULL) {
+                         js_free_prop_enum(ctx, tab_atom, num_index);
+@@ -9668,6 +9767,8 @@
+         } else {
+             /* Note: exotic keys are not reordered and comes after the object own properties. */
+             for(i = 0; i < exotic_count; i++) {
++                if (js_poll_interrupts(ctx))
++                    return -1;
+                 atom = tab_exotic[i].atom;
+                 is_enumerable = tab_exotic[i].is_enumerable;
+                 kind = JS_AtomGetKind(ctx, atom);
+@@ -9891,6 +9992,8 @@
+         return false;
+     p = JS_VALUE_GET_OBJ(obj);
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         if (p->is_exotic) {
+             const JSClassExoticMethods *em = ctx->rt->class_array[p->class_id].exotic;
+             if (em && em->has_property) {
+@@ -10224,6 +10327,8 @@
+     if (p->class_id == JS_CLASS_MAPPED_ARGUMENTS) {
+         JSVarRef **tab = p->u.array.u.var_refs;
+         for(i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return -1;
+             /* add_property cannot fail here but
+                __JS_AtomFromUInt32(i) fails for i > INT32_MAX */
+             pr = add_property(ctx, p, __JS_AtomFromUInt32(i), JS_PROP_C_W_E | JS_PROP_VARREF);
+@@ -10232,6 +10337,8 @@
      } else {
-         return 0;
-@@ -43444,6 +43459,8 @@
+         JSValue *tab = p->u.array.u.values;
+         for(i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return -1;
+             /* add_property cannot fail here but
+                __JS_AtomFromUInt32(i) fails for i > INT32_MAX */
+             pr = add_property(ctx, p, __JS_AtomFromUInt32(i), JS_PROP_C_W_E);
+@@ -10371,6 +10478,8 @@
+         uint32_t old_len = p->u.array.count;
+         if (len < old_len) {
+             for(i = len; i < old_len; i++) {
++                if (js_poll_interrupts(ctx))
++                    return -1;
+                 JS_FreeValue(ctx, p->u.array.u.values[i]);
+                 p->u.array.u.values[i] = JS_UNDEFINED;
+             }
+@@ -10393,6 +10502,8 @@
+ 
+                 /* faster to iterate */
+                 while (cur_len > len) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     atom = JS_NewAtomUInt32(ctx, cur_len - 1);
+                     ret = delete_property(ctx, p, atom);
+                     JS_FreeAtom(ctx, atom);
+@@ -10608,6 +10719,8 @@
+     }
+ 
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         if (p1->is_exotic) {
+             if (p1->fast_array) {
+                 if (__JS_AtomIsTaggedInt(prop)) {
+@@ -12463,6 +12576,8 @@
+ 
+     result[op1_size] = js_mp_mul1(result, op1, op1_size, op2[0], 0);
+     for(i=1;i<op2_size;i++) {
++        if (orcon_poll((int)(op1_size >> 3) + 1))
++            return;
+         r = js_mp_add_mul1(result + i, op1, op1_size, op2[i]);
+         result[i + op1_size] = r;
+     }
+@@ -12578,6 +12693,8 @@
+     }
+ 
+     for(i = n - 1; i >= 0; i--) {
++        if (orcon_poll((int)(nb >> 3) + 1))
++            return;
+         if (unlikely(taba[i + nb] >= b1)) {
+             q = -1;
+         } else if (b1_inv) {
+@@ -12901,6 +13018,11 @@
+     if (!r)
+         return NULL;
+     js_mp_mul_basecase(r->tab, a->tab, a->len, b->tab, b->len);
++    if (orcon_poll_tripped) {
++        orcon_poll_tripped = 0;
++        js_free(ctx, r);
++        return NULL;
++    }
+     /* correct the result if negative operands (no overflow is
+        possible) */
+     if (js_bigint_sign(a))
+@@ -12992,6 +13114,12 @@
+     //    js_bigint_dump1(ctx, "b", tabb, nb);
+     js_mp_divnorm(q->tab, r->tab, na, tabb, nb);
+     js_free(ctx, tabb);
++    if (orcon_poll_tripped) {
++        orcon_poll_tripped = 0;
++        js_free(ctx, r);
++        js_free(ctx, q);
++        return NULL;
++    }
+ 
+     if (is_rem) {
+         js_free(ctx, q);
+@@ -13517,6 +13645,10 @@
+             if (len == 1 && r->tab[0] == 0) {
+                 r->tab[0] = v;
+             } else {
++                if (js_poll_work(ctx, (len >> 3) + 1)) {
++                    js_free(ctx, r);
++                    return NULL;
++                }
+                 h = js_mp_mul1(r->tab, r->tab, len, js_pow_dec[i], v);
+                 if (h != 0) {
+                     r->tab[len++] = h;
+@@ -13694,6 +13826,11 @@
+                     }
+                     break;
+                 } else {
++                    if (js_poll_work(ctx, (len >> 3) + 1)) {
++                        js_free(ctx, buf);
++                        js_free(ctx, tmp);
++                        return JS_EXCEPTION;
++                    }
+                     v = js_mp_div1(r->tab, r->tab, len, radix_base, 0);
+                     q = js_limb_to_a(q, v, radix, js_digits_per_limb_table[radix - 2]);
+                 }
+@@ -15973,6 +16110,7 @@
+         } else {
+             res = js_string_rope_compare(op1, op2, false);
+         }
++        js_charge_work(ctx, (size_t)min_int(ORCON_STR_LEN(op1), ORCON_STR_LEN(op2)) >> 3);
+         switch(op) {
+         case OP_lt:
+             res = (res < 0);
+@@ -16277,6 +16415,8 @@
+             } else {
+                 res = (js_string_rope_compare(op1, op2, true) == 0);
+             }
++            if (tag_is_string(tag2))
++                js_charge_work(ctx, (size_t)min_int(ORCON_STR_LEN(op1), ORCON_STR_LEN(op2)) >> 3);
+         }
+         break;
+     case JS_TAG_SYMBOL:
+@@ -16782,6 +16922,8 @@
+     /* fast path: assume no enumerable properties in the prototype chain */
+     obj1 = js_dup(obj);
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         obj1 = JS_GetPrototypeFree(ctx, obj1);
+         if (JS_IsNull(obj1))
+             break;
+@@ -16813,6 +16955,8 @@
+         /* check that there are no enumerable normal fields */
+         sh = p->shape;
+         for(i = 0, prs = get_shape_prop(sh); i < sh->prop_count; i++, prs++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (prs->flags & JS_PROP_ENUMERABLE)
+                 goto normal_case;
+         }
+@@ -16825,6 +16969,8 @@
+                                    JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY))
+             goto fail;
+         for(i = 0; i < tab_atom_count; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JS_SetPropertyInternal(ctx, enum_obj, tab_atom[i].atom, JS_NULL, 0);
+         }
+         js_free_prop_enum(ctx, tab_atom, tab_atom_count);
+@@ -16836,6 +16982,8 @@
+        prototype chain */
+     obj1 = js_dup(obj);
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_GetOwnPropertyNamesInternal(ctx, &tab_atom, &tab_atom_count,
+                                            JS_VALUE_GET_OBJ(obj1),
+                                            JS_GPN_STRING_MASK | JS_GPN_SET_ENUM)) {
+@@ -16843,6 +16991,8 @@
+             goto fail;
+         }
+         for(i = 0; i < tab_atom_count; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JS_DefinePropertyValue(ctx, enum_obj, tab_atom[i].atom, JS_NULL,
+                                    (tab_atom[i].is_enumerable ?
+                                     JS_PROP_ENUMERABLE : 0));
+@@ -16894,6 +17044,8 @@
+     it = p->u.for_in_iterator;
+ 
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         if (it->is_array) {
+             if (it->idx >= it->array_length)
+                 goto done;
+@@ -17362,6 +17514,8 @@
+             goto general_case;
+         /* Handle fast arrays explicitly */
+         for (i = 0; i < count32; i++) {
++            if (js_poll_interrupts(ctx))
++                return -1;
+             if (JS_DefinePropertyValueUint32(ctx, sp[-3], pos++,
+                                              js_dup(arrp[i]), JS_PROP_C_W_E) < 0)
+                 goto exception;
+@@ -17369,6 +17523,8 @@
+     } else {
+     general_case:
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return -1;
+             int done;
+             value = JS_IteratorNext(ctx, enumobj, method, 0, NULL, &done);
+             if (JS_IsException(value))
+@@ -17431,6 +17587,8 @@
+         return -1;
+ 
+     for (i = 0; i < tab_atom_count; i++) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         if (pexcl) {
+             ret = JS_GetOwnPropertyInternal(ctx, NULL, pexcl, tab_atom[i].atom);
+             if (ret) {
+@@ -18175,6 +18333,8 @@
+ 
+  restart:
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         int call_argc;
+         JSValue *call_argv;
+ 
+@@ -18235,6 +18395,8 @@
+                 if (likely(JS_VALUE_GET_TAG(obj) == JS_TAG_OBJECT)) {
+                     p = JS_VALUE_GET_OBJ(obj);
+                     for(;;) {
++                        if (js_poll_interrupts(ctx))
++                            return JS_EXCEPTION;
+                         prs = find_own_property(&pr, p, atom);
+                         if (prs) {
+                             /* found */
+@@ -19559,6 +19721,8 @@
+                 if (likely(JS_VALUE_GET_TAG(obj) == JS_TAG_OBJECT)) {
+                     p = JS_VALUE_GET_OBJ(obj);
+                     for(;;) {
++                        if (js_poll_interrupts(ctx))
++                            return JS_EXCEPTION;
+                         prs = find_own_property(&pr, p, atom);
+                         if (prs) {
+                             /* found */
+@@ -19607,6 +19771,8 @@
+                 if (likely(JS_VALUE_GET_TAG(obj) == JS_TAG_OBJECT)) {
+                     p = JS_VALUE_GET_OBJ(obj);
+                     for(;;) {
++                        if (js_poll_interrupts(ctx))
++                            return JS_EXCEPTION;
+                         prs = find_own_property(&pr, p, atom);
+                         if (prs) {
+                             /* found */
+@@ -23095,6 +23261,8 @@
+         JS_ThrowStackOverflow(s->ctx);
+         return -1;
+     }
++    if (js_poll_interrupts(s->ctx))
++        return -1;
+ 
+     free_token(s, &s->token);
+ 
+@@ -41278,6 +41446,8 @@
+     //      modifying the object. This would require allocating an array
+     //      JSPropertyDescriptor and use 2 separate loops.
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         JS_FreeValue(ctx, desc);
+         desc = JS_GetProperty(ctx, props, atoms[i].atom);
+         if (JS_IsException(desc))
+@@ -41540,6 +41710,8 @@
+     if (JS_IsException(r))
+         goto exception;
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSValue atomValue, desc;
+         JSValueConst args[2];
+ 
+@@ -41589,6 +41761,8 @@
+     if (JS_IsException(r))
+         goto exception;
+     for(j = i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSAtom atom = atoms[i].atom;
+         if (flags & JS_GPN_ENUM_ONLY) {
+             int desc_flags, res;
+@@ -41938,6 +42112,8 @@
+     if (JS_IsException(obj))
+         goto exception;
+     for (i = 1; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (!JS_IsNull(argv[i]) && !JS_IsUndefined(argv[i])) {
+             s = JS_ToObject(ctx, argv[i]);
+             if (JS_IsException(s))
+@@ -41993,6 +42169,8 @@
+         return JS_EXCEPTION;
+ 
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         int prop_flags;
+         JSAtom prop = props[i].atom;
+ 
+@@ -42036,6 +42214,8 @@
+         return JS_EXCEPTION;
+ 
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         int prop_flags;
+         JSAtom prop = props[i].atom;
+ 
+@@ -42102,6 +42282,8 @@
+         goto fail;
+ 
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSValue key, value, item;
+         item = JS_IteratorNext(ctx, iter, next_method, 0, NULL, &done);
+         if (JS_IsException(item))
+@@ -42221,6 +42403,8 @@
+         return JS_EXCEPTION;
+     v1 = js_dup(v);
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         v1 = JS_GetPrototypeFree(ctx, v1);
+         if (JS_IsException(v1))
+             goto exception;
+@@ -42292,6 +42476,8 @@
+         goto exception;
+ 
+     for (;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         has_prop = JS_GetOwnPropertyInternal(ctx, &desc, JS_VALUE_GET_OBJ(obj), prop);
+         if (has_prop < 0)
+             goto exception;
+@@ -42588,6 +42774,8 @@
+     bf->this_val = js_dup(argv[0]);
+     bf->argc = arg_count;
+     for(i = 0; i < arg_count; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         bf->argv[i] = js_dup(argv[i + 1]);
+     }
+     p->u.bound_function = bf;
+@@ -42734,6 +42922,8 @@
+     if (JS_IsException(r))
+         goto exception;
+     for (k = 0;; k++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         v = JS_IteratorNext(ctx, iter, next_method, 0, NULL, &done);
+         if (JS_IsException(v))
+             goto exception_close;
+@@ -43021,6 +43211,8 @@
+     }
+ 
+     for (i = 0; i < count; ) {
++        if (js_poll_interrupts(ctx))
++            return -1;
+         if (dir < 0) {
+             from = from_pos + count - i - 1;
+             to = to_pos + count - i - 1;
+@@ -43040,6 +43232,8 @@
+                 l = min_int64(l, from + 1);
+                 l = min_int64(l, to + 1);
+                 for(j = 0; j < l; j++) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     set_value(ctx, &p->u.array.u.values[to - j],
+                               js_dup(p->u.array.u.values[from - j]));
+                 }
+@@ -43047,6 +43241,8 @@
+                 l = min_int64(l, len - from);
+                 l = min_int64(l, len - to);
+                 for(j = 0; j < l; j++) {
++                    if (js_poll_interrupts(ctx))
++                        return -1;
+                     set_value(ctx, &p->u.array.u.values[to + j],
+                               js_dup(p->u.array.u.values[from + j]));
+                 }
+@@ -43090,6 +43286,8 @@
+             goto fail;
+     } else {
+         for(i = 0; i < argc; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (JS_SetPropertyUint32(ctx, obj, i, js_dup(argv[i])) < 0)
+                 goto fail;
+         }
+@@ -43144,6 +43342,8 @@
+         if (js_for_of_start(ctx, &stack[1], false))
+             goto exception;
+         for (k = 0;; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             v = JS_IteratorNext(ctx, stack[0], stack[1], 0, NULL, &done);
+             if (JS_IsException(v))
+                 goto exception_close;
+@@ -43179,6 +43379,8 @@
+         if (JS_IsException(r))
+             goto exception;
+         for(k = 0; k < len; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             v = JS_GetPropertyInt64(ctx, arrayLike, k);
+             if (JS_IsException(v))
+                 goto exception;
+@@ -43228,6 +43430,8 @@
+     if (JS_IsException(obj))
+         return JS_EXCEPTION;
+     for(i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_CreateDataPropertyUint32Const(ctx, obj, i, argv[i],
+                                              JS_PROP_THROW) < 0) {
+             goto fail;
+@@ -43396,6 +43600,8 @@
+                 goto exception;
+         *pval = js_dup(argv[1]);
+         for (i++, pval++; i < len; i++, pval++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (-1 == JS_TryGetPropertyInt64(ctx, obj, i, pval))
+                 goto exception;
+         }
+@@ -43428,6 +43634,8 @@
+         goto exception;
+     n = 0;
+     for (i = -1; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (i < 0)
+             e = obj;
+         else
+@@ -43444,6 +43652,8 @@
                  goto exception;
              }
              for (k = 0; k < len; k++, n++) {
@@ -31,7 +836,43 @@
                  res = JS_TryGetPropertyInt64(ctx, e, k, &val);
                  if (res < 0)
                      goto exception;
-@@ -44091,6 +44108,8 @@
+@@ -43797,6 +44007,8 @@
+ 
+     /* XXX: should special case fast arrays */
+     while (start < end) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_SetPropertyInt64(ctx, obj, start, js_dup(argv[0])) < 0)
+             goto exception;
+         start++;
+@@ -43830,6 +44042,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (js_strict_eq2(ctx, argv[0], arrp[n],
+                                   JS_EQ_SAME_VALUE_ZERO)) {
+                     goto done;
+@@ -43879,6 +44093,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (js_strict_eq2(ctx, argv[0], arrp[n], JS_EQ_STRICT)) {
+                     goto done;
+                 }
+@@ -43930,6 +44146,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count) && count == len) {
+             for (; n >= 0; n--) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (js_strict_eq2(ctx, argv[0], arrp[n],
+                                   JS_EQ_STRICT)) {
+                     goto done;
+@@ -44091,6 +44309,8 @@
      string_buffer_init(ctx, b, 0);
  
      for(i = 0; i < n; i++) {
@@ -40,7 +881,84 @@
          if (i > 0) {
              if (c >= 0) {
                  string_buffer_putc8(b, c);
-@@ -44592,6 +44611,8 @@
+@@ -44140,6 +44360,7 @@
+             JSObject *p = JS_VALUE_GET_OBJ(obj);
+             if (shift) {
+                 res = arrp[0];
++                js_charge_work(ctx, (size_t)count32 >> 3);
+                 memmove(arrp, arrp + 1, (count32 - 1) * sizeof(*arrp));
+                 p->u.array.count--;
+             } else {
+@@ -44201,6 +44422,8 @@
+                             return JS_EXCEPTION;
+                     }
+                     for(i = 0; i < argc; i++) {
++                        if (js_poll_interrupts(ctx))
++                            return JS_EXCEPTION;
+                         p->u.array.u.values[array_len + i] = js_dup(argv[i]);
+                     }
+                     p->u.array.count = new_len;
+@@ -44226,6 +44449,8 @@
+         from = 0;
+     }
+     for(i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_SetPropertyInt64(ctx, obj, from + i, js_dup(argv[i])) < 0)
+             goto exception;
+     }
+@@ -44260,6 +44485,8 @@
+ 
+         if (count32 > 1) {
+             for (ll = 0, hh = count32 - 1; ll < hh; ll++, hh--) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 lval = arrp[ll];
+                 arrp[ll] = arrp[hh];
+                 arrp[hh] = lval;
+@@ -44269,6 +44496,8 @@
+     }
+ 
+     for (l = 0, h = len - 1; l < h; l++, h--) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         l_present = JS_TryGetPropertyInt64(ctx, obj, l, &lval);
+         if (l_present < 0)
+             goto exception;
+@@ -44417,12 +44646,16 @@
+         js_is_fast_array(ctx, arr)) {
+         /* XXX: should share code with fast array constructor */
+         for (; k < final && k < count32; k++, n++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (JS_CreateDataPropertyUint32Const(ctx, arr, n, arrp[k], JS_PROP_THROW) < 0)
+                 goto exception;
+         }
+     }
+     /* Copy the remaining elements if any (handle case of inherited properties) */
+     for (; k < final; k++, n++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         kPresent = JS_TryGetPropertyInt64(ctx, obj, k, &val);
+         if (kPresent < 0)
+             goto exception;
+@@ -44443,11 +44676,15 @@
+                 goto exception;
+ 
+             for (k = len; k-- > new_len; ) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (JS_DeletePropertyInt64(ctx, obj, k, JS_PROP_THROW) < 0)
+                     goto exception;
+             }
+         }
+         for (i = 0; i < item_count; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (JS_SetPropertyInt64(ctx, obj, start + i, js_dup(argv[i + 2])) < 0)
+                 goto exception;
+         }
+@@ -44592,6 +44829,8 @@
      }
  
      for (sourceIndex = 0; sourceIndex < sourceLen; sourceIndex++) {
@@ -49,7 +967,148 @@
          present = JS_TryGetPropertyInt64(ctx, source, sourceIndex, &element);
          if (present < 0)
              return -1;
-@@ -47286,7 +47307,7 @@
+@@ -44710,6 +44949,8 @@
+ 
+     if (psc->exception)
+         return 0;
++    if (js_poll_work(ctx, 2))
++        goto exception;
+ 
+     if (psc->has_method) {
+         argv[0] = ap->val;
+@@ -44775,6 +45016,8 @@
+ 
+     /* XXX: should special case fast arrays */
+     for (i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (pos >= array_size) {
+             size_t new_size;
+             ValueSlot *new_array;
+@@ -44804,6 +45047,8 @@
+ 
+     /* XXX: should special case fast arrays */
+     while (n < pos) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (array[n].str)
+             JS_FreeValue(ctx, JS_MKPTR(JS_TAG_STRING, array[n].str));
+         if (array[n].pos == n) {
+@@ -44818,10 +45063,14 @@
+     }
+     js_free(ctx, array);
+     for (i = n; undefined_count-- > 0; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_SetPropertyInt64(ctx, obj, i, JS_UNDEFINED) < 0)
+             goto fail;
+     }
+     for (; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_DeletePropertyInt64(ctx, obj, i, JS_PROP_THROW) < 0)
+             goto fail;
+     }
+@@ -44829,6 +45078,8 @@
+ 
+ exception:
+     for (; n < pos; n++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JS_FreeValue(ctx, array[n].val);
+         if (array[n].str)
+             JS_FreeValue(ctx, JS_MKPTR(JS_TAG_STRING, array[n].str));
+@@ -45291,6 +45542,8 @@
+     /* the iterator is closed either way, the remaining iterables are never
+        opened */
+     while (it->index < it->count) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         pval = &it->values[it->index++];
+         JS_FreeValue(ctx, *pval);
+         *pval = JS_UNDEFINED;
+@@ -45322,6 +45575,8 @@
+     it->iter = JS_UNDEFINED;
+     it->next = JS_UNDEFINED;
+     for (int i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSValueConst obj = argv[i];
+         if (!JS_IsObject(obj)) {
+             JS_ThrowTypeErrorNotAnObject(ctx);
+@@ -46118,6 +46373,8 @@
+             if (magic == GEN_MAGIC_RETURN)
+                 goto close;
+             for (;;) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 item = JS_IteratorNext(ctx, it->obj, it->next, 0, NULL, pdone);
+                 if (JS_IsException(item))
+                     goto step_fail;
+@@ -46176,6 +46433,8 @@
+             if (magic == GEN_MAGIC_RETURN)
+                 goto close;
+             while (it->count > 0) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 it->count--;
+                 item = JS_IteratorNext(ctx, it->obj, it->next, 0, NULL, pdone);
+                 if (JS_IsException(item))
+@@ -46975,6 +47234,8 @@
+     string_buffer_init(ctx, b, argc);
+ 
+     for(i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         int32_t c;
+         if (JS_ToInt32(ctx, &c, argv[i]) || string_buffer_putc16(b, c & 0xffff)) {
+             string_buffer_free(b);
+@@ -47011,6 +47272,8 @@
+     if (string_buffer_init(ctx, b, argc))
+         goto fail;
+     for(i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_VALUE_GET_TAG(argv[i]) == JS_TAG_INT) {
+             c = JS_VALUE_GET_INT(argv[i]);
+             if (c < 0 || c > 0x10ffff)
+@@ -47053,6 +47316,8 @@
+         goto exception;
+ 
+     for (i = 0; i < n; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         val = JS_ToStringFree(ctx, JS_GetPropertyInt64(ctx, raw, i));
+         if (JS_IsException(val))
+             goto exception;
+@@ -47218,6 +47483,8 @@
+     len = p->len;
+     is_wide_char = p->is_wide_char;
+     for (i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_TAG_STRING != JS_VALUE_GET_TAG(argv[i]))
+             goto slow_path;
+         p = JS_VALUE_GET_STRING(argv[i]);
+@@ -47238,6 +47505,8 @@
+     memcpy(d, strv(p), n);
+     d += n;
+     for (i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         p = JS_VALUE_GET_STRING(argv[i]);
+         n = p->len << is_wide_char;
+         memcpy(d, strv(p), n);
+@@ -47249,6 +47518,8 @@
+ slow_path:
+     r = JS_ToStringCheckObject(ctx, this_val);
+     for (i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_IsException(r))
+             break;
+         r = JS_ConcatString(ctx, r, js_dup(argv[i]));
+@@ -47286,7 +47557,7 @@
      return -1;
  }
  
@@ -58,7 +1117,7 @@
  {
      /* assuming 0 <= from <= p1->len */
      int c, i, j, len1 = p1->len, len2 = p2->len;
-@@ -47296,6 +47317,8 @@
+@@ -47296,6 +47567,8 @@
          j = string_indexof_char(p1, c, i);
          if (j < 0 || j + len2 > len1)
              break;
@@ -67,7 +1126,33 @@
          if (!string_cmp(p1, p2, j + 1, 1, len2 - 1))
              return j;
      }
-@@ -47442,6 +47465,8 @@
+@@ -47332,6 +47605,8 @@
+         goto done; // by definition well-formed
+ 
+     for (i = 0, n = p->len; i < n; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = str16(p)[i];
+         if (!is_surrogate(c))
+             continue;
+@@ -47374,6 +47649,8 @@
+ 
+     p = JS_VALUE_GET_STRING(ret);
+     for (i = 0, n = p->len; i < n; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = str16(p)[i];
+         if (!is_surrogate(c))
+             continue;
+@@ -47436,12 +47713,16 @@
+     ret = -1;
+     if (len >= v_len && inc * (stop - start) >= 0) {
+         for (i = start;; i += inc) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (!string_cmp(p, p1, i, 0, v_len)) {
+                 ret = i;
+                 break;
              }
              if (i == stop)
                  break;
@@ -76,7 +1161,15 @@
          }
      }
      JS_FreeValue(ctx, str);
-@@ -47508,6 +47533,10 @@
+@@ -47502,12 +47783,18 @@
+     }
+     if (start >= 0 && start <= stop) {
+         for (i = start;; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (!string_cmp(p, p1, i, 0, v_len)) {
+                 ret = 1;
+                 break;
              }
              if (i == stop)
                  break;
@@ -87,7 +1180,16 @@
          }
      }
   done:
-@@ -47763,6 +47792,8 @@
+@@ -47639,6 +47926,8 @@
+     len = rp->len;
+     i = 0;
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         j = string_indexof_char(rp, '$', i);
+         if (j < 0 || j + 1 >= len)
+             break;
+@@ -47763,6 +48052,8 @@
      endOfLastMatch = 0;
      is_first = true;
      for(;;) {
@@ -96,7 +1198,7 @@
          if (unlikely(searchp->len == 0)) {
              if (is_first)
                  pos = 0;
-@@ -47771,7 +47802,9 @@
+@@ -47771,7 +48062,9 @@
              else
                  pos = endOfLastMatch + 1;
          } else {
@@ -107,7 +1209,7 @@
          }
          if (pos < 0) {
              if (is_first) {
-@@ -47882,7 +47915,11 @@
+@@ -47882,7 +48175,11 @@
      }
      q = p;
      for (q = p; (q += !r) <= s - r - !r; q = p = e + r) {
@@ -120,7 +1222,7 @@
          if (e < 0)
              break;
          T = js_sub_string(ctx, sp, p, e);
-@@ -48046,6 +48083,8 @@
+@@ -48046,6 +48343,8 @@
      if (p1) {
          while (n > 0) {
              int chunk = min_int(n, p1->len);
@@ -129,7 +1231,7 @@
              if (string_buffer_concat(b, p1, 0, chunk))
                  goto fail;
              n -= chunk;
-@@ -48105,6 +48144,10 @@
+@@ -48105,6 +48404,10 @@
          string_buffer_fill(b, string_get(p, 0), n);
      } else {
          while (n-- > 0) {
@@ -140,7 +1242,32 @@
              string_buffer_concat(b, p, 0, len);
          }
      }
-@@ -48289,6 +48332,8 @@
+@@ -48130,12 +48433,22 @@
+     a = 0;
+     b = len = p->len;
+     if (magic & 1) {
+-        while (a < len && lre_is_space(string_get(p, a)))
++        while (a < len && lre_is_space(string_get(p, a))) {
+             a++;
++            if ((a & 1023) == 0 && js_poll_work(ctx, 256)) {
++                JS_FreeValue(ctx, str);
++                return JS_EXCEPTION;
++            }
++        }
+     }
+     if (magic & 2) {
+-        while (b > a && lre_is_space(string_get(p, b - 1)))
++        while (b > a && lre_is_space(string_get(p, b - 1))) {
+             b--;
++            if ((b & 1023) == 0 && js_poll_work(ctx, 256)) {
++                JS_FreeValue(ctx, str);
++                return JS_EXCEPTION;
++            }
++        }
+     }
+     ret = js_sub_string(ctx, p, a, b);
+     JS_FreeValue(ctx, str);
+@@ -48289,6 +48602,8 @@
      if (string_buffer_init(ctx, b, p->len))
          goto fail;
      for(i = 0; i < p->len;) {
@@ -149,7 +1276,145 @@
          c = string_getc(p, &i);
          if (c == 0x3a3 && to_lower && test_final_sigma(p, i - 1)) {
              res[0] = 0x3c2; /* final sigma */
-@@ -51035,6 +51080,8 @@
+@@ -48297,6 +48612,8 @@
+             l = lre_case_conv(res, c, to_lower);
+         }
+         for(j = 0; j < l; j++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (string_buffer_putc(b, res[j]))
+                 goto fail;
+         }
+@@ -48330,6 +48647,8 @@
+     if (string_buffer_init(ctx, b, len))
+         return JS_EXCEPTION;
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (string_buffer_putc(b, buf[i]))
+             goto fail;
+     }
+@@ -48495,6 +48814,8 @@
+         }
+         p = JS_VALUE_GET_STRING(value);
+         for (i = 0; i < p->len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             int c = string_get(p, i);
+             if (c == '"') {
+                 string_buffer_puts8(b, "&quot;");
+@@ -49207,6 +49528,8 @@
+             return JS_EXCEPTION;
+         /* XXX: re_flags = LRE_FLAG_OCTAL unless strict mode? */
+         for (i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             switch(str[i]) {
+             case 'd':
+                 mask = LRE_FLAG_INDICES;
+@@ -49259,7 +49582,10 @@
+                                   sizeof(error_msg), str, len, re_flags, ctx);
+     JS_FreeCString(ctx, str);
+     if (!re_bytecode_buf) {
+-        JS_ThrowSyntaxError(ctx, "%s", error_msg);
++        if (strcmp(error_msg, "interrupted") == 0)
++            JS_ThrowInterrupted(ctx);
++        else
++            JS_ThrowSyntaxError(ctx, "%s", error_msg);
+         return JS_EXCEPTION;
+     }
+ 
+@@ -49494,6 +49820,8 @@
+     /* Escape '/' and newline sequences as needed */
+     bra = 0;
+     for (i = 0, n = p->len; i < n;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c2 = -1;
+         switch (c = string_get(p, i++)) {
+         case '\\':
+@@ -49675,6 +50003,8 @@
+     p = JS_VALUE_GET_STRING(str);
+     string_buffer_init2(ctx, b, 0, p->is_wide_char);
+     for (i = 0; i < p->len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = p->is_wide_char ? (uint32_t)str16(p)[i] : (uint32_t)str8(p)[i];
+         if (c < 33) {
+             if (c >= 9 && c <= 13) {
+@@ -49829,6 +50159,8 @@
+             goto fail;
+         prop_flags = JS_PROP_C_W_E | JS_PROP_THROW;
+         for(i = 0; i < capture_count; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             uint8_t **match = &capture[2 * i];
+             int start = -1;
+             int end = -1;
+@@ -49985,6 +50317,8 @@
+     str_buf = str8(str);
+     next_src_pos = 0;
+     for (;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (last_index > str->len)
+             break;
+ 
+@@ -50128,6 +50462,8 @@
+             goto exception;
+         n = 0;
+         for(;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JS_FreeValue(ctx, result);
+             result = JS_RegExpExec(ctx, rx, S);
+             if (JS_IsException(result))
+@@ -50464,6 +50800,8 @@
+         goto done;
+     }
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSValue result;
+         result = JS_RegExpExec(ctx, rx, str);
+         if (JS_IsException(result))
+@@ -50490,6 +50828,8 @@
+     }
+     nextSourcePosition = 0;
+     for(j = 0; j < results->len; j++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         JSValue result;
+         result = results->arr[j];
+         if (js_get_length32(ctx, &nCaptures, result) < 0)
+@@ -50514,6 +50854,8 @@
+                                              JS_PROP_C_W_E | JS_PROP_THROW) < 0)
+             goto exception;
+         for(n = 1; n < nCaptures; n++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JSValue capN;
+             capN = JS_GetPropertyInt64(ctx, result, n);
+             if (JS_IsException(capN))
+@@ -50715,6 +51057,8 @@
+         goto done;
+     }
+     while (q < size) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_SetProperty(ctx, splitter, JS_ATOM_lastIndex, js_int32(q)) < 0)
+             goto exception;
+         JS_FreeValue(ctx, z);
+@@ -50743,6 +51087,8 @@
+                 if (js_get_length64(ctx, &numberOfCaptures, z))
+                     goto exception;
+                 for(i = 1; i < numberOfCaptures; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     sub = JS_GetPropertyInt64(ctx, z, i);
+                     if (JS_IsException(sub))
+                         goto exception;
+@@ -51035,6 +51381,8 @@
      if (js_check_stack_overflow(ctx->rt, 0)) {
          return JS_ThrowStackOverflow(ctx);
      }
@@ -158,7 +1423,16 @@
  
      if (pr) {
          pr->value = JS_UNDEFINED;
-@@ -51551,6 +51598,8 @@
+@@ -51300,6 +51648,8 @@
+                 goto fail;
+         }
+         for(i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (is_array) {
+                 prop = JS_NewAtomUInt32(ctx, i);
+                 if (prop == JS_ATOM_NULL)
+@@ -51551,6 +51901,8 @@
          JS_ThrowStackOverflow(ctx);
          goto exception;
      }
@@ -167,7 +1441,160 @@
  
      if (JS_IsObject(val)) {
          p = JS_VALUE_GET_OBJ(val);
-@@ -57148,6 +57197,8 @@
+@@ -51609,6 +51961,8 @@
+                 goto exception;
+             string_buffer_putc8(jsc->b, '[');
+             for(i = 0; i < len; i++) {
++                if (js_poll_interrupts(ctx))
++                    return -1;
+                 if (i > 0)
+                     string_buffer_putc8(jsc->b, ',');
+                 string_buffer_concat_value(jsc->b, sep);
+@@ -51647,6 +52001,8 @@
+             string_buffer_putc8(jsc->b, '{');
+             has_content = false;
+             for(i = 0; i < len; i++) {
++                if (js_poll_interrupts(ctx))
++                    return -1;
+                 JS_FreeValue(ctx, prop);
+                 prop = JS_GetPropertyInt64(ctx, tab, i);
+                 if (JS_IsException(prop))
+@@ -51763,6 +52119,8 @@
+             if (js_get_length64(ctx, &n, replacer))
+                 goto exception;
+             for (i = j = 0; i < n; i++) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 JSValue present;
+                 v = JS_GetPropertyInt64(ctx, replacer, i);
+                 if (JS_IsException(v))
+@@ -53295,6 +53653,8 @@
+             goto fail;
+ 
+         for(;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = JS_IteratorNext(ctx, iter, next_method, 0, NULL, &done);
+             if (JS_IsException(item))
+                 goto fail;
+@@ -53991,6 +54351,8 @@
+         map_decref_record(ctx->rt, mr); /* the record can be freed here */
+     }
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (el == &s->records) {
+             /* no more record  */
+             it->cur_record = NULL;
+@@ -54203,6 +54565,8 @@
+             goto exception;
+         found = false;
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+             if (JS_IsException(item))
+                 goto exception;
+@@ -54324,6 +54688,8 @@
+         goto exception;
+     found = true;
+     for (;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+         if (JS_IsException(item))
+             goto exception;
+@@ -54379,6 +54745,8 @@
+             goto exception;
+         t = JS_GetOpaque(newset, JS_CLASS_SET);
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+             if (JS_IsException(item))
+                 goto exception;
+@@ -54406,6 +54774,8 @@
+             goto exception;
+         t = JS_GetOpaque(newset, JS_CLASS_SET);
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = js_map_iterator_next(ctx, iter, 0, NULL, &done, MAGIC_SET);
+             if (JS_IsException(item))
+                 goto exception;
+@@ -54475,6 +54845,8 @@
+             goto exception;
+         t = JS_GetOpaque(newset, JS_CLASS_SET);
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+             if (JS_IsException(item))
+                 goto exception;
+@@ -54495,6 +54867,8 @@
+             goto exception;
+         t = JS_GetOpaque(newset, JS_CLASS_SET);
+         for (;;) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             item = js_map_iterator_next(ctx, iter, 0, NULL, &done, MAGIC_SET);
+             if (JS_IsException(item))
+                 goto exception;
+@@ -54575,6 +54949,8 @@
+     if (JS_IsException(next))
+         goto exception;
+     for (;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+         if (JS_IsException(item))
+             goto exception;
+@@ -54657,6 +55033,8 @@
+     if (JS_IsException(next))
+         goto exception;
+     for (;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         item = JS_IteratorNext(ctx, iter, next, 0, NULL, &done);
+         if (JS_IsException(item))
+             goto exception;
+@@ -55352,6 +55730,8 @@
+ 
+         /* Remaining resources: chain lazy steps. */
+         for (; i >= 0; i--) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JSDisposableResource *res = &s->resources[i];
+             JSValueConst data[3];
+             JSValue hint_val, resolve_fn, reject_fn, then_args[2], new_chain;
+@@ -55408,6 +55788,8 @@
+ 
+     async_dispose_fail:
+         for (; i >= 0; i--) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JSDisposableResource *res = &s->resources[i];
+             JS_FreeValue(ctx, res->value);
+             JS_FreeValue(ctx, res->method);
+@@ -57037,6 +57419,8 @@
+ 
+     p = JS_VALUE_GET_STRING(str);
+     for (k = 0; k < p->len;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = string_get(p, k);
+         if (c == '%') {
+             c = hex_decode(ctx, p, k);
+@@ -57068,6 +57452,8 @@
+                     c = 0;
+                 }
+                 while (n-- > 0) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     c1 = hex_decode(ctx, p, k);
+                     if (c1 < 0)
+                         goto fail;
+@@ -57148,6 +57534,8 @@
      p = JS_VALUE_GET_STRING(str);
      string_buffer_init(ctx, b, p->len);
      for (k = 0; k < p->len;) {
@@ -176,3 +1603,667 @@
          c = string_get(p, k);
          k++;
          if (isURIUnescaped(c, isComponent)) {
+@@ -57212,6 +57600,8 @@
+     p = JS_VALUE_GET_STRING(str);
+     string_buffer_init(ctx, b, p->len);
+     for (i = 0, len = p->len; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = string_get(p, i);
+         if (isUnescaped(c)) {
+             string_buffer_putc16(b, c);
+@@ -57238,6 +57628,8 @@
+     string_buffer_init(ctx, b, 0);
+     p = JS_VALUE_GET_STRING(str);
+     for (i = 0, len = p->len; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         c = string_get(p, i);
+         if (c == '%') {
+             if (i + 6 <= len
+@@ -59153,6 +59545,7 @@
+                                                  max_int(sab_alloc_len, 1));
+             if (!abuf->data)
+                 goto fail;
++            js_charge_work(ctx, sab_alloc_len >> 7);
+             memset(abuf->data, 0, sab_alloc_len);
+         } else {
+             /* the allocation must be done after the object creation */
+@@ -59180,8 +59573,10 @@
+     abuf->shared = (class_id == JS_CLASS_SHARED_ARRAY_BUFFER);
+     abuf->opaque = opaque;
+     abuf->realloc_func = realloc_func;
+-    if (alloc_flag && buf)
++    if (alloc_flag && buf) {
++        js_charge_work(ctx, len >> 7);
+         memcpy(abuf->data, buf, len);
++    }
+     JS_SetOpaqueInternal(obj, abuf);
+     return obj;
+  fail:
+@@ -59611,8 +60006,10 @@
+         if (!new_bs)
+             return JS_ThrowOutOfMemory(ctx);
+         bs = new_bs;
+-        if (new_len > old_len)
++        if (new_len > old_len) {
++            js_charge_work(ctx, (new_len - old_len) >> 7);
+             memset(bs + old_len, 0, new_len - old_len);
++        }
+     }
+     /* neuter the source */
+     abuf->data = NULL;
+@@ -59681,8 +60078,10 @@
+                                   max_int(len, 1));
+         if (!data)
+             return JS_ThrowOutOfMemory(ctx);
+-        if (len > abuf->byte_length)
++        if (len > abuf->byte_length) {
++            js_charge_work(ctx, (len - abuf->byte_length) >> 7);
+             memset(&data[abuf->byte_length], 0, len - abuf->byte_length);
++        }
+         abuf->byte_length = len;
+         abuf->data = data;
+     }
+@@ -59772,6 +60171,7 @@
+             JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
+         goto fail;
+     }
++    js_charge_work(ctx, new_len >> 7);
+     memcpy(new_abuf->data, abuf->data + start, new_len);
+     new_abuf->immutable = immutable;
+     return new_obj;
+@@ -60064,6 +60464,7 @@
+         /* copying between typed objects */
+         if (src_p->class_id == p->class_id) {
+             /* same type, use memmove */
++            js_charge_work(ctx, (size_t)src_len << shift >> 7);
+             memmove(dest_abuf->data + dest_ta->offset + (offset << shift),
+                     src_abuf->data + src_ta->offset, src_len << shift);
+             goto done;
+@@ -60085,6 +60486,8 @@
+         }
+     }
+     for(i = 0; i < src_len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         val = JS_GetPropertyUint32(ctx, src_obj, i);
+         if (JS_IsException(val))
+             goto fail;
+@@ -60232,6 +60635,7 @@
+     if (copy_len > 0) {
+         ta = p->u.typed_array;
+         src_abuf = ta->buffer->u.array_buffer;
++        js_charge_work(ctx, ((size_t)copy_len << size_log2) >> 7);
+         memcpy(abuf->data, src_abuf->data + ta->offset,
+                (size_t)copy_len << size_log2);
+     }
+@@ -60376,6 +60780,8 @@
+         if (JS_IsException(stack[1]))
+             goto exception_close;
+         for (k = 0;; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             v = JS_IteratorNext(ctx, stack[0], stack[1], 0, NULL, &done);
+             if (JS_IsException(v))
+                 goto exception_close;
+@@ -60397,6 +60803,8 @@
+     if (JS_IsException(r))
+         goto exception;
+     for(k = 0; k < len; k++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         v = JS_GetPropertyInt64(ctx, arr, k);
+         if (JS_IsException(v))
+             goto exception;
+@@ -60439,6 +60847,8 @@
+         return obj;
+ 
+     for(i = 0; i < argc; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (JS_SetPropertyUint32(ctx, obj, i, js_dup(argv[i])) < 0) {
+             JS_FreeValue(ctx, obj);
+             return JS_EXCEPTION;
+@@ -60483,6 +60893,7 @@
+     count = min_int(count, space);
+     if (count > 0) {
+         shift = typed_array_size_log2(p->class_id);
++        js_charge_work(ctx, ((size_t)count << shift) >> 7);
+         memmove(p->u.array.u.uint8_ptr + (to << shift),
+                 p->u.array.u.uint8_ptr + (from << shift),
+                 count << shift);
+@@ -60558,6 +60969,8 @@
+     // RAB may have been resized by evil .valueOf method
+     final = min_int(final, p->u.array.count);
+     shift = typed_array_size_log2(p->class_id);
++    if (k < final)
++        js_charge_work(ctx, ((size_t)(final - k) << shift) >> 7);
+     switch(shift) {
+     case 0:
+         if (k < final) {
+@@ -60566,16 +60979,22 @@
+         break;
+     case 1:
+         for(; k < final; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             p->u.array.u.uint16_ptr[k] = v64;
+         }
+         break;
+     case 2:
+         for(; k < final; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             p->u.array.u.uint32_ptr[k] = v64;
+         }
+         break;
+     case 3:
+         for(; k < final; k++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             p->u.array.u.uint64_ptr[k] = v64;
+         }
+         break;
+@@ -60616,6 +61035,8 @@
+     }
+ 
+     for(; k != end; k += dir) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         index_val = js_int32(k);
+         val = JS_GetPropertyValue(ctx, this_val, index_val);
+         if (JS_IsException(val))
+@@ -60795,6 +61216,8 @@
+                     res = pp - pv;
+             } else {
+                 for (; k != stop; k += inc) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     if (pv[k] == v) {
+                         res = k;
+                         break;
+@@ -60815,6 +61238,8 @@
+             pv = p->u.array.u.uint16_ptr;
+             v = v64;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == v) {
+                     res = k;
+                     break;
+@@ -60834,6 +61259,8 @@
+             pv = p->u.array.u.uint32_ptr;
+             v = v64;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == v) {
+                     res = k;
+                     break;
+@@ -60850,6 +61277,8 @@
+             if (special != special_includes)
+                 goto done;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (isfp16nan(pv[k])) {
+                     res = k;
+                     break;
+@@ -60859,6 +61288,8 @@
+             // special case: includes also finds negative zero
+             const uint16_t *pv = p->u.array.u.fp16_ptr;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (isfp16zero(pv[k])) {
+                     res = k;
+                     break;
+@@ -60867,6 +61298,8 @@
+         } else if (hf = tofp16(d), d == fromfp16(hf)) {
+             const uint16_t *pv = p->u.array.u.fp16_ptr;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == hf) {
+                     res = k;
+                     break;
+@@ -60883,6 +61316,8 @@
+             if (special != special_includes)
+                 goto done;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (isnan(pv[k])) {
+                     res = k;
+                     break;
+@@ -60891,6 +61326,8 @@
+         } else if ((f = (float)d) == d) {
+             const float *pv = p->u.array.u.float_ptr;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == f) {
+                     res = k;
+                     break;
+@@ -60907,6 +61344,8 @@
+             if (special != special_includes)
+                 goto done;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (isnan(pv[k])) {
+                     res = k;
+                     break;
+@@ -60915,6 +61354,8 @@
+         } else {
+             const double *pv = p->u.array.u.double_ptr;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == d) {
+                     res = k;
+                     break;
+@@ -60935,6 +61376,8 @@
+             pv = p->u.array.u.uint64_ptr;
+             v = v64;
+             for (; k != stop; k += inc) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 if (pv[k] == v) {
+                     res = k;
+                     break;
+@@ -60989,6 +61432,8 @@
+ 
+     /* XXX: optimize with direct access */
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (i > 0) {
+             if (c >= 0) {
+                 if (string_buffer_putc8(b, c))
+@@ -61014,6 +61459,8 @@
+     // add extra separators in case RAB was resized by evil .valueOf method
+     i = max_int(1, newlen);
+     for(/*empty*/; i < oldlen; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         if (c >= 0) {
+             if (string_buffer_putc8(b, c))
+                 goto fail;
+@@ -61046,6 +61493,7 @@
+     if (typed_array_is_immutable(p))
+         return JS_ThrowTypeErrorImmutableArrayBuffer(ctx);
+     if (len > 0) {
++        js_charge_work(ctx, (size_t)len >> 3);
+         switch (typed_array_size_log2(p->class_id)) {
+         case 0:
+             {
+@@ -61173,6 +61621,7 @@
+                 for (n = 0; n < nbytes; n++)
+                     dst[n] = src[n];
+             } else {
++                js_charge_work(ctx, nbytes >> 7);
+                 memmove(dst, src, nbytes);
+             }
+         } else {
+@@ -61180,6 +61629,8 @@
+             space = max_int(0, p->u.array.count - start);
+             count = min_int(count, space);
+             for (n = 0; n < count; n++) {
++                if (js_poll_interrupts(ctx))
++                    return JS_EXCEPTION;
+                 val = JS_GetPropertyValue(ctx, this_val, js_int32(start + n));
+                 if (JS_IsException(val))
+                     goto exception;
+@@ -61257,56 +61708,89 @@
+     else             return signbit(y) ? 1 : 0;
+ }
+ 
++struct TA_sort_context {
++    JSContext *ctx;
++    int exception;
++    JSValueConst arr;
++    JSValueConst cmp;
++    JSValue (*getfun)(JSContext *ctx, const void *a);
++    int elt_size;
++};
++
++/* Orcon patch: every comparison of the numeric sorts polls the handler (one
++   unit is about the cost of a comparison); after the handler stops the sort the
++   remaining comparisons return at once. */
++#define TA_CMP_POLL(opaque) do { \
++        struct TA_sort_context *psc_ = (opaque); \
++        if (psc_->exception) \
++            return 0; \
++        if (js_poll_work(psc_->ctx, 1)) { \
++            psc_->exception = 1; \
++            return 0; \
++        } \
++    } while (0)
++
+ static int js_TA_cmp_int8(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return *(const int8_t *)a - *(const int8_t *)b;
+ }
+ 
+ static int js_TA_cmp_uint8(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return *(const uint8_t *)a - *(const uint8_t *)b;
+ }
+ 
+ static int js_TA_cmp_int16(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return *(const int16_t *)a - *(const int16_t *)b;
+ }
+ 
+ static int js_TA_cmp_uint16(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return *(const uint16_t *)a - *(const uint16_t *)b;
+ }
+ 
+ static int js_TA_cmp_int32(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     int32_t x = *(const int32_t *)a;
+     int32_t y = *(const int32_t *)b;
+     return (y < x) - (y > x);
+ }
+ 
+ static int js_TA_cmp_uint32(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     uint32_t x = *(const uint32_t *)a;
+     uint32_t y = *(const uint32_t *)b;
+     return (y < x) - (y > x);
+ }
+ 
+ static int js_TA_cmp_int64(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     int64_t x = *(const int64_t *)a;
+     int64_t y = *(const int64_t *)b;
+     return (y < x) - (y > x);
+ }
+ 
+ static int js_TA_cmp_uint64(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     uint64_t x = *(const uint64_t *)a;
+     uint64_t y = *(const uint64_t *)b;
+     return (y < x) - (y > x);
+ }
+ 
+ static int js_TA_cmp_float16(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return js_cmp_doubles(fromfp16(*(const uint16_t *)a),
+                           fromfp16(*(const uint16_t *)b));
+ }
+ 
+ static int js_TA_cmp_float32(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return js_cmp_doubles(*(const float *)a, *(const float *)b);
+ }
+ 
+ static int js_TA_cmp_float64(const void *a, const void *b, void *opaque) {
++    TA_CMP_POLL(opaque);
+     return js_cmp_doubles(*(const double *)a, *(const double *)b);
+ }
+ 
+@@ -61353,15 +61837,6 @@
+ static JSValue js_TA_get_float64(JSContext *ctx, const void *a) {
+     return js_float64(*(const double *)a);
+ }
+-
+-struct TA_sort_context {
+-    JSContext *ctx;
+-    int exception;
+-    JSValueConst arr;
+-    JSValueConst cmp;
+-    JSValue (*getfun)(JSContext *ctx, const void *a);
+-    int elt_size;
+-};
+ 
+ static int js_TA_cmp_generic(const void *a, const void *b, void *opaque) {
+     struct TA_sort_context *psc = opaque;
+@@ -61519,10 +61994,13 @@
+                 js_free(ctx, array_idx);
+                 return JS_EXCEPTION;
+             }
++            js_charge_work(ctx, ((size_t)len * elt_size) >> 7);
+             memcpy(array_tmp, p->u.array.u.ptr, len * elt_size);
+             switch(elt_size) {
+             case 1:
+                 for(i = 0; i < len; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     j = array_idx[i];
+                     if (j < len)
+                         p->u.array.u.uint8_ptr[i] = ((uint8_t *)array_tmp)[j];
+@@ -61530,6 +62008,8 @@
+                 break;
+             case 2:
+                 for(i = 0; i < len; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     j = array_idx[i];
+                     if (j < len)
+                         p->u.array.u.uint16_ptr[i] = ((uint16_t *)array_tmp)[j];
+@@ -61537,6 +62017,8 @@
+                 break;
+             case 4:
+                 for(i = 0; i < len; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     j = array_idx[i];
+                     if (j < len)
+                         p->u.array.u.uint32_ptr[i] = ((uint32_t *)array_tmp)[j];
+@@ -61544,6 +62026,8 @@
+                 break;
+             case 8:
+                 for(i = 0; i < len; i++) {
++                    if (js_poll_interrupts(ctx))
++                        return JS_EXCEPTION;
+                     j = array_idx[i];
+                     if (j < len)
+                         p->u.array.u.uint64_ptr[i] = ((uint64_t *)array_tmp)[j];
+@@ -61692,6 +62176,8 @@
+         goto fail;
+     k = 0;
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         val = JS_IteratorNext(ctx, iter, next_method, 0, NULL, &done);
+         if (JS_IsException(val))
+             goto fail;
+@@ -61752,6 +62238,8 @@
+         goto fail;
+ 
+     for(i = 0; i < len; i++) {
++        if (js_poll_interrupts(ctx))
++            return JS_EXCEPTION;
+         val = JS_GetPropertyUint32(ctx, arr, i);
+         if (JS_IsException(val))
+             goto fail;
+@@ -61818,9 +62306,12 @@
+         goto fail;
+     if (p->class_id == classid) {
+         /* same type: copy the content */
++        js_charge_work(ctx, abuf->byte_length >> 7);
+         memcpy(abuf->data, src_abuf->data + ta->offset, abuf->byte_length);
+     } else {
+         for(i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             JSValue val;
+             val = JS_GetPropertyUint32(ctx, src_obj, i);
+             if (JS_IsException(val))
+@@ -63928,6 +64419,8 @@
+     size_t main_len = (len / 3) * 3;
+ 
+     for (; i < main_len; i += 3, j += 4) {
++        if ((i & 0x3ffff) == 0 && i != 0 && orcon_poll(4096))
++            return 0;
+         uint32_t v = 65536*src[i] + 256*src[i + 1] + src[i + 2];
+         dst[j + 0] = alpha[(v >> 18) & 63];
+         dst[j + 1] = alpha[(v >> 12) & 63];
+@@ -63964,6 +64457,10 @@
+     acc = 0;
+     seen = 0;
+     for (i = 0, j = 0; i < len; i++) {
++        if ((i & 0xffff) == 0 && i != 0 && orcon_poll(4096)) {
++            *err = 2;
++            return 0;
++        }
+         ch = (unsigned char)src[i];
+         if ((b64_flags[ch] & K_WS))
+             continue;
+@@ -64032,6 +64529,8 @@
+         if (unlikely(!tmp))
+             goto fail;
+         for (size_t i = 0; i < len; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             uint32_t c = src[i];
+             if (unlikely(c > 0xFF)) {
+                 JS_ThrowDOMException(ctx, "InvalidCharacterError",
+@@ -64059,6 +64558,10 @@
+ 
+     outp = str8(ostr);
+     written = b64_encode(in8, len, (char *)outp, b64_enc);
++    if (orcon_poll_tripped) {
++        js_free_string(ctx->rt, ostr);
++        return JS_EXCEPTION;
++    }
+     outp[written] = '\0';
+     ostr->len = out_len;
+     ret = JS_MKPTR(JS_TAG_STRING, ostr);
+@@ -64089,6 +64592,8 @@
+     if (likely(!s->is_wide_char)) {
+         const uint8_t *p = (const uint8_t *)str8(s);
+         for (size_t i = 0; i < slen; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (unlikely(p[i] & 0x80)) {
+                 JS_ThrowDOMException(ctx, "InvalidCharacterError",
+                     "The string to be decoded is not correctly encoded");
+@@ -64102,6 +64607,8 @@
+         if (unlikely(!tmp))
+             goto fail;
+         for (size_t i = 0; i < slen; i++) {
++            if (js_poll_interrupts(ctx))
++                return JS_EXCEPTION;
+             if (unlikely(src[i] > 0x7F)) {
+                 JS_ThrowDOMException(ctx, "InvalidCharacterError",
+                     "The string to be decoded is not correctly encoded");
+@@ -64130,6 +64637,10 @@
+     err = 0;
+     out_len = b64_decode((const char *)in, slen, outp, &err);
+ 
++    if (unlikely(err == 2)) {
++        js_free_string(ctx->rt, ostr);
++        goto fail; /* interrupted: the exception is set */
++    }
+     if (unlikely(err)) {
+         js_free_string(ctx->rt, ostr);
+         JS_ThrowDOMException(ctx, "InvalidCharacterError",
+@@ -64202,6 +64713,10 @@
+     /* Fast path: decode complete groups of 4 valid characters.
+        Breaks out on whitespace, padding, invalid chars, or capacity. */
+     while (index + 4 <= src_len && written + 3 <= max_len) {
++        if ((index & 0xffff) == 0 && index != 0 && orcon_poll(4096)) {
++            *p_err = 2;
++            return 0;
++        }
+         uint8_t f = flags[(unsigned char)src[index]]
+                   & flags[(unsigned char)src[index + 1]]
+                   & flags[(unsigned char)src[index + 2]]
+@@ -64227,6 +64742,10 @@
+ 
+     /* Slow path: handle whitespace, padding, partial groups, capacity. */
+     for (;;) {
++        if ((index & 0xffff) == 0 && index != 0 && orcon_poll(4096)) {
++            *p_err = 2;
++            return 0;
++        }
+         index = b64_skip_ws(src, src_len, index, flags);
+ 
+         if (index == src_len) {
+@@ -64349,6 +64868,8 @@
+ static size_t u8a_hex_encode(const uint8_t *src, size_t len, char *dst)
+ {
+     for (size_t i = 0; i < len; i++) {
++        if ((i & 0xffff) == 0 && i != 0 && orcon_poll(4096))
++            return 0;
+         dst[i * 2]     = u8a_hex_digits[src[i] >> 4];
+         dst[i * 2 + 1] = u8a_hex_digits[src[i] & 0xF];
+     }
+@@ -64370,6 +64891,10 @@
+     }
+ 
+     while (i < src_len && written < max_len) {
++        if ((i & 0xffff) == 0 && i != 0 && orcon_poll(4096)) {
++            *p_err = 2;
++            return 0;
++        }
+         int hi = u8a_hex_nibble(src[i]);
+         int lo = u8a_hex_nibble(src[i + 1]);
+         if (hi < 0 || lo < 0) {
+@@ -64556,6 +65081,10 @@
+     dst = (char *)str8(ostr);
+     written = b64_encode(data, len, dst,
+                          alphabet == B64_ALPHABET_BASE64URL ? b64url_enc : b64_enc);
++    if (orcon_poll_tripped) {
++        js_free_string(ctx->rt, ostr);
++        return JS_EXCEPTION;
++    }
+     if (omit_padding) {
+         while (written > 0 && dst[written - 1] == '=')
+             written--;
+@@ -64590,6 +65119,10 @@
+         return JS_EXCEPTION;
+ 
+     u8a_hex_encode(data, len, (char *)str8(ostr));
++    if (orcon_poll_tripped) {
++        js_free_string(ctx->rt, ostr);
++        return JS_EXCEPTION;
++    }
+     str8(ostr)[out_len] = '\0';
+     return JS_MKPTR(JS_TAG_STRING, ostr);
+ }
+@@ -64640,6 +65173,10 @@
+                               last_chunk, &read_pos, &err);
+     JS_FreeCString(ctx, str);
+ 
++    if (err == 2) {
++        js_free(ctx, buf);
++        return JS_EXCEPTION; /* interrupted */
++    }
+     if (err) {
+         js_free(ctx, buf);
+         return JS_ThrowSyntaxError(ctx, "invalid base64 string");
+@@ -64677,6 +65214,10 @@
+     decoded_len = u8a_hex_decode(str, str_len, buf, out_cap, &read_pos, &err);
+     JS_FreeCString(ctx, str);
+ 
++    if (err == 2) {
++        js_free(ctx, buf);
++        return JS_EXCEPTION; /* interrupted */
++    }
+     if (err) {
+         js_free(ctx, buf);
+         return JS_ThrowSyntaxError(ctx, "invalid hex string");
+@@ -64759,6 +65300,8 @@
+                               last_chunk, &read_pos, &err);
+     JS_FreeCString(ctx, str);
+ 
++    if (err == 2)
++        return JS_EXCEPTION; /* interrupted */
+     if (err)
+         return JS_ThrowSyntaxError(ctx, "invalid base64 string");
+ 
+@@ -64799,6 +65342,8 @@
+     decoded_len = u8a_hex_decode(str, str_len, data, len, &read_pos, &err);
+     JS_FreeCString(ctx, str);
+ 
++    if (err == 2)
++        return JS_EXCEPTION; /* interrupted */
+     if (err)
+         return JS_ThrowSyntaxError(ctx, "invalid hex string");
+ 

@@ -48,6 +48,8 @@ type Measurements struct {
 	Modes []*ModeResult
 	// QuickJS, Luxon and Wazero name the pinned versions measured.
 	QuickJS, Luxon, Wazero string
+	// Previous, when set, is the measurement before the patch of section C.
+	Previous *Previous
 }
 
 // ModeResult is the measurement of one way of enforcing the time limit.
@@ -82,14 +84,43 @@ type AbandonResult struct {
 	// ExtraNs, ExtraAllocs and ExtraBytes are the cost per call of the
 	// goroutine and channels, against the same call without them.
 	ExtraNs, ExtraAllocs, ExtraBytes float64
+	// Natives summarizes the native functions of the inventory, each driven
+	// past its deadline as one large call and inside a loop.
+	Natives NativeSummary
+}
+
+// NativeSummary is the outcome of driving every covered native function of the
+// guest past its deadline (SPEC-001 amendment 10, section C).
+type NativeSummary struct {
+	// Total is the number of native functions of the guest, Functions the
+	// covered ones that were driven and Cases the number of runs.
+	Total, Functions, Cases int
+	// Max and P99 are the longest and the 99th percentile of how long an
+	// abandoned call ran on, over the cases.
+	Max, P99 time.Duration
+	// Over counts the cases above the bound of the tests (100 ms).
+	Over int
+	// Worst lists the slowest cases to stop, longest first.
+	Worst []AbandonRow
+}
+
+// Previous is the measurement before the patch of section C, kept to show what
+// the patch cost and gained.
+type Previous struct {
+	// Commit identifies the measured tree.
+	Commit string
+	// Plain, Luxon and Combined are the p99 of the bands of the production stop.
+	Plain, Luxon, Combined time.Duration
 }
 
 // AbandonRow is one built-in driven past its deadline.
 type AbandonRow struct {
 	Name string
-	// Wait is the caller's wait beyond the deadline; Overshoot is how long the
-	// abandoned call ran after the caller stopped waiting.
-	Wait, Overshoot time.Duration
+	// Wait is the caller's wait beyond the deadline; Overshoot and P99 are the
+	// longest and the 99th percentile of how long the abandoned call ran after
+	// the caller stopped waiting, over the runs; Before is the same measure
+	// before the patch of section C (zero when it was not measured).
+	Wait, Overshoot, P99, Before time.Duration
 }
 
 // medianOf returns the median of runs, or fallback when there are none.
@@ -287,6 +318,7 @@ func (m *Measurements) Markdown() string {
 	}
 
 	m.writeReading(&b)
+	m.writePrevious(&b)
 
 	w("## Isolation and determinism\n\nThese are tests, not measurements: `TestSandboxIsolation` (memory bombs, infinite loops, regular-expression backtracking, runaway recursion, attempts to reach the host, state left behind; run in every mode), `TestSandboxContainsABadNeighbour` (one failing execution among many; every mode) and `TestDeterminism` (recorded time and seeded randomness). They run in `make check`.\n\n")
 	w("## Reproducing\n\n```sh\nmake expr-compat N8N_VERSION=<pinned n8n release>   # corpus download, compatibility gate, this report\nmake expr-report                                   # this report from the last corpus, without the gate\n```\n")
@@ -325,11 +357,40 @@ func writeAbandon(b *strings.Builder, heading string, a *AbandonResult) {
 	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
 	w("%s Answering at the deadline\n\n", heading)
 	w("Each function below is made to run far past a %s deadline on a runtime that already served a request. \"Caller wait\" is how long after the deadline the caller got its `ErrTimeout`; \"call ran on\" is how long the abandoned call kept running before its next poll of the interrupt handler stopped it and its runtime was closed. The largest caller wait was %s and the largest overshoot %s (the tests hold them to 5 ms and 100 ms: `TestSandboxIsolationAbandon`).\n\n", dur(a.Deadline), dur(a.CallerSlack), dur(a.MaxOvershoot))
-	w("| Function | Caller wait past the deadline | Call ran on |\n|---|---|---|\n")
+	w("| Function | Caller wait past the deadline | Call ran on, before the patch of section C | Call ran on, now (max) | Call ran on, now (p99) |\n|---|---|---|---|---|\n")
 	for _, r := range a.Functions {
-		w("| %s | %s | %s |\n", r.Name, dur(r.Wait), dur(r.Overshoot))
+		before := "not measured"
+		if r.Before > 0 {
+			before = dur(r.Before)
+		}
+		w("| %s | %s | %s | %s | %s |\n", r.Name, dur(r.Wait), before, dur(r.Overshoot), dur(r.P99))
+	}
+	if n := a.Natives; n.Cases > 0 {
+		w("\n%s Every native function of the guest\n\n", heading+"#")
+		w("`TestSandboxIsolationBuiltinInventory` classifies the %d native functions reachable from the global object; the %d covered ones are each driven past the deadline as one large call and inside a loop of calls (`TestSandboxIsolationAbandonNatives`, %d runs). The abandoned call ran on for at most %s after its caller left (p99 %s); %d runs were above 100 ms.\n\n", n.Total, n.Functions, n.Cases, dur(n.Max), dur(n.P99), n.Over)
+		w("| Slowest to stop | Call ran on |\n|---|---|\n")
+		for _, r := range n.Worst {
+			w("| %s | %s |\n", r.Name, dur(r.Overshoot))
+		}
 	}
 	w("\nGoroutine cost per call, against the same call without the goroutine: %+.0f ns, %+.1f allocations, %+.0f bytes. A call that does not reach its deadline pays only this; an abandoned call also costs its runtime, which is closed when the call ends and never reused, so the next call opens a new one (see the cold open above).\n\n", a.ExtraNs, a.ExtraAllocs, a.ExtraBytes)
+}
+
+// writePrevious compares the production stop with its measurement before the
+// patch of section C, whose charges sit in the allocator and the string
+// comparison, the hot paths of the interpreter.
+func (m *Measurements) writePrevious(b *strings.Builder) {
+	if m.Previous == nil || len(m.Modes) == 0 {
+		return
+	}
+	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
+	mode := m.Modes[0]
+	w("## Cost of charging native work\n\n")
+	w("The patch of section C charges the interrupt counter in the allocator, in string comparison and in the bulk copies, which sit on hot paths. p99 of the median-complexity band of the production stop, median of three runs, before (commit `%s`) and after:\n\n", m.Previous.Commit)
+	w("| Band | Before | After | Target |\n|---|---|---|---|\n")
+	w("| Without Luxon | %s | %s | <= %s |\n", dur(m.Previous.Plain), dur(mode.PlainP99()), WarmP99Target)
+	w("| With Luxon | %s | %s | <= %s |\n", dur(m.Previous.Luxon), dur(mode.LuxonP99()), WarmP99TargetLuxon)
+	w("| Combined | %s | %s | no target |\n\n", dur(m.Previous.Combined), dur(medianOf(mode.BandP99Runs, mode.Suite.MedianBand.P99)))
 }
 
 func verb(ok bool) string {

@@ -392,8 +392,8 @@ func (in *instance) callAndAbandon(ctx context.Context, request []byte, guest ex
 	}
 }
 
-// AbandonedOvershoot waits for an abandoned call to end and reports how long it
-// kept running after the caller stopped waiting. The second result is false
+// AbandonedOvershoot waits for an abandoned call to end, or for ctx, and
+// reports how long it kept running after the caller stopped waiting. The second result is false
 // when the last call was not abandoned. It exists for the isolation tests and
 // the measurement report.
 func (in *instance) AbandonedOvershoot(ctx context.Context) (time.Duration, bool) {
@@ -406,7 +406,10 @@ func (in *instance) AbandonedOvershoot(ctx context.Context) (time.Duration, bool
 	select {
 	case <-ended:
 	case <-ctx.Done():
-		return 0, false
+		// The call is still running: report how long it has run on.
+		in.stateMu.Lock()
+		defer in.stateMu.Unlock()
+		return time.Since(in.abandonedAt), true
 	}
 	in.stateMu.Lock()
 	defer in.stateMu.Unlock()
@@ -435,6 +438,11 @@ func (in *instance) callLocked(ctx context.Context, request []byte) ([]byte, err
 	text := in.output(ctx)
 	switch code := api.DecodeI32(res); code {
 	case 0:
+		if ctx.Err() != nil && strings.HasPrefix(text, `{"x":`) {
+			// The call ended in an exception after the context was done: the
+			// stop is what the caller must see, not the error the stop caused.
+			return nil, stopError(ctx)
+		}
 		return []byte(text), nil
 	default:
 		if cause := context.Cause(ctx); cause != nil && strings.Contains(text, "interrupted") {

@@ -1,0 +1,4 @@
+go test fuzz v1
+string("Array.prototype.unshift")
+string("Array.prototype.shift")
+bool(true)

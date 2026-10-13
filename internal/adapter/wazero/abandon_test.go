@@ -5,7 +5,6 @@ package wazero_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -22,6 +21,9 @@ const (
 	// in a patched built-in. It is at most 40 ms on the development machine, and
 	// the bound leaves room for a loaded runner.
 	overshootBound = 100 * time.Millisecond
+	// A call still running this long after it was abandoned is a hang: the test
+	// stops waiting for it and fails on the bound.
+	hangLimit = 20 * time.Second
 )
 
 // overshootReporter is implemented by the runtimes of ModeCooperativeAbandon.
@@ -35,40 +37,6 @@ type abandonOutcome struct {
 	took      time.Duration
 	overshoot time.Duration
 	abandoned bool
-}
-
-// driveToDeadline runs src on a fresh runtime of the sandbox, past the
-// deadline, and reports how the caller and the abandoned call ended.
-func driveToDeadline(tb testing.TB, sb *wazero.Sandbox, cfg expr.SandboxConfig, src string) abandonOutcome {
-	tb.Helper()
-	rt, err := sb.Open(tb.Context(), cfg)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	defer func() { _ = rt.Close(context.WithoutCancel(tb.Context())) }()
-	call := func(ctx context.Context, code string) error {
-		req := `{"e":` + quote(code) + `,"m":"v","i":0,"r":0,"n":1791913530250,"z":"UTC"}` + "\x01\x01\x01\x01"
-		_, err := rt.Call(ctx, []byte(req), &countingGuest{ops: map[int32]int{}})
-		return err
-	}
-	if err := call(tb.Context(), "1"); err != nil {
-		tb.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(tb.Context(), abandonDeadline)
-	defer cancel()
-	start := time.Now()
-	out := abandonOutcome{err: call(ctx, src)}
-	out.took = time.Since(start)
-	rep, ok := rt.(overshootReporter)
-	if !ok {
-		tb.Fatal("the runtime does not report the overshoot of an abandoned call")
-	}
-	out.overshoot, out.abandoned = rep.AbandonedOvershoot(tb.Context())
-	// A runtime that lost a call is never reused.
-	if out.abandoned && call(tb.Context(), "1") == nil {
-		tb.Error("an abandoned runtime answered a later call")
-	}
-	return out
 }
 
 // abandonCases are the built-ins the interrupt-poll patch covers, each with an
@@ -91,6 +59,20 @@ var abandonCases = []struct{ name, src string }{
 	{"toUpperCase", `'é'.repeat(5e6).toUpperCase().length`},
 	{"encodeURIComponent", `encodeURIComponent('é'.repeat(3e6)).length`},
 	{"loop", `(() => { for (;;) {} })()`},
+
+	// The cases measured in BL-030 (SPEC-001 amendment 10, section C).
+	{"unshift in a loop", `(() => { const a = new Array(3e6).fill(1); for (let i = 0; i < 3e3; i++) a.unshift(1); return 1; })()`},
+	{"string comparison in a loop", `(() => { const a = 'a'.repeat(1e7), b = 'a'.repeat(1e7); let n = 0; for (let i = 0; i < 500; i++) if (a < b) n++; return n; })()`},
+	{"copyWithin in a loop", `(() => { const a = new Array(3e6).fill(1); for (let i = 0; i < 3e3; i++) a.copyWithin(0, 1); return 1; })()`},
+	{"array spread in a loop", `(() => { const a = new Array(2e6).fill(1); let n = 0; for (let i = 0; i < 30; i++) n += [...a].length; return n; })()`},
+	{"Object.keys in a loop", `(() => { const o = {}; for (let i = 0; i < 1e5; i++) o['k' + i] = i; let n = 0; for (let i = 0; i < 500; i++) n += Object.keys(o).length; return n; })()`},
+	{"trim", `' '.repeat(2e7).trim().length`},
+	{"escape", `escape(' '.repeat(5e6)).length`},
+	{"Array.from", `Array.from({ length: 5e6 }).length`},
+	{"BigInt multiplication", `(() => { const x = (1n << 520000n) - 1n; $input.all(); return x * x; })()`},
+	{"BigInt multiplication in a loop", `(() => { const x = (1n << 520000n) - 1n; $input.all(); for (;;) x * x; })()`},
+	{"BigInt division in a loop", `(() => { const x = (1n << 1000000n) - 1n, y = (1n << 400000n) + 1n; $input.all(); for (;;) x / y; })()`},
+	{"includes inside filter", `(() => { const ids = Array.from({ length: 1e5 }, (_, i) => i), seen = Array.from({ length: 1e5 }, (_, i) => i + 1e5); return ids.filter((id) => !seen.includes(id)).length; })()`},
 }
 
 // TestSandboxIsolationAbandon checks, for each built-in the interrupt-poll
@@ -100,24 +82,9 @@ var abandonCases = []struct{ name, src string }{
 func TestSandboxIsolationAbandon(t *testing.T) {
 	ev := evaluatorIn(t, wazero.ModeCooperativeAbandon, expr.Options{Timeout: abandonDeadline, MemoryLimit: 64 << 20})
 	sb := sharedSandbox(wazero.ModeCooperativeAbandon)
-	strict := defaultTestTimeout < time.Second // not under the race detector
 	for _, tc := range abandonCases {
 		t.Run(tc.name, func(t *testing.T) {
-			out := driveToDeadline(t, sb, ev.SandboxConfig(), tc.src)
-			if !errors.Is(out.err, expr.ErrTimeout) {
-				t.Fatalf("got %v after %v, want ErrTimeout", out.err, out.took)
-			}
-			if limit := abandonDeadline + callerSlack; out.took > limit {
-				if strict {
-					t.Errorf("the caller waited %v, more than the deadline plus %v", out.took, callerSlack)
-				} else {
-					t.Logf("the caller waited %v (not enforced under the race detector)", out.took)
-				}
-			}
-			if out.abandoned && out.overshoot > overshootBound && strict {
-				t.Errorf("the abandoned call ran %v after the caller stopped waiting, more than %v", out.overshoot, overshootBound)
-			}
-			t.Logf("caller %v after start, abandoned=%v, call ran %v more", out.took.Round(time.Millisecond), out.abandoned, out.overshoot.Round(time.Millisecond))
+			runAbandonCase(t, sb, ev.SandboxConfig(), tc.src, false, true)
 		})
 	}
 }

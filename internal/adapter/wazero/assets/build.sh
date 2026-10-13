@@ -13,6 +13,8 @@
 #   wasi-sdk 34.0       Apache-2.0 with LLVM exception (build toolchain only)
 #   QuickJS-ng 0.17.0   MIT (linked into quickjs.wasm), plus quickjs-interrupt-poll.patch
 #
+# It also needs Go, to run tools/qjsloops, which writes native-loops.txt.
+#
 # The Luxon bundle is vendored separately by internal/expr/prelude/vendor-luxon.sh.
 #
 # WASI_SDK_PLATFORM and WASI_SDK_SHA256 select the toolchain archive of the
@@ -45,8 +47,16 @@ sdk=$(ls -d "$work"/sdk/wasi-sdk-*/)
 src=$(ls -d "$work"/qjs/quickjs-*/)
 
 # Orcon patch: poll the interrupt handler from the native loops of the
-# built-ins whose work grows with their input (SPEC-001 amendment 10, A.4).
+# built-ins whose work grows with their input and charge native work to the
+# interrupt counter (SPEC-001 amendment 10, sections A.4 and C).
 patch -s -p1 -d "$src" < "$here/quickjs-interrupt-poll.patch"
+
+# Inventory of the C functions of the patched source that have a loop bounded
+# by the input or a memory move of variable length, and whether each polls or
+# charges the counter. It is versioned (native-loops.txt), so a change of the
+# patch or of the QuickJS-ng version shows up in review.
+root=$(cd "$here/../../../.." && pwd)
+(cd "$root/tools" && GOWORK=off go run ./qjsloops -src "${src}quickjs.c" -out "$here/native-loops.txt")
 
 "${sdk}bin/clang" --target=wasm32-wasip1 --sysroot="${sdk}share/wasi-sysroot" \
   -O2 -DNDEBUG -fno-exceptions -D_GNU_SOURCE \

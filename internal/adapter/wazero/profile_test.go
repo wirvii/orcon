@@ -5,6 +5,7 @@ package wazero_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -74,9 +75,12 @@ func TestDateCasesMakeFewHostCalls(t *testing.T) {
 func quote(s string) string {
 	b := []byte{'"'}
 	for _, r := range s {
-		switch r {
-		case '"', '\\':
+		switch {
+		case r == '"' || r == '\\':
 			b = append(b, '\\')
+		case r < 0x20:
+			b = append(b, fmt.Sprintf("\\u%04x", r)...)
+			continue
 		}
 		b = append(b, string(r)...)
 	}
