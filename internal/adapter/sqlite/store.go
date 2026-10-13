@@ -150,6 +150,18 @@ func (s *Store) open(ctx context.Context) error {
 	}
 	s.reads = sqlcgen.New(readDB)
 	s.writer = newWriter(ctx, writeDB)
+	// A standalone process is the only holder of the file: whatever a crashed predecessor left
+	// leased belongs to nobody (ADR-0013 section 9).
+	var tokenTable int
+	if err := s.writeDB.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'token'`).Scan(&tokenTable); err != nil {
+		return fmt.Errorf("look for the token table: %w", err)
+	}
+	if tokenTable == 0 {
+		return nil // migrations without the execution tables (tests of the runner)
+	}
+	if _, err := s.releaseAllLeases(ctx); err != nil {
+		return fmt.Errorf("release the leases of a previous process: %w", err)
+	}
 	return nil
 }
 

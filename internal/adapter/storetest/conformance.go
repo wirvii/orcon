@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -35,6 +36,12 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	flow.VersionStore
 	flow.SnapshotStore
 	execution.WorkerStore
+	store.Reader
+	store.Inbox
+	store.Transactor
+	store.WorkQueue
+	store.Deliveries
+	store.WaitResolver
 	io.Closer
 }
 
@@ -136,6 +143,7 @@ func Conformance(t *testing.T, newStore Factory) {
 		{"ConcurrentWriters", concurrencyCase},
 		{"CloseWhileOperationsRun", closeCase},
 	}
+	cases = append(cases, executionCases()...)
 	for i := range cases {
 		c := &cases[i]
 		t.Run(c.name, func(t *testing.T) { c.run(t, newStore) })

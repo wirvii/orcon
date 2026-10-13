@@ -4,3 +4,14 @@
 # Queries that exist in one dialect only (types-and-time and queries rule QY-1).
 # Format: <dialect>:<QueryName>  # reason, with dialect sqlite or postgres.
 # Empty at birth.
+sqlite:ReleaseAllLeases  # SPEC-001 C2: a standalone process releases every lease at start; PostgreSQL workers release their own (ReleaseWorkerLeases)
+sqlite:MarkTokenAttemptsAbandoned  # SPEC-001 C2: the reaper function orcon_engine.release_expired_leases abandons the attempts itself on PostgreSQL
+postgres:LockExecution  # SPEC-001 C2: the single writer of SQLite already orders the events of an execution
+sqlite:ClaimTokens  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:RenewLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ReleaseExpiredLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ReleaseWorkerLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:MarkDueTimersFired  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ClaimOutbox  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ResolveWaitSecret  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+postgres:LockJoinInstance  # SPEC-001 C2: arrivals at one join serialize on PostgreSQL; SQLite has one writer
