@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Catalog admission
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers how a connector is admitted: the automated checks, human review and seals (ADR-0033). Rule IDs (`CA-…`) are stable. Precedence is in `kinds.md`.
 

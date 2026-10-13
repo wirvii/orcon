@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0079: Connector authoring conventions and toolchain
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 ADR-0029 to ADR-0037 define what a connector is (manifest, kinds, safety contract, egress, trust, versioning, conversion and coverage). Matching the n8n catalog needs hundreds of connectors, written by Orcon maintainers and by third parties, and they must look and behave the same. The maintainers fixed binding direction: declarative connectors by default, native Go only with a written justification naming the declarative-format gap; n8n's resource and operation model with singular resources and a closed verb vocabulary; uniform pagination, dates, identifiers and error classification; English and Spanish catalogs; recorded real responses replayed offline with automatic scrubbing and a secret and personal-data gate; the common conformance suite; fault tests proving that retries happen only when safe and that ambiguous outcomes become UNCERTAIN; nightly live tests that open a "service changed" issue and never block merges; per-connector semantic versioning checked against an automatic manifest diff; one generated documentation page per connector with a hand-written connection guide. Some of these choices extend or amend ADR-0029, ADR-0030 and ADR-0034 and the layout of ADR-0075. ADR-0029 §10 and ADR-0080 §3 fix that every public enumerated value is UPPER_SNAKE.

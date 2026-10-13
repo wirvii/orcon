@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Errors
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file fixes how a connector classifies provider failures (ADR-0011 §1, ADR-0030 §5, ADR-0079 §4 and §5). Rule IDs (`ER-…`) are stable. Precedence is in `kinds.md`.
 

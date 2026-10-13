@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Credentials and egress
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers credential types, authentication schemes, OAuth and credential tests. Network permissions are in `manifest.md` (MF-5 to MF-7). Rule IDs (`CR-…`) are stable. Precedence is in `kinds.md`.
 

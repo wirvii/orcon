@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Declarative-format gaps
 
-Status: **Proposed** — pending owner approval | Source: ADR-0079 §9, rulebook `.agents/skills/orcon-connector/references/kinds.md` (KD-3 to KD-5)
+Status: **Accepted** | Source: ADR-0079 §9, rulebook `.agents/skills/orcon-connector/references/kinds.md` (KD-3 to KD-5)
 
 This registry lists what the declarative HTTP connector format (ADR-0030) cannot express. An official connector is declarative by default; a native Go connector is accepted only when its `authoring.json` cites one of these gaps (`kind.gap: "DG-<n>"`) and names the concrete operation that needs it.
 

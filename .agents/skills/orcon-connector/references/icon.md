@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Icon
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers the connector's icon file only. How icons are framed, sized and coloured in the product is decided by `orcon-ui` and is not repeated here. Rule IDs (`IC-…`) are stable. Precedence is in `kinds.md`.
 

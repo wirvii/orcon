@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Versioning
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers semantic versioning per connector, how a change is classified, change descriptors and the changelog (ADR-0034 as amended by ADR-0079 §6). Rule IDs (`VR-…`) are stable. Precedence is in `kinds.md`.
 

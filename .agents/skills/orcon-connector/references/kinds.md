@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Connector kinds
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file decides which kind a connector is and where it lives. Rule IDs (`KD-…`) are stable and are cited by the linter, by reviews and by catalog rejections. `[official]` marks rules that apply only to `orcon.*` connectors; every other rule also applies to catalog submissions.
 
@@ -12,7 +12,7 @@ When two sources disagree, the higher one wins:
 
 1. Accepted ADRs.
 2. Accepted `orcon-go` rules (`../../orcon-go/references/architecture-layers.md` and the rest of that rulebook).
-3. The connector ADRs 0029 to 0037 and ADR-0079 (design input while Proposed).
+3. The connector ADRs 0029 to 0037 that are still Proposed (design input; once accepted they rank under item 1, as ADR-0079 does).
 4. This rulebook (`references/*.md`).
 5. Reviewer preference.
 

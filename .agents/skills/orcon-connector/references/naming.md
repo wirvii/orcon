@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Naming
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file fixes the names of connectors, nodes, resources, operations and parameters, the date format, the catalogs and the spelling of enumerated values. Rule IDs (`NM-…`) are stable. Precedence is in `kinds.md`.
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # n8n mapping
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers how a connector declares the n8n nodes and credentials it replaces, so the importer can convert flows one to one (ADR-0034 §8, ADR-0037 §6). Rule IDs (`N8-…`) are stable. Precedence is in `kinds.md`.
 

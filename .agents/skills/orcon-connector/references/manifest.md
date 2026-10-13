@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Manifest
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers what an author writes in the `orcon/connector@1` manifest (ADR-0029 §4) beyond what schema validation already enforces. Rule IDs (`MF-…`) are stable. Precedence is in `kinds.md`.
 

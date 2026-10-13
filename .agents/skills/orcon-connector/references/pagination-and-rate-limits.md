@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Pagination and rate limits
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers how a connector pages through lists and declares the provider's rate limits (ADR-0030 §6, ADR-0014). Rule IDs (`PG-…`) are stable. Precedence is in `kinds.md`.
 

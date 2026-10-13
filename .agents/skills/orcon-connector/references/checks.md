@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Checks
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file lists every automated check that enforces this rulebook: the tool, its licence, the command, where it runs, what it verifies and how to fix a failure. Rule IDs (`CK-…`) are stable. Precedence is in `kinds.md`.
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Testing
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers recorded tests (cassettes), scrubbing and detection, fault tests, conformance and live tests. Rule IDs (`TE-…`) are stable. Precedence is in `kinds.md`. The commands that run these tests are in `checks.md`.
 

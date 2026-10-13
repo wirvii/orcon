@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Documentation
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file covers the generated connector pages, the hand-written connection guide and the n8n equivalence page. Rule IDs (`DC-…`) are stable. Precedence is in `kinds.md`.
 

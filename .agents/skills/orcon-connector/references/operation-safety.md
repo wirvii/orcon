@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Operation safety
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This file applies the external-operation safety contract (ADR-0005, ADR-0029 §5) to each connector operation. Rule IDs (`SF-…`) are stable. Precedence is in `kinds.md`.
 

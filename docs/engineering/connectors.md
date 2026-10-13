@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Connector authoring
 
-Status: Proposed — pending owner approval
+Status: Accepted
 
 This page is a summary for contributors and connector authors. It holds no rules of its own: when it and the rulebook disagree, the rulebook wins.
 
