@@ -19,3 +19,9 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 **/tsconfig*.json  # JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+
+# Contribution workflow (orcon-contributing, SPEC-013).
+CODE_OF_CONDUCT.md                       # third-party text, Contributor Covenant 2.1, CC-BY-4.0, attribution inside
+.github/pull_request_template.md         # copied into every pull request description
+.agents/skills/orcon-contributing/assets/github-settings.expected.json   # JSON has no comment syntax
+.agents/skills/orcon-contributing/assets/templates/commit-message.txt   # plain-text commit template (it carries the SPDX lines as comments)
