@@ -20,6 +20,19 @@ export async function settle(page: Page): Promise<void> {
       if (nodes.every((node) => getComputedStyle(node).visibility !== 'hidden')) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+    // Every canvas has applied its first fit, and its viewport has stopped moving.
+    const marks = () => Array.from(document.querySelectorAll<HTMLElement>('[data-lod]'));
+    const viewportOf = () => marks().map((region) => region.querySelector<HTMLElement>('.react-flow__viewport')?.style.transform ?? '').join('|');
+    const steadyStart = performance.now();
+    let last = '';
+    let steady = 0;
+    while (performance.now() - steadyStart < 10_000 && steady < 3) {
+      const fitted = marks().every((region) => region.hasAttribute('data-fitted'));
+      const now = viewportOf();
+      steady = fitted && now === last ? steady + 1 : 0;
+      last = now;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
 }

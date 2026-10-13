@@ -343,7 +343,8 @@ function Canvas({
     const bounds = getNodesBounds(all);
     const fitted = getViewportForBounds(bounds, rect.width, rect.height, metrics.minZoom, FIT_MAX_ZOOM, FIT_PADDING);
     const duration = reducedMotion ? 0 : 160;
-    if (fitted.zoom >= readable || all.length > VIRTUALIZE_ABOVE) {
+    // A view-only canvas always shows the whole flow: there is nothing to edit, so the text size gives way to seeing everything.
+    if (!editable || fitted.zoom >= readable || all.length > VIRTUALIZE_ABOVE) {
       void flow.setViewport(fitted, { duration });
       return;
     }
@@ -352,14 +353,21 @@ function Canvas({
       { x: ANCHOR_MARGIN - first.position.x * readable, y: rect.height / 2 - (bounds.y + bounds.height / 2) * readable, zoom: readable },
       { duration },
     );
-  }, [flow, wide, reducedMotion, coarse]);
+  }, [flow, wide, reducedMotion, coarse, editable]);
   const nodesReady = useNodesInitialized();
   const fittedOnOpen = useRef(false);
   useEffect(() => {
     if (!nodesReady || fittedOnOpen.current) return;
     fittedOnOpen.current = true;
     fitFlow();
+    // Tests and screenshots wait for this mark: the first fit has been applied.
+    requestAnimationFrame(() => containerRef.current?.setAttribute('data-fitted', 'true'));
   }, [nodesReady, fitFlow]);
+
+  // A canvas without nodes has nothing to fit.
+  useEffect(() => {
+    if (graph.nodes.length === 0) containerRef.current?.setAttribute('data-fitted', 'true');
+  }, [graph.nodes.length]);
 
   const selectedIds = useMemo(() => nodes.filter((node) => node.selected).map((node) => node.id), [nodes]);
 
@@ -1024,7 +1032,7 @@ function Canvas({
               maxZoom={metrics.maxZoom}
               onlyRenderVisibleElements={graph.nodes.length > VIRTUALIZE_ABOVE}
               proOptions={{ hideAttribution: false }}
-              attributionPosition="bottom-center"
+              attributionPosition="bottom-right"
               ariaLabelConfig={{
                 'node.a11yDescription.default': intl.formatMessage(canvasMessages.ariaNodeDescription),
                 'node.a11yDescription.keyboardDisabled': intl.formatMessage(canvasMessages.ariaNodeDescription),

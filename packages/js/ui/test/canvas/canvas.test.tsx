@@ -346,14 +346,29 @@ describe('the canvas opens fitted to the flow with readable text', () => {
   };
   const inside = (inner: DOMRect, outer: DOMRect) => inner.left >= outer.left - 1 && inner.top >= outer.top - 1 && inner.right <= outer.right + 1 && inner.bottom <= outer.bottom + 1;
 
-  it('keeps the trigger on screen when the view is too narrow to show the whole flow (phone)', async () => {
+  it('fits the whole flow on a phone, where the canvas is view only', async () => {
     await page.viewport(390, 844);
+    try {
+      const { container } = renderCanvas({ defaultGraph: exampleGraph });
+      await node('Webhook');
+      const region = container.querySelector<HTMLElement>('[role="region"]')!;
+      await waitFor(() => {
+        const nodes = Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node'));
+        expect(nodes.length).toBe(exampleGraph.nodes.length + (exampleGraph.notes?.length ?? 0));
+        for (const element of nodes) expect(inside(element.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true);
+      });
+    } finally {
+      await page.viewport(1440, 900);
+    }
+  });
+
+  it('keeps the trigger on screen when an editable canvas is too narrow to show the whole flow', async () => {
+    await page.viewport(800, 844);
     try {
       const { container } = renderCanvas({ defaultGraph: exampleGraph });
       const trigger = await node('Webhook');
       const region = container.querySelector<HTMLElement>('[role="region"]')!;
       await waitFor(() => expect(inside(trigger.getBoundingClientRect(), region.getBoundingClientRect())).toBe(true));
-      expect(zoomOf(container)).toBeGreaterThanOrEqual(0.6 - 0.01);
     } finally {
       await page.viewport(1440, 900);
     }

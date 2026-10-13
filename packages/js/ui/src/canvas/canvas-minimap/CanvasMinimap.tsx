@@ -44,7 +44,7 @@ export function CanvasMinimap({ visible = true, onPointerEnter, onPointerLeave, 
       onPointerLeave={onPointerLeave}
       data-canvas-minimap
       className={cn(
-        'border-border m-0 overflow-hidden rounded-md border shadow-md transition-opacity',
+        'border-border m-0 mb-8 overflow-hidden rounded-md border shadow-md transition-opacity',
         visible ? 'opacity-100' : 'pointer-events-none opacity-0',
         className,
       )}

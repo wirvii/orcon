@@ -158,18 +158,24 @@
   }
 
   .react-flow__attribution {
-    background-color: var(--orcon-surface-raised);
+    background-color: transparent;
     color: var(--orcon-fg-muted);
-    border-radius: var(--orcon-radius-sm);
     font-size: var(--orcon-font-size-xs);
+    margin: 0;
+    padding: 0;
   }
 
   .react-flow__attribution a {
     display: inline-flex;
     align-items: center;
-    min-height: var(--orcon-size-target-min);
-    min-width: var(--orcon-size-target-min);
     padding-inline: var(--orcon-space-2);
     color: inherit;
+  }
+
+  @media (pointer: coarse) {
+    .react-flow__attribution a {
+      min-height: var(--orcon-size-target-min);
+      min-width: var(--orcon-size-target-min);
+    }
   }
 }

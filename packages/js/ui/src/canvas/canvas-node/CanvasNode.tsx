@@ -355,7 +355,7 @@ export function CanvasNode({
                 // eslint-disable-next-line orcon/no-inline-style -- connector line spans the label area under the tile
                 style={{ height: AI_BLOCK_OFFSET }}
               />
-              <AiBlock kind={block.kind} set={block.set} detail={block.detail} tabbable={editable && tabbable} onActivate={() => actions.openAiBlock?.(node.id, block.kind)} />
+              <AiBlock kind={block.kind} set={block.set} detail={block.detail} tabbable={editable && tabbable} interactive={editable} onActivate={() => actions.openAiBlock?.(node.id, block.kind)} />
             </div>
           ))}
         </div>
