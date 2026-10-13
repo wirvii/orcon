@@ -1,0 +1,475 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package flowjson_test
+
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/wirvii/orcon/internal/adapter/codec/flowjson"
+	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+)
+
+func TestSchemaFileIsTheEmbeddedSchema(t *testing.T) {
+	t.Parallel()
+	onDisk, err := os.ReadFile("schema/orcon-flow-1.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(string(onDisk), string(flowjson.Schema())); diff != "" {
+		t.Errorf("Schema() differs from the published file (-file +embedded):\n%s", diff)
+	}
+	// Callers get a copy and cannot corrupt the embedded bytes.
+	s := flowjson.Schema()
+	s[0] = 'X'
+	if flowjson.Schema()[0] == 'X' {
+		t.Error("Schema() returned the embedded slice itself")
+	}
+}
+
+func TestSchemaIsWellFormed(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	for key, want := range map[string]string{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id":     flowjson.SchemaID,
+		"title":   "orcon/flow@1",
+	} {
+		got, _ := c.root.Get(key)
+		if s, _ := got.Str(); s != want {
+			t.Errorf("schema %s = %q, want %q", key, s, want)
+		}
+	}
+	if f, _ := c.root.Get("properties"); f.Kind() != jsonvalue.KindObject {
+		t.Fatal("schema has no properties")
+	}
+	format, _ := c.root.Get("properties")
+	format, _ = format.Get("format")
+	if v, _ := format.Get("const"); !jsonvalue.Equal(v, str(flow.FormatTag)) {
+		t.Errorf("schema format const = %v, want %s", v, flow.FormatTag)
+	}
+	if ap, _ := c.root.Get("additionalProperties"); !jsonvalue.Equal(ap, jsonvalue.Bool(false)) {
+		t.Error("the top level must be closed (additionalProperties: false)")
+	}
+}
+
+// TestSchemaEnumsMatchTheDomain keeps the published value sets and the Go
+// value sets identical: a value added on one side fails here until the other
+// side follows.
+func TestSchemaEnumsMatchTheDomain(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	want := map[string][]string{
+		"branchMode":      mapStrings(flow.BranchModes()),
+		"priority":        mapStrings(flow.Priorities()),
+		"retention":       mapStrings(flow.Retentions()),
+		"routing":         mapStrings(flow.Routings()),
+		"joinMode":        mapStrings(flow.JoinModes()),
+		"joinData":        mapStrings(flow.JoinDataModes()),
+		"onError":         mapStrings(flow.OnErrors()),
+		"callMode":        mapStrings(flow.CallModes()),
+		"waitKind":        mapStrings(flow.WaitKinds()),
+		"edgeKind":        mapStrings(flow.EdgeKinds()),
+		"attentionNotify": mapStrings(flow.AttentionNotifies()),
+		"varScope":        mapStrings(flow.VarScopes()),
+		"accumulator":     mapStrings(flow.Accumulators()),
+		"effectKind":      mapStrings(flow.EffectKinds()),
+		"idempotencyMode": mapStrings(flow.IdempotencyModes()),
+		"onUncertain":     mapStrings(flow.OnUncertains()),
+		"element":         mapStrings(flow.Elements()),
+	}
+	defs, _ := c.root.Get("$defs")
+	for name, values := range want {
+		def, ok := defs.Get(name)
+		if !ok {
+			t.Errorf("schema has no $defs/%s", name)
+			continue
+		}
+		enum, _ := def.Get("enum")
+		var got []string
+		for _, e := range enum.Items() {
+			s, _ := e.Str()
+			got = append(got, s)
+		}
+		if diff := cmp.Diff(values, got); diff != "" {
+			t.Errorf("$defs/%s differs from the Go value set (-go +schema):\n%s", name, diff)
+		}
+	}
+	for _, name := range []string{"concurrency", "settings", "node"} {
+		if _, ok := defs.Get(name); !ok {
+			t.Errorf("schema has no $defs/%s", name)
+		}
+	}
+	for def, keyword := range map[string]string{"concurrency": flow.KeywordAll} {
+		node, _ := defs.Get(def)
+		if !strings.Contains(string(mustMarshal(t, node)), `"`+keyword+`"`) {
+			t.Errorf("$defs/%s does not accept the keyword %s", def, keyword)
+		}
+	}
+}
+
+func mapStrings[T ~string](in []T) []string {
+	out := make([]string, len(in))
+	for i, v := range in {
+		out[i] = string(v)
+	}
+	return out
+}
+
+func mustMarshal(t *testing.T, v jsonvalue.Value) []byte {
+	t.Helper()
+	b, err := jsonvalue.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// TestSchemaPatternsMatchTheDomain keeps the patterns of the schema equal to
+// the ones the Go validator uses.
+func TestSchemaPatternsMatchTheDomain(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	defs, _ := c.root.Get("$defs")
+	node, _ := defs.Get("node")
+	nodeProps, _ := node.Get("properties")
+	nodeType, _ := nodeProps.Get("type")
+	edge, _ := defs.Get("edge")
+	edgeProps, _ := edge.Get("properties")
+	from, _ := edgeProps.Get("from")
+	fromProps, _ := from.Get("properties")
+	port, _ := fromProps.Get("port")
+	ext, _ := defs.Get("ext")
+	names, _ := ext.Get("propertyNames")
+	allOf, _ := names.Get("allOf")
+
+	patternOf := func(v jsonvalue.Value) string {
+		p, _ := v.Get("pattern")
+		s, _ := p.Str()
+		return s
+	}
+	checks := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"id", patternOf(mustGet(t, defs, "id")), flow.IDPattern},
+		{"variableName", patternOf(mustGet(t, defs, "variableName")), flow.VariableNamePattern},
+		{"duration", patternOf(mustGet(t, defs, "duration")), flow.DurationPattern},
+		{"cycle", patternOf(mustGet(t, defs, "cycle")), flow.CyclePattern},
+		{"node type", patternOf(nodeType), flow.NodeTypePattern},
+		{"port", patternOf(port), flow.PortPattern},
+		{"ext key", patternOf(allOf.Items()[0]), flow.ExtKeyPattern},
+	}
+	for _, tt := range checks {
+		if tt.got != tt.want {
+			t.Errorf("%s pattern in the schema = %q, Go = %q", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+func mustGet(t *testing.T, v jsonvalue.Value, key string) jsonvalue.Value {
+	t.Helper()
+	m, ok := v.Get(key)
+	if !ok {
+		t.Fatalf("no member %q", key)
+	}
+	return m
+}
+
+// TestSchemaAcceptsConformanceFlows is the positive half of E-FMT-1: every
+// conformance flow satisfies the published schema, decodes, and passes the
+// static validation.
+func TestSchemaAcceptsConformanceFlows(t *testing.T) {
+	t.Parallel()
+	c := schemaChecked(t)
+	for name, data := range conformanceFiles(t) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			v, err := jsonvalue.Parse(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if errs := c.errors(v); len(errs) > 0 {
+				t.Errorf("schema rejects %s: %v", name, errs)
+			}
+			doc, err := flowjson.Decode(data)
+			if err != nil {
+				t.Fatalf("Decode(%s): %v", name, err)
+			}
+			if report := flow.Validate(&doc); report.HasErrors() {
+				t.Errorf("Validate(%s) has errors: %v", name, report.Errors())
+			}
+		})
+	}
+}
+
+// structuralCase mutates a conformance flow; the schema must reject it (it is
+// a shape problem) and the Go side must reject it too, at decode time or in
+// validation.
+type structuralCase struct {
+	name    string
+	flow    string
+	pointer string
+	value   string // JSON text of the new value; empty removes the member
+}
+
+func TestSchemaRejectsStructuralViolations(t *testing.T) {
+	t.Parallel()
+	cases := []structuralCase{
+		{"missing format", "linear", "/format", ""},
+		{"wrong format", "linear", "/format", `"orcon/flow@2"`},
+		{"missing id", "linear", "/id", ""},
+		{"id with a space", "linear", "/id", `"a b"`},
+		{"id too long", "linear", "/id", `"` + strings.Repeat("a", 65) + `"`},
+		{"empty name", "linear", "/name", `""`},
+		{"name is a number", "linear", "/name", `7`},
+		{"missing editor", "linear", "/editor", ""},
+		{"missing nodes", "linear", "/nodes", ""},
+		{"unknown top-level member", "linear", "/surprise", `1`},
+		{"unknown setting", "effects-calls-and-settings", "/settings/turbo", `true`},
+		{"memory limit zero", "effects-calls-and-settings", "/settings/memoryLimit", `0`},
+		{"concurrency decimal", "effects-calls-and-settings", "/settings/concurrency", `1.5`},
+		{"bad executionActive", "effects-calls-and-settings", "/settings/timeouts/executionActive", `"30 minutes"`},
+		{"month duration", "effects-calls-and-settings", "/settings/timeouts/executionActive", `"P1M"`},
+		{"empty duration", "effects-calls-and-settings", "/settings/timeouts/executionActive", `"PT"`},
+		{"importedFrom without report", "effects-calls-and-settings", "/settings/importedFrom/reportId", ""},
+		{"variable without scope", "loop", "/variables/0/scope", ""},
+		{"variable name starts with a digit", "loop", "/variables/0/name", `"1x"`},
+		{"node without parameters", "linear", "/nodes/1/parameters", ""},
+		{"parameters not an object", "linear", "/nodes/1/parameters", `[]`},
+		{"node type without major", "linear", "/nodes/1/type", `"orcon.http"`},
+		{"node name too long", "linear", "/nodes/1/name", `"` + strings.Repeat("n", 129) + `"`},
+		{"unknown node member", "linear", "/nodes/1/shade", `"red"`},
+		{"disabled is a string", "linear", "/nodes/1/disabled", `"yes"`},
+		{"writes holds a bad name", "parallel-join", "/nodes/2/writes/0", `"1x"`},
+		{"join without data", "parallel-join", "/nodes/4/join/data", ""},
+		{"loop without maxIterations", "loop", "/nodes/1/loop/maxIterations", ""},
+		{"loop maxIterations zero", "loop", "/nodes/1/loop/maxIterations", `0`},
+		{"multi-instance without batch size", "multi-instance", "/nodes/1/multiInstance/batchSize", ""},
+		{"multi-instance concurrency zero", "multi-instance", "/nodes/1/multiInstance/concurrency", `0`},
+		{"retry without attempts", "effects-calls-and-settings", "/nodes/1/retry/maxAttempts", ""},
+		{"retry factor below one", "effects-calls-and-settings", "/nodes/1/retry/factor", `0.5`},
+		{"retry interval not a duration", "effects-calls-and-settings", "/nodes/1/retry/initialInterval", `"1s"`},
+		{"node timeout not a duration", "effects-calls-and-settings", "/nodes/1/timeouts/node", `"soon"`},
+		{"node concurrency zero", "effects-calls-and-settings", "/nodes/1/concurrency", `0`},
+		{"node concurrency lowercase keyword", "effects-calls-and-settings", "/nodes/1/concurrency", `"all"`},
+		{"compensation without handler", "effects-calls-and-settings", "/nodes/1/compensation/handler", ""},
+		{"call without perItem", "effects-calls-and-settings", "/nodes/4/call/perItem", ""},
+		{"call version zero", "effects-calls-and-settings", "/nodes/4/call/version", `0`},
+		{"call version other keyword", "effects-calls-and-settings", "/nodes/4/call/version", `"LATEST"`},
+		{"recursion depth zero", "effects-calls-and-settings", "/nodes/4/call", `{"target":"x","version":1,"mode":"WAIT","perItem":false,"intentionalRecursion":{"maxDepth":0}}`},
+		{"wait without kind", "waits-and-boundary", "/nodes/2/wait/kind", ""},
+		{"wait timeout not a duration", "waits-and-boundary", "/nodes/2/wait/timeout", `"1 hour"`},
+		{"timer date not a date-time", "waits-and-boundary", "/nodes/1/wait/timer", `{"date":"tomorrow"}`},
+		{"timer cycle malformed", "waits-and-boundary", "/nodes/6/eventDefinition/timer/cycle", `"every 10s"`},
+		{"unknown event definition", "waits-and-boundary", "/nodes/5/eventDefinition/signal", `{}`},
+		{"compensation event definition not empty", "waits-and-boundary", "/nodes/5/eventDefinition", `{"compensation":{"x":1}}`},
+		{"effect without kind", "effects-calls-and-settings", "/nodes/1/effect/effect", ""},
+		{"idempotency without mode", "effects-calls-and-settings", "/nodes/1/effect/idempotency/mode", ""},
+		{"idempotency ttl not a duration", "effects-calls-and-settings", "/nodes/1/effect/idempotency/ttl", `"a day"`},
+		{"verification without reconcile", "effects-calls-and-settings", "/nodes/1/effect/verification/reconcile", ""},
+		{"attention without notify", "effects-calls-and-settings", "/nodes/1/attention/notify", ""},
+		{"extension key without namespace", "effects-calls-and-settings", "/ext", `{"plain":1}`},
+		{"extension key in the reserved namespace", "effects-calls-and-settings", "/ext", `{"orcon.mine":1}`},
+		{"edge without kind", "linear", "/edges/0/kind", ""},
+		{"edge without from port", "linear", "/edges/0/from/port", ""},
+		{"edge port with a space", "linear", "/edges/0/from/port", `"my port"`},
+		{"edge to is a string", "linear", "/edges/0/to", `"fetch"`},
+		{"edge order negative", "effects-calls-and-settings", "/edges/0/order", `-1`},
+		{"edge default is a string", "linear", "/edges/0/default", `"yes"`},
+		{"unknown edge member", "linear", "/edges/0/label", `"x"`},
+	}
+	c := schemaChecked(t)
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			v := conformanceValue(t, tt.flow)
+			if tt.value == "" {
+				v = remove(t, v, tt.pointer)
+			} else {
+				v = set(t, v, tt.pointer, parse(t, tt.value))
+			}
+			if c.valid(v) {
+				t.Errorf("the schema accepts %s although %s was changed", tt.flow, tt.pointer)
+			}
+			if !goRejects(t, v) {
+				t.Errorf("Decode and Validate accept the document the schema rejects (%s)", tt.name)
+			}
+		})
+	}
+}
+
+// goRejects reports whether reading and validating the value fails.
+func goRejects(t *testing.T, v jsonvalue.Value) bool {
+	t.Helper()
+	data, err := jsonvalue.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := flowjson.Decode(data)
+	if err != nil {
+		return true
+	}
+	return flow.Validate(&doc).HasErrors()
+}
+
+func TestSchemaLeavesSemanticRulesToTheValidator(t *testing.T) {
+	t.Parallel()
+	// Each document has the right shape, so the schema accepts it, and breaks a
+	// rule that needs the whole graph, so Validate must reject it.
+	cases := []struct {
+		name, flow, pointer, value, code string
+	}{
+		{"element shape: start event with an incoming edge", "linear", "/edges/1/to/node", `"start"`, flow.CodeElement},
+		{"V3 loop block missing is a shape-valid document", "loop", "/nodes/1/loop", ``, flow.CodeV3},
+		{"V12 duplicate names", "linear", "/nodes/2/name", `"Fetch"`, flow.CodeV12},
+		{"reference to an unknown node", "linear", "/edges/1/to/node", `"ghost"`, flow.CodeReference},
+		{"V8 read of a downstream node", "linear", "/nodes/1/parameters", `{"v":"={{ $('Done').item }}"}`, flow.CodeV8},
+	}
+	c := schemaChecked(t)
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			v := conformanceValue(t, tt.flow)
+			if tt.value == "" {
+				v = remove(t, v, tt.pointer)
+			} else {
+				v = set(t, v, tt.pointer, parse(t, tt.value))
+			}
+			if errs := c.errors(v); len(errs) > 0 {
+				t.Fatalf("the schema rejects a document that only breaks a graph rule: %v", errs)
+			}
+			data := mustMarshal(t, v)
+			doc, err := flowjson.Decode(data)
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			if r := flow.Validate(&doc); !r.Has(tt.code, flow.SeverityError) {
+				t.Errorf("Validate issues = %v, want error %s", r.Issues, tt.code)
+			}
+		})
+	}
+}
+
+type enumPoint struct {
+	flow    string
+	pointer string
+	def     string // name in $defs of the closed value set
+}
+
+// TestEnumValuesUpperSnake is the UPPER_SNAKE half of E-FMT-1 at the format
+// level: at every place where the document holds an enumerated value, each
+// allowed spelling passes the schema and the validator, and the lowercase and
+// camelCase spellings are rejected by both (ADR-0007 section 11).
+func TestEnumValuesUpperSnake(t *testing.T) {
+	t.Parallel()
+	points := []enumPoint{
+		{"effects-calls-and-settings", "/settings/branchMode", "branchMode"},
+		{"effects-calls-and-settings", "/settings/priority", "priority"},
+		{"effects-calls-and-settings", "/settings/retention", "retention"},
+		{"effects-calls-and-settings", "/nodes/1/onError", "onError"},
+		{"effects-calls-and-settings", "/nodes/1/effect/effect", "effectKind"},
+		{"effects-calls-and-settings", "/nodes/1/effect/idempotency/mode", "idempotencyMode"},
+		{"effects-calls-and-settings", "/nodes/1/effect/onUncertain", "onUncertain"},
+		{"effects-calls-and-settings", "/nodes/1/attention/notify", "attentionNotify"},
+		{"effects-calls-and-settings", "/nodes/5/call/mode", "callMode"},
+		{"loop", "/variables/0/scope", "varScope"},
+		{"loop", "/variables/1/accumulator", "accumulator"},
+		{"loop", "/edges/3/kind", "edgeKind"},
+		{"parallel-join", "/nodes/4/join/mode", "joinMode"},
+		{"parallel-join", "/nodes/4/join/data", "joinData"},
+		{"item-routing", "/nodes/1/routing", "routing"},
+		{"waits-and-boundary", "/nodes/2/wait/kind", "waitKind"},
+	}
+	c := schemaChecked(t)
+	defs, _ := c.root.Get("$defs")
+	for _, p := range points {
+		def := mustGet(t, defs, p.def)
+		enum, _ := def.Get("enum")
+		for _, allowed := range enum.Items() {
+			name, _ := allowed.Str()
+			t.Run(p.def+"/"+name, func(t *testing.T) {
+				t.Parallel()
+				good := set(t, conformanceValue(t, p.flow), p.pointer, allowed)
+				if errs := c.errors(good); len(errs) > 0 {
+					t.Errorf("the schema rejects the valid spelling %s: %v", name, errs)
+				}
+				if codes := enumIssues(t, good); len(codes) > 0 {
+					t.Errorf("the validator reports %v for the valid spelling %s", codes, name)
+				}
+				for _, bad := range wrongSpellings(name) {
+					v := set(t, conformanceValue(t, p.flow), p.pointer, str(bad))
+					if c.valid(v) {
+						t.Errorf("the schema accepts %q at %s", bad, p.pointer)
+					}
+					if codes := enumIssues(t, v); len(codes) == 0 {
+						t.Errorf("the validator accepts %q at %s", bad, p.pointer)
+					}
+				}
+			})
+		}
+	}
+	t.Run("keywords", func(t *testing.T) {
+		t.Parallel()
+		for _, tt := range []struct{ flow, pointer, good, bad string }{
+			{"multi-instance", "/nodes/1/multiInstance/concurrency", "ALL", "all"},
+			{"effects-calls-and-settings", "/nodes/5/call/version", "CURRENT", "current"},
+		} {
+			good := set(t, conformanceValue(t, tt.flow), tt.pointer, str(tt.good))
+			if !c.valid(good) || len(enumIssues(t, good)) > 0 {
+				t.Errorf("%s: %q should be accepted", tt.pointer, tt.good)
+			}
+			bad := set(t, conformanceValue(t, tt.flow), tt.pointer, str(tt.bad))
+			if c.valid(bad) || len(enumIssues(t, bad)) == 0 {
+				t.Errorf("%s: %q should be rejected by the schema and the validator", tt.pointer, tt.bad)
+			}
+		}
+	})
+}
+
+// wrongSpellings returns the spellings of an UPPER_SNAKE value that must be
+// refused: lowercase, Capitalized and camelCase.
+func wrongSpellings(upper string) []string {
+	lower := strings.ToLower(upper)
+	parts := strings.Split(lower, "_")
+	var camelWords, titleWords strings.Builder
+	camelWords.WriteString(parts[0])
+	titleWords.WriteString(strings.ToUpper(parts[0][:1]) + parts[0][1:])
+	for _, p := range parts[1:] {
+		camelWords.WriteString(strings.ToUpper(p[:1]) + p[1:])
+		titleWords.WriteString(strings.ToUpper(p[:1]) + p[1:])
+	}
+	camel, title := camelWords.String(), titleWords.String()
+	seen := map[string]bool{upper: true}
+	var out []string
+	for _, s := range []string{lower, camel, title} {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// enumIssues decodes a document and returns the ENUM and STRUCTURE issues of
+// reading and validating it.
+func enumIssues(t *testing.T, v jsonvalue.Value) []string {
+	t.Helper()
+	doc, err := flowjson.Decode(mustMarshal(t, v))
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var out []string
+	for _, i := range flow.Validate(&doc).Errors() {
+		if i.Code == flow.CodeEnum || i.Code == flow.CodeStructure {
+			out = append(out, i.String())
+		}
+	}
+	return out
+}

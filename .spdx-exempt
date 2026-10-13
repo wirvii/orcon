@@ -17,3 +17,5 @@ internal/adapter/webui/dist/**  # build output of the web app, replaced by make 
 tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it carries the SPDX lines as comments)
 
 **/tsconfig*.json  # JSON has no comment syntax
+internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
+internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests

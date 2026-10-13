@@ -1,0 +1,31 @@
+{
+  "format": "orcon/flow@1",
+  "id": "multi-instance",
+  "name": "Parallel multi-instance with an accumulator",
+  "settings": { "concurrency": 32, "memoryLimit": 536870912 },
+  "variables": [{ "name": "processed", "scope": "EXECUTION", "accumulator": "SUM" }],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "each",
+      "name": "Process each order",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": { "url": "https://example.test/orders" },
+      "multiInstance": {
+        "sequential": false,
+        "concurrency": "ALL",
+        "inputCollection": "={{ $json.orders }}",
+        "batchSize": 10,
+        "completionCondition": "={{ $json.failed > 3 }}"
+      },
+      "writes": ["processed"]
+    },
+    { "id": "end", "name": "End", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "each" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "each", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

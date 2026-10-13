@@ -10,3 +10,5 @@ toolchain go1.26.9
 ignore node_modules
 
 require go.uber.org/goleak v1.3.0
+
+require github.com/google/go-cmp v0.7.0
