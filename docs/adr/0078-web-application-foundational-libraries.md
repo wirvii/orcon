@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR 0078: Web application foundational libraries
 
-Status: Accepted (2026-10-13)
+Status: Accepted (2026-10-13) | Amended: 2026-10-13
 
 ## Context
 ADR-0074 fixed the visual foundation of the embedded editor (components, tokens, styling, i18n, UI quality gates). The application code around it has no foundation yet: how it reads and caches server data, routes, keeps editor state, builds forms, validates external input, and how it is tested and kept fast. The public API design (SPEC-005, ADR-0054) makes the editor a client of the public API through the generated TypeScript SDK `@orcon/sdk` (openapi-typescript and openapi-fetch) and delivers live updates over server-sent events. The maintainers fixed binding direction for the application code: server state cached by a query library on top of the SDK, typed routes with state in the URL, a store only for the flow editor, schema-validated forms generated from the API contract, feature folders with enforced boundaries, four test levels, performance budgets and the same license policy as the Go code.
@@ -27,3 +27,7 @@ One definition per query feeds screens, route loaders and live updates; links an
 
 ## Alternatives considered
 SWR (MIT; fewer mutation and cache tools), RTK Query (MIT; brings Redux), Apollo (GraphQL only). React Router 7 (MIT; weaker search-parameter typing). Redux Toolkit (MIT; more ceremony for one editor store), Jotai and Valtio (MIT; less direct undo history), XState (MIT; suited to protocols rather than a document editor). Formik (Apache-2.0; less maintained), TanStack Form (MIT; younger), Conform (MIT; server-action oriented). Valibot, ArkType and Yup (MIT; Zod has the widest generator support). Orval (MIT; mock handlers tied to its own client), Hey API (MIT; client first), openapi-zod-client (MIT; tied to zodios), typed-openapi (MIT; no mock handlers). Cypress (MIT; a second browser tool next to Playwright). Lighthouse CI (Apache-2.0; measures paint metrics rather than the product's own "first useful screen" mark). Measuring on physical devices (not reproducible on every pull request). bundlesize (unmaintained). react-window and react-virtuoso (MIT). dependency-cruiser (MIT; a separate tool, while the boundary rules belong in the lint run). React Compiler (not adopted now; revisited when the editor is measured).
+
+## Amendments
+
+- **SPEC-010 (Amendment 1, 2026-10-13).** Decision 5: `@kubb/plugin-ts` (MIT, Kubb 4) is a required companion of `plugin-zod`, `plugin-faker` and `plugin-msw`, which consume the TypeScript types it generates. It is pinned to the same Kubb 4 version as the other plugins in `packages/js/api-contract`. Its output stays inside `@orcon/api-contract` and adds no HTTP client: requests still go only through `@orcon/sdk` (DT-1).
