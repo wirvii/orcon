@@ -42,6 +42,10 @@ Commit messages, pull requests and documentation describe the change itself. The
 
 Read [docs/engineering/connectors.md](docs/engineering/connectors.md) before writing or changing a connector. The complete connector rulebook lives in `.agents/skills/orcon-connector/references/` and is packaged as the `orcon-connector` mneme skill; templates for new connectors are in `.agents/skills/orcon-connector/assets/templates/`.
 
+## Public API
+
+Read [docs/engineering/api.md](docs/engineering/api.md) before changing the OpenAPI contract in `packages/openapi/`. The complete API design rulebook lives in `.agents/skills/orcon-api/references/` and is packaged as the `orcon-api` mneme skill; start from its templates in `.agents/skills/orcon-api/assets/templates/` and paste `.agents/skills/orcon-api/assets/pr-api-checklist.md` into the pull request.
+
 ## How maintainers track work
 
 Maintainers plan and review work with [mneme](https://github.com/juanftp/mneme), which keeps the project's backlog, specifications, acceptance criteria and QA reports. Pull requests for that work include a line such as `Spec: SPEC-013`. You do not need mneme to contribute: use `Spec: n/a`, and a maintainer links your pull request to the backlog if needed.
