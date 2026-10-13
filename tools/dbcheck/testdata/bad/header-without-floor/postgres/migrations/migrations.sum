@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Checksums of the migrations in this directory.
+0001_create_org.sql  65309686dc3185e579be5424cf5f0cab6a2c28c562defe08086a0f72e2426ad9
+0002_create_api_key.sql  9d58fb82b7195ce894cec74669fb236fb9a8ba3c7747789296de0adf7c7d3076

@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Tables that keep deleted rows for a recovery window (deletion-and-retention.md
+# DL-4). A table has deleted_at if and only if it is listed here. Only an
+# accepted spec that requires recovery may add a line. Format:
+#   <table>  # spec reference
+flow  # SPEC-009 P3: 30-day recovery window

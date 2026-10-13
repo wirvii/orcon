@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Canvas
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3; editor style A, Enmienda 1)
+Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3; editor style A, Amendment 1)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. The workflow canvas is built on `@xyflow/react` with Orcon primitives from `@orcon/ui` (`src/canvas/`, `src/editor/`). All canvas values are CSS px at 100 % zoom and density-independent (canvas geometry scales with zoom only; editor panels follow density). Token names are those of [tokens.md#canvas-tokens](tokens.md#canvas-tokens). The primitives are CanvasNode, NodeStatusBadge, NodeStatusChip, PinnedBadge, NodePort, PortAddButton, OutputStub, CanvasEdge, EdgeLabel, EdgeActions, NodeToolbar, StickyNote, CanvasControls, CanvasMinimap, AddFirstStep, AiBlock, NodePalettePanel and CanvasOutline; the editor components are NodeDetailsView, PaneSplitter, DataPane, DataTableView, JsonTreeView and SchemaView.
 

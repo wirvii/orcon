@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Tables without org_id (tenant-isolation.md TI-1, ADR-0046 section 1). Every
+# other table must carry org_id NOT NULL. Format: <table>  # reason
+schema_migration  # migration bookkeeping of the whole instance (ADR-0015 section 4); the only table keyed by version
+worker  # process registry of the instance, not owned by an organization
+org  # the tenancy root; isolated by its own id (org_self_isolation)
+principal  # actor identity of the instance: id, kind, created_at (IN-12)
+instance_alert  # operational alerts that belong to no organization (SPEC-009 6.2)
+application_user  # person of the instance; organization membership lives elsewhere (SPEC-004)
+instance_key_canary  # SPEC-004 split of key_canary: key check of the instance
+instance_audit_event  # SPEC-004 split of the audit chain: instance-level audit events
+instance_audit_block  # SPEC-004 split of the audit chain: instance-level audit blocks
+connector_package  # SPEC-003 installed connector packages are shared by the instance
+catalog_source  # SPEC-003 catalog sources of the instance
+catalog_metadata  # SPEC-003 catalog metadata of the instance
+connector_revocation  # SPEC-003 revocations apply to the whole instance
+connector_revocation_override  # SPEC-003 instance-level override of a revocation
+code_library  # SPEC-003 code libraries shared by the instance
+session  # SPEC-004 login sessions are resolved before the organization is known
+ai_price_table  # SPEC-006 model price table of the instance
+knowledge_chunk_fts5  # SPEC-006 SQLite FTS5 virtual table; its synchronisation triggers need a TI-10 exception

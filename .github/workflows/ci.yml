@@ -25,8 +25,15 @@ jobs:
         go: [oldstable, stable]
     env:
       GOTOOLCHAIN: local
+      # Base revision of the migration immutability check (dbcheck migration-immutable).
+      # Empty on pushes: dbcheck then uses the merge base with origin/main.
+      DBCHECK_BASE: ${{ github.event.pull_request.base.sha }}
     steps:
+      # Full history: db-check compares migrations.sum with the base revision and
+      # looks for release tags.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ matrix.go }}
@@ -74,9 +81,18 @@ jobs:
           AFTER_SHA: ${{ github.event.after }}
         run: .bin/provenance range "$BEFORE_SHA" "$AFTER_SHA"
 
-  # postgres runs the adapter contract suites against a real PostgreSQL.
+  # postgres runs the adapter contract suites and the database rule checks against
+  # real PostgreSQL: the oldest supported release (14) and the latest (17), pinned
+  # by image digest. Keep the digests equal to PG_IMAGES in the Makefile.
   postgres:
+    name: postgres (${{ matrix.image }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b143664907d6e146eb6e1
+          - postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
     env:
       GOTOOLCHAIN: local
     steps:
@@ -84,8 +100,15 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: stable
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
       - name: Adapter tests against PostgreSQL
-        run: make test-postgres
+        run: make test-postgres PG_IMAGES=${{ matrix.image }}
+      - name: Planted database violations
+        env:
+          ORCON_TEST_POSTGRES_IMAGE: ${{ matrix.image }}
+        run: make db-fixtures
 
   # sbom publishes the CycloneDX bill of materials of a release (dependencies.md DEP-4).
   sbom:

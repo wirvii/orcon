@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Checksums of the migrations in this directory (migrations.md MG-5). One line
+# per migration file: "<file>  <sha256 of the file>". `make db-sum` appends the
+# lines of new files and never rewrites an existing line; `make db-check`
+# rejects a changed, removed or unlisted migration. A published migration is
+# never edited: a fix is a new migration.
