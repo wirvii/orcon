@@ -13,7 +13,7 @@
 
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, resolve } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 
 import { must } from './doc-io.mjs';
 import { parseArgs } from './lib.mjs';
@@ -48,7 +48,7 @@ createServer((req, res) => {
   }
   const rel = url.pathname.slice(mount.length) || 'index.html';
   const file = join(dir, rel);
-  if (!file.startsWith(dir) || !existsSync(file) || !statSync(file).isFile()) {
+  if (!file.startsWith(dir + sep) || !existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404);
     res.end();
     return;

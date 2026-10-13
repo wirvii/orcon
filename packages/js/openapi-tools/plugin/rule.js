@@ -13,6 +13,7 @@ export function defineRule(check) {
   return (options) => ({
     Root(root, ctx) {
       const model = getModel(root, ctx);
+      if (Array.isArray(options?.protocolPaths)) model.setProtocolPaths(options.protocolPaths);
       const seen = new Set();
       const report = (id, message, location) => {
         const text = id ? `[${id}] ${message}` : message;

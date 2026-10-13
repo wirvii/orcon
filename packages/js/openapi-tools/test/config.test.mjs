@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { parse } from 'yaml';
 
 import { RULE_NAMES } from '../plugin/orcon.js';
+import { DEFAULT_PROTOCOL_PATHS } from '../plugin/model.js';
 import { packageDir } from '../scripts/lib.mjs';
 
 const config = parse(readFileSync(join(packageDir, 'redocly.yaml'), 'utf8'));
@@ -22,6 +23,12 @@ test('redocly.yaml registers the plugin and enables all 31 orcon rules as errors
     assert.equal(severityOf(rule), 'error', `orcon/${name} is not an error`);
   }
   assert.equal(Object.keys(config.rules).filter((k) => k.startsWith('orcon/')).length, 31);
+});
+
+test('orcon/path-shape runs first and lists the protocol paths of the plugin', () => {
+  const orcon = Object.keys(config.rules).filter((k) => k.startsWith('orcon/'));
+  assert.equal(orcon[0], 'orcon/path-shape', 'path-shape applies protocolPaths to the shared model before the other rules read it');
+  assert.deepEqual(config.rules['orcon/path-shape'].protocolPaths, [...DEFAULT_PROTOCOL_PATHS]);
 });
 
 test('no rule is turned off or downgraded', () => {

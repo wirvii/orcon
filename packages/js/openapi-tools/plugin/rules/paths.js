@@ -59,6 +59,12 @@ const SHAPE_HINT = {
 };
 
 export const pathShape = defineRule((model, report) => {
+  // The protocol tag exempts an operation from the rules only on the paths ADR-0052 allows.
+  for (const entry of model.pathOperations) {
+    if (entry.taggedProtocol && !model.protocolAllowed(entry.key)) {
+      report('PATH-1', `${entry.method.toUpperCase()} ${entry.key} is tagged protocol but ${entry.key} is not an allowed protocol path (${model.protocolPaths.join(', ')}); it follows the grammar and every rule.`, entry.loc.child(['tags']));
+    }
+  }
   for (const { key, item, itemLoc, ops } of pathItems(model)) {
     const shape = shapeOf(key);
     const params = shape.segments.filter((s) => s.startsWith('{'));

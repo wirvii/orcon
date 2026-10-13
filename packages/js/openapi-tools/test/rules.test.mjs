@@ -70,6 +70,9 @@ const REPORTS = [
   ['verb path declared as a collection', 'path-shape', 'action verb', (d) => {
     d.paths[PUBLISH]['x-orcon-resource'] = 'collection';
   }],
+  ['protocol tag outside the allowed protocol paths', 'path-shape', 'not an allowed protocol path', (d) => {
+    getFlow(d).tags = ['flows', 'protocol'];
+  }],
   ['GET on an action', 'action-verb', 'POST only', (d) => {
     d.paths[PUBLISH].get = structuredClone(getFlow(d));
   }],
@@ -302,6 +305,10 @@ for (const [description, rule, fragment, mutate] of REPORTS) {
 
 /** Changes that are fine and must stay clean. */
 const CLEAN = [
+  ['a protocol-tagged operation on an allowed path (OIDC callback)', (d) => {
+    d.paths['/oidc/callback'] = structuredClone(d.paths['/oauth/token']);
+    d.paths['/oidc/callback'].post.operationId = 'oidcCallback';
+  }],
   ['an identifier enum', (d) => void (schemas(d).Flow.properties.kind = { type: 'string', description: 'Kind.', enum: ['a-b', 'c'], 'x-orcon-enum-kind': 'identifier' })],
   ['a provider id with x-orcon-external-id', (d) => void (schemas(d).Flow.properties.providerId = { type: 'string', description: 'Id at the provider.', maxLength: 64, examples: ['abc'], 'x-orcon-external-id': true })],
   ['a writeOnly secret with a marker', (d) => void (schemas(d).Flow.properties.apiKey = { type: 'string', format: 'password', writeOnly: true, description: 'Key.', examples: ['example-secret-1'] })],

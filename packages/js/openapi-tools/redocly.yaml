@@ -30,7 +30,19 @@ rules:
   operation-4xx-problem-details-rfc7807: error
 
   # Orcon rules, one per rulebook area. Severity error for all of them.
-  orcon/path-shape: error
+  # path-shape must stay the first orcon rule: its protocolPaths option sets the allowlist
+  # of paths where the `protocol` tag exempts an operation (ADR-0052 section 1).
+  orcon/path-shape:
+    severity: error
+    protocolPaths:
+      - /oauth/*
+      - /git-bindings/*/provider-hook
+      - /oidc/**
+      - /saml/**
+      - /scim/**
+      - /credentials/oauth/callback
+      - /.well-known/**
+      - /mcp
   orcon/action-verb: error
   orcon/path-param-name: error
   orcon/operation-id: error

@@ -167,6 +167,10 @@ export const namedSchemas = defineRule((model, report) => {
     }
   }
   // FIELD-9: request schemas are closed. FIELD-10: inputs are bounded.
+  // Known limit: a request schema composed with allOf is not checked for
+  // additionalProperties: false (closing members of an allOf breaks JSON Schema validation,
+  // and unevaluatedProperties is not supported by the Go generator, VER-9). Request bodies
+  // should be plain objects; review.md asks reviewers to look at allOf request bodies.
   for (const { schema, loc } of model.requestSchemas()) {
     if (isObjectSchema(schema) && schema.additionalProperties !== false && !isObject(schema.additionalProperties) && !Array.isArray(schema.allOf)) {
       report('FIELD-9', 'Request schemas set additionalProperties: false.', loc);

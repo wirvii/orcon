@@ -37,7 +37,7 @@ export function redocly(args, options = {}) {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     cwd: options.cwd ?? packageDir,
-    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', REDOCLY_TELEMETRY: 'off' },
+    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', REDOCLY_TELEMETRY: 'off', REDOCLY_SUPPRESS_UPDATE_NOTICE: 'true' },
   });
   if (result.error) throw result.error;
   return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };

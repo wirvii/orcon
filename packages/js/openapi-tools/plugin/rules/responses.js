@@ -180,7 +180,7 @@ export const problemCodesDeclared = defineRule((model, report) => {
     if (!enumValues.includes(code)) report('ERR-7', `Catalog code "${code}" is missing from the ProblemCode enum.`, schema.loc.child(['enum']));
   }
   for (const code of enumValues) {
-    if (!(code in catalog)) report('ERR-7', `ProblemCode value "${code}" has no catalog entry.`, schema.loc.child(['enum']));
+    if (!Object.hasOwn(catalog, code)) report('ERR-7', `ProblemCode value "${code}" has no catalog entry.`, schema.loc.child(['enum']));
   }
   for (const entry of ops) {
     const declared = entry.op['x-orcon-problems'];
@@ -193,7 +193,7 @@ export const problemCodesDeclared = defineRule((model, report) => {
     const hasStatus = (status) => responses.some((r) => r.status === String(status) || r.status === `${Math.floor(status / 100)}XX`);
     declared.forEach((code, i) => {
       const l = where.child([i]);
-      if (!(code in catalog)) {
+      if (!Object.hasOwn(catalog, code)) {
         report('ERR-3', `Problem code "${code}" is not in the catalog (ERR-7: new codes are added to the catalog first).`, l);
         return;
       }

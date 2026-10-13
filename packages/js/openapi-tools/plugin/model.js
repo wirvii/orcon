@@ -29,6 +29,31 @@ const SCHEMA_SINGLE_KEYS = [
   'unevaluatedItems',
 ];
 
+/**
+ * Paths where a protocol-tagged operation is allowed (ADR-0052 section 1: endpoints whose
+ * shape an external standard fixes). `*` matches one segment (a path parameter included),
+ * `**` the rest. Paths omit the /api/v1 prefix. Overridable with the `protocolPaths` option
+ * of orcon/path-shape.
+ */
+export const DEFAULT_PROTOCOL_PATHS = Object.freeze([
+  '/oauth/*',
+  '/git-bindings/*/provider-hook',
+  '/oidc/**',
+  '/saml/**',
+  '/scim/**',
+  '/credentials/oauth/callback',
+  '/.well-known/**',
+  '/mcp',
+]);
+
+export function globToRegExp(glob) {
+  const source = glob
+    .split('/')
+    .map((seg) => (seg === '**' ? '.*' : seg === '*' ? '[^/]+' : seg.replace(/[.+?^${}()|[\]\\]/g, '\\$&')))
+    .join('/');
+  return new RegExp(`^${source}$`);
+}
+
 const cache = new WeakMap();
 
 /** Returns the (cached) model of the document being linted. */
@@ -48,6 +73,18 @@ class Model {
     this.rootLoc = ctx.location;
     this._operations = undefined;
     this._schemas = undefined;
+    this.setProtocolPaths(DEFAULT_PROTOCOL_PATHS);
+  }
+
+  /** Sets the allowlist of protocol paths (see DEFAULT_PROTOCOL_PATHS). */
+  setProtocolPaths(globs) {
+    this.protocolPaths = [...globs];
+    this._protocolRegExps = this.protocolPaths.map(globToRegExp);
+  }
+
+  /** True when `path` may carry protocol-tagged operations. */
+  protocolAllowed(path) {
+    return this._protocolRegExps.some((re) => re.test(path));
   }
 
   /** Follows a `$ref` chain. Returns { node, loc, raw } where raw is the node as written. */
@@ -92,6 +129,7 @@ class Model {
           const op = item.node[method];
           if (!isObject(op)) continue;
           const tags = Array.isArray(op.tags) ? op.tags : [];
+          const model = this;
           out.push({
             kind,
             key,
@@ -100,7 +138,12 @@ class Model {
             loc: item.loc.child([method]),
             item: item.node,
             itemLoc: item.loc,
-            protocol: tags.includes('protocol'),
+            /** Tagged `protocol`, whether or not the path is allowed to be. */
+            taggedProtocol: tags.includes('protocol'),
+            /** Exempt from the grammar rules: tagged and on an allowed path. */
+            get protocol() {
+              return this.taggedProtocol && kind === 'path' && model.protocolAllowed(key);
+            },
           });
         }
       }
