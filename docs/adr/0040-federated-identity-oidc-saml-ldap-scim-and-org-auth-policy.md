@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0040 — Federated identity (OIDC, SAML, LDAP/AD), SCIM provisioning and organization authentication policy
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077); 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -12,7 +12,7 @@ S6: OIDC, SAML, LDAP/AD, SCIM and organization-wide enforcement of 2FA or SSO, a
 ## Decision
 
 ### 1. Identity sources
-Configured per organization in `authentication_source(org_id, id, kind: oidc|saml|ldap, name, configuration_ciphertext, status)`; secrets in configuration (client secrets, bind passwords, SP keys) encrypted with the organization key.
+Configured per organization in `authentication_source(org_id, id, kind: OIDC|SAML|LDAP, name, configuration_ciphertext, status)`; secrets in configuration (client secrets, bind passwords, SP keys) encrypted with the organization key.
 
 ### 2. OIDC
 Authorization code + PKCE (S256); `state` and `nonce` bound to a pre-auth record; validation of `iss`, `aud`, `azp`, `exp`, `iat` (skew 2 min), signature with a per-source algorithm allowlist (default RS256, ES256, PS256, EdDSA; `none` and HS* with discovered keys rejected); JWKS cached and refreshed on unknown `kid` (rate-limited). Claims mapping: email (requires `email_verified=true` for linking by email), name, groups claim → group mapping. Libraries `coreos/go-oidc/v3` (Apache-2.0), `golang.org/x/oauth2` (BSD-3).
@@ -39,3 +39,8 @@ Organizations control their own sign-in without affecting other organizations; o
 
 ## Alternatives considered
 Instance-wide IdPs only (rejected: breaks per-organization SSO); trusting any instance session in every organization (rejected: a compromised IdP of one organization would reach others); Single Logout in V1 (deferred: SPEC-004 Q10).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-009 K19 (2026-10-13, owner decision).** §1 (`authentication_source.kind`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
