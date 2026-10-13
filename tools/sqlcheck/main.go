@@ -15,13 +15,26 @@
 //   - SQL-1: no .sql file anywhere in the repository outside the data-access
 //     layer (internal/adapter/sqlite, internal/adapter/postgres), the contract
 //     suites (internal/adapter/storetest) and the tools module (its test data);
-//     hidden directories, node_modules, bin and dist are not scanned. The Go side of this rule is the orgscope analyzer
-//     of tools/orconvet.
+//     hidden directories, node_modules, bin and dist are not scanned. The Go
+//     side of this rule is the orgscope analyzer of tools/orconvet.
 //   - TI-2: every query carries -- orcon:scope org|instance|engine.
-//   - TI-3, scope org: every organization-scoped table the statement reads or
-//     writes is restricted by org_id = <parameter> in a WHERE or JOIN ON clause
-//     (or, through equal org_id columns, by a table that is); an INSERT sets
-//     org_id from a parameter. A comparison under OR or NOT does not count.
+//   - TI-3, scope org: the statement is read with the PostgreSQL parser
+//     (pg_query_go; SQLite files are first rewritten to the same grammar:
+//     placeholders become $n, INSERT OR IGNORE becomes INSERT). Every
+//     organization-scoped table it reads or writes is constrained by
+//     org_id = <parameter> in the part that every result row must satisfy: the
+//     WHERE, or an ON clause that restricts that side of the join (the
+//     preserved side of an outer join is not restricted by its own ON). A
+//     comparison under OR keeps only what every branch guarantees; NOT, CASE,
+//     IS NULL, functions and other shapes guarantee nothing. Equal org_id
+//     columns and correlated subqueries pass a pin along. An INSERT lists its
+//     columns and sets org_id from a parameter (or an org_id column of its
+//     SELECT); ON CONFLICT DO UPDATE names org_id in the conflict target or has
+//     its own org_id condition. Only SELECT, INSERT, UPDATE and DELETE (also as
+//     common table expressions) are accepted; anything else, anything the
+//     parser rejects, a table the migrations and instance_tables.txt do not
+//     know, REPLACE in SQLite, and any construct the checker does not model is
+//     a finding: it fails closed.
 //   - TI-3, scope instance: the statement references no organization-scoped
 //     table.
 //   - TI-3, scope engine: the query is listed in the reviewed
@@ -29,6 +42,10 @@
 //
 // An organization-scoped table is a table the migrations create that is not
 // listed in the policy file instance_tables.txt (TI-1).
+//
+// The check proves a property of the text of the queries. It does not prove
+// that the Go code reaches the store only through them (that is orgscope), and
+// it cannot see a function the statement calls that reads tables itself.
 //
 // Findings print as "<file>:<line>: <rule> <message>". The exit status is 0
 // when nothing is found, 1 when something is found and 2 for a usage or input
@@ -174,13 +191,13 @@ func checkAdapter(dir string, instance map[string]bool, engine *allowlist, used 
 	}
 	var out []Finding
 	for _, q := range queries {
-		out = append(out, checkQuery(q, dialect, scoped, engine, used)...)
+		out = append(out, checkQuery(q, dialect, scoped, instance, engine, used)...)
 	}
 	return out, nil
 }
 
 // checkQuery applies the scope rules to one query.
-func checkQuery(q query, dialect string, scoped scopedTables, engine *allowlist, used map[string]bool) []Finding {
+func checkQuery(q query, dialect string, scoped scopedTables, instance map[string]bool, engine *allowlist, used map[string]bool) []Finding {
 	finding := func(line int, rule, msg string) Finding {
 		if line == 0 {
 			line = q.line
@@ -202,21 +219,7 @@ func checkQuery(q query, dialect string, scoped scopedTables, engine *allowlist,
 		return []Finding{finding(0, "TI-2", fmt.Sprintf("scope %q must be org, instance or engine", q.scope))}
 	}
 
-	toks, err := lex(q.body, q.bodyLine)
-	if err != nil {
-		return []Finding{finding(0, "TI-3", fmt.Sprintf("cannot read the statement: %v", err))}
-	}
-	a, err := analyze(toks)
-	if err != nil {
-		return []Finding{finding(0, "TI-3", fmt.Sprintf("cannot read the statement: %v", err))}
-	}
-	var problems []problem
-	if q.scope == "org" {
-		problems = checkOrgStatement(a, scoped)
-	} else {
-		problems = checkInstanceStatement(a, scoped)
-	}
-	sortProblems(problems)
+	problems := checkStatement(q.body, q.bodyLine, dialect, q.scope, scoped, instance)
 	out := make([]Finding, 0, len(problems))
 	for _, p := range problems {
 		out = append(out, finding(p.line, "TI-3", p.msg))

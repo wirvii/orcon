@@ -2,35 +2,44 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package orgscope is wall 2(a) of organization isolation (ADR-0046 section 3,
-// SPEC-004 R-ISO-02). It reports two things:
+// SPEC-004 R-ISO-02). It enforces two rules.
 //
-//   - a call into a SQL driver (database/sql, pgx, the SQLite driver) from a
-//     package outside the data-access layer, which is internal/adapter/sqlite
-//     and internal/adapter/postgres plus the declared exceptions
-//     internal/adapter/storetest (the contract suites) and
-//     internal/adapter/connectors (SQL against the user's own systems, never
-//     Orcon's store);
-//   - query text that is built at run time instead of being a constant, in any
-//     package except those two exceptions (the contract suites build EXPLAIN,
-//     PRAGMA and CREATE DATABASE text, and a connector runs the user's SQL): a string concatenation, fmt.Sprintf and friends, a
-//     strings.Builder or bytes.Buffer, or a variable that holds one of these,
-//     passed as the query of a driver call or of a method declared by the
-//     data-access layer (the sqlc DBTX interface).
+// Rule 1, SQL stays in the data-access layer. Any reference to a symbol of a SQL
+// driver package (database/sql, pgx, pgconn, the SQLite drivers, lib/pq, sqlx)
+// from a package outside internal/adapter/sqlite and internal/adapter/postgres
+// is reported: a call, a method value such as db.Exec passed around, a type
+// name, a variable. So is a call to any function that returns a driver value
+// (a helper handing out a *sql.DB). The declared exceptions are
+// internal/adapter/storetest (the contract suites) and
+// internal/adapter/connectors (SQL against the user's own systems, never
+// Orcon's store).
 //
-// Queries are parameterized only (orcon-db TI-8). The analyzer is deliberately
-// conservative about what it flags: a query that arrives as a plain parameter,
-// a field or a function result is not reported, because nothing in the type
-// information says it was built unsafely; the constant text of generated code
-// is the norm.
+// Rule 2, SQL text is a constant. The statement passed to a driver call
+// (Exec, Query, QueryRow, Prepare, Queue, ... and their Context forms; every
+// string parameter except a prepared statement's name) or to a method that the
+// data-access layer itself declares (the sqlc DBTX interface) must be a
+// constant expression. sqlc emits its statements as constants, so generated code
+// passes. A concatenation, fmt.Sprintf, a variable, a parameter, a field, a
+// closure result, a helper's result: all are reported, whatever they are made
+// of. The rule holds in every package except the two exceptions above.
 //
-// The part of wall 2 that reads the statements themselves (every statement of
-// scope org filters by org_id) is tools/sqlcheck. The check that a store method
-// receives an orgscope.Org arrives with the type itself (SPEC-004 SE1b).
+// The one escape is a directive on the call line or the line above:
+//
+//	//orcon:dynamic-sql <reason>
+//
+// for the few places that must run text they did not write (a migration runner
+// executing an embedded file). It needs a reason and is reviewed like any other
+// line.
+//
+// What this does not do: it does not read the statement (tools/sqlcheck does,
+// on the query files), and it does not check that a store method receives an
+// orgscope.Org (that type arrives with the first tables). Import rules of the
+// depguard configuration remain the backstop for the drivers' import paths;
+// lint-fixtures plants an import of database/sql and of pgx to prove it.
 package orgscope
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 	"strings"
 
@@ -43,17 +52,19 @@ import (
 // Analyzer is the orgscope analyzer.
 var Analyzer = &analysis.Analyzer{
 	Name:     "orgscope",
-	Doc:      "reports SQL driver calls outside the data-access layer and query text built by concatenation",
+	Doc:      "reports SQL driver use outside the data-access layer and SQL text that is not a constant",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
 
-// driverPrefixes are the import path prefixes of SQL drivers and of the
-// standard database package.
+// driverPrefixes are the import path prefixes of SQL drivers and wrappers.
 var driverPrefixes = []string{
 	"database/sql",
 	"github.com/jackc/pgx",
 	"github.com/jackc/pgconn",
+	"github.com/lib/pq",
+	"github.com/mattn/go-sqlite3",
+	"github.com/jmoiron/sqlx",
 	"modernc.org/sqlite",
 }
 
@@ -64,46 +75,193 @@ var dataAccessPackages = []string{
 	"internal/adapter/postgres",
 }
 
-// exemptPackages may call a driver without being the data-access layer.
+// exemptPackages may use a driver, and build statement text, without being the
+// data-access layer.
 var exemptPackages = []string{
 	"internal/adapter/storetest",
 	"internal/adapter/connectors",
 }
 
-// sinkNames are the methods and functions whose first string parameter is SQL text.
+// sinkNames are the methods and functions that take SQL text.
 var sinkNames = map[string]bool{
-	"Exec": true, "ExecContext": true,
-	"Query": true, "QueryContext": true,
-	"QueryRow": true, "QueryRowContext": true,
-	"Prepare": true, "PrepareContext": true,
+	"Exec": true, "ExecContext": true, "MustExec": true, "MustExecContext": true,
+	"Query": true, "QueryContext": true, "Queryx": true, "QueryxContext": true,
+	"QueryRow": true, "QueryRowContext": true, "QueryRowx": true, "QueryRowxContext": true,
+	"Prepare": true, "PrepareContext": true, "Preparex": true, "PreparexContext": true,
+	"PrepareNamed": true, "PrepareNamedContext": true,
+	"NamedExec": true, "NamedExecContext": true, "NamedQuery": true, "NamedQueryContext": true,
+	"Get": true, "GetContext": true, "Select": true, "SelectContext": true,
 	"Queue": true,
 }
+
+// handleMethods are the methods of a database handle interface that the layer
+// declares (sqlc's DBTX).
+var handleMethods = map[string]bool{
+	"Exec": true, "ExecContext": true, "Query": true, "QueryContext": true,
+	"QueryRow": true, "QueryRowContext": true, "Prepare": true, "PrepareContext": true,
+}
+
+// directive marks a reviewed exception to rule 2.
+const directive = "//orcon:dynamic-sql"
 
 func run(pass *analysis.Pass) (any, error) {
 	pkgPath := strings.TrimSuffix(pass.Pkg.Path(), "_test")
 	exempt := containsAny(pkgPath, exemptPackages)
 	inLayer := exempt || containsAny(pkgPath, dataAccessPackages)
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector) //nolint:errcheck,forcetypeassert // the Requires clause guarantees the type
-	flow := collectAssignments(pass, insp)
+	allowed := directiveLines(pass)
 
+	if !inLayer {
+		insp.Preorder([]ast.Node{(*ast.Ident)(nil), (*ast.CallExpr)(nil)}, func(n ast.Node) {
+			switch n := n.(type) {
+			case *ast.Ident:
+				reportDriverUse(pass, n)
+			case *ast.CallExpr:
+				reportDriverValue(pass, n)
+			}
+		})
+	}
+	if exempt {
+		return nil, nil //nolint:nilnil // analyzers without a result return nil
+	}
 	insp.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call := n.(*ast.CallExpr) //nolint:errcheck,forcetypeassert // filtered by the node types above
-		fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-		if !ok || fn.Pkg() == nil {
-			return
-		}
-		fromDriver := isDriver(fn.Pkg().Path())
-		if fromDriver && !inLayer {
-			pass.Reportf(call.Pos(), "SQL access (%s.%s) outside the data-access layer; SQL lives only in internal/adapter/sqlite and internal/adapter/postgres", fn.Pkg().Name(), fn.Name())
-		}
-		if exempt || !sinkNames[fn.Name()] || (!fromDriver && !containsAny(fn.Pkg().Path(), dataAccessPackages)) {
-			return
-		}
-		if arg := queryArg(fn, call); arg != nil && flow.dynamic(arg, 0) {
-			pass.Reportf(arg.Pos(), "SQL text is built at run time; write the statement as a constant and pass values as parameters (orcon-db TI-8)")
-		}
+		checkSink(pass, call, allowed)
 	})
 	return nil, nil //nolint:nilnil // analyzers without a result return nil
+}
+
+// reportDriverUse reports an identifier that resolves to a symbol of a driver package.
+func reportDriverUse(pass *analysis.Pass, id *ast.Ident) {
+	obj := pass.TypesInfo.Uses[id]
+	if obj == nil || obj.Pkg() == nil || !isDriver(obj.Pkg().Path()) {
+		return
+	}
+	if _, isPkg := obj.(*types.PkgName); isPkg {
+		return
+	}
+	pass.Reportf(id.Pos(), "SQL access (%s.%s) outside the data-access layer; SQL lives only in internal/adapter/sqlite and internal/adapter/postgres", obj.Pkg().Name(), obj.Name())
+}
+
+// reportDriverValue reports a call, to code that is not a driver itself, whose
+// result holds a driver value (a helper that hands out a *sql.DB).
+func reportDriverValue(pass *analysis.Pass, call *ast.CallExpr) {
+	if fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func); ok && fn.Pkg() != nil && isDriver(fn.Pkg().Path()) {
+		return // reported as a use of the driver symbol
+	}
+	tv, ok := pass.TypesInfo.Types[call]
+	if !ok || tv.Type == nil {
+		return
+	}
+	if tuple, isTuple := tv.Type.(*types.Tuple); isTuple {
+		for i := range tuple.Len() {
+			if holdsDriver(tuple.At(i).Type(), 0) {
+				pass.Reportf(call.Pos(), "call returns a SQL driver value outside the data-access layer; SQL lives only in internal/adapter/sqlite and internal/adapter/postgres")
+				return
+			}
+		}
+		return
+	}
+	if holdsDriver(tv.Type, 0) {
+		pass.Reportf(call.Pos(), "call returns a SQL driver value outside the data-access layer; SQL lives only in internal/adapter/sqlite and internal/adapter/postgres")
+	}
+}
+
+// holdsDriver reports whether t is, or is made of, a type of a driver package.
+func holdsDriver(t types.Type, depth int) bool {
+	if depth > 4 || t == nil {
+		return false
+	}
+	switch t := t.(type) {
+	case *types.Named:
+		if t.Obj().Pkg() != nil && isDriver(t.Obj().Pkg().Path()) {
+			return true
+		}
+		return false
+	case *types.Pointer:
+		return holdsDriver(t.Elem(), depth+1)
+	case *types.Slice:
+		return holdsDriver(t.Elem(), depth+1)
+	case *types.Array:
+		return holdsDriver(t.Elem(), depth+1)
+	case *types.Map:
+		return holdsDriver(t.Elem(), depth+1)
+	case *types.Chan:
+		return holdsDriver(t.Elem(), depth+1)
+	}
+	return false
+}
+
+// checkSink applies rule 2 to a call.
+func checkSink(pass *analysis.Pass, call *ast.CallExpr, allowed map[lineKey]string) {
+	fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	if !ok || fn.Pkg() == nil || !sinkNames[fn.Name()] {
+		return
+	}
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok {
+		return
+	}
+	if !isDriver(fn.Pkg().Path()) {
+		// Outside the drivers only the handle interface of the layer (sqlc's
+		// DBTX) is a sink; a store method named Get or Select is not.
+		if !containsAny(fn.Pkg().Path(), dataAccessPackages) || sig.Recv() == nil || !types.IsInterface(sig.Recv().Type()) || !handleMethods[fn.Name()] {
+			return
+		}
+	}
+	params := sig.Params()
+	for i := range params.Len() {
+		p := params.At(i)
+		basic, isBasic := p.Type().Underlying().(*types.Basic)
+		if !isBasic || basic.Kind() != types.String || p.Name() == "name" || i >= len(call.Args) {
+			continue
+		}
+		arg := call.Args[i]
+		if tv, known := pass.TypesInfo.Types[arg]; known && tv.Value != nil {
+			continue // a constant, however it is spelled
+		}
+		if reason, found := directiveFor(pass, call, allowed); found {
+			if reason == "" {
+				pass.Reportf(call.Pos(), "%s needs a reason after the directive", directive)
+			}
+			continue
+		}
+		pass.Reportf(arg.Pos(), "SQL text must be a constant: write the statement as a constant (sqlc does) and pass values as parameters (orcon-db TI-8); a reviewed exception takes %s <reason>", directive)
+	}
+}
+
+type lineKey struct {
+	file string
+	line int
+}
+
+// directiveLines maps the lines holding the dynamic-sql directive to its reason.
+func directiveLines(pass *analysis.Pass) map[lineKey]string {
+	out := map[lineKey]string{}
+	for _, f := range pass.Files {
+		for _, group := range f.Comments {
+			for _, c := range group.List {
+				rest, ok := strings.CutPrefix(c.Text, directive)
+				if !ok || (rest != "" && rest[0] != ' ' && rest[0] != '\t') {
+					continue
+				}
+				pos := pass.Fset.Position(c.Slash)
+				out[lineKey{pos.Filename, pos.Line}] = strings.TrimSpace(rest)
+			}
+		}
+	}
+	return out
+}
+
+// directiveFor finds the directive on the line of the call or the line above.
+func directiveFor(pass *analysis.Pass, call *ast.CallExpr, allowed map[lineKey]string) (string, bool) {
+	pos := pass.Fset.Position(call.Pos())
+	for _, line := range []int{pos.Line, pos.Line - 1} {
+		if reason, ok := allowed[lineKey{pos.Filename, line}]; ok {
+			return reason, true
+		}
+	}
+	return "", false
 }
 
 // containsAny reports whether path holds one of the element runs.
@@ -121,130 +279,6 @@ func isDriver(path string) bool {
 		if strings.HasPrefix(path, p) {
 			return true
 		}
-	}
-	return false
-}
-
-// queryArg returns the argument bound to the first string parameter of fn.
-func queryArg(fn *types.Func, call *ast.CallExpr) ast.Expr {
-	sig, ok := fn.Type().(*types.Signature)
-	if !ok {
-		return nil
-	}
-	params := sig.Params()
-	for i := range params.Len() {
-		basic, isBasic := params.At(i).Type().Underlying().(*types.Basic)
-		if !isBasic || basic.Kind() != types.String {
-			continue
-		}
-		if i < len(call.Args) {
-			return call.Args[i]
-		}
-		return nil
-	}
-	return nil
-}
-
-// assignments records, per variable, the expressions assigned to it and
-// whether it was ever extended with +=.
-type assignments struct {
-	pass     *analysis.Pass
-	values   map[types.Object][]ast.Expr
-	extended map[types.Object]bool
-}
-
-func collectAssignments(pass *analysis.Pass, insp *inspector.Inspector) *assignments {
-	a := &assignments{pass: pass, values: map[types.Object][]ast.Expr{}, extended: map[types.Object]bool{}}
-	insp.Preorder([]ast.Node{(*ast.AssignStmt)(nil), (*ast.ValueSpec)(nil)}, func(n ast.Node) {
-		switch s := n.(type) {
-		case *ast.AssignStmt:
-			a.recordAssign(s)
-		case *ast.ValueSpec:
-			if len(s.Names) != len(s.Values) {
-				return
-			}
-			for i, id := range s.Names {
-				if obj := pass.TypesInfo.ObjectOf(id); obj != nil {
-					a.values[obj] = append(a.values[obj], s.Values[i])
-				}
-			}
-		}
-	})
-	return a
-}
-
-func (a *assignments) recordAssign(s *ast.AssignStmt) {
-	for i, lhs := range s.Lhs {
-		id, ok := lhs.(*ast.Ident)
-		if !ok {
-			continue
-		}
-		obj := a.pass.TypesInfo.ObjectOf(id)
-		if obj == nil {
-			continue
-		}
-		if s.Tok == token.ADD_ASSIGN {
-			a.extended[obj] = true
-			continue
-		}
-		if len(s.Lhs) == len(s.Rhs) {
-			a.values[obj] = append(a.values[obj], s.Rhs[i])
-		}
-	}
-}
-
-// maxDepth bounds the chase through variables.
-const maxDepth = 8
-
-// dynamic reports whether expr is query text assembled at run time.
-func (a *assignments) dynamic(expr ast.Expr, depth int) bool {
-	if depth > maxDepth {
-		return false
-	}
-	if tv, ok := a.pass.TypesInfo.Types[expr]; ok && tv.Value != nil {
-		return false // a constant, however it is spelled
-	}
-	switch e := expr.(type) {
-	case *ast.ParenExpr:
-		return a.dynamic(e.X, depth+1)
-	case *ast.BinaryExpr:
-		return e.Op == token.ADD
-	case *ast.CallExpr:
-		return a.dynamicCall(e)
-	case *ast.Ident:
-		obj := a.pass.TypesInfo.ObjectOf(e)
-		if obj == nil {
-			return false
-		}
-		if a.extended[obj] {
-			return true
-		}
-		for _, v := range a.values[obj] {
-			if a.dynamic(v, depth+1) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// dynamicCall reports whether call builds a string: fmt.Sprint*, strings
-// functions that compose text, or the String method of a builder or buffer.
-func (a *assignments) dynamicCall(call *ast.CallExpr) bool {
-	fn, ok := typeutil.Callee(a.pass.TypesInfo, call).(*types.Func)
-	if !ok || fn.Pkg() == nil {
-		return false
-	}
-	switch fn.Pkg().Path() {
-	case "fmt":
-		return strings.HasPrefix(fn.Name(), "Sprint")
-	case "strings":
-		switch fn.Name() {
-		case "Join", "Replace", "ReplaceAll", "Repeat", "String":
-			return true
-		}
-	case "bytes":
-		return fn.Name() == "String"
 	}
 	return false
 }

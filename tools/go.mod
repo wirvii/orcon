@@ -17,8 +17,10 @@ tool (
 )
 
 require (
+	github.com/pganalyze/pg_query_go/v6 v6.2.5
 	go.uber.org/goleak v1.3.0
 	golang.org/x/tools v0.52.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (

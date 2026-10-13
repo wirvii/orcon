@@ -72,7 +72,6 @@ func TestRejectsUnscopedQueries(t *testing.T) {
 		{"select filtered", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT id, name FROM flow WHERE org_id = $1 AND id = $2;", ""},
 		{"select alias and reversed", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT f.id FROM flow AS f WHERE $1 = f.org_id AND f.id = $2;", ""},
 		{"sqlc named parameter", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);", ""},
-		{"sqlite placeholder", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = ? AND id = ?;", ""},
 		{"cast parameter", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = $1::uuid AND id = $2;", ""},
 		{"join restricted in ON", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id, p.name FROM flow f JOIN project p ON p.org_id = f.org_id AND p.id = f.project_id WHERE f.org_id = $1 ORDER BY f.id LIMIT 10;", ""},
 		{"join both restricted", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM flow f JOIN project p ON p.org_id = $1 AND p.id = f.project_id WHERE f.org_id = $1 LIMIT 10;", ""},
@@ -94,7 +93,36 @@ func TestRejectsUnscopedQueries(t *testing.T) {
 		{"comment mentions table", "-- name: GetPrincipal :one\n-- orcon:scope instance\n-- flow is read elsewhere\nSELECT id FROM principal WHERE id = $1;", ""},
 		{"string mentions org_id", "-- name: GetPrincipal :one\n-- orcon:scope instance\nSELECT 'flow WHERE org_id = $1' FROM principal;", ""},
 		{"function in from", "-- name: Series :many\n-- orcon:scope org\nSELECT n FROM generate_series(1, 3) AS n;", ""},
-		{"table dropped in migrations", "-- name: Scratch :many\n-- orcon:scope org\nSELECT id FROM scratch;", ""},
+		{"left join restricting the nullable side", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM principal p LEFT JOIN flow f ON f.org_id = $1;", ""},
+		{"right join restricting the nullable side", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM flow f RIGHT JOIN principal p ON p.id = f.project_id WHERE f.org_id = $1;", ""},
+		{"left join pinned in where", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM flow f LEFT JOIN principal p ON p.id = f.project_id WHERE f.org_id = $1;", ""},
+		{"upsert naming org_id in the conflict target", "-- name: UpsertFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ($1, $2, $3, $4) ON CONFLICT (org_id, id) DO UPDATE SET name = excluded.name;", ""},
+		{"upsert with its own org_id condition", "-- name: UpsertFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = excluded.name WHERE flow.org_id = $1;", ""},
+		{"upsert do nothing", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING;", ""},
+		{"data-modifying cte restricted", "-- name: DeleteFlow :one\n-- orcon:scope org\nWITH d AS (DELETE FROM flow WHERE org_id = $1 AND id = $2 RETURNING id) SELECT id FROM d;", ""},
+		{"same-table alias used for the pin", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT run.id FROM flow run WHERE run.org_id = $1;", ""},
+
+		// Fail-closed probes from review: each must be a finding.
+		{"table in parentheses", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM (flow);", "cannot read the statement"},
+		{"table in parentheses inside exists", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT p.id FROM principal p WHERE EXISTS (SELECT 1 FROM (flow) WHERE true);", "cannot read the statement"},
+		{"values list joined with a table", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM (VALUES (1)) v, flow;", "flow is not restricted"},
+		{"NOT before the comparison", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM flow WHERE NOT org_id = $1;", "flow is not restricted"},
+		{"alias hides the table name", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM flow run, flow f WHERE run.org_id = $1;", "flow is not restricted"},
+		{"alias and unknown table share a name", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT * FROM flow run, run f WHERE run.org_id = $1;", "neither organization-scoped"},
+		{"left join preserved side in ON", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.* FROM flow f LEFT JOIN principal p ON f.org_id = $1;", "flow is not restricted"},
+		{"right join preserved side in ON", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM principal p RIGHT JOIN flow f ON f.org_id = $1;", "flow is not restricted"},
+		{"full join in ON", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM flow f FULL JOIN principal p ON f.org_id = $1;", "flow is not restricted"},
+		{"case expression", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT id FROM flow WHERE CASE WHEN id = $2 THEN true ELSE org_id = $1 END;", "flow is not restricted"},
+		{"comparison tested for null", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = $1 IS NULL;", "flow is not restricted"},
+		{"truncate", "-- name: Wipe :exec\n-- orcon:scope org\nTRUNCATE flow;", "is not a SELECT, INSERT, UPDATE or DELETE"},
+		{"merge", "-- name: Merge :exec\n-- orcon:scope org\nMERGE INTO flow f USING principal p ON f.id = p.id WHEN MATCHED THEN DELETE;", "is not a SELECT, INSERT, UPDATE or DELETE"},
+		{"data-modifying cte unrestricted", "-- name: DeleteFlow :one\n-- orcon:scope org\nWITH d AS (DELETE FROM flow WHERE id = $1 RETURNING id) SELECT id FROM d;", "flow is not restricted"},
+		{"upsert on a non-org conflict target", "-- name: UpsertFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = excluded.name;", "ON CONFLICT DO UPDATE"},
+		{"upsert on a named constraint", "-- name: UpsertFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ($1, $2, $3, $4) ON CONFLICT ON CONSTRAINT pk_flow DO UPDATE SET name = excluded.name;", "ON CONFLICT DO UPDATE"},
+		{"select into", "-- name: Copy :exec\n-- orcon:scope org\nSELECT id INTO scratchcopy FROM flow WHERE org_id = $1;", "SELECT INTO"},
+		{"two statements", "-- name: Two :exec\n-- orcon:scope org\nSELECT id FROM flow WHERE org_id = $1; SELECT id FROM flow;", "exactly one statement"},
+		{"unknown table", "-- name: Scratch :many\n-- orcon:scope org\nSELECT id FROM scratch;", "neither organization-scoped"},
+		{"unqualified org_id with a derived table", "-- name: ListFlows :many\n-- orcon:scope org\nSELECT f.id FROM flow f, (SELECT 1 AS org_id) d WHERE org_id = $1;", "flow is not restricted"},
 
 		// Rejected shapes.
 		{"select without org_id", "-- name: GetFlow :one\n-- orcon:scope org\nSELECT id FROM flow WHERE id = $1;", "flow is not restricted"},
@@ -115,8 +143,8 @@ func TestRejectsUnscopedQueries(t *testing.T) {
 		{"update without org_id", "-- name: RenameFlow :exec\n-- orcon:scope org\nUPDATE flow SET name = $2 WHERE id = $1;", "flow is not restricted"},
 		{"update sets org_id only", "-- name: MoveFlow :exec\n-- orcon:scope org\nUPDATE flow SET org_id = $1 WHERE id = $2;", "flow is not restricted"},
 		{"delete without org_id", "-- name: DeleteFlow :exec\n-- orcon:scope org\n-- orcon:delete audit:flow.deleted\nDELETE FROM flow WHERE id = $1;", "flow is not restricted"},
-		{"insert without org_id column", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow (id, project_id, name) VALUES ($1, $2, $3);", "does not set org_id"},
-		{"insert without column list", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow VALUES ($1, $2, $3, $4);", "explicit column list"},
+		{"insert without org_id column", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow (id, project_id, name) VALUES ($1, $2, $3);", "must list its columns and set org_id"},
+		{"insert without column list", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow VALUES ($1, $2, $3, $4);", "must list its columns and set org_id"},
 		{"insert org_id from a literal", "-- name: CreateFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) VALUES ('x', $2, $3, $4);", "org_id value must be a parameter"},
 		{"insert second tuple from a literal", "-- name: CreateFlows :exec\n-- orcon:scope org\nINSERT INTO flow (id, org_id, project_id, name) VALUES ($1, $2, $3, $4), ($5, 'x', $3, $4);", "org_id value must be a parameter"},
 		{"insert select with a literal", "-- name: CopyFlow :exec\n-- orcon:scope org\nINSERT INTO flow (org_id, id, project_id, name) SELECT 'x', $2, project_id, name FROM flow WHERE org_id = $1;", "org_id value must be a parameter or an org_id column"},
@@ -241,6 +269,47 @@ func TestUsageErrors(t *testing.T) {
 	}
 	if code, _ := r.run(); code != 2 {
 		t.Fatalf("missing policy list: exit %d, want 2", code)
+	}
+}
+
+func TestSQLiteDialect(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"question mark", "SELECT id FROM flow WHERE org_id = ? AND id = ?;", ""},
+		{"numbered question mark", "SELECT id FROM flow WHERE org_id = ?1 AND id = ?2;", ""},
+		{"colon name", "SELECT id FROM flow WHERE org_id = :org_id AND id = :id;", ""},
+		{"at name", "SELECT id FROM flow WHERE org_id = @org_id;", ""},
+		{"sqlc arg over several lines", "SELECT id FROM flow\nWHERE org_id = sqlc.arg(\n  org_id\n) AND id = sqlc.narg(id);", ""},
+		{"insert or ignore", "INSERT OR IGNORE INTO flow (org_id, id, project_id, name) VALUES (?, ?, ?, ?);", ""},
+		{"insert with datetime function", "INSERT INTO flow (org_id, id, project_id, name) VALUES (?, ?, ?, strftime('%Y', 'now'));", ""},
+		{"unrestricted", "SELECT id FROM flow WHERE id = ?;", "flow is not restricted"},
+		{"insert or replace", "INSERT OR REPLACE INTO flow (org_id, id, project_id, name) VALUES (?, ?, ?, ?);", "REPLACE deletes"},
+		{"replace into", "REPLACE INTO flow (org_id, id, project_id, name) VALUES (?, ?, ?, ?);", "REPLACE deletes"},
+		{"org_id literal", "SELECT id FROM flow WHERE org_id = 'x';", "flow is not restricted"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := newRepo(t)
+			r.write("internal/adapter/sqlite/migrations/0001_init.sql", migrationSQL)
+			r.write("internal/adapter/sqlite/queries/q.sql", "-- name: Q :one\n-- orcon:scope org\n"+tc.query+"\n")
+			var stdout, stderr bytes.Buffer
+			code := run([]string{"-root", r.root, filepath.Join(r.root, "internal/adapter/sqlite")}, &stdout, &stderr)
+			out := stdout.String() + stderr.String()
+			if tc.want == "" {
+				if code != 0 {
+					t.Fatalf("exit %d:\n%s", code, out)
+				}
+				return
+			}
+			if code != 1 || !strings.Contains(out, tc.want) {
+				t.Fatalf("exit %d, want 1 with %q:\n%s", code, tc.want, out)
+			}
+		})
 	}
 }
 

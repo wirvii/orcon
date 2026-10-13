@@ -241,10 +241,10 @@ if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/zzfixture
 else
   fail 18 "SQL driver call outside the data-access layer (orconvet orgscope reported nothing)"
 fi
-if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/adapter/sqlite/zzfixture19/ 2>&1) | grep -q 'SQL text is built at run time'; then
-  pass 19 "SQL text built by concatenation"
+if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/adapter/sqlite/zzfixture19/ 2>&1) | grep -q 'SQL text must be a constant'; then
+  pass 19 "SQL text that is not a constant"
 else
-  fail 19 "SQL text built by concatenation (orconvet orgscope reported nothing)"
+  fail 19 "SQL text that is not a constant (orconvet orgscope reported nothing)"
 fi
 
 if [ "$failed" -ne 0 ]; then

@@ -18,6 +18,7 @@ func TestOrgScope(t *testing.T) {
 	// declared exceptions raise nothing.
 	analysistest.Run(t, analysistest.TestData(), orgscope.Analyzer,
 		"fixture/internal/area",
+		"fixture/internal/adapter/sqlite/helper",
 		"fixture/internal/adapter/sqlite/store",
 		"fixture/internal/adapter/postgres/store",
 		"fixture/internal/adapter/storetest",

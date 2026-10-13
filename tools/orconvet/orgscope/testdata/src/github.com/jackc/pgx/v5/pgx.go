@@ -10,7 +10,16 @@ import "context"
 type Conn struct{}
 
 // Exec is a stub.
-func (*Conn) Exec(_ context.Context, _ string, _ ...any) error { return nil }
+func (*Conn) Exec(_ context.Context, sql string, _ ...any) error { return nil }
 
 // Query is a stub.
-func (*Conn) Query(_ context.Context, _ string, _ ...any) error { return nil }
+func (*Conn) Query(_ context.Context, sql string, _ ...any) error { return nil }
+
+// Prepare is a stub; the first string is the name of the statement, the second its text.
+func (*Conn) Prepare(_ context.Context, name string, sql string) error { return nil }
+
+// Batch is a stub.
+type Batch struct{}
+
+// Queue is a stub.
+func (*Batch) Queue(query string, _ ...any) {}
