@@ -360,9 +360,28 @@ func TestLintSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range dbrules.LintSQLite(t.Context(), s.Reader(), policy) {
-		t.Errorf("%s", f)
-	}
+	findings := dbrules.LintSQLite(t.Context(), s.Reader(), policy)
+	// The trigger registry (SPEC-002 T1, criterion E-DB-1) reports under its own name.
+	t.Run("trigger", func(t *testing.T) {
+		for _, f := range findings {
+			if isTriggerObject(f) {
+				t.Errorf("%s", f)
+			}
+		}
+	})
+	t.Run("other", func(t *testing.T) {
+		for _, f := range findings {
+			if !isTriggerObject(f) {
+				t.Errorf("%s", f)
+			}
+		}
+	})
+}
+
+// isTriggerObject reports whether a schema finding is about the trigger
+// registry: its tables and the activation state of the flow.
+func isTriggerObject(f dbrules.Finding) bool {
+	return strings.Contains(f.Object, "trigger") || strings.Contains(f.Object, "activation_state")
 }
 
 func TestHotQueryPlans(t *testing.T) {

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0038 — Identity, principals, organizations and sessions
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077, including its value-spelling decision); 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; consistency with ADR-0077, including its value-spelling decision); 2026-10-13 (stored enumerated values are UPPER_SNAKE, ADR-0015 §2); 2026-10-13 (SPEC-004 Amendment 7)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -16,8 +16,8 @@ Instance → Organization → Project → resources (flows, credentials, variabl
 Each project has a `handle` unique per instance (owner decision, SPEC-004 Q11): the project slug by default, or `<orgSlug>-<projectSlug>` when the slug is taken; collision messages are generic and never reveal another organization's flows, projects or name. The handle is the `<project>` segment of native webhook addresses (ADR-0022 §1). An organization may optionally have its own ingress host.
 
 ### 2. Users and memberships
-- `application_user(id, principal_id, email_normalized, display_name, status, password_hash?, created_at, …)` is an instance table (`user` is a reserved word); `email_normalized` and `principal_id` are unique.
-- `membership(org_id, id, application_user_id, status: INVITED|ACTIVE|SUSPENDED, org_role_id, invited_by_principal_id?, created_at)`, unique `(org_id, application_user_id)`; a user without an active membership cannot observe the organization or its existence.
+- `application_user(id, principal_id, email_normalized, display_name, status: ACTIVE|DISABLED, password_hash?, created_at, …)` is an instance table (`user` is a reserved word); `email_normalized` and `principal_id` are unique. `DISABLED` is set by an instance administrator holding `instance:users`: it blocks every authentication method and revokes the account's sessions as deprovisioning does (§5); memberships are kept.
+- `membership(org_id, id, application_user_id, status: INVITED|ACTIVE|SUSPENDED, invited_by_principal_id?, created_at)`, unique `(org_id, application_user_id)`; a member's organization roles are `role_binding` rows with `scope_kind = ORG` and `subject_kind = USER` (ADR-0041 §1), created together with the membership when an invitation is accepted; a user without an active membership cannot observe the organization or its existence.
 - `external_identity(org_id, id, application_user_id, authentication_source_id, issuer, subject)`, unique `(org_id, authentication_source_id, issuer, subject)`; identity sources belong to an organization (ADR-0040 §1), so the link does too.
 
 ### 3. Principals
@@ -54,3 +54,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 
 - **SPEC-005.** §2: a project gains `environment` (optional label) and `protected` (boolean; default `true` for every new project, including the default project of each organization; column `is_protected`), changed with `project:update` and audited as `project.protection_changed`; lowering `protected` at the request of an `apiKey` principal always goes through confirmation (ADR-0059 §5). §8: new configurable policies: forbid personal keys; maximum lifetime of personal keys (default 30 days). §3: ADR-0056 defines the `apiKey` principal (API keys and OAuth access tokens of service-account clients), bound to a user or service account; the `service_account` row hangs from `principal` (ADR-0077 §8). §6: the authenticator chain includes `apiKeyAuthenticator` after the session cookie; the `OrgID` of an `apiKey` principal is fixed.
 - **SPEC-009 K19 (2026-10-13, owner decision).** §2 and §7 (`membership.status`; organization status `DELETION_SCHEDULED`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
+- **SPEC-004 Amendment 7 (2026-10-13, owner decision).** §2: `membership` no longer carries `org_role_id`; a member's organization roles are `role_binding` rows with `scope_kind = ORG` and `subject_kind = USER`, created with the membership when an invitation is accepted. The owner chose this model, which resolves the tension with ADR-0041 §1. `application_user.status` takes the values `ACTIVE|DISABLED`; `DISABLED` is set by an instance administrator holding `instance:users`, blocks every authentication method and revokes the account's sessions, and memberships are kept.

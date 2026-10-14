@@ -128,6 +128,12 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/identity
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/n8nimport
+              desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/connector
+              desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/trigger
+              desc: platform packages are leaves (AL-1)
         pgx-confined:
           files:
             - "$all"
@@ -179,6 +185,14 @@ linters:
             - "!**/cmd/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/codec
+              desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-cli:
+          files:
+            - "$all"
+            - "!**/internal/adapter/cli/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/cli
               desc: only cmd/orcon wires adapters (AL-8)
         adapter-private-egress:
           files:

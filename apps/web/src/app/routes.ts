@@ -10,5 +10,6 @@ import { index, physical, rootRoute } from '@tanstack/virtual-file-routes';
  */
 export const routes = rootRoute('shell/RootLayout.tsx', [
   index('shell/Home.tsx'),
+  physical('/flows', '../features/editor/routes'),
   physical('/settings', '../features/settings/routes'),
 ]);

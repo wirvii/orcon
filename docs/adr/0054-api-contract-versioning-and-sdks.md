@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0054 — API contract source of truth, versioning, deprecation, documentation and SDK generation
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; §1 amended 2026-10-12 by SPEC-008: Go generator fixed as `oapi-codegen` strict, ADR-0076; amended 2026-10-12 by ADR-0080: lint toolchain, extensions, executed examples, reference site, changelog; amended 2026-10-13 by SPEC-012 Amendment 2: one built-in lint rule off for protocol errors, oasdiff severity file and events compared as responses, reference-site policy)

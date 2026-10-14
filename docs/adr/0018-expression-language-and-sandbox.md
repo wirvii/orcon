@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0018 — Expression language and sandboxed JavaScript runtime
 
 Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12, 2026-10-13

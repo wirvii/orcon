@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Execution event catalog
 
 Status: **Accepted** | Source: ADR-0009 §7–§9 (accepted 2026-10-12 via SPEC-001), with the `ai.*` events added by SPEC-006
@@ -41,6 +42,10 @@ Aggregated per journal batch, with counts and id ranges: `op.prepared`, `op.disp
 
 ### Recovery and limits
 `lease.expired`, `token.poisoned`, `memory.limit_exceeded`, `limit.throttled` (live-only, not persisted; the latest value is sampled to the execution row).
+
+A token's abandon count grows by one when its lease is lost without its holder returning it: the reaper expires the lease, a SQLite process starts after a crash, a worker clears leases left by its previous run, or a worker gives a token back after an engine or infrastructure error in its step (a node error, including a recovered panic, never counts). A worker that returns its tokens during an orderly shutdown, within or past the shutdown grace, does not add to the count. The count goes back to zero at every confirmation point that stores new results for the token. A token one abandon away from the poison threshold runs only on a worker that holds no other token, so the abandon that reaches the threshold is always one where the token ran alone; `token.poisoned` therefore names a token that crashed its process by itself.
+
+`lease.expired` carries `data.cause` — `LEASE_TIMEOUT`, `PROCESS_RESTART`, `STALE_INCARNATION` or `STEP_ERROR` — and `data.abandonedCount`, the count after the increment.
 
 ### Human attention (ADR-0073)
 | Type | Meaning |

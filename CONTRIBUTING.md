@@ -28,7 +28,7 @@ Orcon uses [Conventional Commits](https://www.conventionalcommits.org/) with exa
 - Internal scopes: `docs`, `ci`, `deps`, `tooling`.
 - The summary is in English, imperative, starts in lowercase and has no final period. Mark a breaking change with `!`, for example `feat(api)!: remove the v0 flow endpoint`.
 
-A check runs on the pull request title and on every commit of the pull request. To fix a commit message, use `git rebase -i origin/main` and push with `--force-with-lease`.
+A check fails the pull request when its title does not follow the format, because the title becomes the commit on `main`. The same check only warns about the commits of the pull request (merge commits are ignored). To fix a commit message, use `git rebase -i origin/main` and push with `--force-with-lease`.
 
 Commit messages, pull requests and documentation describe the change itself. They never carry AI authorship trailers or name the AI tools used while writing the change; an automatic check enforces this.
 

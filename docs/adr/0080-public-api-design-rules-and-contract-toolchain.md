@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR 0080: Public API design rules and contract toolchain
 
 Status: Accepted | Amended: 2026-10-13 (SPEC-012 Amendment 2)
@@ -30,3 +31,4 @@ Spectral (Apache-2.0) as linter (needs a separate bundler). Redoc as reference (
 Changes applied after acceptance; each entry names its source.
 
 - **SPEC-012 (Amendment 2, 2026-10-13, owner decision).** §10: the content security policy of the reference site adds `style-src 'self' 'unsafe-inline'`, `img-src 'self' data:`, `base-uri 'self'`, `form-action 'none'`, `frame-ancestors 'none'` and `object-src 'none'` (measured: the renderer injects its styles at run time and is unusable without inline styles), and `/api/reference` redirects to `/api/reference/`. §9: the Redocly built-in rule `operation-4xx-problem-details-rfc7807` is turned off for the real contract, because protocol-tagged operations answer errors in the format of their external standard; the project rule `orcon/problem-responses` requires problem+json for every other operation (ERR-1). A secret Orcon generates is returned exactly once, in `<Resource>WithSecret` (FIELD-7); a resource reports how it failed in `failure`, never `error` (RESP-6); the evaluate response member is `itemResults` (ADR-0052 §7).
+- **SPEC-005 (Amendment 8, Q-API-B, 2026-10-14, owner decision).** §4: the extension `x-orcon-experimental-feature` (operations and `webhooks` entries; kebab-case name) declares the feature name that callers send in the `Orcon-Experimental` header; it is required if and only if `x-orcon-stability` is `experimental`. `Orcon-Experimental` carries a comma-separated list of feature names, and a request that omits the operation's feature is answered `400 experimental-not-enabled`.

@@ -32,21 +32,21 @@ VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(project_id), sqlc.arg(name), sq
 
 -- name: GetFlow :one
 -- orcon:scope org
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: GetFlowByName :one
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND name = sqlc.arg(name) AND deleted_at IS NULL;
 
 -- name: ListFlows :many
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND id > sqlc.arg(after_id) AND deleted_at IS NULL
 ORDER BY id

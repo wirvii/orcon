@@ -1,0 +1,3 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><path d="M0 0h10v10z"/><rect width="1" height="1" style="mask-image:src(&quot;https://evil.example/x.png&quot;)"/></svg>

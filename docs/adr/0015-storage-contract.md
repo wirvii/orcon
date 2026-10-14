@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0015 — Storage contract: logical schema, SQLite and PostgreSQL adapters, migrations
 
 Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (ADR-0077); 2026-10-13 (SPEC-009: unique execution event order; stored enumerated values are UPPER_SNAKE in every table); 2026-10-13 (required timestamp columns clarified)

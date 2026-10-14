@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0003 — Durable state plus execution history
 
 Status: **Accepted (architectural direction); detailed model specified by ADR-0007…ADR-0019** | Date: 2026-10-10 | Amended: 2026-10-12 (SPEC-001)

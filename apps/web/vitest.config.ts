@@ -30,7 +30,8 @@ export default defineConfig({
       provider: 'v8',
       // The logic of the app: models, stores and data layers of every feature, and the runtime of app/.
       include: ['src/features/*/{model,store,api}/**/*.{ts,tsx}', 'src/app/{boundary,live-events,errors,forms,perf}/**/*.{ts,tsx}'],
-      exclude: ['**/*.test.{ts,tsx}', '**/*.gen.ts', '**/gen/**'],
+      // The layout worker only forwards a message to `layout.ts`, which is tested; it cannot run outside a worker.
+      exclude: ['**/*.test.{ts,tsx}', '**/*.gen.ts', '**/gen/**', '**/*.worker.ts'],
       reporter: ['text-summary', 'json-summary'],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },

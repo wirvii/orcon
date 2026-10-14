@@ -20,6 +20,7 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 		ID: fromPGUUID[flow.FlowID](row.ID), OrgID: fromPGUUID[identity.OrgID](row.OrgID), ProjectID: fromPGUUID[identity.ProjectID](row.ProjectID),
 		Name: row.Name, Draft: row.DraftDocument, DraftRevision: row.DraftRevision,
 		ActiveVersionID:      fromPGUUID[flow.FlowVersionID](row.ActiveFlowVersionID),
+		ActivationState:      flow.ActivationState(row.ActivationState),
 		DeletedAt:            instant(row.DeletedAt),
 		DeletedByPrincipalID: fromPGUUID[identity.PrincipalID](row.DeletedByPrincipalID),
 		CreatedAt:            instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
@@ -86,7 +87,7 @@ func (s *Store) ListFlows(ctx context.Context, org identity.OrgID, project ident
 }
 
 // UpdateFlowDraft implements [flow.Store].
-func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID flow.FlowID, draft []byte, expectedRevision int64, now time.Time) (int64, error) {
+func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
 	var revision int64
 	err := s.inOrg(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
@@ -97,7 +98,7 @@ func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID 
 		}
 		if n == 1 {
 			revision = expectedRevision + 1
-			return nil
+			return replaceDraftReferences(ctx, q, org, flowID, references, now)
 		}
 		// Either the flow does not exist or its revision moved; tell them apart.
 		if _, err := q.GetFlow(ctx, pgUUID(org), pgUUID(flowID)); err != nil {
@@ -133,7 +134,7 @@ func (s *Store) PublishVersion(ctx context.Context, v flow.VersionRecord) error 
 		if n == 0 {
 			return fmt.Errorf("flow %s: %w", v.FlowID, flow.ErrNotFound)
 		}
-		return nil
+		return insertVersionReferences(ctx, q, v)
 	})
 }
 

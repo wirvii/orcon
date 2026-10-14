@@ -27,6 +27,6 @@ Trigger events form a non-execution event stream, separate from the execution ev
 | Polling | `poll.completed`, `poll.failed` | |
 | Persistent listeners | `listener.acquired`, `listener.lost`, `listener.failed`, `listener.rebalanced` | |
 | External registration | `registration.requested`, `registration.succeeded`, `registration.failed`, `registration.renewed`, `registration.removed`, `registration.orphan_removed` | |
-| Flow lifecycle | `flow.published`, `flow.activated`, `flow.deactivated`, `flow.rolled_back` | |
+| Flow lifecycle | `flow.published`, `flow.activated`, `flow.deactivated`, `flow.rolled_back` | `flow.deactivated` carries `reason: FLOW_DELETED` when the flow was deleted; a deactivation requested by a person carries no `reason`. |
 | Addresses | `address.collision` | No detail of another organization. |
 | Test sessions | `test.session_opened`, `test.session_expired` | |

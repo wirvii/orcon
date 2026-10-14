@@ -4,11 +4,18 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     types: [checks_requested]
 permissions:
   contents: read
+# A newer push to a pull request supersedes the run in flight; main and the merge
+# queue are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   # ---------------------------------------------------------------------------
   # SPEC-008 G5 block: Go gate (tooling.md TOOL-3). Required jobs: check, provenance.
@@ -20,6 +27,7 @@ jobs:
   # (GOTOOLCHAIN=auto for tools/go.mod), so no workflow step changes the toolchain.
   check:
     name: check (go ${{ matrix.go }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -53,7 +61,7 @@ jobs:
   # and its description (SPEC-008 4.11). Pushes to main check before..after.
   provenance:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     env:
       GOTOOLCHAIN: local
     steps:
@@ -94,6 +102,7 @@ jobs:
   # by image digest. Keep the digests equal to PG_IMAGES in the Makefile.
   postgres-matrix:
     name: postgres (${{ matrix.image }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -103,6 +112,7 @@ jobs:
           - postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
     env:
       GOTOOLCHAIN: local
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       # Full history: test-compat-floor checks out the release tag of every declared floor.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -134,7 +144,7 @@ jobs:
     name: postgres
     runs-on: ubuntu-latest
     needs: postgres-matrix
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     steps:
       - name: Require every postgres leg to pass
         env:
@@ -169,6 +179,7 @@ jobs:
   # End of the SPEC-008 G5 block. Jobs below are not part of the Go gate.
   # ---------------------------------------------------------------------------
   integration:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -188,6 +199,7 @@ jobs:
       - name: Smoke test standalone
         run: make smoke
   ui-quality:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -244,6 +256,7 @@ jobs:
       - name: Web accessibility
         run: pnpm --filter @orcon/web test:a11y
   ui-visual:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -276,6 +289,7 @@ jobs:
             packages/js/ui/visual/test-results
           if-no-files-found: ignore
   skills:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:orcon:schema:connector:1",
+  "$comment": "SPDX-FileCopyrightText: The Orcon Authors. SPDX-License-Identifier: Apache-2.0.",
+  "title": "orcon/connector@1",
+  "description": "Orcon connector manifest (ADR-0029). This schema checks the shape of the manifest: member names, JSON types, closed UPPER_SNAKE value sets, ranges and patterns. Rules that need the whole document (node types that match the connector id, operations named by safety contracts and credentials, the safety contract rules of ADR-0029 section 5, a changelog entry for the version, the reserved orcon. namespace) are checked by the validator in internal/connector and are not expressible here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "version", "kind", "displayName", "description", "publisher", "license", "compat", "nodes", "permissions", "changelog"],
+  "properties": {
+    "format": { "const": "orcon/connector@1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}\\.[a-z][a-z0-9-]{0,62}$" },
+    "version": { "$ref": "#/$defs/version" },
+    "kind": { "enum": ["DECLARATIVE", "NATIVE", "WASM", "LIBRARY", "RUNTIME"] },
+    "displayName": { "$ref": "#/$defs/shortText" },
+    "description": { "$ref": "#/$defs/longText" },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/shortText" },
+        "url": { "$ref": "#/$defs/webUrl" },
+        "contact": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "license": { "type": "string", "pattern": "^[A-Za-z0-9.+() -]{1,128}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": { "$ref": "#/$defs/webUrl" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" },
+        "buildRecipe": { "$ref": "#/$defs/longText" }
+      }
+    },
+    "compat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engineApi"],
+      "properties": {
+        "engineApi": { "type": "string", "pattern": "^\\s*(\\*|(\\^|~|>=|<=|>|<|=)?(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*|[xX*]))?(\\.(0|[1-9][0-9]*|[xX*]))?(-[0-9A-Za-z.-]+)?)(\\s+(\\*|(\\^|~|>=|<=|>|<|=)?(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*|[xX*]))?(\\.(0|[1-9][0-9]*|[xX*]))?(-[0-9A-Za-z.-]+)?))*(\\s*\\|\\|\\s*(\\*|(\\^|~|>=|<=|>|<|=)?(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*|[xX*]))?(\\.(0|[1-9][0-9]*|[xX*]))?(-[0-9A-Za-z.-]+)?)(\\s+(\\*|(\\^|~|>=|<=|>|<|=)?(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*|[xX*]))?(\\.(0|[1-9][0-9]*|[xX*]))?(-[0-9A-Za-z.-]+)?))*)*\\s*$" },
+        "wasmAbi": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "credentials": { "type": "array", "items": { "$ref": "#/$defs/credential" } },
+    "permissions": { "$ref": "#/$defs/permissions" },
+    "rateLimits": { "type": "array", "items": { "$ref": "#/$defs/rateLimit" } },
+    "n8n": { "type": "object" },
+    "ai": { "type": "object" },
+    "changelog": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/changelogEntry" } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "WASM" } }, "required": ["kind"] },
+      "then": { "properties": { "compat": { "required": ["engineApi", "wasmAbi"] } } },
+      "else": { "properties": { "compat": { "not": { "required": ["wasmAbi"] } } } }
+    }
+  ],
+  "$defs": {
+    "shortText": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "longText": { "type": "string", "minLength": 1, "maxLength": 4000 },
+    "webUrl": { "type": "string", "pattern": "^https?://[^\\s]+$" },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "duration": {
+      "type": "string",
+      "format": "duration",
+      "pattern": "^P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
+    },
+    "operationName": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,31}\\.[a-z][A-Za-z0-9]{0,31}$" },
+    "pointer": { "type": "string", "pattern": "^(/([^/~]|~[01])*)+$" },
+    "portName": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*(:[A-Za-z0-9_.-]+)?$" },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "displayName", "group"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,63}$" },
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$" },
+        "displayName": { "$ref": "#/$defs/shortText" },
+        "group": { "enum": ["ACTION", "TRIGGER"] },
+        "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "parameters": { "type": "object" },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/portName" } },
+        "sensitiveFields": { "type": "array", "items": { "$ref": "#/$defs/pointer" } },
+        "n8n": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["types"],
+          "properties": {
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "typeVersions"],
+                "properties": {
+                  "name": { "$ref": "#/$defs/shortText" },
+                  "typeVersions": { "type": "array", "minItems": 1, "items": { "type": "number", "exclusiveMinimum": 0 } },
+                  "parameterMap": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "group": { "const": "ACTION" } }, "required": ["group"] },
+          "then": { "required": ["operations"], "properties": { "operations": { "minItems": 1 } }, "not": { "required": ["trigger"] } }
+        },
+        {
+          "if": { "properties": { "group": { "const": "TRIGGER" } }, "required": ["group"] },
+          "then": { "required": ["trigger"], "not": { "required": ["operations"] } }
+        }
+      ]
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "delivery"],
+      "properties": {
+        "family": { "enum": ["WEBHOOK", "APP_EVENT", "SCHEDULE", "POLL", "LISTEN", "INTERNAL"] },
+        "delivery": { "enum": ["AT_LEAST_ONCE", "AT_MOST_ONCE", "CURSOR_EXACT"] },
+        "dedupeKeySource": { "enum": ["HEADER", "JSON_PATH", "CONNECTOR"] },
+        "maxPayload": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "displayName", "purity", "itemMode"],
+      "properties": {
+        "name": { "$ref": "#/$defs/operationName" },
+        "displayName": { "$ref": "#/$defs/shortText" },
+        "purity": { "enum": ["PURE", "READ", "EFFECT", "INTERNAL_EFFECT"] },
+        "itemMode": { "enum": ["PER_ITEM", "BATCH"] },
+        "safety": { "$ref": "#/$defs/safety" },
+        "rateLimit": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,63}$" },
+        "retry": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "purity": { "const": "EFFECT" } }, "required": ["purity"] },
+          "then": { "required": ["safety"] },
+          "else": { "not": { "required": ["safety"] } }
+        }
+      ]
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect", "level", "proofLevel"],
+      "properties": {
+        "effect": { "enum": ["READ", "WRITE", "DELETE", "UNKNOWN"] },
+        "level": { "enum": ["READ_ONLY", "IDEMPOTENCY_KEY", "RECONCILE", "UNSAFE"] },
+        "idempotency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "enum": ["PROVIDER_KEY", "NATURAL_KEY", "NONE"] },
+            "location": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["in"],
+              "oneOf": [{ "required": ["name"] }, { "required": ["path"] }],
+              "properties": {
+                "in": { "enum": ["HEADER", "QUERY", "BODY"] },
+                "name": { "$ref": "#/$defs/shortText" },
+                "path": { "$ref": "#/$defs/shortText" }
+              }
+            },
+            "ttl": { "$ref": "#/$defs/duration" },
+            "scope": { "enum": ["CREDENTIAL", "ACCOUNT", "GLOBAL"] }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation", "match", "consistency"],
+          "properties": {
+            "operation": { "$ref": "#/$defs/operationName" },
+            "match": { "$ref": "#/$defs/longText" },
+            "notFoundMeansFailed": { "type": "boolean" },
+            "consistency": {
+              "oneOf": [
+                { "const": "STRONG" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["eventualDelay"],
+                  "properties": { "eventualDelay": { "$ref": "#/$defs/duration" } }
+                }
+              ]
+            }
+          }
+        },
+        "onUncertain": { "enum": ["RESEND_WITH_KEY", "RECONCILE", "SUSPEND"] },
+        "retrySafe": { "type": "boolean" },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation"],
+          "properties": {
+            "operation": { "$ref": "#/$defs/operationName" },
+            "precondition": { "$ref": "#/$defs/longText" },
+            "verify": { "$ref": "#/$defs/operationName" }
+          }
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxItems"],
+          "properties": {
+            "maxItems": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+            "perItemResults": { "type": "boolean" }
+          }
+        },
+        "manualCheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["description"],
+          "properties": {
+            "description": { "$ref": "#/$defs/longText" },
+            "url": { "$ref": "#/$defs/longText" }
+          }
+        },
+        "proofLevel": { "enum": ["DECLARED", "TESTED", "VERIFIED"] }
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "fields", "scheme"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,63}$" },
+        "displayName": { "$ref": "#/$defs/shortText" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
+              "type": { "enum": ["STRING", "NUMBER", "BOOLEAN", "OPTIONS"] },
+              "sensitive": { "type": "boolean" },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "scheme": { "$ref": "#/$defs/scheme" },
+        "test": { "$ref": "#/$defs/operationName" },
+        "n8nTypes": { "type": "array", "items": { "$ref": "#/$defs/shortText" } }
+      }
+    },
+    "scheme": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["NONE", "API_KEY", "BASIC", "BEARER", "OAUTH2", "CUSTOM_HEADERS", "AWS_SIG_V4", "SESSION_TOKEN"] }
+      },
+      "oneOf": [
+        {
+          "properties": { "type": { "enum": ["NONE", "BASIC", "BEARER"] } },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "API_KEY" },
+            "in": { "enum": ["HEADER", "QUERY", "COOKIE"] },
+            "name": { "$ref": "#/$defs/shortText" },
+            "prefix": { "$ref": "#/$defs/shortText" }
+          },
+          "required": ["in", "name"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "OAUTH2" },
+            "grant": { "enum": ["AUTHORIZATION_CODE", "PKCE", "CLIENT_CREDENTIALS"] },
+            "authUrl": { "$ref": "#/$defs/webUrl" },
+            "tokenUrl": { "$ref": "#/$defs/webUrl" },
+            "scopes": { "type": "array", "items": { "$ref": "#/$defs/shortText" } },
+            "tokenPlacement": { "enum": ["HEADER", "QUERY", "BODY"] }
+          },
+          "required": ["grant", "tokenUrl"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "CUSTOM_HEADERS" },
+            "headers": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/shortText" } }
+          },
+          "required": ["headers"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "AWS_SIG_V4" },
+            "service": { "$ref": "#/$defs/shortText" },
+            "region": { "$ref": "#/$defs/shortText" }
+          },
+          "required": ["service", "region"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "SESSION_TOKEN" },
+            "login": { "$ref": "#/$defs/operationName" },
+            "extract": { "$ref": "#/$defs/shortText" },
+            "ttl": { "$ref": "#/$defs/duration" },
+            "placement": { "enum": ["HEADER", "QUERY", "BODY"] }
+          },
+          "required": ["login", "extract", "ttl", "placement"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^(\\*\\.)?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$"
+              }
+            },
+            "ports": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 } },
+            "schemes": { "type": "array", "items": { "enum": ["https", "http"] } },
+            "allowPrivateNetworks": { "type": "boolean" },
+            "fromCredential": { "type": "array", "items": { "$ref": "#/$defs/shortText" } }
+          }
+        },
+        "credentials": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,63}$" } },
+        "credentialRawAccess": { "type": "boolean" },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "memoryMiB": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+            "timeout": { "$ref": "#/$defs/duration" },
+            "maxConcurrent": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+          }
+        }
+      }
+    },
+    "rateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "key"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{0,63}$" },
+        "key": {
+          "oneOf": [{ "enum": ["CREDENTIAL", "HOST"] }, { "type": "string", "pattern": "^=" }]
+        },
+        "requestsPerSecond": { "type": "number", "exclusiveMinimum": 0 },
+        "burst": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "concurrency": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "respectHeaders": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "retryAfter": { "$ref": "#/$defs/shortText" },
+            "remaining": { "$ref": "#/$defs/shortText" },
+            "resetAt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["header", "format"],
+              "properties": {
+                "header": { "$ref": "#/$defs/shortText" },
+                "format": { "enum": ["EPOCH", "EPOCH_MS", "SECONDS", "HTTP_DATE"] }
+              }
+            }
+          }
+        }
+      },
+      "anyOf": [{ "required": ["requestsPerSecond"] }, { "required": ["concurrency"] }]
+    },
+    "changelogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "date", "notes"],
+      "properties": {
+        "version": { "$ref": "#/$defs/version" },
+        "date": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "notes": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$" } }
+      }
+    }
+  }
+}

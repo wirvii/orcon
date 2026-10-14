@@ -76,10 +76,22 @@ func Validate(d *Document) Report {
 // node type must be known to the catalog, and the safety contract of an
 // effect type must be valid (rule V10, ADR-0029 section 5). Types the format
 // itself defines (orcon.loop, orcon.if, orcon.switch) are not looked up.
+//
+// A catalog that also implements [ConnectorNodeTypes] is asked about the
+// package version a connector node pins and the operation it selects: the
+// contract checked is that of the pinned version, and a pin that is not
+// installed, not granted or blocked by policy stops the publication
+// (ADR-0034 section 1).
 func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report {
-	return validate(d, validatorConfig{lookup: func(nodeType string) (NodeType, bool) {
+	cfg := validatorConfig{lookup: func(nodeType string) (NodeType, bool) {
 		return types.Lookup(ctx, nodeType)
-	}})
+	}}
+	if ct, ok := types.(ConnectorNodeTypes); ok {
+		cfg.resolve = func(n *Node) NodeResolution {
+			return ct.ResolveNode(ctx, n.Type, n.Connector, operationOf(n))
+		}
+	}
+	return validate(d, cfg)
 }
 
 // validatorConfig carries what a validation run needs besides the document.
@@ -88,6 +100,9 @@ func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report
 type validatorConfig struct {
 	lookup  func(nodeType string) (NodeType, bool)
 	writers func(*Node) []string
+	// resolve describes a connector node; nil when the catalog does not know
+	// connector packages.
+	resolve func(n *Node) NodeResolution
 }
 
 func validate(d *Document, cfg validatorConfig) Report {
@@ -181,7 +196,10 @@ func checkCycle(r *collector, path, s string) {
 	}
 }
 
-func checkExt(r *collector, path string, ext jsonvalue.Value) {
+// checkExt checks the extension members of the document (node == nil) or of
+// a node. A key in the reserved orcon namespace is valid only where an
+// Accepted ADR defines it: orcon.import in a node (ADR-0034 section 8).
+func checkExt(r *collector, path string, ext jsonvalue.Value, node *Node) {
 	if ext.IsZero() {
 		return
 	}
@@ -191,6 +209,8 @@ func checkExt(r *collector, path string, ext jsonvalue.Value) {
 	}
 	for _, m := range ext.Members() {
 		switch {
+		case m.Key == ImportExtKey && node != nil:
+			checkImportMark(r, path+"/"+m.Key, m.Value, node)
 		case strings.HasPrefix(m.Key, "orcon."):
 			r.errorf(CodeExt, path, "extension key %q uses the reserved orcon. namespace", m.Key)
 		case !extKeyPattern.MatchString(m.Key):
@@ -217,7 +237,7 @@ func (v *validator) structure() {
 		r.errorf(CodeValue, "/name", "name must have 1 to %d characters", maxFlowNameRunes)
 	}
 	checkObject(r, "/editor", d.Editor)
-	checkExt(r, "/ext", d.Ext)
+	checkExt(r, "/ext", d.Ext, nil)
 	v.settings()
 	for i, vr := range d.Variables {
 		v.variable(i, vr)
@@ -286,12 +306,16 @@ func (v *validator) node(i int, n *Node) {
 	checkEnum(r, base+"/element", n.Element, Elements())
 	checkPattern(r, base+"/type", "node type", n.Type, typePattern)
 	checkObject(r, base+"/parameters", n.Parameters)
-	checkExt(r, base+"/ext", n.Ext)
+	v.connectorPin(base, n)
+	checkExt(r, base+"/ext", n.Ext, n)
 	checkOptEnum(r, base+"/onError", n.OnError, OnErrors())
 	v.routingAndLoop(base, n)
 	v.variablesShape(i, n)
 	v.nodeBlocks(base, n)
 	v.waitAndBoundary(base, n)
+	if n.Trigger != nil {
+		v.trigger(base, n)
+	}
 	if n.Attention != nil {
 		checkEnum(r, base+"/attention/notify", n.Attention.Notify, AttentionNotifies())
 	}

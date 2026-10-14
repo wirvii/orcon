@@ -30,6 +30,7 @@ own file here, so parallel changes do not edit the same lines.
 | `mk/contributing.mk` | `.github/workflows/contributing.yml` (job `release-check`), `pr.yml`, `release-please.yml`, `release.yml` | SPEC-013 C4, C5 |
 | `mk/ops.mk` | `.github/workflows/ops.yml`, `.github/workflows/ops-nightly.yml`, `install-test.yml` | SPEC-015 O2, O9, O10 |
 | `mk/docs.mk` | `.github/workflows/docs.yml` | SPEC-015 O11 |
+| `mk/brand.mk` (`brand-check`, a prerequisite of `check` because SPEC-018 B1 expressly asks for it) | none (a CI step for the fidelity test comes with SPEC-018 B1b) | SPEC-018 B1 |
 | `mk/flow.mk` (JSON schema validation of the corpus; its spec decides whether it joins `check`) | none | BL-021 |
 
 ## Workflow rules for every area workflow
