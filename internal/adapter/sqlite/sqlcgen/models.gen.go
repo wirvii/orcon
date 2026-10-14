@@ -340,6 +340,26 @@ type InstanceAlert struct {
 	UpdatedAt                       int64
 }
 
+type InstanceKey struct {
+	ID                 []byte
+	KeyLevel           string
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
+type InstanceKeyCanary struct {
+	ID         []byte
+	KeyLevel   string
+	KeyVersion int64
+	Probe      []byte
+	CreatedAt  int64
+	UpdatedAt  int64
+}
+
 type JoinArrival struct {
 	ID               []byte
 	OrgID            []byte
@@ -534,6 +554,18 @@ type Org struct {
 	DeletionScheduledAt sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64
+}
+
+type OrgKey struct {
+	ID                 []byte
+	OrgID              []byte
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	Probe              []byte
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type Outbox struct {

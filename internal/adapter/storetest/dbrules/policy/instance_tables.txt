@@ -25,3 +25,4 @@ knowledge_chunk_fts5  # SPEC-006 SQLite FTS5 virtual table; its synchronisation 
 backup_run  # SPEC-015 backup runs of the instance
 instance_hold  # SPEC-015 hold placed on the instance after a restore
 instance_setup  # SPEC-015 first-run state of the instance
+instance_key  # SPEC-004 SE3b instance key (IK) wrapped by the master key; the instance has one key at a time
