@@ -6,4 +6,5 @@
 *.node_id  # identifier of a node inside a stored flow document
 *.edge_id  # identifier of an edge inside a stored flow document
 *.provider_request_id  # identifier issued by an external model provider
+*.target_node_id  # identifier of the node a test run targets, a node inside a stored flow document
 *.connector_id  # "<publisher>.<name>" text identity of a connector package, chosen by its publisher (ADR-0029 section 3)

@@ -26,6 +26,7 @@ func testEnv(t *testing.T) *isolation.Env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	env.Editor = editorOpener(store)
 	return env
 }
 
@@ -45,6 +46,13 @@ func TestRegistryComplete(t *testing.T) {
 	for _, s := range reg.Orphans(isolation.DefaultSurface) {
 		t.Errorf("the isolation case for %s has no route or store method; remove it", s)
 	}
+}
+
+// TestEditorIsolation runs the cross-organization cases of the visual editor storage (SPEC-014 ED2)
+// for the chosen store: every operation of the editor port, from organization A against B.
+func TestEditorIsolation(t *testing.T) {
+	env := testEnv(t)
+	isolation.EditorRegistry().Run(t.Context(), t, env)
 }
 
 // TestCrossOrgSmoke runs every registered case for the chosen store.

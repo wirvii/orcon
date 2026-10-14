@@ -56,6 +56,9 @@ type Env struct {
 	Store   Store
 	RLSOnly bool // wall 3 alone: the filter of wall 1 is off (build tag isolation_rls_only)
 	A, B    Org  // A attacks, B is attacked
+	// Editor opens a fresh backend for the editor cases. The test driver sets it for the store
+	// under test; a run without it fails the editor cases rather than passing them vacuously.
+	Editor EditorOpener
 }
 
 // NewEnv builds the environment of a run. The argument rlsOnly is the build-tag
@@ -245,4 +248,4 @@ func (NoSurface) Routes() []string { return nil }
 func (NoSurface) StoreMethods() []string { return nil }
 
 // DefaultSurface is what TestRegistryComplete compares [BuildRegistry] with.
-var DefaultSurface Surface = NoSurface{}
+var DefaultSurface Surface = EditorSurface{}

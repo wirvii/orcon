@@ -134,6 +134,30 @@ type ConnectorReference struct {
 	UpdatedAt        int64
 }
 
+type EffectPreview struct {
+	ID                     []byte
+	OrgID                  []byte
+	ExecutionID            []byte
+	NodeExecutionID        []byte
+	NodeID                 string
+	Status                 string
+	Effect                 string
+	SafetyLevel            string
+	ItemCount              int64
+	IsPreviewAvailable     int64
+	PreviewDocument        []byte
+	PreviewDocumentFormat  string
+	PreviewSha256          []byte
+	DecisionDocument       []byte
+	DecisionDocumentFormat sql.NullString
+	ExpiresAt              int64
+	DecidedByPrincipalID   []byte
+	DecidedAt              sql.NullInt64
+	Revision               int64
+	CreatedAt              int64
+	UpdatedAt              int64
+}
+
 type Execution struct {
 	ID                      []byte
 	OrgID                   []byte
@@ -210,19 +234,21 @@ type ExternalOperation struct {
 }
 
 type Flow struct {
-	ID                   []byte
-	OrgID                []byte
-	ProjectID            []byte
-	Name                 string
-	DraftDocument        []byte
-	DraftDocumentFormat  string
-	DraftRevision        int64
-	ActiveFlowVersionID  []byte
-	DeletedAt            sql.NullInt64
-	DeletedByPrincipalID []byte
-	CreatedAt            int64
-	UpdatedAt            int64
-	ActivationState      string
+	ID                        []byte
+	OrgID                     []byte
+	ProjectID                 []byte
+	Name                      string
+	DraftDocument             []byte
+	DraftDocumentFormat       string
+	DraftRevision             int64
+	ActiveFlowVersionID       []byte
+	DeletedAt                 sql.NullInt64
+	DeletedByPrincipalID      []byte
+	CreatedAt                 int64
+	UpdatedAt                 int64
+	ActivationState           string
+	DraftUpdatedAt            sql.NullInt64
+	DraftUpdatedByPrincipalID []byte
 }
 
 type FlowDataOperation struct {
@@ -240,10 +266,38 @@ type FlowDatum struct {
 	ID                  []byte
 	OrgID               []byte
 	FlowID              []byte
+	Namespace           string
 	DataKey             string
 	ValueDocument       []byte
 	ValueDocumentFormat string
 	Version             int64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
+type FlowEditingSession struct {
+	ID                    []byte
+	OrgID                 []byte
+	FlowID                []byte
+	OpenedByPrincipalID   []byte
+	ClientLabel           string
+	LastSeenDraftRevision int64
+	OpenedAt              int64
+	LastSeenAt            int64
+	ExpiresAt             int64
+	Revision              int64
+	CreatedAt             int64
+	UpdatedAt             int64
+}
+
+type FlowNodePin struct {
+	ID                  []byte
+	OrgID               []byte
+	FlowID              []byte
+	NodeID              string
+	NodeTestDataID      []byte
+	Revision            int64
+	PinnedByPrincipalID []byte
 	CreatedAt           int64
 	UpdatedAt           int64
 }
@@ -275,18 +329,20 @@ type FlowTrigger struct {
 }
 
 type FlowVersion struct {
-	ID                     []byte
-	OrgID                  []byte
-	FlowID                 []byte
-	VersionNumber          int64
-	Document               []byte
-	DocumentFormat         string
-	ContentHash            string
-	WarningDocument        []byte
-	WarningDocumentFormat  sql.NullString
-	PublishedByPrincipalID []byte
-	PublishedAt            int64
-	CreatedAt              int64
+	ID                          []byte
+	OrgID                       []byte
+	FlowID                      []byte
+	VersionNumber               int64
+	Document                    []byte
+	DocumentFormat              string
+	ContentHash                 string
+	WarningDocument             []byte
+	WarningDocumentFormat       sql.NullString
+	PublishedByPrincipalID      []byte
+	PublishedAt                 int64
+	CreatedAt                   int64
+	PublicationNote             sql.NullString
+	RolledBackFromVersionNumber sql.NullInt64
 }
 
 type HumanTask struct {
@@ -441,6 +497,23 @@ type NodeOutput struct {
 	UpdatedAt            int64
 }
 
+type NodeTestDatum struct {
+	ID                   []byte
+	OrgID                []byte
+	FlowID               []byte
+	NodeID               string
+	SourceKind           string
+	OutputDocument       []byte
+	OutputDocumentFormat sql.NullString
+	BlobID               []byte
+	ItemCount            int64
+	SizeBytes            int64
+	ContentSha256        []byte
+	HasMaskedValues      int64
+	CreatedByPrincipalID []byte
+	CreatedAt            int64
+}
+
 type NondeterminismRecord struct {
 	ID                  []byte
 	OrgID               []byte
@@ -565,6 +638,31 @@ type TaskAttempt struct {
 	FinishedAt          sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64
+}
+
+type TestRun struct {
+	ID                   []byte
+	OrgID                []byte
+	FlowID               []byte
+	ExecutionID          []byte
+	FlowSnapshotID       []byte
+	TargetKind           string
+	TargetNodeID         sql.NullString
+	EffectMode           string
+	PlanDocument         []byte
+	PlanDocumentFormat   string
+	StartedByPrincipalID []byte
+	CreatedAt            int64
+}
+
+type TestRunSeed struct {
+	ID             []byte
+	OrgID          []byte
+	TestRunID      []byte
+	NodeID         string
+	SeedKind       string
+	NodeTestDataID []byte
+	CreatedAt      int64
 }
 
 type Timer struct {

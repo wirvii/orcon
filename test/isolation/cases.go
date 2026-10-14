@@ -9,5 +9,15 @@ package isolation
 // cases_flow.go) as a function that takes the registry, and calls it from here,
 // so two cuts never edit the same lines.
 func BuildRegistry() *Registry {
-	return NewRegistry()
+	return EditorRegistry()
+}
+
+// EditorRegistry returns the registry of the visual editor storage cases.
+func EditorRegistry() *Registry {
+	reg := NewRegistry()
+	if err := addEditorCases(reg); err != nil {
+		// A duplicate or invalid case is a programming error in this package, not a run-time condition.
+		panic(err)
+	}
+	return reg
 }
