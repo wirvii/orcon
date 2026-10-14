@@ -4,6 +4,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -16,24 +17,60 @@ import (
 
 // AuthConfig names the places a request carries its credentials.
 type AuthConfig struct {
-	// SessionCookie is the name of the session cookie.
+	// SessionCookie is the name of the session cookie (SPEC-016 R-SH-API-04).
 	SessionCookie string
-	// CSRFHeader is the header that carries the anti-forgery token of a cookie
-	// session.
+	// CSRFCookie is the name of the readable cookie that holds the CSRF value of the session.
+	CSRFCookie string
+	// CSRFHeader is the header that carries the anti-forgery token of a cookie session.
 	CSRFHeader string
 	// OrgHeader is the header with which a client chooses its organization.
 	OrgHeader string
 }
 
-// DefaultAuthConfig returns the conventional names.
+// DefaultAuthConfig returns the names of the contract: the cookies are host-only
+// (the __Host- prefix) and the CSRF header is Orcon-Csrf-Token.
 func DefaultAuthConfig() AuthConfig {
-	return AuthConfig{SessionCookie: "orcon_session", CSRFHeader: "X-CSRF-Token", OrgHeader: "Orcon-Org"}
+	return AuthConfig{
+		SessionCookie: "__Host-orcon_session",
+		CSRFCookie:    "__Host-orcon_csrf",
+		CSRFHeader:    "Orcon-Csrf-Token",
+		OrgHeader:     "Orcon-Org",
+	}
+}
+
+type credentialsKey struct{}
+
+// CarryCredentials stores the credentials the request presents in its context, for
+// every operation, public ones included, so a handler can read the Origin and the
+// session of the caller (SPEC-016 R-SH-SES-03). It authenticates nobody.
+func CarryCredentials(cfg AuthConfig) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), credentialsKey{}, credentialsOf(r, cfg))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// WithCredentials returns ctx carrying c, as [CarryCredentials] stores them. It lets
+// a caller that has no request at hand (a test, a handler run directly) present the
+// same credentials.
+func WithCredentials(ctx context.Context, c identity.Credentials) context.Context {
+	return context.WithValue(ctx, credentialsKey{}, c)
+}
+
+// CredentialsFrom returns the credentials the request presented, as
+// [CarryCredentials] stored them.
+func CredentialsFrom(ctx context.Context) (identity.Credentials, bool) {
+	c, ok := ctx.Value(credentialsKey{}).(identity.Credentials)
+	return c, ok
 }
 
 // Authenticate resolves the credentials of the request into a principal and
 // stores it in the context (pipeline step 3). A request with no credential, or
-// one the authenticator rejects, gets 401 unauthenticated; an authenticator
-// failure gets 500 and is logged once.
+// one the authenticator rejects, gets 401 unauthenticated; a cookie session that
+// changes state without the Origin and CSRF token of the installation gets 403
+// csrf-check-failed; an authenticator failure gets 500 and is logged once.
 func Authenticate(a identity.Authenticator, logger *slog.Logger, cfg AuthConfig) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +83,9 @@ func Authenticate(a identity.Authenticator, logger *slog.Logger, cfg AuthConfig)
 			switch {
 			case errors.Is(err, identity.ErrUnauthenticated):
 				unauthenticated(w, r)
+				return
+			case errors.Is(err, identity.ErrCSRFCheckFailed):
+				problem.Write(w, r, problem.CSRFCheckFailed)
 				return
 			case err != nil:
 				logger.ErrorContext(r.Context(), "authentication failed",
@@ -71,6 +111,7 @@ func unauthenticated(w http.ResponseWriter, r *http.Request) {
 func credentialsOf(r *http.Request, cfg AuthConfig) identity.Credentials {
 	creds := identity.Credentials{
 		CSRFToken:    r.Header.Get(cfg.CSRFHeader),
+		Origin:       r.Header.Get("Origin"),
 		UnsafeMethod: isUnsafe(r.Method),
 		OrgHint:      r.Header.Get(cfg.OrgHeader),
 	}
@@ -79,6 +120,9 @@ func credentialsOf(r *http.Request, cfg AuthConfig) identity.Credentials {
 	}
 	if c, err := r.Cookie(cfg.SessionCookie); err == nil {
 		creds.Session = c.Value
+	}
+	if c, err := r.Cookie(cfg.CSRFCookie); err == nil {
+		creds.CSRFCookie = c.Value
 	}
 	return creds
 }

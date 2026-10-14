@@ -142,13 +142,14 @@ func TestAuthenticateOutcomes(t *testing.T) {
 	}{
 		{"no credential", stubAuthn{p: known}, nil, http.StatusUnauthorized},
 		{"rejected", stubAuthn{err: identity.ErrUnauthenticated}, withBearer, http.StatusUnauthorized},
+		{"csrf check failed", stubAuthn{err: identity.ErrCSRFCheckFailed}, withBearer, http.StatusForbidden},
 		{"failed", stubAuthn{err: errors.New("database down")}, withBearer, http.StatusInternalServerError},
 		{"empty principal", stubAuthn{}, withBearer, http.StatusInternalServerError},
 		{"accepted", stubAuthn{p: known}, withBearer, http.StatusNoContent},
 		{"scheme is case-insensitive", stubAuthn{p: known}, func(r *http.Request) { r.Header.Set("Authorization", "bearer abc") }, http.StatusNoContent},
 		{"other scheme is no credential", stubAuthn{p: known}, func(r *http.Request) { r.Header.Set("Authorization", "Basic abc") }, http.StatusUnauthorized},
 		{"cookie session", stubAuthn{p: known}, func(r *http.Request) {
-			r.AddCookie(&http.Cookie{Name: "orcon_session", Value: "s", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+			r.AddCookie(&http.Cookie{Name: "__Host-orcon_session", Value: "s", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 		}, http.StatusNoContent},
 	}
 	for _, tt := range tests {
@@ -175,11 +176,13 @@ func TestAuthenticatePassesWhatTheRequestCarries(t *testing.T) {
 	h := middleware.Authenticate(captureAuthn{&got}, quiet, middleware.DefaultAuthConfig())(http.HandlerFunc(ok))
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/x", nil)
 	req.Header.Set("Authorization", "Bearer tok")
-	req.Header.Set("X-CSRF-Token", "csrf")
+	req.Header.Set("Orcon-Csrf-Token", "csrf")
+	req.Header.Set("Origin", "https://orcon.example.test")
 	req.Header.Set("Orcon-Org", "acme")
-	req.AddCookie(&http.Cookie{Name: "orcon_session", Value: "sess", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	req.AddCookie(&http.Cookie{Name: "__Host-orcon_session", Value: "sess", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+	req.AddCookie(&http.Cookie{Name: "__Host-orcon_csrf", Value: "csrf", Secure: true, SameSite: http.SameSiteStrictMode}) //nolint:gosec // the CSRF cookie is readable by design
 	h.ServeHTTP(httptest.NewRecorder(), req)
-	if got.Bearer != "tok" || got.Session != "sess" || got.CSRFToken != "csrf" || got.OrgHint != "acme" || !got.UnsafeMethod {
+	if got.Bearer != "tok" || got.Session != "sess" || got.CSRFToken != "csrf" || got.CSRFCookie != "csrf" || got.Origin != "https://orcon.example.test" || got.OrgHint != "acme" || !got.UnsafeMethod {
 		t.Errorf("credentials = %#v", got)
 	}
 	got = identity.Credentials{}
