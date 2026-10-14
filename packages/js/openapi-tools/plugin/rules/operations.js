@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
 import { MUTATING, isObject } from '../model.js';
-import { SNAKE, STABILITIES, defineRule, lastLiteral } from '../rule.js';
+import { KEBAB, SNAKE, STABILITIES, defineRule, lastLiteral } from '../rule.js';
 import { READ_VERBS, RUN_VERBS } from '../verbs.js';
 
 const headerParam = (model, entry, name) => model.parameters(entry).find((p) => p.in === 'header' && p.name.toLowerCase() === name.toLowerCase());
@@ -134,6 +134,16 @@ export const stability = defineRule((model, report) => {
     if (!STABILITIES.includes(value)) {
       report('VER-1', `${entry.kind === 'webhook' ? 'Webhook' : entry.method.toUpperCase()} ${entry.key} declares x-orcon-stability: ${STABILITIES.join(' | ')}.`, entry.loc);
       continue;
+    }
+    // The feature that Orcon-Experimental must name (SPEC-005 Amendment 8, Q-API-B): required if and
+    // only if the operation is experimental.
+    const feature = entry.op['x-orcon-experimental-feature'];
+    if (value === 'experimental') {
+      if (typeof feature !== 'string' || !KEBAB.test(feature)) {
+        report('VER-1', 'An experimental operation declares x-orcon-experimental-feature, a kebab-case feature name.', entry.loc.child(['x-orcon-experimental-feature']));
+      }
+    } else if (feature !== undefined) {
+      report('VER-1', 'x-orcon-experimental-feature is only for experimental operations.', entry.loc.child(['x-orcon-experimental-feature']));
     }
     if (value === 'experimental' && entry.kind === 'path') {
       if (!headerParam(model, entry, 'Orcon-Experimental')) report('VER-1', 'An experimental operation takes the Orcon-Experimental header.', entry.loc);

@@ -269,10 +269,10 @@ func TestExperimentalGate(t *testing.T) {
 	with := func(value string) func(*http.Request) {
 		return func(r *http.Request) { r.Header.Set("Orcon-Experimental", value) }
 	}
-	if rec := h.do(http.MethodGet, "/api/v1/preview", "token-a", with("getPreview")); rec.Code != http.StatusOK {
+	if rec := h.do(http.MethodGet, "/api/v1/preview", "token-a", with("editor-preview")); rec.Code != http.StatusOK {
 		t.Errorf("status with the feature named = %d, want 200", rec.Code)
 	}
-	if rec := h.do(http.MethodGet, "/api/v1/preview", "token-a", with("other, GetPreview")); rec.Code != http.StatusOK {
+	if rec := h.do(http.MethodGet, "/api/v1/preview", "token-a", with("other, Editor-Preview")); rec.Code != http.StatusOK {
 		t.Errorf("status with the feature in a list = %d, want 200", rec.Code)
 	}
 	if rec := h.do(http.MethodGet, "/api/v1/preview", "token-a", with("other")); rec.Code != http.StatusBadRequest {

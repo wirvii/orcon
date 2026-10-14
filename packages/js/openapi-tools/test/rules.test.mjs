@@ -240,6 +240,14 @@ const REPORTS = [
   ['experimental operation without the header', 'stability', 'Orcon-Experimental', (d) => {
     getFlow(d)['x-orcon-stability'] = 'experimental';
   }],
+  ['experimental operation without a feature name', 'stability', 'x-orcon-experimental-feature', (d) => {
+    getFlow(d)['x-orcon-stability'] = 'experimental';
+    getFlow(d).parameters = [{ name: 'Orcon-Experimental', in: 'header', required: true, description: 'Feature flag.', schema: { type: 'string', maxLength: 64, examples: ['flows-get'] } }];
+    getFlow(d)['x-orcon-problems'].push('experimental-not-enabled');
+  }],
+  ['feature name on a stable operation', 'stability', 'only for experimental', (d) => {
+    getFlow(d)['x-orcon-experimental-feature'] = 'flows-get';
+  }],
   ['sunset without deprecated', 'deprecation', 'not deprecated: true', (d) => {
     getFlow(d)['x-orcon-sunset'] = '2027-01-01';
   }],
@@ -356,6 +364,7 @@ const CLEAN = [
   ['x-orcon-* values that are not UPPER_SNAKE', (d) => void (getFlow(d)['x-orcon-note'] = { kind: 'lower-case' })],
   ['an experimental operation with its header and problem', (d) => {
     getFlow(d)['x-orcon-stability'] = 'experimental';
+    getFlow(d)['x-orcon-experimental-feature'] = 'flows-get';
     getFlow(d).parameters = [{ name: 'Orcon-Experimental', in: 'header', required: true, description: 'Feature flag.', schema: { type: 'string', maxLength: 64, examples: ['flows-get'] } }];
     getFlow(d)['x-orcon-problems'].push('experimental-not-enabled');
     delete getFlow(d)['x-orcon-examples'];

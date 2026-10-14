@@ -256,7 +256,7 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation) []mi
 		)
 	}
 	if op.Stability == "experimental" {
-		chain = append(chain, middleware.ExperimentalGate(op.ID))
+		chain = append(chain, middleware.ExperimentalGate(op.ExperimentalFeature))
 	}
 	if !op.Public {
 		chain = append(chain, middleware.Authorize(deps.Authorizer, deps.Logger, op.Requirement, resourceOf(op)))

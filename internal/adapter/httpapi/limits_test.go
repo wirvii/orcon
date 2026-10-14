@@ -96,3 +96,29 @@ func TestMethodNotAllowedListsTheAllowedMethods(t *testing.T) {
 		t.Errorf("unauthenticated DELETE = %d, want 405", rec.Code)
 	}
 }
+
+// TestExperimentalFeatureIsDeclared: x-orcon-experimental-feature is required
+// if and only if the operation is experimental (Amendment 8, Q-API-B).
+func TestExperimentalFeatureIsDeclared(t *testing.T) {
+	spec, err := ParseSpec([]byte(syntheticSpec))
+	if err != nil {
+		t.Fatalf("ParseSpec: %v", err)
+	}
+	found := false
+	for i := range spec.Operations {
+		if spec.Operations[i].ID == "getPreview" {
+			found = spec.Operations[i].ExperimentalFeature == "editor-preview"
+		}
+	}
+	if !found {
+		t.Error("getPreview does not carry its feature name")
+	}
+	without := strings.Replace(syntheticSpec, `, "x-orcon-experimental-feature": "editor-preview"`, "", 1)
+	if _, err := ParseSpec([]byte(without)); err == nil {
+		t.Error("an experimental operation without a feature name was accepted")
+	}
+	stray := strings.Replace(syntheticSpec, `"operationId": "getThing",`, `"operationId": "getThing", "x-orcon-experimental-feature": "stray",`, 1)
+	if _, err := ParseSpec([]byte(stray)); err == nil {
+		t.Error("a feature name on a stable operation was accepted")
+	}
+}

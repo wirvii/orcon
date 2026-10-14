@@ -52,6 +52,9 @@ type Operation struct {
 	IssuesSecret bool
 	// PathParams are the names of the path parameters in order of appearance.
 	PathParams []string
+	// ExperimentalFeature is x-orcon-experimental-feature: the name Orcon-Experimental must
+	// carry to use an experimental operation; empty for the others.
+	ExperimentalFeature string
 	// HasBody is true when the operation declares a request body.
 	HasBody bool
 	// Description is the description of the operation.
@@ -137,6 +140,10 @@ func (s *Spec) operation(path, method string, item, doc map[string]any) (Operati
 	case "stable", "beta", "experimental":
 	default:
 		return op, fmt.Errorf("%w: %s: x-orcon-stability %q", ErrSpec, where, op.Stability)
+	}
+	op.ExperimentalFeature, _ = doc["x-orcon-experimental-feature"].(string)
+	if (op.Stability == "experimental") != (op.ExperimentalFeature != "") {
+		return op, fmt.Errorf("%w: %s: x-orcon-experimental-feature is required if and only if the operation is experimental", ErrSpec, where)
 	}
 
 	tags, _ := doc["tags"].([]any)

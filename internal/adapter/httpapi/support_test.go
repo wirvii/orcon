@@ -52,7 +52,7 @@ const syntheticSpec = `{
       "get": {"operationId": "getMe", "x-orcon-permission": "authenticated", "x-orcon-rate-class": "read", "x-orcon-stability": "stable"}
     },
     "/preview": {
-      "get": {"operationId": "getPreview", "x-orcon-permission": "authenticated", "x-orcon-rate-class": "read", "x-orcon-stability": "experimental"}
+      "get": {"operationId": "getPreview", "x-orcon-permission": "authenticated", "x-orcon-rate-class": "read", "x-orcon-stability": "experimental", "x-orcon-experimental-feature": "editor-preview"}
     },
     "/secrets": {
       "post": {"operationId": "createSecret", "x-orcon-permission": "flow:create", "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
