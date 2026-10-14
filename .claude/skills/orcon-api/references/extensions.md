@@ -17,6 +17,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 | `x-orcon-permission` | operation | permission \| `{allOf}` \| `{anyOf}` \| `authenticated` \| `anonymous` | always | `permission` |
 | `x-orcon-rate-class` | operation | `read \| write \| run \| stream` | always | `rate-class` |
 | `x-orcon-stability` | operation, webhook | `stable \| beta \| experimental` | always | `stability` |
+| `x-orcon-experimental-feature` | operation, webhook | kebab-case feature name sent in `Orcon-Experimental` | when `x-orcon-stability: experimental` | `stability` |
 | `x-orcon-idempotency` | operation (POST) | `required \| optional` | every POST | `idempotency` |
 | `x-orcon-audit` / `x-orcon-audit-reason` | operation | action name \| `none` / string | always / when mutation is `none` | `audit` |
 | `x-orcon-problems` | operation | list of catalog codes | always (non-protocol) | `problem-codes-declared` |
