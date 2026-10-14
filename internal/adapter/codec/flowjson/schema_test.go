@@ -171,6 +171,7 @@ func TestSchemaPatternsMatchTheDomain(t *testing.T) {
 		{"connector version", patternOf(mustGet(t, pinProps, "version")), flow.ConnectorVersionPattern},
 		{"connector digest", patternOf(mustGet(t, pinProps, "digest")), flow.ConnectorDigestPattern},
 		{"ext key", patternOf(allOf.Items()[0]), flow.ExtKeyPattern},
+		{"sensitive path", patternOf(mustGet(t, defs, "sensitivePath")), flow.SensitivePathPattern},
 	}
 	for _, tt := range checks {
 		if tt.got != tt.want {

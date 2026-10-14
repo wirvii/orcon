@@ -9,6 +9,7 @@ import (
 	"math"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -35,6 +36,14 @@ const (
 	PortPattern = `^[A-Za-z][A-Za-z0-9_-]*(:[A-Za-z0-9_.-]+)?$`
 	// ExtKeyPattern is the form of extension keys: "vendor.key".
 	ExtKeyPattern = `^[a-z0-9][a-z0-9-]*\.[A-Za-z0-9_.-]+$`
+	// SensitivePathPattern is the form of a sensitive-path mark: a JSON
+	// Pointer (RFC 6901) that starts with "/" and uses "~" only as "~0" or
+	// "~1". A segment that is exactly "*" is a wildcard (ADR-0017 section 3).
+	SensitivePathPattern = `^/([^~]|~[01])*$`
+	// MaxSensitivePaths is the most sensitive-path marks one node carries.
+	MaxSensitivePaths = 64
+	// MaxSensitivePathRunes is the most code points one sensitive path has.
+	MaxSensitivePathRunes = 512
 	// DurationPattern is an ISO 8601 duration of weeks, days, hours, minutes
 	// and seconds with at least one component. Years and months are excluded
 	// because their length varies.
@@ -46,15 +55,16 @@ const (
 )
 
 var (
-	idPattern       = regexp.MustCompile(IDPattern)
-	uuidPattern     = regexp.MustCompile(UUIDPattern)
-	instantPattern  = regexp.MustCompile(InstantPattern)
-	variablePattern = regexp.MustCompile(VariableNamePattern)
-	typePattern     = regexp.MustCompile(NodeTypePattern)
-	portPattern     = regexp.MustCompile(PortPattern)
-	extKeyPattern   = regexp.MustCompile(ExtKeyPattern)
-	durationPattern = regexp.MustCompile(DurationPattern)
-	cyclePattern    = regexp.MustCompile(CyclePattern)
+	idPattern            = regexp.MustCompile(IDPattern)
+	uuidPattern          = regexp.MustCompile(UUIDPattern)
+	instantPattern       = regexp.MustCompile(InstantPattern)
+	variablePattern      = regexp.MustCompile(VariableNamePattern)
+	typePattern          = regexp.MustCompile(NodeTypePattern)
+	portPattern          = regexp.MustCompile(PortPattern)
+	sensitivePathPattern = regexp.MustCompile(SensitivePathPattern)
+	extKeyPattern        = regexp.MustCompile(ExtKeyPattern)
+	durationPattern      = regexp.MustCompile(DurationPattern)
+	cyclePattern         = regexp.MustCompile(CyclePattern)
 )
 
 const (
@@ -318,6 +328,31 @@ func (v *validator) node(i int, n *Node) {
 	}
 	if n.Attention != nil {
 		checkEnum(r, base+"/attention/notify", n.Attention.Notify, AttentionNotifies())
+	}
+	sensitivePaths(r, base+"/sensitivePaths", n.SensitivePaths)
+}
+
+// sensitivePaths validates the sensitive-path marks of a node: at most
+// [MaxSensitivePaths] unique JSON Pointers of the form [SensitivePathPattern]
+// with at most [MaxSensitivePathRunes] code points each. An empty list is
+// rejected by the reader; here it is simply no marks.
+func sensitivePaths(r *collector, base string, paths []string) {
+	if len(paths) > MaxSensitivePaths {
+		r.errorf(CodeValue, base, "a node has at most %d sensitive paths, found %d", MaxSensitivePaths, len(paths))
+	}
+	seen := make(map[string]struct{}, len(paths))
+	for i, p := range paths {
+		at := base + "/" + strconv.Itoa(i)
+		switch c := utf8.RuneCountInString(p); {
+		case c > MaxSensitivePathRunes:
+			r.errorf(CodeFormat, at, "sensitive path has %d characters; at most %d are allowed", c, MaxSensitivePathRunes)
+		case !sensitivePathPattern.MatchString(p):
+			r.errorf(CodeFormat, at, "sensitive path %q is not a JSON Pointer: it must start with \"/\" and use \"~\" only as \"~0\" or \"~1\"", p)
+		}
+		if _, dup := seen[p]; dup {
+			r.errorf(CodeValue, at, "sensitive path %q is declared more than once", p)
+		}
+		seen[p] = struct{}{}
 	}
 }
 
