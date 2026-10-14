@@ -67,6 +67,8 @@ Automatic migration at startup applies only when the verdict is `ROLLING_SAFE`. 
 
 Every process compares its version with the effective floor on each heartbeat. A process that falls below it stops taking new work and new requests, finishes the work in flight as it does on shutdown, and exits with code 75. The log states the cause.
 
+On shutdown, Orcon gives work in flight a grace period of 30 seconds. The platform's kill timeout must exceed it by at least 15 seconds; on Kubernetes, set `terminationGracePeriodSeconds` to 45 or more.
+
 ### SQLite: automatic backup before migrating
 
 With SQLite, when migrations are pending and `backup.beforeUpgrade` is `true` (the default for SQLite), the process takes an offline local backup in `<dataDir>/backups/pre-upgrade/` before it migrates. The backup is local even when `backup.target` points to S3, so that startup never depends on the network. The three most recent are kept. With PostgreSQL the default is `false`, so take your own backup first.

@@ -5,7 +5,7 @@ sources:
   - ADR-0083
   - ADR-0015
   - ADR-0004
-sourceHash: 254ce1febfd08c9cd8b600e3b79150d331c22f5175da607445b057d21032dbb9
+sourceHash: 58ea90d52cc9254ee811e06a06baa9e9eef31a390dc2a5b752b6e4f697ef2edf
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
@@ -67,6 +67,8 @@ Puedes saltar versiones menores cuando `orcon store schema plan` dice `ROLLING_S
 La migración automática al arrancar solo se aplica cuando el veredicto es `ROLLING_SAFE`. En otro caso el proceso no arranca, y su mensaje nombra los procesos que quedarían por debajo del piso y el comando `orcon store schema apply --full-stop`. Poner `store.migrations.auto` en `false` desactiva la migración automática.
 
 Cada proceso compara su versión con el piso efectivo en cada latido. Un proceso que queda por debajo deja de tomar trabajo nuevo y peticiones nuevas, termina el trabajo en curso como al apagarse y sale con el código 75. El registro indica la causa.
+
+Al apagarse, Orcon da al trabajo en curso un plazo de gracia de 30 segundos. El plazo de la plataforma para matar el proceso debe superarlo en al menos 15 segundos; en Kubernetes, fija `terminationGracePeriodSeconds` en 45 o más.
 
 ### SQLite: respaldo automático antes de migrar
 
