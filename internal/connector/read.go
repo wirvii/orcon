@@ -237,6 +237,7 @@ func (r *reader) node(o *obj, m *Manifest) Node {
 		r.failf(RuleShape, o.at("operations"), "a TRIGGER node has a trigger declaration, not operations")
 	}
 	n.Parameters = o.opaque("parameters")
+	r.reservedParameters(o, n.Parameters)
 	n.Outputs = o.portNames("outputs")
 	n.SensitiveFields = o.pointers("sensitiveFields")
 	if c, ok := o.child("n8n", false); ok {
@@ -244,6 +245,24 @@ func (r *reader) node(o *obj, m *Manifest) Node {
 		c.done()
 	}
 	return n
+}
+
+// reservedParameterNames are the parameter names the platform keeps for
+// operation selection (ADR-0029 section 4, SPEC-003 Amendment 8): "operation"
+// holds the operation a node runs and "resource" is the part of its name before
+// the dot, so a manifest cannot use either for another setting.
+var reservedParameterNames = []string{"operation", "resource"}
+
+// reservedParameters rejects a parameter schema that declares a reserved name.
+func (r *reader) reservedParameters(o *obj, params jsonvalue.Value) {
+	if params.IsZero() {
+		return
+	}
+	for _, name := range reservedParameterNames {
+		if _, ok := params.Get(name); ok {
+			r.failf(RuleIdentity, o.at("parameters")+"/"+name, "parameter name %q is reserved for operation selection; choose another name", name)
+		}
+	}
 }
 
 // checkNodeType requires the type to read "<connector id>.<name>@<major>"

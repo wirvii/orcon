@@ -133,20 +133,48 @@ func (p *blockingPolicy) Check(_ context.Context, m *connector.Manifest) error {
 	return nil
 }
 
-// coreTypes answers for the node types the engine owns, which the connector
-// catalog does not know, and delegates the rest.
-type coreTypes struct{ *connector.Catalog }
+// fakeCore is a CoreTypes fake: orcon.http@1 takes its contract from the
+// literal method (GET and HEAD read, anything else is an unsafe effect), and
+// every other core type is pure. It records how it was asked.
+type fakeCore struct {
+	mu       sync.Mutex
+	lookups  []string
+	resolved []string
+}
 
-func (c coreTypes) Lookup(ctx context.Context, nodeType string) (flow.NodeType, bool) {
-	if strings.HasPrefix(nodeType, "orcon.") {
+var _ connector.CoreTypes = (*fakeCore)(nil)
+
+func (c *fakeCore) Lookup(_ context.Context, nodeType string) (flow.NodeType, bool) {
+	c.mu.Lock()
+	c.lookups = append(c.lookups, nodeType)
+	c.mu.Unlock()
+	switch {
+	case nodeType == "orcon.http@1":
+		return unsafeHTTP, true
+	case strings.HasPrefix(nodeType, "orcon."):
 		return flow.NodeType{Purity: flow.PurityPure}, true
 	}
-	return c.Catalog.Lookup(ctx, nodeType)
+	return flow.NodeType{}, false
 }
 
-func (c coreTypes) ResolveNode(ctx context.Context, nodeType string, pin *flow.ConnectorPin, operation string) flow.NodeResolution {
-	if strings.HasPrefix(nodeType, "orcon.") {
-		return flow.NodeResolution{Type: flow.NodeType{Purity: flow.PurityPure}, Known: true}
+func (c *fakeCore) ResolveCore(_ context.Context, n *flow.Node) (flow.NodeType, bool) {
+	c.mu.Lock()
+	c.resolved = append(c.resolved, n.Type)
+	c.mu.Unlock()
+	switch {
+	case n.Type == "orcon.http@1":
+		if m, ok := n.Parameters.Get("method"); ok {
+			if s, ok := m.Str(); ok && (s == "GET" || s == "HEAD") {
+				return flow.NodeType{Purity: flow.PurityRead}, true
+			}
+		}
+		return unsafeHTTP, true
+	case strings.HasPrefix(n.Type, "orcon."):
+		return flow.NodeType{Purity: flow.PurityPure}, true
 	}
-	return c.Catalog.ResolveNode(ctx, nodeType, pin, operation)
+	return flow.NodeType{}, false
 }
+
+var unsafeHTTP = flow.NodeType{Purity: flow.PurityEffect, Contract: &flow.Contract{
+	Effect: flow.EffectUnknown, Level: flow.SafetyUnsafe, OnUncertain: flow.OnUncertainSuspend,
+}}

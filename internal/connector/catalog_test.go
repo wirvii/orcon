@@ -5,6 +5,7 @@ package connector_test
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,17 @@ func (w *world) grant(org identity.OrgID, project identity.ProjectID, rec connec
 	if _, err := w.registry.Grant(w.t.Context(), org, project, rec, w.admin); err != nil {
 		w.t.Fatalf("Grant() failed: %v", err)
 	}
+}
+
+// packageNode builds a flow node of a type with an optional pin; operation, when
+// not empty, is written as the literal "operation" parameter.
+func packageNode(t *testing.T, nodeType string, pin *flow.ConnectorPin, operation string) *flow.Node {
+	t.Helper()
+	params := `{}`
+	if operation != "" {
+		params = fmt.Sprintf(`{ "operation": %q }`, operation)
+	}
+	return &flow.Node{ID: "n1", Type: nodeType, Parameters: value(t, params), Connector: pin}
 }
 
 func TestInstallRecordsThePackage(t *testing.T) {
@@ -146,7 +158,7 @@ func TestLookupDescribesTheNewestVersion(t *testing.T) {
 	w.install("1.2.0")
 	w.install("1.10.0")
 	w.install("1.9.0")
-	cat := w.registry.Catalog(w.orgA, w.project)
+	cat := w.registry.Catalog(w.orgA, w.project, nil)
 
 	nt, ok := cat.Lookup(t.Context(), "acme.shop.order@1")
 	if !ok || nt.Purity != flow.PurityEffect || nt.Contract == nil || nt.Contract.Level != flow.SafetyUnsafe {
@@ -179,22 +191,22 @@ func TestResolveNodeUsesThePinnedVersion(t *testing.T) {
 	}
 	w.grant(w.orgA, identity.ProjectID{}, old)
 	w.grant(w.orgA, identity.ProjectID{}, newer)
-	cat := w.registry.Catalog(w.orgA, w.project)
+	cat := w.registry.Catalog(w.orgA, w.project, nil)
 
-	res := cat.ResolveNode(t.Context(), "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: old.Digest}, "order.create")
+	res := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: old.Digest}, "order.create"))
 	if !res.Known || len(res.Problems) != 0 || res.Type.Contract.Level != flow.SafetyIdempotencyKey {
 		t.Errorf("pinned to 1.2.0: %+v", res)
 	}
-	res = cat.ResolveNode(t.Context(), "acme.shop.order@1", &flow.ConnectorPin{Version: "2.0.0", Digest: newer.Digest}, "order.create")
+	res = cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "2.0.0", Digest: newer.Digest}, "order.create"))
 	if !res.Known || len(res.Problems) != 0 || res.Type.Contract.Level != flow.SafetyUnsafe {
 		t.Errorf("pinned to 2.0.0: %+v", res)
 	}
-	res = cat.ResolveNode(t.Context(), "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: old.Digest}, "order.nope")
-	if !res.Known || !res.UnknownOperation {
+	res = cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: old.Digest}, "order.nope"))
+	if !res.Known || res.Selection != flow.SelectionUnknown {
 		t.Errorf("an operation the version does not have: %+v", res)
 	}
-	res = cat.ResolveNode(t.Context(), "orcon.http@1", nil, "")
-	if res.Known || len(res.Problems) != 0 {
+	res = cat.ResolveNode(t.Context(), packageNode(t, "orcon.http@1", nil, ""))
+	if res.Known || len(res.Problems) != 0 || res.Selection != flow.SelectionOK {
 		t.Errorf("a type no package can own must come back unknown and without pin problems: %+v", res)
 	}
 }
@@ -204,21 +216,21 @@ func TestResolveNodeNamesEveryPinProblem(t *testing.T) {
 	w := newWorld(t)
 	rec := w.install("1.2.0")
 	w.policy.block("acme.shop", "1.2.0", "revoked by the test")
-	cat := w.registry.Catalog(w.orgA, w.project)
+	cat := w.registry.Catalog(w.orgA, w.project, nil)
 	wrongDigest := "sha256:" + strings.Repeat("0", 64)
 
-	res := cat.ResolveNode(t.Context(), "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: wrongDigest}, "")
+	res := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: wrongDigest}, ""))
 	joined := strings.Join(res.Problems, "\n")
 	for _, want := range []string{"digest " + wrongDigest, rec.Digest, "not granted", "policy blocks", "revoked by the test"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("problems do not mention %q:\n%s", want, joined)
 		}
 	}
-	res = cat.ResolveNode(t.Context(), "acme.shop.order@1", &flow.ConnectorPin{Version: "9.9.9", Digest: rec.Digest}, "")
+	res = cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "9.9.9", Digest: rec.Digest}, ""))
 	if res.Known || len(res.Problems) != 1 || !strings.Contains(res.Problems[0], "version 9.9.9, which is not installed") {
 		t.Errorf("a version that is not installed: %+v", res)
 	}
-	res = cat.ResolveNode(t.Context(), "acme.shop.order@1", nil, "")
+	res = cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", nil, ""))
 	if !res.Known || len(res.Problems) != 1 || !strings.Contains(res.Problems[0], "no connector pin") {
 		t.Errorf("a node without a pin: %+v", res)
 	}
@@ -234,7 +246,7 @@ func TestGrantsAreScopedToTheOrganizationAndProject(t *testing.T) {
 	w.grant(w.orgA, otherProject, rec)
 
 	problems := func(org identity.OrgID, project identity.ProjectID) int {
-		return len(w.registry.Catalog(org, project).ResolveNode(t.Context(), "acme.shop.order@1", pin, "").Problems)
+		return len(w.registry.Catalog(org, project, nil).ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", pin, "")).Problems)
 	}
 	if problems(w.orgA, w.project) == 0 {
 		t.Error("another organization's grant, and another project's, let this project use the package")

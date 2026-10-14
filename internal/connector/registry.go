@@ -134,8 +134,10 @@ func (r *Registry) Grant(ctx context.Context, org identity.OrgID, project identi
 // Catalog returns the node-type catalog for flows of one project. Validation
 // level 5 uses it: a connector node is valid when its pinned version is
 // installed, granted to the organization or project, and allowed by the policy.
-func (r *Registry) Catalog(org identity.OrgID, project identity.ProjectID) *Catalog {
-	return &Catalog{registry: r, org: org, project: project}
+// The catalog delegates the node types no package owns to core, which may be
+// nil when there are none.
+func (r *Registry) Catalog(org identity.OrgID, project identity.ProjectID, core CoreTypes) *Catalog {
+	return &Catalog{registry: r, org: org, project: project, core: core}
 }
 
 // latest returns the newest installed, not retired version of a connector that

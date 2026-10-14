@@ -88,7 +88,7 @@ func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report
 	}}
 	if ct, ok := types.(ConnectorNodeTypes); ok {
 		cfg.resolve = func(n *Node) NodeResolution {
-			return ct.ResolveNode(ctx, n.Type, n.Connector, operationOf(n))
+			return ct.ResolveNode(ctx, n)
 		}
 	}
 	return validate(d, cfg)
