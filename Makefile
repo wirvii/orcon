@@ -20,12 +20,12 @@ GOTOOL := $(TOOLS_ENV) go tool -modfile=$(CURDIR)/tools/go.mod
 # Workspace modules (go.work): every Go module of the product and the community packages.
 WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
-.PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
+.PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance brand-check hooks \
 	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
 	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
-check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
+check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance brand-check generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
 
 # ---------------------------------------------------------------------------
 # Tools
@@ -39,6 +39,7 @@ tools: $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION) $(BIN)/.sqlc-$(SQLC_VERSIO
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/benchgate ./benchgate
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/licensecheck ./licenses
 	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/dbcheck ./dbcheck
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/brandcheck ./brandcheck
 
 $(BIN)/.golangci-lint-$(GOLANGCI_LINT_VERSION):
 	mkdir -p $(BIN)
@@ -88,6 +89,13 @@ spdx-fix:
 
 provenance:
 	$(BIN)/provenance files
+
+# brand-check enforces the brand asset rules (SPEC-018 BC-1..BC-6): brand SVGs are
+# true vectors, wired copies are identical, mascot cut-outs are board pixels, the
+# reference boards are unchanged and no unapproved asset reaches the app.
+brand-check:
+	cd tools && $(TOOLS_ENV) go build -o ../$(BIN)/brandcheck ./brandcheck
+	$(BIN)/brandcheck all
 
 hooks:
 	git config core.hooksPath scripts/git-hooks
