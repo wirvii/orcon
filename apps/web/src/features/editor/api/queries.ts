@@ -41,7 +41,9 @@ if (import.meta.env.MODE === 'perf') {
  * the API (`createServerDraftSource`). The performance build has no server: it keeps the drafts in
  * memory, seeded with the reference flow, so the measurements do not depend on the network.
  */
-export const draftSource: DraftSource = import.meta.env.MODE === 'perf' ? createLocalDraftSource(seeds) : createServerDraftSource();
+export const usesLocalDrafts = import.meta.env.MODE === 'perf';
+
+export const draftSource: DraftSource = usesLocalDrafts ? createLocalDraftSource(seeds) : createServerDraftSource();
 
 /** Where the credential widget reads and creates credentials: the same seam as `draftSource` (ED5a part 2 swaps it). */
 export const credentialSource: CredentialSource = createLocalCredentialSource();
