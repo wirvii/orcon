@@ -41,13 +41,13 @@ type Tx interface {
 	LockFlowState(ctx context.Context, flowID flow.FlowID) (FlowState, error)
 	// NextVersionNumber returns the number of the next version of the flow.
 	NextVersionNumber(ctx context.Context, flowID flow.FlowID) (int64, error)
-	// InsertVersion inserts a published version.
+	// InsertVersion inserts a published version and its connector references.
 	InsertVersion(ctx context.Context, v flow.VersionRecord) error
 	// SetActiveVersion points the flow at its live version.
 	SetActiveVersion(ctx context.Context, flowID flow.FlowID, version flow.FlowVersionID, now time.Time) error
 	// ReplaceDraft replaces the draft when its revision is still
 	// expectedRevision, or fails with flow.ErrDraftConflict.
-	ReplaceDraft(ctx context.Context, flowID flow.FlowID, draft []byte, expectedRevision int64, now time.Time) error
+	ReplaceDraft(ctx context.Context, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) error
 	// SetActivationState writes the activation state of the flow.
 	SetActivationState(ctx context.Context, flowID flow.FlowID, state flow.ActivationState, now time.Time) error
 	// SoftDeleteFlow marks the flow deleted and records who did it.

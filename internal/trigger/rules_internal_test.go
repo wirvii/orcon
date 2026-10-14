@@ -6,6 +6,10 @@ package trigger
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 func TestValidateCron(t *testing.T) {
@@ -43,5 +47,22 @@ func TestValidateCron(t *testing.T) {
 		if msg := err.Error(); !strings.Contains(msg, field) {
 			t.Errorf("validateCron(%q) = %q, want it to mention %q", expr, msg, field)
 		}
+	}
+}
+
+func TestConnectorReferences(t *testing.T) {
+	t.Parallel()
+	s := &Service{ids: id.NewV7Generator(time.Now)}
+	doc := &flow.Document{Nodes: []flow.Node{
+		{ID: "a", Type: "acme.crm.create@1", Connector: &flow.ConnectorPin{Version: "1.2.0"}},
+		{ID: "b", Type: "acme.crm.update@1", Connector: &flow.ConnectorPin{Version: "1.2.0"}},
+		{ID: "c", Type: "orcon.http@1"},
+	}}
+	refs := s.connectorReferences(doc)
+	if len(refs) != 1 || refs[0].ConnectorID != "acme.crm" || refs[0].ConnectorVersion != "1.2.0" || refs[0].ID.IsZero() {
+		t.Fatalf("connectorReferences() = %+v, want one acme.crm 1.2.0 pin with an identity", refs)
+	}
+	if got := s.connectorReferences(&flow.Document{}); got != nil {
+		t.Fatalf("a document without pins gave %+v", got)
 	}
 }

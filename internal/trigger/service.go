@@ -268,7 +268,7 @@ func (s *Service) publishTx(ctx context.Context, tx Tx, p *publication, pre *pre
 		return Published{}, err
 	}
 	if p.replaceDraft {
-		if err := tx.ReplaceDraft(ctx, p.flowID, pre.document, p.draftRevision, now); err != nil {
+		if err := tx.ReplaceDraft(ctx, p.flowID, pre.document, p.draftRevision, s.connectorReferences(&pre.doc), now); err != nil {
 			return Published{}, err
 		}
 	}
@@ -305,6 +305,7 @@ func (s *Service) insertVersion(ctx context.Context, tx Tx, p *publication, pre 
 		ID: flow.FlowVersionID(s.ids.New()), OrgID: p.org, FlowID: p.flowID, Number: number,
 		Document: pre.document, ContentHash: pre.hash.String(),
 		PublishedByPrincipalID: p.by, PublishedAt: now, CreatedAt: now,
+		ConnectorReferences: s.connectorReferences(&pre.doc),
 	}
 	if w := report.WarningsValue(); !w.IsZero() {
 		if version.Warnings, err = jsonvalue.Marshal(w); err != nil {
@@ -318,6 +319,18 @@ func (s *Service) insertVersion(ctx context.Context, tx Tx, p *publication, pre 
 		return flow.VersionRecord{}, err
 	}
 	return version, nil
+}
+
+// connectorReferences lists the connector versions the document pins, as the
+// rows the store records with a version or a draft (ADR-0034 section 6).
+func (s *Service) connectorReferences(doc *flow.Document) []flow.ConnectorReference {
+	var refs []flow.ConnectorReference
+	for _, use := range flow.ConnectorUses(doc) {
+		refs = append(refs, flow.ConnectorReference{
+			ID: flow.ConnectorReferenceID(s.ids.New()), ConnectorID: use.ConnectorID, ConnectorVersion: use.ConnectorVersion,
+		})
+	}
+	return refs
 }
 
 func mergeReports(r flow.Report, extra []flow.Issue) flow.Report {

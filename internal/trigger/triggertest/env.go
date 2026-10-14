@@ -93,7 +93,7 @@ func (e *env) saveDraft(org identity.OrgID, flowID flow.FlowID, draft []byte) {
 	e.t.Helper()
 	rec, err := e.b.Flows.GetFlow(e.ctx(), org, flowID)
 	must(e.t, "read the flow", err)
-	_, err = e.b.Flows.UpdateFlowDraft(e.ctx(), org, flowID, draft, rec.DraftRevision, e.clock.Now())
+	_, err = e.b.Flows.UpdateFlowDraft(e.ctx(), org, flowID, draft, rec.DraftRevision, nil, e.clock.Now())
 	must(e.t, "save the draft", err)
 }
 

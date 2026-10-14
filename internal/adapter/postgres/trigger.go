@@ -88,7 +88,10 @@ func (t *triggerTx) InsertVersion(ctx context.Context, v flow.VersionRecord) err
 		params.WarningDocument = v.Warnings
 		params.WarningDocumentFormat = pgtype.Text{String: flow.WarningsFormat, Valid: true}
 	}
-	return t.q.InsertFlowVersion(ctx, params)
+	if err := t.q.InsertFlowVersion(ctx, params); err != nil {
+		return err
+	}
+	return insertVersionReferences(ctx, t.q, v)
 }
 
 func (t *triggerTx) SetActiveVersion(ctx context.Context, flowID flow.FlowID, version flow.FlowVersionID, now time.Time) error {
@@ -98,7 +101,7 @@ func (t *triggerTx) SetActiveVersion(ctx context.Context, flowID flow.FlowID, ve
 	return expectOne(n, err, "flow", flowID)
 }
 
-func (t *triggerTx) ReplaceDraft(ctx context.Context, flowID flow.FlowID, draft []byte, expectedRevision int64, now time.Time) error {
+func (t *triggerTx) ReplaceDraft(ctx context.Context, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) error {
 	n, err := t.q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
 		DraftDocument: draft, UpdatedAt: timestamp(now), OrgID: t.orgID(), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
 	})
@@ -108,7 +111,7 @@ func (t *triggerTx) ReplaceDraft(ctx context.Context, flowID flow.FlowID, draft 
 	if n == 0 {
 		return flow.ErrDraftConflict
 	}
-	return nil
+	return replaceDraftReferences(ctx, t.q, t.org, flowID, references, now)
 }
 
 func (t *triggerTx) SetActivationState(ctx context.Context, flowID flow.FlowID, state flow.ActivationState, now time.Time) error {

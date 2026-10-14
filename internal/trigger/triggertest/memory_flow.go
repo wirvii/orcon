@@ -171,7 +171,7 @@ func (m *Memory) ListFlows(_ context.Context, org identity.OrgID, project identi
 }
 
 // UpdateFlowDraft implements [flow.Store].
-func (m *Memory) UpdateFlowDraft(_ context.Context, org identity.OrgID, id flow.FlowID, draft []byte, expected int64, now time.Time) (int64, error) {
+func (m *Memory) UpdateFlowDraft(_ context.Context, org identity.OrgID, id flow.FlowID, draft []byte, expected int64, _ []flow.ConnectorReference, now time.Time) (int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	f, ok := m.s.flows[id]

@@ -224,7 +224,7 @@ func (t *memTx) SetActiveVersion(_ context.Context, flowID flow.FlowID, version 
 	return nil
 }
 
-func (t *memTx) ReplaceDraft(_ context.Context, flowID flow.FlowID, draft []byte, expected int64, now time.Time) error {
+func (t *memTx) ReplaceDraft(_ context.Context, flowID flow.FlowID, draft []byte, expected int64, _ []flow.ConnectorReference, now time.Time) error {
 	if err := t.write(); err != nil {
 		return err
 	}
