@@ -122,15 +122,16 @@ const xsdChunk = 250
 // supported conformance flows and every generated flow of TestRoundTripGenerated.
 // The OMG schema files are not part of this repository: CI fetches them with
 // scripts/fetch-bpmn-xsd.sh and sets ORCON_BPMN_XSD_DIR to their directory;
-// xmllint must be installed. Elsewhere the test is skipped, but when CI is set
-// a missing directory or tool is a failure, so the check cannot silently
+// xmllint must be installed. Elsewhere the test is skipped, but when
+// ORCON_BPMN_XSD_REQUIRED is set (only the check job sets it) a missing
+// directory or tool is a failure, so the check cannot silently
 // disappear from the pipeline.
 func TestRoundTripXSD(t *testing.T) {
 	dir := os.Getenv("ORCON_BPMN_XSD_DIR")
 	lint, lintErr := exec.LookPath("xmllint")
 	if dir == "" || lintErr != nil {
 		const why = "ORCON_BPMN_XSD_DIR is not set or xmllint is not installed; see scripts/fetch-bpmn-xsd.sh"
-		if os.Getenv("CI") != "" {
+		if os.Getenv("ORCON_BPMN_XSD_REQUIRED") != "" {
 			t.Fatal(why)
 		}
 		t.Skip(why)
