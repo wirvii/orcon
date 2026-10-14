@@ -6,6 +6,7 @@ package sqlite_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
@@ -48,5 +49,44 @@ func TestProbeRefusesAFileThatIsNotADatabase(t *testing.T) {
 	exists, err := sqlite.Probe(t.Context(), path)
 	if err == nil || !exists {
 		t.Fatalf("Probe = %v, %v; want true and an error", exists, err)
+	}
+}
+
+// names lists the files of a directory.
+func names(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, e := range entries {
+		out = append(out, e.Name())
+	}
+	return out
+}
+
+func TestProbeOfAStoppedDatabaseCreatesNoFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "orcon.db")
+	s, err := sqlite.Open(t.Context(), sqlite.Options{Path: path, BinaryVersion: binaryVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, leftover := range []string{"-wal", "-shm"} {
+		_ = os.Remove(path + leftover) // a clean close usually removes them; make sure the stopped state is plain
+	}
+	before := names(t, dir)
+	exists, err := sqlite.Probe(t.Context(), path)
+	if err != nil || !exists {
+		t.Fatalf("Probe = %v, %v; want true, nil", exists, err)
+	}
+	if after := names(t, dir); !slices.Equal(before, after) {
+		t.Fatalf("the probe changed the directory: before %v, after %v", before, after)
 	}
 }

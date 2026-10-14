@@ -12,6 +12,21 @@ import (
 	"os"
 )
 
+// probeMode picks how to open the file without changing the directory. A database in
+// WAL mode that nobody holds has no -wal and -shm files, and a plain read-only open
+// would create them (owned by whoever runs the probe, which breaks the service when
+// that is another user). Nobody holds it in that case, so it is opened immutable: no
+// locks and no side files. When both files exist a server holds it, and a read-only
+// open reads through them without creating anything.
+func probeMode(path string) string {
+	_, walErr := os.Stat(path + "-wal")
+	_, shmErr := os.Stat(path + "-shm")
+	if walErr == nil && shmErr == nil {
+		return "mode=ro"
+	}
+	return "immutable=1"
+}
+
 // Probe checks that the database file can be opened and read, for orcon config
 // check --probe. It opens the file read-only (mode=ro), so it creates nothing
 // and does not take the process lock of [Open]; it then runs SELECT 1.
@@ -28,7 +43,7 @@ func Probe(ctx context.Context, path string) (exists bool, err error) {
 		}
 		return false, fmt.Errorf("probe sqlite: %w", err)
 	}
-	db, err := sql.Open("sqlite", "file:"+escapePath(path)+"?mode=ro&_pragma=busy_timeout(2000)&_pragma=query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+escapePath(path)+"?"+probeMode(path)+"&_pragma=busy_timeout(2000)&_pragma=query_only(1)")
 	if err != nil {
 		return true, fmt.Errorf("probe sqlite: open: %w", err)
 	}
