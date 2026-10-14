@@ -36,8 +36,8 @@ func TestCatalogIsWellFormed(t *testing.T) {
 			t.Errorf("Lookup(%s) = %+v, %v", s.Code, got, ok)
 		}
 	}
-	if len(seen) != 24 {
-		t.Errorf("the catalog has %d codes, ERR-6 and Amendment 8 confirm 24", len(seen))
+	if len(seen) != 25 {
+		t.Errorf("the catalog has %d codes, ERR-6, Amendment 8 and BL-090 give 25", len(seen))
 	}
 	if _, ok := problem.Lookup("no-such-code"); ok {
 		t.Error("Lookup found a code that is not in the catalog")

@@ -49,6 +49,7 @@ const (
 	DeprecatedRemoved        Code = "deprecated-removed"
 	PreconditionFailed       Code = "precondition-failed"
 	PayloadTooLarge          Code = "payload-too-large"
+	UnsupportedMediaType     Code = "unsupported-media-type"
 	IdempotencyKeyReused     Code = "idempotency-key-reused"
 	PreconditionRequired     Code = "precondition-required"
 	RateLimited              Code = "rate-limited"
@@ -90,6 +91,7 @@ var catalog = []Spec{
 	{DeprecatedRemoved, http.StatusGone, "Removed", "The operation was removed after its sunset date.", false},
 	{PreconditionFailed, http.StatusPreconditionFailed, "Precondition failed", "If-Match does not match the current ETag.", false},
 	{PayloadTooLarge, http.StatusRequestEntityTooLarge, "Payload too large", "The body exceeds the size limit.", false},
+	{UnsupportedMediaType, http.StatusUnsupportedMediaType, "Unsupported media type", "The body is not in a media type the operation accepts.", false},
 	{IdempotencyKeyReused, http.StatusUnprocessableEntity, "Idempotency key reused", "The key was used with a different request.", false},
 	{PreconditionRequired, http.StatusPreconditionRequired, "Precondition required", "If-Match is missing.", false},
 	{RateLimited, http.StatusTooManyRequests, "Rate limited", "The rate class quota is exhausted.", true},

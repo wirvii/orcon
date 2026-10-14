@@ -144,7 +144,7 @@ func TestProtocolEndpointsTagged(t *testing.T) {
 	if bad := untaggedProtocol(spec); len(bad) != 0 {
 		t.Errorf("synthetic contract: %v", bad)
 	}
-	untagged := strings.Replace(syntheticSpec, `"tags": ["protocol"], `, "", 1)
+	untagged := strings.Replace(syntheticSpec, `"tags": ["protocol"], "security": [], "x-orcon-permission": "anonymous"`, `"x-orcon-permission": "flow:read"`, 1)
 	spec, err = ParseSpec([]byte(untagged))
 	if err != nil {
 		t.Fatalf("ParseSpec: %v", err)

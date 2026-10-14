@@ -135,13 +135,17 @@ func build(supplied *Deps, rawSpec []byte, register func(mux apigen.ServeMux, ba
 		return nil, err
 	}
 
+	validators, err := newBodyValidators(spec, rawSpec)
+	if err != nil {
+		return nil, err
+	}
 	limiter := middleware.NewLimiter(deps.Clock, deps.Limits, deps.LimiterOptions...)
 	rec := &recorder{mux: http.NewServeMux(), ops: map[string]Operation{}}
 	for i := range spec.Operations {
 		rec.ops[spec.Operations[i].Pattern] = spec.Operations[i]
 	}
 	rec.wrap = func(op *Operation, h http.Handler) http.Handler {
-		return middleware.Chain(h, operationChain(deps, limiter, op)...)
+		return middleware.Chain(h, operationChain(deps, limiter, op, bodyMiddleware(validators, op))...)
 	}
 	register(rec, spec.BasePath)
 	if len(rec.unknown) > 0 {
@@ -246,7 +250,7 @@ func checkPermissions(spec *Spec, cat *authz.Catalog) error {
 // steps 3 to 6): authentication, principal rate limit, stability gate and
 // authorization. Operations that need no authentication skip all of them but
 // the stability gate; the per-address limit of the global chain protects them.
-func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation) []middleware.Middleware {
+func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body middleware.Middleware) []middleware.Middleware {
 	// Step 1 of the pipeline: the body limit of the operation, before anything reads the request.
 	chain := []middleware.Middleware{withOperation(op), middleware.BodyLimit(BodyLimitFor(op.ID))}
 	if !op.Public {
@@ -260,6 +264,10 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation) []mi
 	}
 	if !op.Public {
 		chain = append(chain, middleware.Authorize(deps.Authorizer, deps.Logger, op.Requirement, resourceOf(op)))
+	}
+	if body != nil {
+		// After authorization: a caller who may not call the operation learns nothing of its schema.
+		chain = append(chain, body)
 	}
 	return chain
 }

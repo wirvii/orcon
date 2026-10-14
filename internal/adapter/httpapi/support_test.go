@@ -6,6 +6,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,17 +37,18 @@ const syntheticSpec = `{
     },
     "/drafts": {
       "put": {"operationId": "replaceDraft", "description": "Replaces a draft. It needs a revision. Request body limit: 8 MiB.", "x-orcon-permission": "flow:update", "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
-        "parameters": [{"$ref": "#/components/parameters/IfMatch"}], "requestBody": {"content": {"application/json": {}}}}
+        "parameters": [{"$ref": "#/components/parameters/IfMatch"}],
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewThing"}}, "application/merge-patch+json": {"schema": {"$ref": "#/components/schemas/NewThing"}}}}}
     },
     "/things": {
-      "post": {"operationId": "createThing", "description": "Creates a thing. It may be repeated. Request body limit: 1 MiB.", "requestBody": {"content": {"application/json": {}}}, "x-orcon-permission": {"anyOf": ["flow:create", "flow:update"]}, "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
+      "post": {"operationId": "createThing", "description": "Creates a thing. It may be repeated. Request body limit: 1 MiB.", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewThing"}}}}, "x-orcon-permission": {"anyOf": ["flow:create", "flow:update"]}, "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
         "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}]}
     },
     "/things/stream": {
       "get": {"operationId": "streamThings", "x-orcon-permission": "flow:read", "x-orcon-rate-class": "stream", "x-orcon-stability": "stable"}
     },
     "/ping": {
-      "get": {"operationId": "ping", "x-orcon-permission": "anonymous", "x-orcon-rate-class": "read", "x-orcon-stability": "stable"}
+      "get": {"operationId": "getSetupState", "security": [], "x-orcon-permission": "anonymous", "x-orcon-rate-class": "read", "x-orcon-stability": "stable"}
     },
     "/me": {
       "get": {"operationId": "getMe", "x-orcon-permission": "authenticated", "x-orcon-rate-class": "read", "x-orcon-stability": "stable"}
@@ -73,7 +75,12 @@ const syntheticSpec = `{
       "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": false, "schema": {"type": "string"}},
       "IdempotencyKeyRequired": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string"}}
     },
-    "schemas": {"ThingWithSecret": {"type": "object"}}
+    "schemas": {
+      "ThingWithSecret": {"type": "object"},
+      "NewThing": {"type": "object", "additionalProperties": false, "properties": {
+        "name": {"type": "string", "maxLength": 5}, "tag": {"type": ["string", "null"]},
+        "count": {"type": "integer", "minimum": 1, "maximum": 10}, "id": {"type": "string", "format": "uuid"}}}
+    }
   }
 }`
 
@@ -131,7 +138,10 @@ func fakeHandlers(mux apigen.ServeMux, base string, onStream func()) {
 		json200(map[string]string{"id": r.PathValue("thingId")})(w, r)
 	})
 	mux.HandleFunc("PUT "+base+"/things/{thingId}", json200(map[string]string{"updated": "yes"}))
-	mux.HandleFunc("POST "+base+"/things", json200(map[string]string{"created": "yes"}))
+	mux.HandleFunc("POST "+base+"/things", func(w http.ResponseWriter, r *http.Request) {
+		received, _ := io.ReadAll(r.Body)
+		json200(map[string]string{"created": "yes", "received": string(received)})(w, r)
+	})
 	mux.HandleFunc("PUT "+base+"/drafts", json200(map[string]string{"saved": "yes"}))
 	mux.HandleFunc("GET "+base+"/things/stream", func(w http.ResponseWriter, r *http.Request) {
 		if onStream != nil {

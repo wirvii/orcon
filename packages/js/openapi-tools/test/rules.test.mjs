@@ -257,6 +257,8 @@ const REPORTS = [
   ['deprecated field without a guide', 'deprecation', 'x-orcon-deprecation-guide', (d) => {
     Object.assign(schemas(d).Flow.properties.name, { deprecated: true, 'x-orcon-sunset': '2027-01-01' });
   }],
+  ['security [] with a permission', 'permission', 'security: []', (d) => void (getFlow(d).security = [])],
+  ['allOf and anyOf together', 'permission', 'not both', (d) => void (getFlow(d)['x-orcon-permission'] = { allOf: ['flow:read'], anyOf: ['flow:update'] })],
   ['anonymous on a normal operation', 'permission', 'protocol operations', (d) => void (getFlow(d)['x-orcon-permission'] = 'anonymous')],
   ['allOf with an unknown permission', 'permission', 'not in the permission catalog', (d) => {
     getFlow(d)['x-orcon-permission'] = { allOf: ['flow:read', 'flow:peek'] };

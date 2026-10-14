@@ -254,6 +254,15 @@ export const permission = defineRule((model, report, options) => {
       report('CHAN-7', `${entry.method.toUpperCase()} ${entry.key} declares x-orcon-permission.`, entry.loc);
       continue;
     }
+    // An empty security list opens an operation to everyone, so it is allowed only together with the
+    // anonymous permission (SPEC-005 BL-088); the server refuses the other combinations too.
+    if (Array.isArray(entry.op.security) && entry.op.security.length === 0 && value !== 'anonymous') {
+      report('CHAN-7', 'security: [] is only for operations with the anonymous permission.', entry.loc.child(['security']));
+    }
+    if (isObject(value) && 'allOf' in value && 'anyOf' in value) {
+      report('CHAN-7', 'x-orcon-permission declares allOf or anyOf, not both.', loc);
+      continue;
+    }
     const names = permissionNames(value);
     if (!names || names.length === 0 || names.some((n) => typeof n !== 'string')) {
       report('CHAN-7', 'x-orcon-permission is a permission, { allOf: [...] }, { anyOf: [...] }, authenticated or anonymous.', loc);
