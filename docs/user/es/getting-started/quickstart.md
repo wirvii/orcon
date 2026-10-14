@@ -5,10 +5,11 @@ sources:
   - ADR-0083
   - ADR-0042
   - ADR-0039
-sourceHash: a5bdf114e147cc9a52c4fd60fd89a2c412505d8663b8a0917c5fff62e52f258a
+sourceHash: 3df8af9d6b70faa25c43bab73eb6fc03216cebe290379ffb9c746963535efc34
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Inicio rápido
 
 > Esta página describe un comportamiento especificado por el ADR 0083 que aún no está implementado. El corte que entregue el instalador y los comandos de primera ejecución quitará esta nota.

@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0071 — n8n AI/LangChain node import mapping
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: UPPER_SNAKE values per ADR-0080 §3)

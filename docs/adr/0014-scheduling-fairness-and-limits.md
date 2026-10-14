@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0014 — Scheduling fairness and concurrency limits
 
 Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12

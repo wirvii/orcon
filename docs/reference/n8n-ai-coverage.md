@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # n8n AI node inventory and Orcon mapping
 
 Status: **Accepted** | Source: SPEC-006 Annex B, with ADR-0071 (accepted 2026-10-12 via SPEC-006)
