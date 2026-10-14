@@ -22,7 +22,12 @@ servers:
     description: This installation.
 security:
   - bearer: []
+  - sessionCookie: []
 tags:
+  - name: session
+    description: Signing in and out of the browser and the user who is signed in.
+  - name: organizations
+    description: The organizations the signed-in user belongs to.
   - name: projects
     description: Projects that group flows, credentials and executions inside an organization.
   - name: flows
@@ -34,6 +39,14 @@ tags:
   - name: node-types
     description: The node types a project can use in its flows.
 paths:
+  /users/me:
+    $ref: ./paths/current-user.yaml
+  /users/me/sessions:
+    $ref: ./paths/user-sessions.yaml
+  /users/me/sessions/{sessionId}/revoke:
+    $ref: ./paths/user-session-revoke.yaml
+  /orgs:
+    $ref: ./paths/orgs.yaml
   /orgs/{orgId}/projects:
     $ref: ./paths/org-projects.yaml
   /projects/{projectId}:
@@ -92,7 +105,28 @@ components:
       type: http
       scheme: bearer
       description: An API key, a service account token or a session token, sent as a bearer credential.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-orcon_session
+      description: >-
+        The browser session, set by createSession as an HttpOnly, Secure, SameSite=Lax cookie with Path=/.
+        Browsers also hold a readable CSRF cookie, __Host-orcon_csrf (Secure, SameSite=Strict, Path=/). Every
+        unsafe request (POST, PUT, PATCH, DELETE) authenticated by this cookie must send the value of that
+        CSRF cookie in the Orcon-Csrf-Token header and must come from the public origin of the installation;
+        otherwise the response is 403 csrf-check-failed. Requests that carry an API key as a bearer
+        credential use no cookie and no CSRF token.
   parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Id of the session.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
     OrgId:
       name: orgId
       in: path
@@ -274,6 +308,16 @@ components:
       $ref: ./schemas/problem.yaml#/Problem
     ProblemFieldError:
       $ref: ./schemas/problem.yaml#/ProblemFieldError
+    SessionCredentials:
+      $ref: ./schemas/session.yaml#/SessionCredentials
+    Session:
+      $ref: ./schemas/session.yaml#/Session
+    CurrentUser:
+      $ref: ./schemas/session.yaml#/CurrentUser
+    Organization:
+      $ref: ./schemas/session.yaml#/Organization
+    OrganizationList:
+      $ref: ./schemas/session.yaml#/OrganizationList
     ProblemCode:
       $ref: ./schemas/problem.yaml#/ProblemCode
     Project:
@@ -363,6 +407,12 @@ components:
             $ref: '#/components/schemas/Problem'
     Unauthenticated:
       description: No valid credential was sent.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CsrfCheckFailed:
+      description: The request did not carry a valid CSRF token or came from another origin.
       content:
         application/problem+json:
           schema:

@@ -142,6 +142,7 @@ post:
   x-orcon-problems:
     - validation-failed
     - unauthenticated
+    - csrf-check-failed
     - forbidden
     - not-found
     - conflict

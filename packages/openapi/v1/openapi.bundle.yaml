@@ -17,7 +17,12 @@ servers:
     description: This installation.
 security:
   - bearer: []
+  - sessionCookie: []
 tags:
+  - name: session
+    description: Signing in and out of the browser and the user who is signed in.
+  - name: organizations
+    description: The organizations the signed-in user belongs to.
   - name: projects
     description: Projects that group flows, credentials and executions inside an organization.
   - name: flows
@@ -29,6 +34,315 @@ tags:
   - name: node-types
     description: The node types a project can use in its flows.
 paths:
+  /users/me:
+    x-orcon-resource: singleton
+    get:
+      operationId: getCurrentUser
+      summary: Get the signed-in user
+      description: Returns the user of the session the request carries, with that session. It never returns the password hash or the session token.
+      tags:
+        - session
+      x-orcon-permission: authenticated
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - unauthenticated
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: users whoami
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: currentUser
+          scenario: signed-in-user
+          request: {}
+          response:
+            status: 200
+            body: currentUser
+      responses:
+        '200':
+          description: The signed-in user and the current session.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+              examples:
+                currentUser:
+                  summary: A signed-in user
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a81
+                    email: ana@example.com
+                    displayName: Ana Torres
+                    currentSession:
+                      id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                      createdAt: '2026-10-14T15:04:05Z'
+                      expiresAt: '2026-11-13T15:04:05Z'
+                      idleExpiresAt: '2026-10-14T23:04:05Z'
+                      assuranceLevel: AAL1
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /users/me/sessions:
+    x-orcon-resource: collection
+    post:
+      operationId: createSession
+      summary: Sign in with an email and a password
+      description: 'Checks the email and the password and starts a browser session. The response sets two cookies: the session cookie, which holds an opaque token and is HttpOnly, and the CSRF cookie, whose value every unsafe request sends back in the Orcon-Csrf-Token header. A session the request already carries is revoked and replaced. A wrong email, a wrong password, a disabled account and an account without a password all get the same 401 unauthenticated. Too many failed attempts get 429 rate-limited with Retry-After, whether or not the account exists. Request body limit: 1 MiB.'
+      tags:
+        - session
+      security: []
+      x-orcon-permission: anonymous
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-idempotency: optional
+      x-orcon-audit: login.succeeded
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - conflict
+        - secret-already-issued
+        - idempotency-in-progress
+        - idempotency-key-reused
+        - payload-too-large
+        - unsupported-media-type
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        none:
+          category: interactive-session-only
+          reason: The command line signs in with device authorization (ADR-0058), not with a password.
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: signInWithPassword
+          scenario: account-with-password
+          request:
+            body: signInWithPassword
+          response:
+            status: 201
+            body: signedInSession
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCredentials'
+            examples:
+              signInWithPassword:
+                summary: Email and password of an account
+                value:
+                  email: ana@example.com
+                  password: example-secret-1
+      responses:
+        '201':
+          description: The session was started. The Set-Cookie headers carry the session and CSRF cookies.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+              examples:
+                signedInSession:
+                  summary: The new session; the token itself is never in the body
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                    createdAt: '2026-10-14T15:04:05Z'
+                    expiresAt: '2026-11-13T15:04:05Z'
+                    idleExpiresAt: '2026-10-14T23:04:05Z'
+                    assuranceLevel: AAL1
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfCheckFailed'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /users/me/sessions/{sessionId}/revoke:
+    x-orcon-resource: action
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      operationId: revokeSession
+      summary: Sign out of the current browser session
+      description: Revokes the session the request carries and clears its cookies. Only the current session can be revoked here; any other session id is not found, so the response never reveals another session. A later request with the same token gets 401 unauthenticated. API keys are revoked with the API key operations instead.
+      tags:
+        - session
+      x-orcon-permission: authenticated
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-idempotency: optional
+      x-orcon-audit: session.revoked
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - not-found
+        - idempotency-in-progress
+        - idempotency-key-reused
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        none:
+          category: interactive-session-only
+          reason: Browser sessions only; API keys are revoked with the API key operations.
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: signOutCurrentSession
+          scenario: signed-in-user
+          request:
+            pathParams:
+              sessionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+          response:
+            status: 204
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: The session was revoked; the cookies are cleared.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfCheckFailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /orgs:
+    x-orcon-resource: collection
+    get:
+      operationId: listOrgs
+      summary: List the organizations of the signed-in user
+      description: 'Returns the active organizations the signed-in user belongs to, ordered by name and then id, one page at a time. At most 1000 organizations are read per user: a user with more sees the first 1000 by name. Use the slug filter to resolve an organization from a URL.'
+      tags:
+        - organizations
+      x-orcon-permission: authenticated
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: orgs list
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: firstPageOfOrgs
+          scenario: user-with-organizations
+          request:
+            query:
+              limit: 50
+          response:
+            status: 200
+            body: firstPageOfOrgs
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+        - name: slug
+          in: query
+          required: false
+          description: Return only the organization with this slug (exact match).
+          schema:
+            type: string
+            maxLength: 100
+            examples:
+              - acme
+      responses:
+        '200':
+          description: One page of organizations.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationList'
+              examples:
+                firstPageOfOrgs:
+                  summary: Two organizations
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+                        slug: acme
+                        name: Acme
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72
+                        slug: wirvii
+                        name: Wirvii
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /orgs/{orgId}/projects:
     x-orcon-resource: collection
     parameters:
@@ -82,8 +396,8 @@ paths:
             enum:
               - name
               - -name
-              - createdAt
-              - -createdAt
+              - updatedAt
+              - -updatedAt
             x-orcon-enum-kind: identifier
             default: name
         - name: q
@@ -104,6 +418,15 @@ paths:
             maxLength: 100
             examples:
               - prod
+        - name: handle
+          in: query
+          required: false
+          description: Return only the project with this handle (exact match); a URL resolves a project this way.
+          schema:
+            type: string
+            maxLength: 201
+            examples:
+              - onboarding
       responses:
         '200':
           description: One page of projects.
@@ -168,6 +491,7 @@ paths:
       x-orcon-problems:
         - validation-failed
         - unauthenticated
+        - csrf-check-failed
         - forbidden
         - not-found
         - conflict
@@ -642,6 +966,7 @@ paths:
       x-orcon-problems:
         - validation-failed
         - unauthenticated
+        - csrf-check-failed
         - forbidden
         - not-found
         - conflict
@@ -3538,7 +3863,22 @@ components:
       type: http
       scheme: bearer
       description: An API key, a service account token or a session token, sent as a bearer credential.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-orcon_session
+      description: The browser session, set by createSession as an HttpOnly, Secure, SameSite=Lax cookie with Path=/. Browsers also hold a readable CSRF cookie, __Host-orcon_csrf (Secure, SameSite=Strict, Path=/). Every unsafe request (POST, PUT, PATCH, DELETE) authenticated by this cookie must send the value of that CSRF cookie in the Orcon-Csrf-Token header and must come from the public origin of the installation; otherwise the response is 403 csrf-check-failed. Requests that carry an API key as a bearer credential use no cookie and no CSRF token.
   parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Id of the session.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
     OrgId:
       name: orgId
       in: path
@@ -3821,6 +4161,149 @@ components:
           examples:
             - The note is longer than 500 characters.
           maxLength: 1000
+    SessionCredentials:
+      type: object
+      description: The email and the password of an account that signs in.
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email of the account; compared case-insensitively.
+          examples:
+            - ana@example.com
+          maxLength: 320
+        password:
+          type: string
+          writeOnly: true
+          description: Password of the account. It is never returned.
+          examples:
+            - example-secret-1
+          minLength: 1
+          maxLength: 1024
+    Session:
+      type: object
+      description: A browser session. The token that proves it is only in the session cookie, never in the body.
+      required:
+        - id
+        - createdAt
+        - expiresAt
+        - idleExpiresAt
+        - assuranceLevel
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the session; it is what revoking the session names.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: When the session started, in UTC.
+          examples:
+            - '2026-10-14T15:04:05Z'
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the session ends whatever its activity (maximum age), in UTC.
+          examples:
+            - '2026-11-13T15:04:05Z'
+        idleExpiresAt:
+          type: string
+          format: date-time
+          description: When the session ends without activity (idle timeout), in UTC.
+          examples:
+            - '2026-10-14T23:04:05Z'
+        assuranceLevel:
+          type: string
+          description: How strongly the user was verified; AAL1 is a password, AAL2 adds a second factor.
+          x-orcon-enum-kind: identifier
+          enum:
+            - AAL1
+            - AAL2
+          examples:
+            - AAL1
+    CurrentUser:
+      type: object
+      description: The signed-in user and the session the request carries.
+      required:
+        - id
+        - email
+        - displayName
+        - currentSession
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the user.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a81
+          readOnly: true
+        email:
+          type: string
+          format: email
+          description: Email of the user.
+          examples:
+            - ana@example.com
+          maxLength: 320
+        displayName:
+          type: string
+          description: Name the user is shown with.
+          examples:
+            - Ana Torres
+          maxLength: 200
+        currentSession:
+          description: The session the request carries.
+          $ref: '#/components/schemas/Session'
+    Organization:
+      type: object
+      description: An organization the user belongs to.
+      required:
+        - id
+        - slug
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the organization.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+          readOnly: true
+        slug:
+          type: string
+          description: Short name of the organization, unique across the installation; it appears in URLs.
+          examples:
+            - acme
+          maxLength: 100
+        name:
+          type: string
+          description: Display name of the organization.
+          examples:
+            - Acme
+          maxLength: 200
+    OrganizationList:
+      type: object
+      description: One page of organizations.
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: The items of this page.
+          items:
+            $ref: '#/components/schemas/Organization'
+        nextPageToken:
+          type: string
+          description: Token for the next page; absent on the last page.
+          examples:
+            - example-page-token-2
+          maxLength: 1024
     ProblemCode:
       type: string
       description: Stable code of a problem; the type URI is urn:orcon:problem:<code>.
@@ -3851,6 +4334,7 @@ components:
         - service-unavailable
         - confirmation-required
         - federated-token-rejected
+        - csrf-check-failed
       x-orcon-problem-catalog:
         validation-failed:
           status: 400
@@ -3976,6 +4460,11 @@ components:
           status: 400
           title: Federated token rejected
           when: The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant.
+          retryable: false
+        csrf-check-failed:
+          status: 403
+          title: CSRF check failed
+          when: The request did not carry a valid CSRF token or came from another origin.
           retryable: false
     Project:
       type: object
@@ -5315,6 +5804,12 @@ components:
             $ref: '#/components/schemas/Problem'
     Unauthenticated:
       description: No valid credential was sent.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CsrfCheckFailed:
+      description: The request did not carry a valid CSRF token or came from another origin.
       content:
         application/problem+json:
           schema:

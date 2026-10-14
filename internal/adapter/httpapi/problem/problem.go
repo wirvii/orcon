@@ -57,6 +57,7 @@ const (
 	ServiceUnavailable       Code = "service-unavailable"
 	ConfirmationRequired     Code = "confirmation-required"
 	FederatedTokenRejected   Code = "federated-token-rejected"
+	CSRFCheckFailed          Code = "csrf-check-failed"
 )
 
 // Spec describes one entry of the catalog.
@@ -99,6 +100,7 @@ var catalog = []Spec{
 	{ServiceUnavailable, http.StatusServiceUnavailable, "Service unavailable", "The server is starting, stopping or overloaded.", true},
 	{ConfirmationRequired, http.StatusForbidden, "Confirmation required", "The request was stored as a confirmation that a person must approve before it runs.", false},
 	{FederatedTokenRejected, http.StatusBadRequest, "Federated token rejected", "The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant.", false},
+	{CSRFCheckFailed, http.StatusForbidden, "CSRF check failed", "The request did not carry a valid CSRF token or came from another origin.", false},
 }
 
 // Catalog returns a copy of the catalog in contract order.

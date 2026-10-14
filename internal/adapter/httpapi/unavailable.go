@@ -24,6 +24,26 @@ type Unavailable struct{}
 
 var _ apigen.StrictServerInterface = Unavailable{}
 
+// CreateSession refuses POST /users/me/sessions.
+func (Unavailable) CreateSession(context.Context, apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// RevokeSession refuses POST /users/me/sessions/{sessionId}/revoke.
+func (Unavailable) RevokeSession(context.Context, apigen.RevokeSessionRequestObject) (apigen.RevokeSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// GetCurrentUser refuses GET /users/me.
+func (Unavailable) GetCurrentUser(context.Context, apigen.GetCurrentUserRequestObject) (apigen.GetCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// ListOrgs refuses GET /orgs.
+func (Unavailable) ListOrgs(context.Context, apigen.ListOrgsRequestObject) (apigen.ListOrgsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
 // GetExecution refuses GET /executions/{executionId}.
 func (Unavailable) GetExecution(context.Context, apigen.GetExecutionRequestObject) (apigen.GetExecutionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable

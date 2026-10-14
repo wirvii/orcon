@@ -17,6 +17,7 @@ Every error of the public API is an `application/problem+json` document (RFC 945
 | <a id="step-up-required"></a>`step-up-required` | 403 | Step-up required | The operation needs a recent second factor. | no |
 | <a id="personal-keys-disabled"></a>`personal-keys-disabled` | 403 | Personal keys disabled | The organization does not allow personal API keys. | no |
 | <a id="confirmation-required"></a>`confirmation-required` | 403 | Confirmation required | The request was stored as a confirmation that a person must approve before it runs. | no |
+| <a id="csrf-check-failed"></a>`csrf-check-failed` | 403 | CSRF check failed | The request did not carry a valid CSRF token or came from another origin. | no |
 | <a id="not-found"></a>`not-found` | 404 | Not found | The resource does not exist or is not visible to the caller. | no |
 | <a id="method-not-allowed"></a>`method-not-allowed` | 405 | Method not allowed | The path exists but the method is not one of its operations; the Allow header lists the methods that are. | no |
 | <a id="conflict"></a>`conflict` | 409 | Conflict | The resource state does not allow the operation. | no |
