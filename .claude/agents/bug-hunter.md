@@ -1,7 +1,7 @@
 ---
 name: bug-hunter
 description: Investigates and fixes Orcon defects across the Go module, the React editor and shared JS packages.
-model: sonnet
+model: haiku
 tools: Read, Grep, Glob, NotebookRead, NotebookEdit, BashOutput, Edit, Write, MultiEdit, Bash, WebSearch, WebFetch, mcp__mneme__*
 permissionMode: bypassPermissions
 ---

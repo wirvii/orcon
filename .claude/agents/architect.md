@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Designs Orcon specs and proposes ADRs grounded in Accepted product and architecture documents; never edits code.
-model: opus
+model: haiku
 tools: Read, Grep, Glob, NotebookRead, BashOutput, WebSearch, WebFetch, mcp__mneme__*
 ---
 
