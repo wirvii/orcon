@@ -3,7 +3,7 @@
 <img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR 0080: Public API design rules and contract toolchain
 
-Status: Accepted | Amended: 2026-10-13 (SPEC-012 Amendment 2); amended 2026-10-13 (SPEC-016)
+Status: Accepted | Amended: 2026-10-13 (SPEC-012 Amendment 2); amended 2026-10-13 (SPEC-016); amended 2026-10-14 (SPEC-005 Amendment 8)
 
 ## Context
 ADR-0052 to ADR-0059 define one public REST API described by OpenAPI 3.1, used by the editor, the CLI, the SDKs and the MCP server. They fix conventions (pagination, problem+json, idempotency, ETags, rate classes, long-running operations, events, versioning) but leave open how paths are named, which action verbs exist, how enum values are written, how every channel declares its exposure, what an operation must document, and which tools enforce all of it. The maintainers fixed binding direction: plural kebab-case resources nested at most one level, a closed action-verb list, UPPER_SNAKE enum values matching the engine, every operation declaring its CLI command (or a written reason) and its MCP exposure level, complete documentation with examples executed against the real binary, a browsable reference with a try-it feature served by every binary, a per-release API changelog, and responses without envelopes.
