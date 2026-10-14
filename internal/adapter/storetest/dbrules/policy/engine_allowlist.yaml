@@ -87,3 +87,6 @@
 - dialect: sqlite
   query: UpdateConnectorGrantGrantedByPrincipalToNull
   reason: clears connector_grant.granted_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: ResolveUserOrganizations
+  reason: lists the active organizations of one user from membership rows of every organization (SPEC-004 R-ID-02, section 7-3); PostgreSQL reads them through orcon_engine.resolve_user_organizations

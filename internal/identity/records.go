@@ -3,7 +3,11 @@
 
 package identity
 
-import "time"
+import (
+	"time"
+
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+)
 
 // Organization statuses (ADR-0038 section 7). DELETION_SCHEDULED is the grace
 // period before destruction, a lifecycle status and not a soft delete.
@@ -143,4 +147,16 @@ type LoginThrottle struct {
 	// LockedUntil is the instant before which the identifier is refused.
 	LockedUntil time.Time
 	UpdatedAt   time.Time
+}
+
+// MaxResolvedOrganizations is the most organizations one listing reads for a user (SPEC-016 R-SH-ORG-03).
+const MaxResolvedOrganizations = 1000
+
+// OrganizationChoice is an organization a user can work in: the scope to call its
+// operations under, and what a person reads to pick it.
+type OrganizationChoice struct {
+	Scope orgscope.Org
+	ID    OrgID
+	Slug  string
+	Name  string
 }

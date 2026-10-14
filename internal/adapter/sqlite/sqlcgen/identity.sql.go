@@ -666,6 +666,47 @@ func (q *Queries) MarkSessionRevoked(ctx context.Context, revokedAt sql.NullInt6
 	return result.RowsAffected()
 }
 
+const resolveUserOrganizations = `-- name: ResolveUserOrganizations :many
+SELECT org.id, org.slug, org.name
+FROM membership
+JOIN org ON org.id = membership.org_id
+WHERE membership.application_user_id = ?1
+  AND membership.status = 'ACTIVE'
+  AND org.status = 'ACTIVE'
+ORDER BY org.name, org.id
+LIMIT ?2
+`
+
+type ResolveUserOrganizationsRow struct {
+	ID   []byte
+	Slug string
+	Name string
+}
+
+// orcon:scope engine
+func (q *Queries) ResolveUserOrganizations(ctx context.Context, applicationUserID []byte, rowLimit int64) ([]ResolveUserOrganizationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, resolveUserOrganizations, applicationUserID, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveUserOrganizationsRow{}
+	for rows.Next() {
+		var i ResolveUserOrganizationsRow
+		if err := rows.Scan(&i.ID, &i.Slug, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateApplicationUserPasswordHash = `-- name: UpdateApplicationUserPasswordHash :execrows
 UPDATE application_user
 SET password_hash = ?1, updated_at = ?2

@@ -11,10 +11,15 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/goleak"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 	"github.com/wirvii/orcon/test/isolation"
 )
 
@@ -279,4 +284,60 @@ func TestSentinelsFindLeaks(t *testing.T) {
 	if strings.Contains(env.A.Sentinel("flow-name"), env.B.Sentinel("flow-name")) || strings.Contains(env.B.Sentinel("flow-name"), env.A.Sentinel("flow-name")) {
 		t.Error("one organization's sentinel contains the other's")
 	}
+}
+
+// TestResolveUserOrganizationsOnlyActive (SPEC-004 section 7-3, SPEC-016 R-SH-ORG-04): the organizations of a
+// user are those of its ACTIVE memberships in ACTIVE organizations. A suspended membership, an invitation, a
+// suspended organization and an organization the user does not belong to are left out.
+func TestResolveUserOrganizationsOnlyActive(t *testing.T) {
+	for _, st := range selectedStores(t) {
+		t.Run(string(st), func(t *testing.T) {
+			ctx := t.Context()
+			env := isolation.Seed(ctx, t, factoryOf(t, st)(t), st, isolation.RLSOnly)
+			ana := env.A.User
+			fresh := id.NewV7Generator(time.Now)
+			now := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+			membership := func(org identity.OrgID, status string) {
+				t.Helper()
+				scope := scopeOfOrg(t, org)
+				rec := identity.MembershipRecord{ID: identity.MembershipID(fresh.New()), OrgID: org, UserID: ana.ID, Status: status, CreatedAt: now, UpdatedAt: now}
+				if err := env.Stores.CreateMembership(ctx, scope, rec); err != nil {
+					t.Fatalf("membership of ana in %s: %v", status, err)
+				}
+			}
+			newOrg := func(status string) identity.OrgID {
+				t.Helper()
+				org := identity.OrgID(fresh.New())
+				name := "org-" + status + "-" + org.String()
+				if err := env.Stores.CreateOrganization(ctx, identity.OrgRecord{ID: org, Name: name, Slug: name, Status: status, CreatedAt: now, UpdatedAt: now}); err != nil {
+					t.Fatalf("create organization %s: %v", status, err)
+				}
+				return org
+			}
+			// Ana is ACTIVE in A (seeded). Suspended membership in B, an invitation in C, and an
+			// ACTIVE membership in a suspended organization E; D is an organization she does not belong to.
+			membership(identity.OrgID(env.B.UUID), identity.MembershipSuspended)
+			membership(newOrg(identity.OrgActive), identity.MembershipInvited)
+			membership(newOrg(identity.OrgSuspended), identity.MembershipActive)
+			newOrg(identity.OrgActive)
+
+			got, err := env.Stores.ResolveUserOrganizations(ctx, ana.ID, identity.MaxResolvedOrganizations)
+			if err != nil {
+				t.Fatalf("resolve: %v", err)
+			}
+			if len(got) != 1 || got[0].ID != identity.OrgID(env.A.UUID) {
+				t.Fatalf("organizations of ana = %+v; want only A", got)
+			}
+		})
+	}
+}
+
+// scopeOfOrg issues the scope of an organization created by the test.
+func scopeOfOrg(t *testing.T, org identity.OrgID) orgscope.Org {
+	t.Helper()
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		t.Fatalf("scope: %v", err)
+	}
+	return scope
 }

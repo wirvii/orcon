@@ -248,3 +248,14 @@ RETURNING failures;
 UPDATE login_throttle
 SET locked_until_at = sqlc.arg(locked_until_at), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: ResolveUserOrganizations :many
+-- orcon:scope engine
+SELECT org.id, org.slug, org.name
+FROM membership
+JOIN org ON org.id = membership.org_id
+WHERE membership.application_user_id = sqlc.arg(application_user_id)
+  AND membership.status = 'ACTIVE'
+  AND org.status = 'ACTIVE'
+ORDER BY org.name, org.id
+LIMIT sqlc.arg(row_limit);
