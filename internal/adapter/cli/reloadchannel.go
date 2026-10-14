@@ -157,10 +157,13 @@ func randomID() (string, error) {
 }
 
 // liveServers lists the servers whose registration is recent enough.
-func liveServers(dir string, fresh time.Duration) []string {
+func liveServers(dir string, fresh time.Duration) ([]string, error) {
 	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil // no run directory: no server has ever run here
+	}
 	if err != nil {
-		return nil
+		return nil, runDirError(dir, err)
 	}
 	var ids []string
 	for _, e := range entries {
@@ -174,7 +177,16 @@ func liveServers(dir string, fresh time.Duration) []string {
 		}
 	}
 	slices.Sort(ids)
-	return ids
+	return ids, nil
+}
+
+// runDirError explains why the run directory cannot be used and, when it can be found, who owns it:
+// the usual cause is a server that runs as another user.
+func runDirError(dir string, err error) error {
+	if owner := ownerOf(dir); owner != "" {
+		return fmt.Errorf("cannot use %s, which is owned by %s: %w; run this command as %s", dir, owner, err, owner)
+	}
+	return fmt.Errorf("cannot use %s: %w", dir, err)
 }
 
 // RequestReload asks every server that uses dataDir to reload its configuration
@@ -199,7 +211,10 @@ func RequestReload(ctx context.Context, dataDir string, wait, poll time.Duration
 	}
 	defer unlock()
 
-	expected := liveServers(dir, staleServerPolls*ReloadPollInterval)
+	expected, err := liveServers(dir, staleServerPolls*ReloadPollInterval)
+	if err != nil {
+		return nil, err
+	}
 	if len(expected) == 0 {
 		return nil, noServerError(dataDir)
 	}
@@ -251,7 +266,7 @@ func lockReload(ctx context.Context, dir string, timeout, tick <-chan time.Time)
 			if errors.Is(err, fs.ErrNotExist) {
 				return nil, ErrNoServer // there is no run directory, so no server has ever run here
 			}
-			return nil, fmt.Errorf("lock the reload channel: %w", err)
+			return nil, runDirError(dir, err)
 		}
 		if info, serr := os.Stat(path); serr == nil && time.Since(info.ModTime()) > staleLock {
 			_ = os.Remove(path) // left by a command that died
