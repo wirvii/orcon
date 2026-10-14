@@ -4,6 +4,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -17,7 +18,7 @@ import (
 
 func newReal(t *testing.T) *Router {
 	t.Helper()
-	rt, err := New(&Deps{Role: config.RoleAPI})
+	rt, err := New(&Deps{Role: config.RoleAPI, Idempotency: memStore()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestRouterMatchesOpenAPI(t *testing.T) {
 	})
 
 	t.Run("a route that is no operation is refused", func(t *testing.T) {
-		_, err := build(&Deps{Role: config.RoleAPI}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
+		_, err := build(&Deps{Role: config.RoleAPI, Idempotency: memStore()}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
 			fakeHandlers(mux, base, nil)
 			mux.HandleFunc("GET "+base+"/hidden", func(http.ResponseWriter, *http.Request) {})
 		})
@@ -75,7 +76,7 @@ func TestRouterMatchesOpenAPI(t *testing.T) {
 	})
 
 	t.Run("an operation without a route is refused", func(t *testing.T) {
-		_, err := build(&Deps{Role: config.RoleAPI}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
+		_, err := build(&Deps{Role: config.RoleAPI, Idempotency: memStore()}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
 			mux.HandleFunc("GET "+base+"/ping", func(http.ResponseWriter, *http.Request) {})
 		})
 		if err == nil || !strings.Contains(err.Error(), "have no route") {
@@ -169,8 +170,16 @@ func TestUnknownPathsUnderAPIAnswerWithAProblem(t *testing.T) {
 
 func TestNewRefusesRolesThatDoNotServeTheAPI(t *testing.T) {
 	for _, role := range []config.Role{config.RoleScheduler, config.RoleWorker, "bogus"} {
-		if _, err := New(&Deps{Role: role}); err == nil {
+		if _, err := New(&Deps{Role: role, Idempotency: memStore()}); err == nil {
 			t.Errorf("New accepted the role %q", role)
 		}
+	}
+}
+
+// TestNilIdempotencyStoreFailsClosed: the router has no silent in-memory default.
+func TestNilIdempotencyStoreFailsClosed(t *testing.T) {
+	_, err := New(&Deps{Role: config.RoleAPI})
+	if !errors.Is(err, ErrNoIdempotencyStore) {
+		t.Fatalf("New without a store = %v, want ErrNoIdempotencyStore", err)
 	}
 }
