@@ -283,8 +283,8 @@ func TestBoardsUnchanged(t *testing.T) {
 				tr.put(readmePath, []byte("# Brand\n"))
 			},
 			want: []want{
-				{ruleBoards, readmePath, "does not record a sha256 for " + primaryBoard},
-				{ruleBoards, readmePath, "does not record a sha256 for " + secondBoard},
+				{ruleBoards, readmePath, "does not record a sha256 for orcon-board-primary.png"},
+				{ruleBoards, readmePath, "does not record a sha256 for orcon-board-secondary.png"},
 			},
 		},
 		{
@@ -458,8 +458,8 @@ func TestMissingManifestChecksOnlySVGsAndBoards(t *testing.T) {
 				tr.put(readmePath, []byte("# Brand\n"))
 			},
 			want: []want{
-				{ruleBoards, readmePath, "does not record a sha256 for " + primaryBoard},
-				{ruleBoards, readmePath, "does not record a sha256 for " + secondBoard},
+				{ruleBoards, readmePath, "does not record a sha256 for orcon-board-primary.png"},
+				{ruleBoards, readmePath, "does not record a sha256 for orcon-board-secondary.png"},
 			},
 		},
 	}
@@ -546,6 +546,69 @@ func TestMascotRejectsColorManagementChunks(t *testing.T) {
 			tr.put(mascotPath, managed)
 			tr.put(mascotCopy, managed)
 			requireExactly(t, tr.check(), want{ruleMascot, mascotPath, "carries a " + chunk + " chunk"})
+		})
+	}
+}
+
+func TestREADMEDigestMustBelongToTheBoardLine(t *testing.T) {
+	t.Parallel()
+	zeros := strings.Repeat("0", 64)
+	ones := strings.Repeat("1", 64)
+	tests := []struct {
+		name   string
+		readme func(tr *tree, valid string) string
+		want   []want
+	}{
+		{name: "valid README", readme: func(_ *tree, valid string) string { return valid }},
+		{
+			name:   "longer file name with another digest before",
+			readme: func(_ *tree, valid string) string { return "orcon-board-primary.png.bak " + zeros + "\n" + valid },
+		},
+		{
+			name:   "prefixed file name with another digest before",
+			readme: func(_ *tree, valid string) string { return "old-orcon-board-primary.png " + zeros + "\n" + valid },
+		},
+		{
+			name: "digest in upper case",
+			readme: func(tr *tree, valid string) string {
+				return strings.Replace(valid, digest(tr.read(primaryBoard)), strings.ToUpper(digest(tr.read(primaryBoard))), 1)
+			},
+		},
+		{
+			name: "same board recorded twice with different digests",
+			readme: func(_ *tree, valid string) string {
+				return valid + "| Primary | `orcon-board-primary.png` | `" + zeros + "` |\n"
+			},
+			want: []want{{ruleBoards, readmePath, "more than one sha256 on the lines that name orcon-board-primary.png"}},
+		},
+		{
+			name: "two digests on the board line",
+			readme: func(_ *tree, valid string) string {
+				return valid + "orcon-board-secondary.png " + zeros + " " + ones + "\n"
+			},
+			want: []want{{ruleBoards, readmePath, "more than one sha256 on the lines that name orcon-board-secondary.png"}},
+		},
+		{
+			name: "a 65 digit run is not a digest",
+			readme: func(tr *tree, valid string) string {
+				return strings.Replace(valid, digest(tr.read(secondBoard)), "a"+digest(tr.read(secondBoard)), 1)
+			},
+			want: []want{{ruleBoards, readmePath, "does not record a sha256 for orcon-board-secondary.png"}},
+		},
+		{
+			name: "only a longer file name carries the digest",
+			readme: func(tr *tree, _ string) string {
+				return "orcon-board-primary.png.bak " + digest(tr.read(primaryBoard)) + "\norcon-board-secondary.png " + digest(tr.read(secondBoard)) + "\n"
+			},
+			want: []want{{ruleBoards, readmePath, "does not record a sha256 for orcon-board-primary.png"}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tr := goodTree(t)
+			tr.put(readmePath, []byte(tc.readme(tr, string(tr.read(readmePath)))))
+			requireExactly(t, tr.check(), tc.want...)
 		})
 	}
 }

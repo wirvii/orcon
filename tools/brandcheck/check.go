@@ -361,10 +361,10 @@ func checkBoards(root string, boards map[string]Board) []Finding {
 		if readmeErr != nil {
 			continue
 		}
-		line, recorded := recordedDigest(readme, path.Base(b.Path))
+		line, recorded, problem := recordedDigest(readme, path.Base(b.Path))
 		switch {
-		case recorded == "":
-			findings = append(findings, whole(readmePath, ruleBoards, "does not record a sha256 for %s", b.Path))
+		case problem != "":
+			findings = append(findings, Finding{File: readmePath, Line: max(line, 1), Rule: ruleBoards, Detail: problem})
 		case recorded != sum:
 			findings = append(findings, Finding{File: readmePath, Line: line, Rule: ruleBoards,
 				Detail: fmt.Sprintf("records sha256 %s for %s, the file is %s", recorded, b.Path, sum)})
@@ -373,16 +373,32 @@ func checkBoards(root string, boards map[string]Board) []Finding {
 	return findings
 }
 
-// recordedDigest finds the line of the README that names file and carries a
-// SHA-256, and returns its 1-based number and the lower-cased digest.
-func recordedDigest(readme []byte, file string) (line int, digest string) {
+// recordedDigest finds the SHA-256 the README records for file. A line counts
+// only when it names exactly that file (not a longer name that contains it) and
+// the digest must be unique: a line with two different digests, or two lines
+// with different digests, is ambiguous. It returns the 1-based line of the first
+// digest and the digest lower-cased; problem is set when there is none or it is
+// ambiguous.
+func recordedDigest(readme []byte, file string) (line int, sum, problem string) {
+	named := regexp.MustCompile(`(^|[^A-Za-z0-9._-])` + regexp.QuoteMeta(file) + `($|[^A-Za-z0-9._-])`)
+	seen := map[string]bool{}
 	for i, l := range strings.Split(string(readme), "\n") {
-		if !strings.Contains(l, file) {
+		if !named.MatchString(l) {
 			continue
 		}
-		if m := hexDigest.FindString(l); m != "" {
-			return i + 1, strings.ToLower(m)
+		for _, m := range hexDigest.FindAllString(l, -1) {
+			m = strings.ToLower(m)
+			if line == 0 {
+				line, sum = i+1, m
+			}
+			seen[m] = true
 		}
 	}
-	return 0, ""
+	switch {
+	case len(seen) == 0:
+		return 0, "", "does not record a sha256 for " + file
+	case len(seen) > 1:
+		return line, "", "records more than one sha256 on the lines that name " + file
+	}
+	return line, sum, ""
 }
