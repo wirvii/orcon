@@ -14,3 +14,4 @@ This file covers how a connector declares the n8n nodes and credentials it repla
 - **N8-4** Credential types map through `credentials[].n8nTypes`; secrets are never imported.
 - **N8-5** Write operations imported without an inferable contract are `UNSAFE` and flagged for review (ADR-0029 §5).
 - **N8-6** Use n8n public documentation and observed behaviour only; never n8n source, text or images.
+- **N8-7** The n8n resource and operation values map together onto the Orcon `operation` parameter: `parameterMap.operation` is an object whose keys are `<n8n resource>:<n8n operation>` (empty resource part when the n8n node has no resource parameter) and whose values are Orcon operation names; a node that n8n exposes with no operation choice maps with `parameterMap.operation` set to the Orcon operation name. `resource` never appears as a separate entry. A pair that is not in the map, or an expression in either n8n value, is reported and never approximated.
