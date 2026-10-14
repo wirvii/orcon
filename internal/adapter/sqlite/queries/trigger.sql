@@ -156,18 +156,6 @@ SELECT EXISTS (
     AND (a.status = 'ACTIVE' OR a.retired_at > sqlc.arg(retired_after))
 ) AS is_taken;
 
--- name: LockTriggerRoute :exec
--- orcon:scope engine
--- PostgreSQL serializes the claims of one path with an advisory lock. SQLite has one writer that applies
--- every transaction in turn, so there is nothing to take; the query exists to keep the two query sets alike.
-SELECT 1 AS is_locked WHERE sqlc.arg(route_key) <> '';
-
--- name: MarkTriggerRoutesChanged :exec
--- orcon:scope engine
--- PostgreSQL tells the api processes with pg_notify. A SQLite instance has one process, which rebuilds its
--- own route index; the query exists to keep the two query sets alike.
-SELECT 1 AS is_sent WHERE sqlc.arg(payload) <> '';
-
 -- name: AppendTriggerEvent :exec
 -- orcon:scope org
 INSERT INTO trigger_event (id, org_id, occurred_at, flow_id, node_id, type, schema_version, data_document, data_document_format, created_at)

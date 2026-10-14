@@ -603,18 +603,6 @@ func (q *Queries) LockFlowState(ctx context.Context, orgID []byte, iD []byte) (L
 	return i, err
 }
 
-const lockTriggerRoute = `-- name: LockTriggerRoute :exec
-SELECT 1 AS is_locked WHERE ?1 <> ''
-`
-
-// orcon:scope engine
-// PostgreSQL serializes the claims of one path with an advisory lock. SQLite has one writer that applies
-// every transaction in turn, so there is nothing to take; the query exists to keep the two query sets alike.
-func (q *Queries) LockTriggerRoute(ctx context.Context, routeKey interface{}) error {
-	_, err := q.db.ExecContext(ctx, lockTriggerRoute, routeKey)
-	return err
-}
-
 const markFlowDeleted = `-- name: MarkFlowDeleted :execrows
 UPDATE flow
 SET deleted_at = ?1,
@@ -644,18 +632,6 @@ func (q *Queries) MarkFlowDeleted(ctx context.Context, arg MarkFlowDeletedParams
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const markTriggerRoutesChanged = `-- name: MarkTriggerRoutesChanged :exec
-SELECT 1 AS is_sent WHERE ?1 <> ''
-`
-
-// orcon:scope engine
-// PostgreSQL tells the api processes with pg_notify. A SQLite instance has one process, which rebuilds its
-// own route index; the query exists to keep the two query sets alike.
-func (q *Queries) MarkTriggerRoutesChanged(ctx context.Context, payload interface{}) error {
-	_, err := q.db.ExecContext(ctx, markTriggerRoutesChanged, payload)
-	return err
 }
 
 const purgeFlow = `-- name: PurgeFlow :execrows

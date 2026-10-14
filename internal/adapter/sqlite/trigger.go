@@ -315,7 +315,8 @@ func (t *triggerTx) ReplaceAddressMethods(ctx context.Context, address trigger.A
 	return t.insertMethods(ctx, address, methods, now)
 }
 
-// LockRoute has nothing to do: one writer applies every transaction in turn.
+// LockRoute has no SQL on SQLite: one writer applies every transaction in turn,
+// so two claims of a path never interleave. PostgreSQL takes an advisory lock.
 func (t *triggerTx) LockRoute(context.Context, trigger.Scope, string) error { return nil }
 
 func (t *triggerTx) ListRoutes(ctx context.Context, scope trigger.Scope, after trigger.MethodID, limit int) ([]trigger.RoutePage, error) {
@@ -354,7 +355,7 @@ func (t *triggerTx) RouteTakenByOtherOrganization(ctx context.Context, scope tri
 	})
 }
 
-// NotifyRoutesChanged has no channel to signal: the route index of a SQLite
+// NotifyRoutesChanged has no SQL on SQLite and no channel to signal: the route index of a SQLite
 // instance lives in its own process and rebuilds there.
 func (t *triggerTx) NotifyRoutesChanged(context.Context, flow.FlowID) error { return nil }
 
