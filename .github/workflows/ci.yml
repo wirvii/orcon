@@ -55,6 +55,18 @@ jobs:
         with:
           path: .bin
           key: bin-${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('tools/versions.mk', 'go.mod', 'tools/go.mod') }}
+      # The BPMN round trip is validated against the OMG BPMN 2.0 XSD
+      # (SPEC-001 E-FMT-4). The schema files are fetched, checked against pinned
+      # digests and never committed; TestRoundTripXSD fails in this job without them
+      # (ORCON_BPMN_XSD_REQUIRED) and skips in jobs that do not fetch them.
+      - name: Install xmllint
+        run: |
+          command -v xmllint >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq libxml2-utils; }
+      - name: Fetch the BPMN 2.0 schema
+        run: |
+          sh scripts/fetch-bpmn-xsd.sh "$RUNNER_TEMP/bpmn-xsd"
+          echo "ORCON_BPMN_XSD_DIR=$RUNNER_TEMP/bpmn-xsd" >> "$GITHUB_ENV"
+          echo "ORCON_BPMN_XSD_REQUIRED=1" >> "$GITHUB_ENV"
       - run: make check
 
   # provenance keeps AI authorship marks out of the pull request range, its title
