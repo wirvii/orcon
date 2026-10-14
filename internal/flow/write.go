@@ -150,6 +150,12 @@ func (n *Node) value() jsonvalue.Value {
 	b.str("element", string(n.Element))
 	b.str("type", n.Type)
 	b.val("parameters", orEmptyObject(n.Parameters))
+	if n.Connector != nil {
+		var c builder
+		c.str("version", n.Connector.Version)
+		c.str("digest", n.Connector.Digest)
+		b.val("connector", c.build())
+	}
 	b.flag("disabled", n.Disabled)
 	b.val("ext", n.Ext)
 	b.str("routing", string(n.Routing))

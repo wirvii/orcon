@@ -37,3 +37,12 @@ func (i FlowSnapshotID) String() string { return id.UUID(i).String() }
 
 // IsZero reports whether i is the nil identity.
 func (i FlowSnapshotID) IsZero() bool { return id.UUID(i).IsZero() }
+
+// ConnectorReferenceID identifies a row of connector_reference.
+type ConnectorReferenceID id.UUID
+
+// String returns the lowercase hyphenated form.
+func (i ConnectorReferenceID) String() string { return id.UUID(i).String() }
+
+// IsZero reports whether i is the nil identity.
+func (i ConnectorReferenceID) IsZero() bool { return id.UUID(i).IsZero() }

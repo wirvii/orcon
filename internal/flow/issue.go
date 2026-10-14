@@ -41,6 +41,10 @@ const (
 	CodeBlock = "BLOCK"
 	// CodeAttention marks an attention notification that cannot be turned off.
 	CodeAttention = "ATTENTION"
+	// CodeConnector marks a node whose connector pin is out of place (on a type
+	// no package owns) or that level 5 cannot accept: the version is not
+	// installed, not granted, or blocked by the policy.
+	CodeConnector = "CONNECTOR"
 	// CodeV1 is rule V1: every node is reachable from a start event.
 	CodeV1 = "V1"
 	// CodeV2 is rule V2: every cycle has a loop control and back edges target one.

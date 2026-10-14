@@ -41,6 +41,15 @@
       "type": "string",
       "pattern": "^R\\d*/P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
     },
+    "connectorPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "digest"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
     "positiveInteger": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
     "byteCount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "ext": {
@@ -186,6 +195,7 @@
         "element": { "$ref": "#/$defs/element" },
         "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$" },
         "parameters": { "type": "object" },
+        "connector": { "$ref": "#/$defs/connectorPin" },
         "disabled": { "type": "boolean" },
         "ext": { "$ref": "#/$defs/nodeExt" },
         "routing": { "$ref": "#/$defs/routing" },

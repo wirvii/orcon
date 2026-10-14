@@ -18,17 +18,43 @@ func (v *validator) safety() {
 		var nt NodeType
 		known := false
 		if !isFormatType(n.Type) {
-			nt, known = v.cfg.lookup(n.Type)
-			if !known {
-				v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+			var ok bool
+			if nt, ok = v.resolve(base, n); !ok {
 				continue
 			}
+			known = true
 			v.contract(base+"/type", n, nt)
 		}
 		if n.Attention != nil {
 			v.attention(base+"/attention", n, nt, known)
 		}
 	}
+}
+
+// resolve finds the node type of a node. With a catalog that knows connector
+// packages it asks for the pinned version and the selected operation and
+// reports the reasons the pin cannot be used (CodeConnector); otherwise it is
+// the plain lookup. It reports false when the type cannot be used, after
+// recording why.
+func (v *validator) resolve(base string, n *Node) (NodeType, bool) {
+	if v.cfg.resolve == nil {
+		nt, known := v.cfg.lookup(n.Type)
+		if !known {
+			v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+		}
+		return nt, known
+	}
+	res := v.cfg.resolve(n)
+	switch {
+	case !res.Known && len(res.Problems) == 0:
+		v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+	case res.UnknownOperation:
+		v.r.errorf(CodeV10, base+"/parameters/operation", "node %q selects operation %q, which type %q does not have", n.ID, operationOf(n), n.Type)
+	}
+	for _, problem := range res.Problems {
+		v.r.errorf(CodeConnector, base+"/connector", "node %q: %s", n.ID, strings.TrimSpace(problem))
+	}
+	return res.Type, res.Known && !res.UnknownOperation
 }
 
 // contract implements V10 for one node: an effect type must carry a valid

@@ -96,6 +96,44 @@ type CallEdge struct {
 	CreatedAt     pgtype.Timestamptz
 }
 
+type ConnectorGrant struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ConnectorPackageID   pgtype.UUID
+	ProjectID            pgtype.UUID
+	PermissionsDigest    string
+	GrantedByPrincipalID pgtype.UUID
+	GrantedAt            pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type ConnectorPackage struct {
+	ID                     pgtype.UUID
+	ConnectorID            string
+	Version                string
+	Digest                 string
+	Kind                   string
+	ManifestDocument       []byte
+	ManifestDocumentFormat string
+	Status                 string
+	InstalledAt            pgtype.Timestamptz
+	InstalledByPrincipalID pgtype.UUID
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+type ConnectorReference struct {
+	ID               pgtype.UUID
+	OrgID            pgtype.UUID
+	FlowID           pgtype.UUID
+	FlowVersionID    pgtype.UUID
+	ConnectorID      string
+	ConnectorVersion string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type Execution struct {
 	ID                      pgtype.UUID
 	OrgID                   pgtype.UUID

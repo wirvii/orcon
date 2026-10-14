@@ -341,6 +341,10 @@ func (d *decoder) node(o *obj) Node {
 		AttachedTo: NodeID(o.str("attachedTo", false)),
 	}
 	n.CancelActivity = o.optBool("cancelActivity")
+	if c, ok := o.child("connector", false); ok {
+		n.Connector = &ConnectorPin{Version: c.str("version", true), Digest: c.str("digest", true)}
+		c.done()
+	}
 	d.nodeBlocks(o, &n)
 	o.done()
 	return n

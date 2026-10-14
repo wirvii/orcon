@@ -73,8 +73,12 @@ type Node struct {
 	Type string
 	// Parameters is an object; string values starting with "=" are expressions.
 	Parameters jsonvalue.Value
-	Disabled   *bool
-	Ext        jsonvalue.Value
+	// Connector pins the installed connector package the node was built
+	// against (ADR-0034 section 1). It is absent on nodes whose type the
+	// format or the engine defines.
+	Connector *ConnectorPin
+	Disabled  *bool
+	Ext       jsonvalue.Value
 
 	Routing       Routing
 	Join          *Join
@@ -94,6 +98,17 @@ type Node struct {
 	EventDefinition *EventDefinition
 
 	Attention *Attention
+}
+
+// ConnectorPin names the exact connector package a node uses: its version and
+// the digest of the package, so a republished version cannot change a flow
+// that pinned the old one (ADR-0034 section 1). The pin takes part in the
+// content hash.
+type ConnectorPin struct {
+	// Version is the SemVer 2.0 version of the package.
+	Version string
+	// Digest is "sha256:" followed by 64 lowercase hexadecimal digits.
+	Digest string
 }
 
 // IntOrKeyword holds a field that is either a positive integer or one
