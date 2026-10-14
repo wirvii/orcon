@@ -70,8 +70,23 @@ type ProjectStore interface {
 	ListProjects(ctx context.Context, org identity.OrgID, after identity.ProjectID, limit int) ([]ProjectRecord, error)
 }
 
-// Record is a row of flow. Soft delete columns are read here; the delete,
-// restore and purge operations belong to the retention cut (ADR-0077 section 4).
+// ActivationState says whether the automatic triggers of a flow accept events
+// (ADR-0024 section 1). It is separate from publication: publishing creates a
+// version, activating switches the triggers on.
+type ActivationState string
+
+// Activation states, the spelling the API exposes (ADR-0080 section 3).
+const (
+	// ActivationActive means the automatic triggers accept events.
+	ActivationActive ActivationState = "ACTIVE"
+	// ActivationInactive means no automatic trigger accepts events. It is the
+	// state of every new flow.
+	ActivationInactive ActivationState = "INACTIVE"
+)
+
+// Record is a row of flow. Soft delete columns are read here; the operations
+// that delete, restore and purge a flow belong to the trigger area, because
+// they switch the triggers off in the same transaction (ADR-0024 section 8).
 type Record struct {
 	ID            FlowID
 	OrgID         identity.OrgID
@@ -81,6 +96,9 @@ type Record struct {
 	DraftRevision int64
 	// ActiveVersionID is the zero value while nothing is published.
 	ActiveVersionID FlowVersionID
+	// ActivationState is [ActivationInactive] until the flow is activated.
+	// CreateFlow ignores it: a new flow is always inactive.
+	ActivationState ActivationState
 	// DeletedAt is the zero time while the flow is active.
 	DeletedAt time.Time
 	// DeletedByPrincipalID is the zero value unless a principal deleted the flow.
@@ -106,10 +124,12 @@ type Store interface {
 	// identity greater than after, ordered by identity.
 	ListFlows(ctx context.Context, org identity.OrgID, project identity.ProjectID, after FlowID, limit int) ([]Record, error)
 	// UpdateFlowDraft replaces the draft document when the stored revision still
-	// equals expectedRevision, increments the revision and returns it. A
-	// different stored revision fails with [ErrDraftConflict] and changes
-	// nothing.
-	UpdateFlowDraft(ctx context.Context, org identity.OrgID, flow FlowID, draft []byte, expectedRevision int64, now time.Time) (int64, error)
+	// equals expectedRevision, increments the revision and returns it. In the
+	// same transaction it replaces the connector references recorded for the
+	// draft with references (nil clears them), so a retirement never reads
+	// inside a document (ADR-0034 section 6). A different stored revision fails
+	// with [ErrDraftConflict] and changes nothing.
+	UpdateFlowDraft(ctx context.Context, org identity.OrgID, flow FlowID, draft []byte, expectedRevision int64, references []ConnectorReference, now time.Time) (int64, error)
 }
 
 // VersionRecord is a row of flow_version: an immutable published version.
@@ -121,7 +141,10 @@ type VersionRecord struct {
 	Document    []byte
 	ContentHash string
 	// Warnings is nil when publication produced none.
-	Warnings               []byte
+	Warnings []byte
+	// ConnectorReferences are the connector versions the document pins; they
+	// are stored with the version in the same transaction.
+	ConnectorReferences    []ConnectorReference
 	PublishedByPrincipalID identity.PrincipalID
 	PublishedAt            time.Time
 	CreatedAt              time.Time
@@ -129,8 +152,9 @@ type VersionRecord struct {
 
 // VersionStore persists published versions.
 type VersionStore interface {
-	// PublishVersion inserts the version and makes it the flow's active version
-	// in one transaction. A repeated version number fails with [ErrConflict].
+	// PublishVersion inserts the version, records its connector references and
+	// makes it the flow's active version in one transaction. A repeated version
+	// number fails with [ErrConflict].
 	PublishVersion(ctx context.Context, v VersionRecord) error
 	// GetVersion returns a version by identity, or [ErrVersionNotFound].
 	GetVersion(ctx context.Context, org identity.OrgID, version FlowVersionID) (VersionRecord, error)
@@ -140,6 +164,27 @@ type VersionStore interface {
 	// ListVersions returns at most limit versions of the flow with a number
 	// greater than after, ordered by number.
 	ListVersions(ctx context.Context, org identity.OrgID, flow FlowID, after int64, limit int) ([]VersionRecord, error)
+}
+
+// ConnectorReferenceRecord is a row of connector_reference as it is read.
+type ConnectorReferenceRecord struct {
+	ConnectorReference
+	OrgID  identity.OrgID
+	FlowID FlowID
+	// FlowVersionID is the zero value for a reference of the draft.
+	FlowVersionID FlowVersionID
+	CreatedAt     time.Time
+}
+
+// ReferenceStore reads the connector references recorded with drafts and
+// published versions.
+type ReferenceStore interface {
+	// ListDraftConnectorReferences returns at most limit references of the
+	// flow's draft with an identity greater than after, ordered by identity.
+	ListDraftConnectorReferences(ctx context.Context, org identity.OrgID, flow FlowID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
+	// ListVersionConnectorReferences returns at most limit references of a
+	// published version with an identity greater than after, ordered by identity.
+	ListVersionConnectorReferences(ctx context.Context, org identity.OrgID, version FlowVersionID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
 }
 
 // SnapshotRecord is a row of flow_snapshot: the content-addressed document of

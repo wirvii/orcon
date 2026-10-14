@@ -40,5 +40,16 @@ export default defineConfig({
     // license check reads.
     chunkModules(repositoryRoot),
   ],
-  build: { outDir, manifest: true, rollupOptions: { plugins: [thirdParty(outDir, resolve(repositoryRoot, 'packages/js/ui'))] } },
+  build: {
+    outDir,
+    manifest: true,
+    rollupOptions: {
+      plugins: [thirdParty(outDir, resolve(repositoryRoot, 'packages/js/ui'))],
+      output: {
+        // The binary embeds `dist` with go:embed, which leaves out every file whose name starts with "_" or ".".
+        // The router plugin names the chunk of `$flowId.tsx` "_flowId", so a leading "_" is dropped (the hash keeps names unique).
+        chunkFileNames: (chunk) => `assets/${chunk.name.replace(/^[._]+/, '') || 'chunk'}-[hash].js`,
+      },
+    },
+  },
 });

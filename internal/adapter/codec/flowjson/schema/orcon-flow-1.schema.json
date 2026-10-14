@@ -41,6 +41,15 @@
       "type": "string",
       "pattern": "^R\\d*/P(\\d+W|\\d+D(T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))?|T(\\d+H(\\d+M)?(\\d+(\\.\\d+)?S)?|\\d+M(\\d+(\\.\\d+)?S)?|\\d+(\\.\\d+)?S))$"
     },
+    "connectorPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "digest"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
     "positiveInteger": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
     "byteCount": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "ext": {
@@ -93,6 +102,29 @@
     "waitKind": { "enum": ["TIMER", "SIGNAL", "HUMAN"] },
     "edgeKind": { "enum": ["SEQUENCE", "BACK"] },
     "attentionNotify": { "enum": ["DEFAULT", "ON", "OFF"] },
+    "triggerFamily": { "enum": ["WEBHOOK", "APP_EVENT", "SCHEDULE", "POLL", "LISTEN", "INTERNAL"] },
+    "addressFamily": { "enum": ["N8N", "NATIVE"] },
+    "responseProfile": { "enum": ["NATIVE", "N8N"] },
+    "responseMode": { "enum": ["IMMEDIATE", "LAST_NODE", "RESPOND_NODE", "STREAM"] },
+    "dedupeSource": { "enum": ["HEADER", "JSON_PATH", "CONNECTOR"] },
+    "missedPolicy": { "enum": ["SKIP", "CATCH_UP_ONCE"] },
+    "ruleKind": { "enum": ["SECONDS", "MINUTES", "HOURS", "DAYS", "WEEKS", "MONTHS", "CRON"] },
+    "weekday": { "enum": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] },
+    "httpMethod": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"] },
+    "triggerRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/ruleKind" },
+        "every": { "$ref": "#/$defs/positiveInteger" },
+        "at": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+        "weekdays": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/weekday" } },
+        "dayOfMonth": { "type": "integer", "minimum": 1, "maximum": 31 },
+        "cron": { "$ref": "#/$defs/text" }
+      }
+    },
+    "triggerRules": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/triggerRule" } },
     "varScope": { "enum": ["EXECUTION", "ITERATION"] },
     "accumulator": { "enum": ["SUM", "APPEND", "MAX", "MIN"] },
     "element": {
@@ -186,6 +218,7 @@
         "element": { "$ref": "#/$defs/element" },
         "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$" },
         "parameters": { "type": "object" },
+        "connector": { "$ref": "#/$defs/connectorPin" },
         "disabled": { "type": "boolean" },
         "ext": { "$ref": "#/$defs/nodeExt" },
         "routing": { "$ref": "#/$defs/routing" },
@@ -305,6 +338,91 @@
           "additionalProperties": false,
           "required": ["notify"],
           "properties": { "notify": { "$ref": "#/$defs/attentionNotify" } }
+        },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family"],
+          "properties": {
+            "family": { "$ref": "#/$defs/triggerFamily" },
+            "addresses": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["family", "path"],
+                "properties": {
+                  "family": { "$ref": "#/$defs/addressFamily" },
+                  "path": { "$ref": "#/$defs/text" },
+                  "webhookId": { "$ref": "#/$defs/text" },
+                  "suffix": { "$ref": "#/$defs/text" },
+                  "methods": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/httpMethod" } },
+                  "responseProfile": { "$ref": "#/$defs/responseProfile" }
+                }
+              }
+            },
+            "response": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": {
+                "mode": { "$ref": "#/$defs/responseMode" },
+                "waitTimeout": { "$ref": "#/$defs/duration" }
+              }
+            },
+            "dedupe": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source"],
+              "properties": {
+                "source": { "$ref": "#/$defs/dedupeSource" },
+                "name": { "$ref": "#/$defs/text" },
+                "window": { "$ref": "#/$defs/duration" }
+              }
+            },
+            "schedule": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rules"],
+              "properties": {
+                "timeZone": { "$ref": "#/$defs/text" },
+                "rules": { "$ref": "#/$defs/triggerRules" },
+                "missed": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["policy"],
+                  "properties": {
+                    "policy": { "$ref": "#/$defs/missedPolicy" },
+                    "marginHours": { "$ref": "#/$defs/positiveInteger" }
+                  }
+                }
+              }
+            },
+            "poll": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rules"],
+              "properties": { "rules": { "$ref": "#/$defs/triggerRules" } }
+            },
+            "listen": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxInFlight": { "$ref": "#/$defs/positiveInteger" },
+                "hostTag": { "$ref": "#/$defs/text" },
+                "localPath": { "$ref": "#/$defs/text" }
+              }
+            },
+            "registration": { "type": "object", "additionalProperties": false },
+            "inputSchema": { "type": "object" },
+            "callers": {
+              "oneOf": [
+                { "const": "PROJECT" },
+                { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/uuid" } }
+              ]
+            }
+          }
         }
       }
     },

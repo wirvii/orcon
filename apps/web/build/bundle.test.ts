@@ -17,13 +17,19 @@ interface InitialChunks {
   initialJavaScript: (distFolder: string) => string[];
 }
 
+interface EmbedCheck {
+  skippedByEmbed: (distFolder: string) => string[];
+}
+
 interface ChunkCheck {
   leaks: (distFolder: string) => { file: string; module: string }[];
   forbidden: string[];
+  allowed: string[];
 }
 
 const { initialJavaScript } = (await import(pathToFileURL(join(scripts, 'initial-chunks.mjs')).href)) as InitialChunks;
-const { leaks, forbidden } = (await import(pathToFileURL(join(scripts, 'check-initial-chunks.mjs')).href)) as ChunkCheck;
+const { skippedByEmbed } = (await import(pathToFileURL(join(scripts, 'check-embed-names.mjs')).href)) as EmbedCheck;
+const { leaks, forbidden, allowed } = (await import(pathToFileURL(join(scripts, 'check-initial-chunks.mjs')).href)) as ChunkCheck;
 
 interface ManifestChunk {
   file: string;
@@ -70,8 +76,21 @@ describe('initialJavaScript', () => {
 describe('leaks (the editor outside the initial chunks)', () => {
   const chunk = (file: string, modules: string[]): ChunkModules => ({ file, isEntry: false, modules });
 
-  it('names the editor, React Flow, Zustand and Immer', () => {
-    expect(forbidden.join(' ')).toMatch(/@xyflow.*zustand.*immer.*features\/editor/);
+  it('names the editor, React Flow, Zustand, Immer and the layout library, and allows only the route files of the editor', () => {
+    expect(forbidden.join(' ')).toMatch(/@xyflow.*zustand.*immer.*dagrejs.*features\/editor/);
+    expect(allowed).toEqual(['src/features/editor/routes/']);
+  });
+
+  it('lets the route file of the editor, which holds no editor code, be in the initial chunk', () => {
+    const folder = dist(manifest, [chunk('assets/index.js', ['apps/web/src/features/editor/routes/$flowId.tsx', 'apps/web/src/main.tsx'])]);
+    expect(leaks(folder)).toEqual([]);
+  });
+
+  it('still reports what the route file imports', () => {
+    const folder = dist(manifest, [
+      chunk('assets/index.js', ['apps/web/src/features/editor/routes/$flowId.tsx', 'apps/web/src/features/editor/api/queries.ts', 'node_modules/.pnpm/@dagrejs+dagre@3/node_modules/@dagrejs/dagre/dist/dagre.esm.js']),
+    ]);
+    expect(leaks(folder).map((found) => found.module.split('/').slice(-1)[0])).toEqual(['queries.ts', 'dagre.esm.js']);
   });
 
   it('finds none when the editor is only in a lazy chunk', () => {
@@ -94,6 +113,25 @@ describe('leaks (the editor outside the initial chunks)', () => {
       'assets/index.js index.js',
       'assets/vendor.js editor-store.ts',
     ]);
+  });
+});
+
+describe('skippedByEmbed (files the Go binary would not embed)', () => {
+  function build(files: string[]): string {
+    const root = mkdtempSync(join(tmpdir(), 'orcon-embed-'));
+    for (const file of files) {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), '');
+    }
+    return root;
+  }
+
+  it('finds none in an ordinary build, and leaves the folder of the build tool alone', () => {
+    expect(skippedByEmbed(build(['index.html', 'assets/index-abc.js', 'assets/flowId-def.js', '.vite/manifest.json']))).toEqual([]);
+  });
+
+  it('names a script whose name starts with an underscore or a dot, at any depth', () => {
+    expect(skippedByEmbed(build(['index.html', 'assets/_flowId-def.js', 'assets/deep/.hidden.css', '_top.js'])).sort()).toEqual(['_top.js', 'assets/_flowId-def.js', 'assets/deep/.hidden.css']);
   });
 });
 

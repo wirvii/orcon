@@ -76,10 +76,22 @@ func Validate(d *Document) Report {
 // node type must be known to the catalog, and the safety contract of an
 // effect type must be valid (rule V10, ADR-0029 section 5). Types the format
 // itself defines (orcon.loop, orcon.if, orcon.switch) are not looked up.
+//
+// A catalog that also implements [ConnectorNodeTypes] is asked about the
+// package version a connector node pins and the operation it selects: the
+// contract checked is that of the pinned version, and a pin that is not
+// installed, not granted or blocked by policy stops the publication
+// (ADR-0034 section 1).
 func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report {
-	return validate(d, validatorConfig{lookup: func(nodeType string) (NodeType, bool) {
+	cfg := validatorConfig{lookup: func(nodeType string) (NodeType, bool) {
 		return types.Lookup(ctx, nodeType)
-	}})
+	}}
+	if ct, ok := types.(ConnectorNodeTypes); ok {
+		cfg.resolve = func(n *Node) NodeResolution {
+			return ct.ResolveNode(ctx, n.Type, n.Connector, operationOf(n))
+		}
+	}
+	return validate(d, cfg)
 }
 
 // validatorConfig carries what a validation run needs besides the document.
@@ -88,6 +100,9 @@ func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report
 type validatorConfig struct {
 	lookup  func(nodeType string) (NodeType, bool)
 	writers func(*Node) []string
+	// resolve describes a connector node; nil when the catalog does not know
+	// connector packages.
+	resolve func(n *Node) NodeResolution
 }
 
 func validate(d *Document, cfg validatorConfig) Report {
@@ -291,12 +306,16 @@ func (v *validator) node(i int, n *Node) {
 	checkEnum(r, base+"/element", n.Element, Elements())
 	checkPattern(r, base+"/type", "node type", n.Type, typePattern)
 	checkObject(r, base+"/parameters", n.Parameters)
+	v.connectorPin(base, n)
 	checkExt(r, base+"/ext", n.Ext, n)
 	checkOptEnum(r, base+"/onError", n.OnError, OnErrors())
 	v.routingAndLoop(base, n)
 	v.variablesShape(i, n)
 	v.nodeBlocks(base, n)
 	v.waitAndBoundary(base, n)
+	if n.Trigger != nil {
+		v.trigger(base, n)
+	}
 	if n.Attention != nil {
 		checkEnum(r, base+"/attention/notify", n.Attention.Notify, AttentionNotifies())
 	}

@@ -21,3 +21,5 @@ sqlite:UpdateStartedExecution  # SPEC-001 C4a: PostgreSQL starts the execution i
 sqlite:ReleaseTokenLease  # SPEC-001 C4a: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
 sqlite:ClaimLastChanceToken  # SPEC-001 C4a: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
 sqlite:GetOldestLastChance  # SPEC-001 C4a: PostgreSQL reads it from a hand-written method with the engine functions (DA-8)
+postgres:LockTriggerRoute  # SPEC-002 T1: claims of one web path serialize on an advisory lock across organizations; SQLite has a single writer
+postgres:MarkTriggerRoutesChanged  # SPEC-002 T1: pg_notify tells the api processes to rebuild the route index; SQLite has no signal yet (T2 adds the in-process one)

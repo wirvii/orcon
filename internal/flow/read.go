@@ -341,6 +341,10 @@ func (d *decoder) node(o *obj) Node {
 		AttachedTo: NodeID(o.str("attachedTo", false)),
 	}
 	n.CancelActivity = o.optBool("cancelActivity")
+	if c, ok := o.child("connector", false); ok {
+		n.Connector = &ConnectorPin{Version: c.str("version", true), Digest: c.str("digest", true)}
+		c.done()
+	}
 	d.nodeBlocks(o, &n)
 	o.done()
 	return n
@@ -388,6 +392,10 @@ func (d *decoder) nodeBlocks(o *obj, n *Node) {
 	}
 	if c, ok := o.child("eventDefinition", false); ok {
 		n.EventDefinition = d.eventDefinition(c)
+	}
+	if c, ok := o.child("trigger", false); ok {
+		n.Trigger = d.trigger(c)
+		c.done()
 	}
 	if c, ok := o.child("attention", false); ok {
 		n.Attention = &Attention{Notify: AttentionNotify(c.str("notify", true))}

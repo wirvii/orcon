@@ -96,6 +96,44 @@ type CallEdge struct {
 	CreatedAt     int64
 }
 
+type ConnectorGrant struct {
+	ID                   []byte
+	OrgID                []byte
+	ConnectorPackageID   []byte
+	ProjectID            []byte
+	PermissionsDigest    string
+	GrantedByPrincipalID []byte
+	GrantedAt            int64
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
+type ConnectorPackage struct {
+	ID                     []byte
+	ConnectorID            string
+	Version                string
+	Digest                 string
+	Kind                   string
+	ManifestDocument       []byte
+	ManifestDocumentFormat string
+	Status                 string
+	InstalledAt            int64
+	InstalledByPrincipalID []byte
+	CreatedAt              int64
+	UpdatedAt              int64
+}
+
+type ConnectorReference struct {
+	ID               []byte
+	OrgID            []byte
+	FlowID           []byte
+	FlowVersionID    []byte
+	ConnectorID      string
+	ConnectorVersion string
+	CreatedAt        int64
+	UpdatedAt        int64
+}
+
 type Execution struct {
 	ID                        []byte
 	OrgID                     []byte
@@ -187,6 +225,7 @@ type Flow struct {
 	DeletedByPrincipalID []byte
 	CreatedAt            int64
 	UpdatedAt            int64
+	ActivationState      string
 }
 
 type FlowDataOperation struct {
@@ -220,6 +259,22 @@ type FlowSnapshot struct {
 	Document       []byte
 	DocumentFormat string
 	CreatedAt      int64
+}
+
+type FlowTrigger struct {
+	ID                []byte
+	OrgID             []byte
+	FlowID            []byte
+	NodeID            string
+	Family            string
+	Type              string
+	ConfigurationHash string
+	FlowVersionID     []byte
+	Status            string
+	Health            string
+	LastError         sql.NullString
+	CreatedAt         int64
+	UpdatedAt         int64
 }
 
 type FlowVersion struct {
@@ -564,6 +619,45 @@ type TokenInput struct {
 	InlineDocumentFormat string
 	CreatedAt            int64
 	UpdatedAt            int64
+}
+
+type TriggerAddress struct {
+	ID              []byte
+	OrgID           []byte
+	FlowTriggerID   []byte
+	Family          string
+	Scope           string
+	Pattern         string
+	StaticPrefix    string
+	Host            sql.NullString
+	RandomSuffix    sql.NullString
+	ResponseProfile string
+	Status          string
+	RetiredAt       sql.NullInt64
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
+type TriggerAddressMethod struct {
+	ID               []byte
+	OrgID            []byte
+	TriggerAddressID []byte
+	Method           string
+	CreatedAt        int64
+	UpdatedAt        int64
+}
+
+type TriggerEvent struct {
+	ID                 []byte
+	OrgID              []byte
+	OccurredAt         int64
+	FlowID             []byte
+	NodeID             sql.NullString
+	Type               string
+	SchemaVersion      int64
+	DataDocument       []byte
+	DataDocumentFormat string
+	CreatedAt          int64
 }
 
 type TriggerRate struct {
