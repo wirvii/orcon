@@ -31,6 +31,8 @@ func TriggerValidation(t *testing.T, f Factory) {
 		{"T-V3 a trigger that needs a missing credential", missingCredential},
 		{"T-V4 an imported n8n address stays unless the author confirms", importedAddress},
 		{"T-V4 deleting a trigger node that owns an imported address needs the confirmation", importedAddressNodeRemoved},
+		{"T-V4 dropping the trigger block of a node with an imported address needs the confirmation", importedAddressBlockRemoved},
+		{"T-V4 a rollback that drops an imported address needs the confirmation", importedAddressRollback},
 		{"T-V5 a respond node that cannot be reached only warns", unreachableRespondNode},
 		{"T-V6 a local file inside the allowed paths publishes", localFileInside},
 		{"a dry run reports what publication would", dryRun},
@@ -246,6 +248,44 @@ func importedAddressNodeRemoved(t *testing.T, f Factory) {
 	}
 	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
 	must(t, "publish with the confirmation", err)
+}
+
+// importedAddressBlockRemoved checks T-V4 for a draft that keeps the node but
+// drops its trigger block, so the imported address goes with it.
+func importedAddressBlockRemoved(t *testing.T, f Factory) {
+	t.Helper()
+	e := newEnv(t, f, trigger.Settings{})
+	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
+	id := e.newFlow(e.orgA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
+	e.publish(e.orgA, id)
+	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t"}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	issue := validationIssue(t, "drop the trigger block of a node with an imported address", err, trigger.CodeTV4)
+	if !contains(issue.Message, "/legacy-hook") {
+		t.Fatalf("message %q does not name the address", issue.Message)
+	}
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
+	must(t, "publish with the confirmation", err)
+}
+
+// importedAddressRollback checks T-V4 for a rollback to a version that does
+// not have an imported address the live version has.
+func importedAddressRollback(t *testing.T, f Factory) {
+	t.Helper()
+	e := newEnv(t, f, trigger.Settings{})
+	plain := `{"family":"WEBHOOK","addresses":[{"family":"NATIVE","path":"plain"}]}`
+	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
+	id := e.newFlow(e.orgA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: plain}}}))
+	e.publish(e.orgA, id)
+	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
+	e.publish(e.orgA, id)
+	_, err := e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.orgA, Flow: id, By: e.user, ToVersion: 1})
+	issue := validationIssue(t, "roll back to a version without the imported address", err, trigger.CodeTV4)
+	if !contains(issue.Message, "/legacy-hook") {
+		t.Fatalf("message %q does not name the address", issue.Message)
+	}
+	_, err = e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.orgA, Flow: id, By: e.user, ToVersion: 1, AllowImportedAddressChange: true})
+	must(t, "roll back with the confirmation", err)
 }
 
 func unreachableRespondNode(t *testing.T, f Factory) {
