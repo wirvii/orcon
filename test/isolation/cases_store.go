@@ -40,7 +40,14 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	// Organizations of a user (engine plane: membership rows of every organization).
 	"ResolveUserOrganizations":  caseResolveUserOrganizations,
 	"GetUserCredentialsByEmail": caseGetUserCredentialsByEmail,
-	"SetPasswordHash":           caseSetPasswordHash,
+	// Key store (ADR-0042).
+	"MasterCanary":    caseMasterCanary,
+	"PutMasterCanary": caseMasterCanary,
+	"PutKey":          casePutKey,
+	"Key":             caseKey,
+	"ActiveKey":       caseActiveKey,
+	"ActiveKeys":      caseActiveKeys,
+	"SetPasswordHash": caseSetPasswordHash,
 	// Sessions and the sign-in throttle (instance tables).
 	"CreateSession":          caseCreateSession,
 	"GetSession":             caseGetSession,

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/connector"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -39,6 +40,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	identity.SessionStore
 	identity.LoginThrottleStore
 	identity.OrganizationResolver
+	envelope.KeyStore
 	identity.MembershipStore
 	identity.ProjectStore
 	flow.Store

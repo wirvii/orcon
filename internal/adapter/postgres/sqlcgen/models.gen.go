@@ -340,6 +340,26 @@ type InstanceAlert struct {
 	UpdatedAt                       pgtype.Timestamptz
 }
 
+type InstanceKey struct {
+	ID                 int64
+	KeyLevel           string
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type InstanceKeyCanary struct {
+	ID         int64
+	KeyLevel   string
+	KeyVersion int64
+	Probe      []byte
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type JoinArrival struct {
 	ID               pgtype.UUID
 	OrgID            pgtype.UUID
@@ -534,6 +554,18 @@ type Org struct {
 	DeletionScheduledAt pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+}
+
+type OrgKey struct {
+	ID                 int64
+	OrgID              pgtype.UUID
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	Probe              []byte
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 type Outbox struct {
