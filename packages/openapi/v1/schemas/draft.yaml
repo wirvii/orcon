@@ -1,0 +1,196 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+FlowDocument:
+  type: object
+  description: >-
+    A flow document in the orcon/flow@1 format, stored and returned as it is. The canonical JSON Schema
+    is internal/adapter/codec/flowjson/schema/orcon-flow-1.schema.json and the format, its node types
+    and its static rules are described in docs/reference/orcon-flow-1.md. This schema is deliberately
+    open: the server validates every document with that schema and the static rules and answers validation-failed
+    with a JSON Pointer for each problem. A document has at most 2000 nodes and 10000 edges.
+  required:
+    - format
+    - nodes
+    - edges
+  additionalProperties: {}
+  properties:
+    format:
+      type: string
+      description: Identifier and version of the document format.
+      enum:
+        - orcon/flow@1
+      x-orcon-enum-kind: identifier
+    id:
+      type: string
+      format: uuid
+      description: Id of the document, kept across drafts and versions.
+      examples:
+        - 01930000-0000-7000-8000-00000000000a
+    name:
+      type: string
+      description: Name of the flow as written in the document.
+      examples:
+        - Welcome email
+      maxLength: 200
+    nodes:
+      type: array
+      description: 'The nodes of the flow: events, tasks, gateways and calls.'
+      maxItems: 2000
+      items:
+        type: object
+        description: One node of the flow.
+        additionalProperties: {}
+    edges:
+      type: array
+      description: The connections between nodes.
+      maxItems: 10000
+      items:
+        type: object
+        description: One edge of the flow.
+        additionalProperties: {}
+ValidationIssue:
+  type: object
+  description: One finding of the static validation of a flow document (ADR-0007 section 9).
+  required:
+    - severity
+    - code
+    - path
+    - message
+  properties:
+    severity:
+      type: string
+      description: ERROR blocks publication; WARNING is shown and stored with the version.
+      enum:
+        - ERROR
+        - WARNING
+      examples:
+        - ERROR
+    code:
+      type: string
+      description: Name of the rule that found the issue, for example V8 or REFERENCE.
+      examples:
+        - REFERENCE
+      maxLength: 100
+    path:
+      type: string
+      description: JSON Pointer to the offending part of the document.
+      examples:
+        - /edges/1/to/node
+      maxLength: 2048
+    message:
+      type: string
+      description: Explanation for a person.
+      examples:
+        - The edge points at a node that does not exist.
+      maxLength: 1000
+ValidationResult:
+  type: object
+  description: The outcome of validating the draft of a flow.
+  required:
+    - valid
+    - draftRevision
+    - issues
+  properties:
+    valid:
+      type: boolean
+      description: True when there is no issue with severity ERROR, so the draft can be published.
+    draftRevision:
+      type: integer
+      description: Revision of the draft that was validated.
+      examples:
+        - 7
+      minimum: 0
+    issues:
+      type: array
+      description: Every issue found, errors first.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/ValidationIssue
+FlowDraft:
+  type: object
+  description: The editable draft of a flow.
+  required:
+    - flowId
+    - revision
+    - document
+    - updatedAt
+  properties:
+    flowId:
+      type: string
+      format: uuid
+      description: Id of the flow the draft belongs to.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+    revision:
+      type: integer
+      description: Revision number of the draft; it is the value of the ETag.
+      examples:
+        - 7
+      minimum: 0
+    document:
+      $ref: ../openapi.yaml#/components/schemas/FlowDocument
+      description: The flow document.
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the draft last changed, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    updatedBy:
+      type: string
+      format: uuid
+      description: Id of the principal that saved the stored revision; absent when unknown.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+ReplaceDraftRequest:
+  type: object
+  description: The new content of a draft.
+  required:
+    - document
+  additionalProperties: false
+  properties:
+    document:
+      $ref: ../openapi.yaml#/components/schemas/FlowDocument
+      description: The complete flow document that replaces the draft.
+JsonPatchOperation:
+  type: object
+  description: One operation of a JSON Patch (RFC 6902).
+  required:
+    - op
+    - path
+  additionalProperties: false
+  properties:
+    op:
+      type: string
+      description: What to do. A test operation that fails stops the whole patch and changes nothing.
+      enum:
+        - add
+        - remove
+        - replace
+        - move
+        - copy
+        - test
+      examples:
+        - replace
+      x-orcon-enum-kind: identifier
+    path:
+      type: string
+      description: JSON Pointer of the part of the draft document the operation applies to.
+      examples:
+        - /name
+      maxLength: 2048
+    from:
+      type: string
+      description: JSON Pointer of the source, for move and copy.
+      examples:
+        - /nodes/0
+      maxLength: 2048
+    value:
+      description: The value for add, replace and test.
+JsonPatch:
+  type: array
+  description: >-
+    A JSON Patch (RFC 6902) applied to the draft document. Put a test operation first to make the patch
+    depend on a value you read.
+  maxItems: 1000
+  items:
+    $ref: ../openapi.yaml#/components/schemas/JsonPatchOperation

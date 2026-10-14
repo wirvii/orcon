@@ -8,3 +8,28 @@ Every error of the public API is an `application/problem+json` document (RFC 945
 
 | Code | Status | Title | When | Retryable |
 |---|---|---|---|---|
+| <a id="validation-failed"></a>`validation-failed` | 400 | Validation failed | A parameter or the body is invalid. | no |
+| <a id="invalid-page-token"></a>`invalid-page-token` | 400 | Invalid page token | The page token is unknown or was issued for other parameters. | no |
+| <a id="experimental-not-enabled"></a>`experimental-not-enabled` | 400 | Experimental feature not enabled | The operation is experimental and Orcon-Experimental does not name it. | no |
+| <a id="federated-token-rejected"></a>`federated-token-rejected` | 400 | Federated token rejected | The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant. | no |
+| <a id="unauthenticated"></a>`unauthenticated` | 401 | Unauthenticated | No valid credential was sent. | no |
+| <a id="forbidden"></a>`forbidden` | 403 | Forbidden | The caller lacks the required permission. | no |
+| <a id="step-up-required"></a>`step-up-required` | 403 | Step-up required | The operation needs a recent second factor. | no |
+| <a id="personal-keys-disabled"></a>`personal-keys-disabled` | 403 | Personal keys disabled | The organization does not allow personal API keys. | no |
+| <a id="confirmation-required"></a>`confirmation-required` | 403 | Confirmation required | The request was stored as a confirmation that a person must approve before it runs. | no |
+| <a id="not-found"></a>`not-found` | 404 | Not found | The resource does not exist or is not visible to the caller. | no |
+| <a id="method-not-allowed"></a>`method-not-allowed` | 405 | Method not allowed | The path exists but the method is not one of its operations; the Allow header lists the methods that are. | no |
+| <a id="conflict"></a>`conflict` | 409 | Conflict | The resource state does not allow the operation. | no |
+| <a id="idempotency-in-progress"></a>`idempotency-in-progress` | 409 | Idempotent request in progress | A request with the same key is still running. | yes |
+| <a id="secret-already-issued"></a>`secret-already-issued` | 409 | Secret already issued | A replay asked again for a secret that is shown only once. | no |
+| <a id="attention-already-resolved"></a>`attention-already-resolved` | 409 | Attention already resolved | The human-attention item was already handled. | no |
+| <a id="project-managed-by-git"></a>`project-managed-by-git` | 409 | Project managed by Git | The project is bound to a Git repository so its flows change only through a Git sync. | no |
+| <a id="deprecated-removed"></a>`deprecated-removed` | 410 | Removed | The operation was removed after its sunset date. | no |
+| <a id="precondition-failed"></a>`precondition-failed` | 412 | Precondition failed | If-Match does not match the current ETag. | no |
+| <a id="payload-too-large"></a>`payload-too-large` | 413 | Payload too large | The body exceeds the size limit. | no |
+| <a id="unsupported-media-type"></a>`unsupported-media-type` | 415 | Unsupported media type | The body is not in a media type the operation accepts. | no |
+| <a id="idempotency-key-reused"></a>`idempotency-key-reused` | 422 | Idempotency key reused | The key was used with a different request. | no |
+| <a id="precondition-required"></a>`precondition-required` | 428 | Precondition required | If-Match is missing. | no |
+| <a id="rate-limited"></a>`rate-limited` | 429 | Rate limited | The rate class quota is exhausted. | yes |
+| <a id="internal-error"></a>`internal-error` | 500 | Internal error | An unexpected server error happened. | yes |
+| <a id="service-unavailable"></a>`service-unavailable` | 503 | Service unavailable | The server is starting, stopping or overloaded. | yes |

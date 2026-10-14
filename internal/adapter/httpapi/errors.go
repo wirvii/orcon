@@ -8,11 +8,15 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 )
+
+// unavailableRetry is the Retry-After of an operation that has no handler yet.
+const unavailableRetry = 30 * time.Second
 
 type operationKey struct{}
 
@@ -61,6 +65,10 @@ func (h errorHandler) request(w http.ResponseWriter, r *http.Request, err error)
 // in the table of area errors yet, so it is an internal error: logged once
 // with the request id, never shown to the client (API-4.1).
 func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, errUnavailable) {
+		problem.Write(w, r, problem.ServiceUnavailable, problem.RetryAfter(unavailableRetry))
+		return
+	}
 	h.logger.ErrorContext(r.Context(), "request failed",
 		"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
 	problem.Write(w, r, problem.InternalError)

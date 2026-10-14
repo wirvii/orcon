@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+post:
+  operationId: createTestSession
+  summary: Open a test session for a flow draft
+  description: >-
+    Opens a short window in which the test addresses of the draft are live, so you can send a real event
+    and watch the execution it starts. The session ends when its time or event limit is reached, or when
+    you cancel it; a second session on the same address conflicts. Request body limit: 1 MiB.
+  tags:
+    - testing
+  x-orcon-permission: flow:execute
+  x-orcon-rate-class: run
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: test_session.opened
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - payload-too-large
+    - unsupported-media-type
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows test-sessions create
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: openShortSession
+      scenario: flow-with-valid-draft
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        body: openShortSession
+      response:
+        status: 201
+        body: openShortSession
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/CreateTestSessionRequest
+        examples:
+          openShortSession:
+            summary: A two minute session for one event
+            value:
+              expiresInSeconds: 120
+              maximumEventCount: 1
+  responses:
+    '201':
+      description: The opened session.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        Location:
+          $ref: ../openapi.yaml#/components/headers/Location
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/TestSession
+          examples:
+            openShortSession:
+              summary: An active session
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                status: ACTIVE
+                draftRevision: 1
+                eventCount: 0
+                maximumEventCount: 1
+                addresses: []
+                createdAt: '2026-10-12T15:04:05Z'
+                expiresAt: '2026-10-12T15:06:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

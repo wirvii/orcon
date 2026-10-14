@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExecutionId
+post:
+  operationId: cancelExecution
+  summary: Cancel an execution
+  description: >-
+    Asks the engine to stop an execution that has not finished. The execution moves to CANCELING and then
+    CANCELED once running steps have stopped; steps that already sent an external request are not undone.
+  tags:
+    - executions
+  x-orcon-permission: execution:cancel
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: execution.cancelled
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: executions cancel
+  x-orcon-mcp:
+    level: write
+    tool: cancel_execution
+    description: Cancel a running or waiting execution.
+  x-orcon-examples:
+    - name: cancelWaitingExecution
+      scenario: execution-waiting
+      request:
+        pathParams:
+          executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+      response:
+        status: 200
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  responses:
+    '200':
+      description: The execution after the cancel request.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Execution
+          examples:
+            cancelWaitingExecution:
+              summary: The execution is being canceled
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                flowVersion: 1
+                mode: MANUAL
+                status: CANCELING
+                createdAt: '2026-10-12T15:04:05Z'
+                startedAt: '2026-10-12T15:04:05Z'
+                dataHidden: false
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

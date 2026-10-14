@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: view
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExecutionId
+get:
+  operationId: listExecutionData
+  summary: List the data of an execution
+  description: >-
+    Returns the items each node received and produced, one entry per node execution and port, one page
+    at a time. It needs the permission to read execution data; every read is audited.
+  tags:
+    - executions
+  x-orcon-permission: execution:read-data
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: execution.data_viewed
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: executions data
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: dataOfFinishedExecution
+      scenario: execution-succeeded
+      request:
+        pathParams:
+          executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+      response:
+        status: 200
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+  responses:
+    '200':
+      description: One page of data entries.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/ExecutionDataList
+          examples:
+            dataOfFinishedExecution:
+              summary: The output of the greeting node
+              value:
+                items:
+                  - nodeExecutionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+                    nodeId: greeting
+                    side: OUTPUT
+                    port: main
+                    itemCount: 1
+                    dataItems:
+                      - {}
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
