@@ -167,3 +167,14 @@ type ProjectStore interface {
 	// identity greater than after, ordered by identity (keyset pagination).
 	ListProjects(ctx context.Context, org orgscope.Org, after ProjectID, limit int) ([]ProjectRecord, error)
 }
+
+// OrganizationResolver lists the organizations a user belongs to through an active
+// membership of an active organization (SPEC-004 R-ID-02, R-ID-03). Membership rows
+// belong to many organizations, so the read crosses them in the engine plane.
+type OrganizationResolver interface {
+	// ResolveUserOrganizations returns at most limit organizations of the user, ordered
+	// by name and then id. The adapters cap limit at [MaxResolvedOrganizations].
+	//
+	//orcon:scope engine membership rows of every organization are read for one user (SPEC-004 section 7-3)
+	ResolveUserOrganizations(ctx context.Context, user UserID, limit int) ([]OrganizationChoice, error)
+}

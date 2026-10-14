@@ -34,9 +34,11 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"GetSystemPrincipal": caseGetSystemPrincipal,
 	"DeletePrincipal":    caseDeletePrincipal,
 	// Users (instance table).
-	"CreateUser":                caseCreateUser,
-	"GetUser":                   caseGetUser,
-	"GetUserByEmail":            caseGetUserByEmail,
+	"CreateUser":     caseCreateUser,
+	"GetUser":        caseGetUser,
+	"GetUserByEmail": caseGetUserByEmail,
+	// Organizations of a user (engine plane: membership rows of every organization).
+	"ResolveUserOrganizations":  caseResolveUserOrganizations,
 	"GetUserCredentialsByEmail": caseGetUserCredentialsByEmail,
 	"SetPasswordHash":           caseSetPasswordHash,
 	// Sessions and the sign-in throttle (instance tables).
@@ -565,4 +567,25 @@ func errText(err error) string {
 		return ""
 	}
 	return fmt.Sprint(err)
+}
+
+// ---------------------------------------------------------------- organizations of a user
+
+// caseResolveUserOrganizations (SPEC-004 R-ID-02, section 7-3): a user lists only the
+// organizations of its active memberships, and a suspended membership leaves the list.
+func caseResolveUserOrganizations(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	got, err := env.Stores.ResolveUserOrganizations(ctx, env.A.User.ID, identity.MaxResolvedOrganizations)
+	if err != nil || len(got) != 1 || got[0].ID != env.A.Record.ID {
+		tb.Fatalf("organizations of the user of A = %+v, %v; want only A", got, err)
+	}
+	noLeak(tb, "the organizations of a user", got, err, &env.B)
+
+	if err := env.Stores.UpdateMembershipStatus(ctx, env.B.Scope, env.B.Membership.ID, identity.MembershipSuspended, time.Now().UTC()); err != nil {
+		tb.Fatalf("suspend the membership of B: %v", err)
+	}
+	got, err = env.Stores.ResolveUserOrganizations(ctx, env.B.User.ID, identity.MaxResolvedOrganizations)
+	if err != nil || len(got) != 0 {
+		tb.Fatalf("organizations of a user whose only membership is suspended = %+v, %v; want none", got, err)
+	}
 }
