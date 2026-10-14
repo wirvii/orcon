@@ -30,7 +30,10 @@
     "test:expansion": "vitest run --project expansion",
     "test:visual": "pnpm build-storybook && playwright test -c visual/playwright.config.ts",
     "test:visual:docker": "pnpm build-storybook && sh visual/run-docker.sh",
-    "test:virtual": "vitest run --project virtual"
+    "test:virtual": "vitest run --project virtual",
+    "test:brand": "playwright test -c test/brand/playwright.config.ts",
+    "brand:render": "node scripts/brand-render.mjs",
+    "brand:review-shots": "node scripts/brand-review-shots.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.0",

@@ -27,6 +27,11 @@ The product owner re-uploaded these two original boards during the brand review 
 - Midnight navy: **#0F172A**
 - Slate: **#64748B**
 
+### Brand gradient highlight (sixth color)
+- Light lime: **#84EB72**, measured on the primary board at the top-left of the symbol, where the artwork is lighter than the labelled palette.
+
+The product owner decided on 2026-10-14 that the vector symbol reproduces the board's gradient. Light lime is therefore used **only** as the first stop of the symbol gradient (`brand/logo/orcon-symbol.svg`, the app icon, the lockups and the favicons derived from them). It is not a UI color, has no design token, and never appears behind or as text.
+
 This palette takes precedence over earlier speculative palettes. The approved board also uses white/light neutral surfaces. The second board has a different exploratory palette; prefer the primary board as the color reference until a final token review.
 
 ## Approved visual characteristics

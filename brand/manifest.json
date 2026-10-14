@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "boards": {
+    "primary": {
+      "path": "brand/reference/orcon-board-primary.png",
+      "sha256": "feeacfa2842751b97df1a740154eed577f7a19521ac4e246af552a1f97c4b8e7"
+    },
+    "secondary": {
+      "path": "brand/reference/orcon-board-secondary.png",
+      "sha256": "94ac8627cb6fa828e1e4dbba3e0162b41ce2276125a0b366794774fe209f8767"
+    }
+  },
+  "assets": [
+    {
+      "path": "brand/logo/orcon-symbol.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          76,
+          62,
+          196,
+          213
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "symbol",
+          "region": [
+            76,
+            62,
+            196,
+            213
+          ],
+          "mask": "brand-hue",
+          "iou_min": 0.95
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-app-icon.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          69,
+          349,
+          182,
+          171
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "app icon",
+          "region": [
+            69,
+            349,
+            182,
+            171
+          ],
+          "mask": "tile",
+          "iou_min": 0.95
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-wordmark-on-dark.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          306,
+          106,
+          427,
+          102
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "wordmark on dark",
+          "region": [
+            306,
+            106,
+            427,
+            102
+          ],
+          "mask": "light-on-dark",
+          "iou_min": 0.93
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-wordmark-on-light.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          285,
+          378,
+          285,
+          76
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "wordmark on light",
+          "region": [
+            285,
+            378,
+            285,
+            76
+          ],
+          "mask": "dark-on-light",
+          "iou_min": 0.93
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-lockup-on-dark.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          76,
+          62,
+          657,
+          213
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "lockup on dark",
+          "region": [
+            76,
+            62,
+            657,
+            213
+          ],
+          "mask": "light-on-dark",
+          "iou_min": 0.93
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-lockup-on-light.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          69,
+          349,
+          499,
+          171
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "lockup on light",
+          "region": [
+            69,
+            349,
+            499,
+            171
+          ],
+          "mask": "tile",
+          "iou_min": 0.93
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-lockup-descriptor-on-dark.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          76,
+          62,
+          657,
+          213
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "descriptor lockup on dark",
+          "region": [
+            76,
+            62,
+            657,
+            213
+          ],
+          "mask": "light-on-dark",
+          "iou_min": 0.9
+        },
+        {
+          "name": "descriptor on dark",
+          "region": [
+            314,
+            226,
+            417,
+            18
+          ],
+          "mask": "light-on-dark",
+          "iou_min": 0.85
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/logo/orcon-lockup-descriptor-on-light.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          69,
+          349,
+          567,
+          171
+        ]
+      },
+      "fidelity": [
+        {
+          "name": "descriptor lockup on light",
+          "region": [
+            69,
+            349,
+            567,
+            171
+          ],
+          "mask": "tile",
+          "iou_min": 0.9
+        },
+        {
+          "name": "descriptor on light",
+          "region": [
+            293,
+            462,
+            342,
+            16
+          ],
+          "mask": "dark-on-light",
+          "iou_min": 0.85
+        }
+      ],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          71,
+          352,
+          178,
+          166
+        ]
+      },
+      "fidelity": [],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon-16.svg",
+      "kind": "svg",
+      "source": {
+        "board": "primary",
+        "region": [
+          71,
+          352,
+          178,
+          166
+        ]
+      },
+      "fidelity": [],
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon-16.png",
+      "kind": "png",
+      "from": "brand/icon/favicon-16.svg",
+      "width": 16,
+      "height": 16,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon-32.png",
+      "kind": "png",
+      "from": "brand/icon/favicon.svg",
+      "width": 32,
+      "height": 32,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon-48.png",
+      "kind": "png",
+      "from": "brand/icon/favicon.svg",
+      "width": 48,
+      "height": 48,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/icon-192.png",
+      "kind": "png",
+      "from": "brand/icon/favicon.svg",
+      "width": 192,
+      "height": 192,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/icon-512.png",
+      "kind": "png",
+      "from": "brand/icon/favicon.svg",
+      "width": 512,
+      "height": 512,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/apple-touch-icon.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-symbol.svg",
+      "width": 180,
+      "height": 180,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-symbol-256.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-symbol.svg",
+      "width": 256,
+      "height": 256,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-symbol-512.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-symbol.svg",
+      "width": 512,
+      "height": 512,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-symbol-1024.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-symbol.svg",
+      "width": 1024,
+      "height": 1024,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-lockup-on-dark@2x.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-lockup-on-dark.svg",
+      "width": 1314,
+      "height": 426,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-lockup-on-light@2x.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-lockup-on-light.svg",
+      "width": 998,
+      "height": 342,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-lockup-descriptor-on-dark@2x.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-lockup-descriptor-on-dark.svg",
+      "width": 1314,
+      "height": 426,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/png/orcon-lockup-descriptor-on-light@2x.png",
+      "kind": "png",
+      "from": "brand/logo/orcon-lockup-descriptor-on-light.svg",
+      "width": 1134,
+      "height": 342,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/icon/favicon.ico",
+      "kind": "ico",
+      "entries": [
+        16,
+        32,
+        48
+      ],
+      "from": "brand/icon/favicon-16.svg",
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/mascot/mascot-headshot.png",
+      "kind": "mascot",
+      "source": {
+        "board": "primary",
+        "region": [
+          908,
+          742,
+          196,
+          204
+        ]
+      },
+      "max_bytes": 204800,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/mascot/mascot-happy.png",
+      "kind": "mascot",
+      "source": {
+        "board": "primary",
+        "region": [
+          1118,
+          742,
+          193,
+          204
+        ]
+      },
+      "max_bytes": 204800,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/mascot/mascot-thinking.png",
+      "kind": "mascot",
+      "source": {
+        "board": "primary",
+        "region": [
+          1325,
+          742,
+          196,
+          204
+        ]
+      },
+      "max_bytes": 204800,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    },
+    {
+      "path": "brand/mascot/mascot-crossed-arms.png",
+      "kind": "mascot",
+      "source": {
+        "board": "primary",
+        "region": [
+          0,
+          650,
+          412,
+          374
+        ]
+      },
+      "max_bytes": 204800,
+      "copies": [],
+      "approval": {
+        "status": "approved",
+        "by": "owner",
+        "date": "2026-10-14",
+        "note": "PC1/PC2 approved; gradient with the light lime highlight (decision A)"
+      }
+    }
+  ]
+}
