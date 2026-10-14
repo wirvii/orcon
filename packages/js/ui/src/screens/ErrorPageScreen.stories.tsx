@@ -17,8 +17,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   play: async ({ canvasElement }) => {
-    // An error never shows the mascot, and the request number is there to report.
-    await expect(canvasElement.querySelector('[data-mascot-pose]')).toBeNull();
+    // The full-page error screen shows the thinking mascot, and the request number is there to report.
+    await expect(canvasElement.querySelector('[data-mascot-pose="thinking"]')).not.toBeNull();
     await expect(within(canvasElement).getByText(/req_5b21c9e0/)).toBeVisible();
   },
 };

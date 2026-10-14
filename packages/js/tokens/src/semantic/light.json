@@ -20,6 +20,13 @@
       "$value": "{color.slate.900}"
     }
   },
+  "mascot": {
+    "$type": "color",
+    "panel": {
+      "$value": "{color.green.100}",
+      "$description": "Soft green rounded box behind the mascot in the light theme."
+    }
+  },
   "fg": {
     "$type": "color",
     "default": {

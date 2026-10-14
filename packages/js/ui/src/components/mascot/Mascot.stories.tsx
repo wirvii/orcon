@@ -11,7 +11,12 @@ const meta = {
   title: 'Components/Mascot',
   component: Mascot,
   parameters: {
-    docs: { description: { component: 'Neutral placeholder until the production mascot artwork is approved.' } },
+    docs: {
+      description: {
+        component:
+          'The approved cut-outs of the primary brand board on a soft rounded panel, light and dark theme. Decorative and lazy-loaded; allowed contexts only.',
+      },
+    },
   },
 } satisfies Meta<typeof Mascot>;
 
@@ -19,19 +24,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = { args: { pose: 'welcome' } };
+export const Welcome: Story = { args: { pose: 'welcome' } };
+export const Happy: Story = { args: { pose: 'happy' } };
 export const Thinking: Story = { args: { pose: 'thinking' } };
-export const ThumbsUp: Story = { args: { pose: 'thumbs-up' } };
-export const Explorer: Story = { args: { pose: 'explorer' } };
 
 export const Matrix: Story = {
   render: () => (
     <MatrixTable
-      caption="Mascot poses (placeholder frame)"
-      columns={['welcome', 'thinking', 'thumbs-up', 'explorer']}
+      caption="Mascot poses"
+      columns={['welcome', 'happy', 'thinking']}
       rows={[
         {
-          label: 'placeholder',
-          cells: (['welcome', 'thinking', 'thumbs-up', 'explorer'] as const).map((pose) => <Mascot key={pose} pose={pose} />),
+          label: 'approved cut-out',
+          cells: (['welcome', 'happy', 'thinking'] as const).map((pose) => <Mascot key={pose} pose={pose} />),
         },
       ]}
     />

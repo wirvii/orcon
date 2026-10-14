@@ -16,6 +16,7 @@ import { routes } from './src/app/routes';
 const here = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(here, '../..');
 const outDir = resolve(here, 'dist');
+const brandAssetsInlineLimit = (file: string) => (/[\\/]assets[\\/](brand|mascot)[\\/]/.test(file) ? false : undefined);
 
 // The build is embedded in the Go binary and served from its root, so asset paths stay absolute.
 // The router plugin must come before the React plugin: it generates the committed route tree
@@ -43,6 +44,9 @@ export default defineConfig({
   build: {
     outDir,
     manifest: true,
+    // Brand art is emitted as files, never inlined as data: URIs in the JavaScript, so a strict
+    // Content-Security-Policy (img-src 'self') works. Anything else keeps Vite's default limit (4 kB).
+    assetsInlineLimit: brandAssetsInlineLimit,
     rollupOptions: {
       plugins: [thirdParty(outDir, resolve(repositoryRoot, 'packages/js/ui'))],
       output: {

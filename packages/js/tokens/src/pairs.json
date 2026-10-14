@@ -4,6 +4,7 @@
     {"fg": "fg.default", "bg": "surface.default", "kind": "text", "min": 4.5},
     {"fg": "fg.default", "bg": "surface.raised", "kind": "text", "min": 4.5},
     {"fg": "fg.default", "bg": "surface.sunken", "kind": "text", "min": 4.5},
+    {"fg": "fg.default", "bg": "mascot.panel", "kind": "text", "min": 4.5},
     {"fg": "fg.muted", "bg": "bg.app", "kind": "text", "min": 4.5},
     {"fg": "fg.muted", "bg": "surface.default", "kind": "text", "min": 4.5},
     {"fg": "fg.muted", "bg": "surface.raised", "kind": "text", "min": 4.5},

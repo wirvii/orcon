@@ -12,6 +12,11 @@ const config: StorybookConfig = {
   viteFinal: (viteConfig) => ({
     ...viteConfig,
     plugins: [...(viteConfig.plugins ?? []), tailwindcss()],
+    // Brand art stays a file, never a data: URI (same rule as the app build).
+    build: {
+      ...viteConfig.build,
+      assetsInlineLimit: (file: string) => (/[\\/]assets[\\/](brand|mascot)[\\/]/.test(file) ? false : undefined),
+    },
   }),
 };
 

@@ -28,7 +28,7 @@ export function NotFound() {
   const intl = useIntl();
   return (
     <div className="mx-auto flex max-w-screen-md flex-col items-center gap-4 py-8 text-center">
-      <Mascot pose="explorer" />
+      <Mascot pose="thinking" />
       <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
       <p className="text-fg-muted max-w-screen-sm wrap-anywhere">{intl.formatMessage(messages.text)}</p>
       <Button asChild>

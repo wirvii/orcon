@@ -137,7 +137,7 @@ export function FlowListScreen({ flows = fixtureFlows, status = 'ready', now = F
         <EmptyState
           title={intl.formatMessage(messages.emptyTitle)}
           description={intl.formatMessage(messages.emptyText)}
-          mascot={<Mascot pose="thinking" />}
+          mascot={<Mascot pose="happy" />}
           action={create}
         />
       ) : (

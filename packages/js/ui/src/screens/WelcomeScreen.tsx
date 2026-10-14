@@ -53,7 +53,7 @@ export interface WelcomeScreenProps {
 
 /**
  * The first-run welcome without the shell, for an app that provides its own frame.
- * The mascot placeholder is allowed here (welcome and onboarding), and the page says
+ * The welcome mascot (crossed arms) is allowed here (welcome and onboarding), and the page says
  * what to do next.
  */
 export function WelcomeContent({ onCreateFlow, docsHref = '#docs' }: WelcomeScreenProps) {
