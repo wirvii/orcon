@@ -4,7 +4,7 @@
 
 # API operation index
 
-Generated from the API contract: 34 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
+Generated from the API contract: 38 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
 
 ## Operations
 
@@ -35,6 +35,7 @@ Generated from the API contract: 34 operations and 0 event types. The reference 
 | GET | `/api/v1/flows/{flowId}/versions` | `listFlowVersions` | List the versions of a flow | stable | `flow:read` | `orcon flows versions` | none |
 | GET | `/api/v1/flows/{flowId}/versions/{version}` | `getFlowVersion` | Get one version of a flow | stable | `flow:read` | `orcon flows version` | none |
 | POST | `/api/v1/human-tasks/{humanTaskId}/complete` | `completeHumanTask` | Complete a human task | stable | `human-task:resolve` | `orcon human-tasks complete` | none |
+| GET | `/api/v1/orgs` | `listOrgs` | List the organizations of the signed-in user | stable | `authenticated` | `orcon orgs list` | none |
 | GET | `/api/v1/orgs/{orgId}/projects` | `listProjects` | List the projects of an organization | stable | `org:read` | `orcon projects list` | `list_projects` (read) |
 | POST | `/api/v1/orgs/{orgId}/projects` | `createProject` | Create a project in an organization | stable | `project:create` | `orcon projects create` | none |
 | DELETE | `/api/v1/projects/{projectId}` | `deleteProject` | Delete a project | stable | `project:delete` | `orcon projects delete` | none |
@@ -44,6 +45,9 @@ Generated from the API contract: 34 operations and 0 event types. The reference 
 | GET | `/api/v1/projects/{projectId}/flows` | `listFlows` | List the flows of a project | stable | `flow:read` | `orcon flows list` | `search_flows` (read) |
 | POST | `/api/v1/projects/{projectId}/flows` | `createFlow` | Create a flow in a project | stable | `flow:create` | `orcon flows create` | `create_flow` (write) |
 | GET | `/api/v1/projects/{projectId}/node-types` | `listNodeTypes` | List the node types a project can use | stable | `project:read` | `orcon node-types list` | `list_node_types` (read) |
+| GET | `/api/v1/users/me` | `getCurrentUser` | Get the signed-in user | stable | `authenticated` | `orcon users whoami` | none |
+| POST | `/api/v1/users/me/sessions` | `createSession` | Sign in with an email and a password | stable | `anonymous` | none (interactive-session-only) | none |
+| POST | `/api/v1/users/me/sessions/{sessionId}/revoke` | `revokeSession` | Sign out of the current browser session | stable | `authenticated` | none (interactive-session-only) | none |
 
 ## Events
 

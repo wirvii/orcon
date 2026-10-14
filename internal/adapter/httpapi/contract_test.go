@@ -206,6 +206,10 @@ var coreOperations = []struct {
 	{"resolveExternalOperation", "POST", "/external-operations/{externalOperationId}/resolve", "execution:resolve", "write", "optional", ""},
 	{"completeHumanTask", "POST", "/human-tasks/{humanTaskId}/complete", "human-task:resolve", "write", "optional", ""},
 	{"listNodeTypes", "GET", "/projects/{projectId}/node-types", "project:read", "read", "", "list_node_types"},
+	{"createSession", "POST", "/users/me/sessions", "anonymous", "write", "optional", ""},
+	{"revokeSession", "POST", "/users/me/sessions/{sessionId}/revoke", "authenticated", "write", "optional", ""},
+	{"getCurrentUser", "GET", "/users/me", "authenticated", "read", "", ""},
+	{"listOrgs", "GET", "/orgs", "authenticated", "read", "", ""},
 }
 
 // TestCoreOperationsDeclared: the contract declares exactly the operations of
@@ -233,8 +237,8 @@ func TestCoreOperationsDeclared(t *testing.T) {
 		if op.Method != want.method || op.Path != want.path {
 			t.Errorf("%s is %s %s, want %s %s", want.id, op.Method, op.Path, want.method, want.path)
 		}
-		if len(op.Requirement.Permissions) != 1 || string(op.Requirement.Permissions[0]) != want.permission {
-			t.Errorf("%s permission = %v, want %s", want.id, op.Requirement.Permissions, want.permission)
+		if !requirementIs(op.Requirement, want.permission) {
+			t.Errorf("%s permission = %+v, want %s", want.id, op.Requirement, want.permission)
 		}
 		if string(op.Class) != want.class {
 			t.Errorf("%s rate class = %s, want %s", want.id, op.Class, want.class)

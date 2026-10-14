@@ -54,8 +54,8 @@ get:
         enum:
           - name
           - -name
-          - createdAt
-          - -createdAt
+          - updatedAt
+          - -updatedAt
         x-orcon-enum-kind: identifier
         default: name
     - name: q
@@ -76,6 +76,15 @@ get:
         maxLength: 100
         examples:
           - prod
+    - name: handle
+      in: query
+      required: false
+      description: Return only the project with this handle (exact match); a URL resolves a project this way.
+      schema:
+        type: string
+        maxLength: 201
+        examples:
+          - onboarding
   responses:
     '200':
       description: One page of projects.
@@ -142,6 +151,7 @@ post:
   x-orcon-problems:
     - validation-failed
     - unauthenticated
+    - csrf-check-failed
     - forbidden
     - not-found
     - conflict

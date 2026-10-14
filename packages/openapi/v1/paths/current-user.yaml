@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: singleton
+get:
+  operationId: getCurrentUser
+  summary: Get the signed-in user
+  description: >-
+    Returns the user of the session the request carries, with that session. It never returns the password
+    hash or the session token.
+  tags:
+    - session
+  x-orcon-permission: authenticated
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - unauthenticated
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: users whoami
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: currentUser
+      scenario: signed-in-user
+      request: {}
+      response:
+        status: 200
+        body: currentUser
+  responses:
+    '200':
+      description: The signed-in user and the current session.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/CurrentUser
+          examples:
+            currentUser:
+              summary: A signed-in user
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a81
+                email: ana@example.com
+                displayName: Ana Torres
+                currentSession:
+                  id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                  createdAt: '2026-10-14T15:04:05Z'
+                  expiresAt: '2026-11-13T15:04:05Z'
+                  idleExpiresAt: '2026-10-14T23:04:05Z'
+                  assuranceLevel: AAL1
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+get:
+  operationId: listOrgs
+  summary: List the organizations of the signed-in user
+  description: >-
+    Returns the active organizations the signed-in user belongs to, ordered by name and then id, one page
+    at a time. At most 1000 organizations are read per user: a user with more sees the first 1000 by name.
+    Use the slug filter to resolve an organization from a URL.
+  tags:
+    - organizations
+  x-orcon-permission: authenticated
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: orgs list
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: firstPageOfOrgs
+      scenario: user-with-organizations
+      request:
+        query:
+          limit: 50
+      response:
+        status: 200
+        body: firstPageOfOrgs
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+    - name: slug
+      in: query
+      required: false
+      description: Return only the organization with this slug (exact match).
+      schema:
+        type: string
+        maxLength: 100
+        examples:
+          - acme
+  responses:
+    '200':
+      description: One page of organizations.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/OrganizationList
+          examples:
+            firstPageOfOrgs:
+              summary: Two organizations
+              value:
+                items:
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+                    slug: acme
+                    name: Acme
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a72
+                    slug: wirvii
+                    name: Wirvii
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
