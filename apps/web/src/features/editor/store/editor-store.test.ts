@@ -74,7 +74,7 @@ describe('the editor store: what actions return', () => {
     expect(store.getState().renameNode('webhook', 'Order received')).toEqual({ references: 1 });
     expect(store.getState().addNote({ x: 0, y: 0 })).toBe('note-2');
     expect(store.getState().removeNodes(['done'])).toEqual(['done']);
-    expect(store.getState().duplicate(['slack'])).toEqual({ nodeIds: ['slack-1'], noteIds: [] });
+    expect(store.getState().duplicate(['slack'])).toEqual({ nodeIds: ['slack-1'], noteIds: [], droppedEdges: 0, placeholders: 0 });
   });
 });
 

@@ -73,6 +73,16 @@ export const editorMessages = defineMessages({
   noticeTooLarge: { id: 'editor.notice.tooLarge', defaultMessage: 'That is too large to paste. The limit is 2 MiB.', description: 'Shown when the pasted text is bigger than the editor accepts.' },
   noticeInvalidFragment: { id: 'editor.notice.invalidFragment', defaultMessage: 'The pasted nodes are not valid, so nothing was added.', description: 'Shown when pasted text claims to be a set of Orcon nodes but is malformed.' },
   noticeFragmentTooBig: { id: 'editor.notice.fragmentTooBig', defaultMessage: 'That is too many nodes to paste at once. The limit is {max}.', description: 'Shown when a paste would add more nodes than allowed. {max} is the limit.' },
+  noticeDroppedEdges: {
+    id: 'editor.notice.droppedEdges',
+    defaultMessage: '{count, plural, one {# connection was not pasted because it breaks the connection rules} other {# connections were not pasted because they break the connection rules}}',
+    description: 'Shown after a paste when some connections of the pasted text would close a cycle, enter a trigger or repeat another one. {count} is how many.',
+  },
+  noticePlaceholders: {
+    id: 'editor.notice.placeholders',
+    defaultMessage: '{count, plural, one {# node has a type this editor does not know: it was added disabled and cannot run} other {# nodes have a type this editor does not know: they were added disabled and cannot run}}',
+    description: 'Shown after a paste when nodes of the pasted text have an unknown type. {count} is how many.',
+  },
   noticeN8n: {
     id: 'editor.notice.n8n',
     defaultMessage: 'This looks like an n8n workflow. It is converted on the server, which this preview does not reach yet.',

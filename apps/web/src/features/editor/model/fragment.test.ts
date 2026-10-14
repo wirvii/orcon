@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { detectClipboardFormat, FLOW_FRAGMENT_FORMAT } from './clipboard-format';
 import { exampleFlowDocument } from './example-flow';
 import { editorBlock } from './flow-document';
-import { buildFragment, flowFragmentSchema, fragmentSize, pasteFragment } from './fragment';
+import { buildFragment, COORDINATE_LIMIT, flowFragmentSchema, fragmentSize, pasteFragment } from './fragment';
 
 describe('telling what was pasted', () => {
   it('knows an Orcon fragment by its tag', () => {
@@ -69,7 +69,7 @@ describe('pasting', () => {
     const fragment = buildFragment(document, new Set(['inventory', 'slack', 'note-1']));
     const result = pasteFragment(document, fragment, { at: { x: 1003, y: 421 } });
 
-    expect(result).toEqual({ nodeIds: ['inventory-1', 'slack-1'], noteIds: ['note-2'] });
+    expect(result).toEqual({ nodeIds: ['inventory-1', 'slack-1'], noteIds: ['note-2'], droppedEdges: 0, placeholders: 0 });
     expect(document.nodes.slice(-2).map((node) => [node.id, node.name])).toEqual([
       ['inventory-1', 'HTTP Request 2'],
       ['slack-1', 'Slack 2'],
@@ -118,8 +118,73 @@ describe('pasting', () => {
     const document = exampleFlowDocument();
     document.editor = {};
     const result = pasteFragment(document, flowFragmentSchema.parse({ format: FLOW_FRAGMENT_FORMAT, nodes: [], edges: [], editor: {} }), { at: { x: 40, y: 40 } });
-    expect(result).toEqual({ nodeIds: [], noteIds: [] });
+    expect(result).toEqual({ nodeIds: [], noteIds: [], droppedEdges: 0, placeholders: 0 });
     expect(editorBlock(document)).toEqual({ nodes: {}, stickyNotes: [] });
+  });
+
+  describe('a fragment is untrusted text: it passes the rules of a connection made by hand', () => {
+    const node = (id: string, type: string, element = 'task') => ({ id, name: id.toUpperCase(), element, type, parameters: {} });
+    const edge = (id: string, from: string, to: string, port = 'main') => ({ id, from: { node: from, port }, to: { node: to }, kind: 'SEQUENCE' });
+    const fragmentOf = (nodes: unknown[], edges: unknown[], editor: unknown = {}) => flowFragmentSchema.parse({ format: FLOW_FRAGMENT_FORMAT, nodes, edges, editor });
+
+    it('drops a connection that closes a cycle and says how many', () => {
+      const document = exampleFlowDocument();
+      const result = pasteFragment(document, fragmentOf([node('a', 'orcon.http@1'), node('b', 'orcon.http@1')], [edge('1', 'a', 'b'), edge('2', 'b', 'a')]), { at: { x: 0, y: 0 } });
+      expect(result.droppedEdges).toBe(1);
+      expect(document.edges.slice(5).map((added) => [added.from.node, added.to.node, added.kind])).toEqual([['a-1', 'b-1', 'SEQUENCE']]);
+    });
+
+    it('keeps a cycle that goes back into a loop node, as a back edge', () => {
+      const document = exampleFlowDocument();
+      const result = pasteFragment(document, fragmentOf([node('l', 'orcon.loop@1'), node('b', 'orcon.http@1')], [edge('1', 'l', 'b', 'loop'), edge('2', 'b', 'l')]), { at: { x: 0, y: 0 } });
+      expect(result.droppedEdges).toBe(0);
+      expect(document.edges.at(-1)).toMatchObject({ kind: 'BACK' });
+    });
+
+    it('drops a connection into a trigger, a connection to itself and a duplicate', () => {
+      const document = exampleFlowDocument();
+      const result = pasteFragment(
+        document,
+        fragmentOf([node('a', 'orcon.http@1'), node('t', 'orcon.start@1', 'startEvent'), node('b', 'orcon.http@1')], [edge('1', 'a', 't'), edge('2', 'a', 'a'), edge('3', 'a', 'b'), edge('4', 'a', 'b')]),
+        { at: { x: 0, y: 0 } },
+      );
+      expect(result.droppedEdges).toBe(3);
+      expect(document.edges).toHaveLength(6);
+    });
+
+    it('adds a node of a type this editor does not know as the disabled placeholder, keeping the original type', () => {
+      const document = exampleFlowDocument();
+      const result = pasteFragment(document, fragmentOf([node('e', 'evil.unknown@9'), node('k', 'orcon.http@1')], []), { at: { x: 0, y: 0 } });
+      expect(result.placeholders).toBe(1);
+      expect(document.nodes.find((added) => added.id === 'e-1')).toMatchObject({ type: 'orcon.unsupported@1', disabled: true, ext: { 'orcon.import': { originalType: 'evil.unknown@9' } } });
+      expect(document.nodes.find((added) => added.id === 'k-1')?.type).toBe('orcon.http@1');
+    });
+
+    it('keeps a type the flow already uses', () => {
+      const document = exampleFlowDocument();
+      document.nodes.push({ id: 'z', name: 'Z', element: 'task', type: 'acme.custom@1', parameters: {} });
+      expect(pasteFragment(document, fragmentOf([node('c', 'acme.custom@1')], []), { at: { x: 0, y: 0 } }).placeholders).toBe(0);
+    });
+
+    it('snaps positions to the grid and keeps them within reach, however far the fragment says', () => {
+      const document = exampleFlowDocument();
+      pasteFragment(
+        document,
+        fragmentOf([node('a', 'orcon.http@1'), node('b', 'orcon.http@1')], [], {
+          nodes: { a: { x: 1e9, y: 3.7 }, b: { x: -1e12, y: 5e8 } },
+          stickyNotes: [{ id: 'n', x: 1e15, y: 7, w: 1e9, h: 80, color: 1, body: '' }],
+        }),
+        { offset: { x: 33, y: 47 } },
+      );
+      const positions = [document.editor.nodes?.['a-1'], document.editor.nodes?.['b-1'], document.editor.stickyNotes?.at(-1)];
+      for (const at of positions) {
+        expect(Math.abs(at?.x ?? Infinity)).toBeLessThanOrEqual(COORDINATE_LIMIT);
+        expect(Math.abs(at?.y ?? Infinity)).toBeLessThanOrEqual(COORDINATE_LIMIT);
+        expect(Math.abs(at?.x ?? 1) % 20).toBe(0);
+        expect(Math.abs(at?.y ?? 1) % 20).toBe(0);
+      }
+      expect(document.editor.stickyNotes?.at(-1)?.w).toBe(5000);
+    });
   });
 
   it('refuses a malformed fragment', () => {

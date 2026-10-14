@@ -111,7 +111,13 @@ export function useEditorCommands(deps: CommandDeps): EditorCommands {
       const result = api.getState().paste(parsed.data, { at: canvas()?.anchorPoint() ?? { x: 0, y: 0 } });
       const first = result.nodeIds[0] ?? result.noteIds[0];
       if (first) canvas()?.focusSoon(first);
-      tell('info', say(editorMessages.noticePasted, { count: result.nodeIds.length + result.noteIds.length }));
+      // One notice says everything: what was added and what was left out or changed.
+      const sentences = [
+        say(editorMessages.noticePasted, { count: result.nodeIds.length + result.noteIds.length }),
+        ...(result.droppedEdges > 0 ? [say(editorMessages.noticeDroppedEdges, { count: result.droppedEdges })] : []),
+        ...(result.placeholders > 0 ? [say(editorMessages.noticePlaceholders, { count: result.placeholders })] : []),
+      ];
+      tell(sentences.length > 1 ? 'warning' : 'info', sentences.join('. '));
     };
 
     const duplicate = () => {

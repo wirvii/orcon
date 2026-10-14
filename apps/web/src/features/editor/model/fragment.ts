@@ -4,9 +4,11 @@
 import { z } from 'zod';
 
 import { fallbackPositions, snap } from './canvas-graph';
+import { edgeKindFor, edgeProblem } from './document-ops';
 import { FLOW_FRAGMENT_FORMAT } from './clipboard-format';
 import { deepCopy, editorBlock, editorSchema, flowEdgeSchema, flowNodeSchema, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowNode, type Point, type StickyNote } from './flow-document';
 import { namesOf, uniqueName } from './names';
+import { NODE_TYPES, UNSUPPORTED_TYPE } from './node-types';
 
 /**
  * `orcon/flow-fragment@1`: the text the editor copies (SPEC-014 R-ED-CLIP-01). Selected nodes with
@@ -66,7 +68,18 @@ export interface PasteOptions {
 export interface PasteResult {
   nodeIds: string[];
   noteIds: string[];
+  /** Connections of the fragment that were not added because they break the connection rules. */
+  droppedEdges: number;
+  /** Nodes of a type this editor does not know: they were added as the inert placeholder, disabled. */
+  placeholders: number;
 }
+
+/** Coordinates of pasted items stay within this distance of the origin: a hand-written fragment cannot put a node out of reach. */
+export const COORDINATE_LIMIT = 100_000;
+/** The largest width or height a pasted sticky note keeps. */
+const MAX_NOTE_SIDE = 5_000;
+
+const bound = (value: number): number => Math.min(COORDINATE_LIMIT, Math.max(-COORDINATE_LIMIT, value));
 
 /** The ids a fragment brings: its nodes and its sticky notes. */
 export const fragmentSize = (fragment: FlowFragment): number => fragment.nodes.length + (fragment.editor.stickyNotes?.length ?? 0);
@@ -79,9 +92,11 @@ export function pasteFragment(document: FlowDocument, fragment: FlowFragment, op
   const taken = takenIds(document);
   const names = namesOf(document);
   const editor = editorBlock(document);
-  const sourcePositions = fragment.editor.nodes ?? {};
-  const notes = fragment.editor.stickyNotes ?? [];
+  // A fragment is text from anywhere: positions are bounded before anything is computed from them.
+  const sourcePositions = Object.fromEntries(Object.entries(fragment.editor.nodes ?? {}).map(([id, at]) => [id, { x: bound(at.x), y: bound(at.y) }]));
+  const notes = (fragment.editor.stickyNotes ?? []).map((note) => ({ ...note, x: bound(note.x), y: bound(note.y), w: Math.min(note.w, MAX_NOTE_SIDE), h: Math.min(note.h, MAX_NOTE_SIDE) }));
   const origins = [...fragment.nodes.map((node) => sourcePositions[node.id] ?? { x: 0, y: 0 }), ...notes.map((note) => ({ x: note.x, y: note.y }))];
+  const known = new Set([...NODE_TYPES.map((def) => def.type), ...document.nodes.map((node) => node.type), UNSUPPORTED_TYPE]);
   const left = origins.length === 0 ? 0 : Math.min(...origins.map((point) => point.x));
   const top = origins.length === 0 ? 0 : Math.min(...origins.map((point) => point.y));
   const delta: Point = options.at ? { x: snap(options.at.x) - left, y: snap(options.at.y) - top } : (options.offset ?? { x: 40, y: 40 });
@@ -95,25 +110,39 @@ export function pasteFragment(document: FlowDocument, fragment: FlowFragment, op
   const remap = (value: unknown): unknown => (typeof value === 'string' ? (idMap.get(value) ?? value) : value);
 
   const nodeIds: string[] = [];
+  let placeholders = 0;
   for (const source of fragment.nodes) {
     const node: FlowNode = deepCopy(source);
+    if (!known.has(node.type)) {
+      // Unknown types become the inert placeholder (SPEC-014 OQ1), which keeps what it was.
+      node['ext'] = { ...(typeof node['ext'] === 'object' && node['ext'] !== null ? node['ext'] : {}), 'orcon.import': { originalType: node.type, reason: 'unknown node type' } };
+      node.type = UNSUPPORTED_TYPE;
+      node.disabled = true;
+      placeholders += 1;
+    }
     node.id = idMap.get(source.id) ?? source.id;
     node.name = uniqueName(source.name, names);
     names.add(node.name);
     if ('attachedTo' in node) node['attachedTo'] = remap(node['attachedTo']);
     document.nodes.push(node);
     const at = sourcePositions[source.id] ?? { x: 0, y: 0 };
-    editor.nodes[node.id] = { x: at.x + delta.x, y: at.y + delta.y };
+    editor.nodes[node.id] = { x: bound(snap(at.x + delta.x)), y: bound(snap(at.y + delta.y)) };
     nodeIds.push(node.id);
   }
 
+  let droppedEdges = 0;
   for (const source of fragment.edges) {
     const from = idMap.get(source.from.node);
     const to = idMap.get(source.to.node);
     if (!from || !to) continue;
+    // The rules of a connection made by hand: nothing into a trigger, no cycle but a back edge into a loop node, no duplicate.
+    if (edgeProblem(document, from, source.from.port, to) !== undefined) {
+      droppedEdges += 1;
+      continue;
+    }
     const id = nextId('edge', taken);
     taken.add(id);
-    const edge: FlowEdge = { ...deepCopy(source), id, from: { ...source.from, node: from }, to: { ...source.to, node: to } };
+    const edge: FlowEdge = { ...deepCopy(source), id, from: { ...source.from, node: from }, to: { ...source.to, node: to }, kind: edgeKindFor(document, from, to) };
     document.edges.push(edge);
   }
 
@@ -121,9 +150,9 @@ export function pasteFragment(document: FlowDocument, fragment: FlowFragment, op
   for (const source of notes) {
     const id = nextId('note', taken);
     taken.add(id);
-    const note: StickyNote = { ...source, id, x: source.x + delta.x, y: source.y + delta.y };
+    const note: StickyNote = { ...source, id, x: bound(snap(source.x + delta.x)), y: bound(snap(source.y + delta.y)) };
     editor.stickyNotes.push(note);
     noteIds.push(id);
   }
-  return { nodeIds, noteIds };
+  return { nodeIds, noteIds, droppedEdges, placeholders };
 }

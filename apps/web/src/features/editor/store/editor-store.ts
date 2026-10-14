@@ -210,7 +210,7 @@ export function createEditorStore(initial: EditorInit): EditorStore {
         const { value } = commit('paste', (draft) => pasteFragment(draft, fragment, options), {
           selection: (result) => (result ? [...result.nodeIds, ...result.noteIds] : []),
         });
-        return value ?? { nodeIds: [], noteIds: [] };
+        return value ?? { nodeIds: [], noteIds: [], droppedEdges: 0, placeholders: 0 };
       },
 
       duplicate: (ids) => get().paste(buildFragment(get().document, new Set(ids)), { offset: { x: 40, y: 40 } }),

@@ -390,6 +390,27 @@ describe('the editor screen', () => {
       expect(screen.getByRole('region', { name: 'Flow canvas: 6 nodes' })).toBeVisible();
     });
 
+    it('pastes a hand-written fragment under the rules of a connection and says what it left out', async () => {
+      renderEditor();
+      await opened();
+      const node = (id: string, type: string) => ({ id, name: id, element: 'task', type, parameters: {} });
+      const text = JSON.stringify({
+        format: 'orcon/flow-fragment@1',
+        nodes: [node('a', 'orcon.http@1'), node('b', 'orcon.http@1'), node('x', 'evil.unknown@9')],
+        edges: [
+          { id: '1', from: { node: 'a', port: 'main' }, to: { node: 'b' }, kind: 'SEQUENCE' },
+          { id: '2', from: { node: 'b', port: 'main' }, to: { node: 'a' }, kind: 'SEQUENCE' },
+        ],
+        editor: { nodes: { a: { x: 1e9, y: 0 } } },
+      });
+      fireEvent.paste(canvasNode(/^Slack,/), { clipboardData: { getData: () => text, setData: vi.fn() } });
+      expect(
+        await screen.findByText(
+          'Pasted 3 items. 1 connection was not pasted because it breaks the connection rules. 1 node has a type this editor does not know: it was added disabled and cannot run',
+        ),
+      ).toBeVisible();
+    });
+
     it('leaves copy, cut and paste alone inside a text field', async () => {
       renderEditor();
       await opened();
