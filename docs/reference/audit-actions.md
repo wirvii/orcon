@@ -47,6 +47,7 @@ Action names have the form `category.action`. Annex B writes several related act
 | `org.created\|suspended\|resumed\|deletion_scheduled\|deleted\|crypto_shredded` |  |  |
 | `project.created\|updated\|deleted` |  | Includes a change of the project identifier. |
 | `member.invited\|joined\|removed\|suspended\|role_changed` |  |  |
+| `user.created` | Source (`LOCAL_COMMAND` until an instance user administration operation exists) | Instance audit log; actor `SYSTEM` for local commands. |
 | `group.created\|deleted\|member_added\|member_removed` |  |  |
 | `service_account.created\|deleted\|token_rotated` |  |  |
 | `domain.verified\|removed` |  |  |
