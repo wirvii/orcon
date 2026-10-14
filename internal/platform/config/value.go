@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"math"
 	"net"
@@ -40,6 +41,12 @@ func (v Value) String() string {
 	}
 	return v.plain()
 }
+
+// GoString keeps a secret out of %#v. Format below already covers every verb; this is for callers that use the interface directly.
+func (v Value) GoString() string { return v.String() }
+
+// Format writes String for every verb, so no fmt verb can reach a secret held in the unexported fields.
+func (v Value) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, v.String()) }
 
 func (v Value) plain() string {
 	switch {

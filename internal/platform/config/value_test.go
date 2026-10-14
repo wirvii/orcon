@@ -4,6 +4,8 @@
 package config_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/platform/config"
@@ -50,5 +52,39 @@ func TestSourceStrings(t *testing.T) {
 	}
 	if config.SeverityError.String() != "ERROR" || config.SeverityWarning.String() != "WARN" {
 		t.Error("severity labels changed")
+	}
+}
+
+func TestValueAndEntryNeverPrintASecret(t *testing.T) {
+	t.Parallel()
+
+	const plain = "hunter2-the-secret"
+	res := load(t, input{environ: baseEnv("ORCON_MASTER_KEY", "aHVudGVyMi10aGUtc2VjcmV0", "ORCON_OBSERVABILITY_OTLP_HEADERS", "Authorization="+plain)})
+	for _, path := range []string{"keys.master.key", "observability.otlp.headers"} {
+		v := res.Config.Value(path)
+		var entry config.Entry
+		for _, e := range res.Config.Entries() {
+			if e.Key.Path == path {
+				entry = e
+			}
+		}
+		for name, got := range map[string]string{
+			"Value %v":   fmt.Sprintf("%v", v),
+			"Value %+v":  fmt.Sprintf("%+v", v),
+			"Value %#v":  fmt.Sprintf("%#v", v),
+			"Value %s":   fmt.Sprintf("%s", v), //nolint:perfsprint,gocritic // the verb is what is under test
+			"Value %x":   fmt.Sprintf("%x", v),
+			"Value %d":   fmt.Sprintf("%d", v),
+			"Entry %v":   fmt.Sprintf("%v", entry),
+			"Entry %+v":  fmt.Sprintf("%+v", entry),
+			"Entry %#v":  fmt.Sprintf("%#v", entry),
+			"Entry ptr":  fmt.Sprintf("%#v", &entry),
+			"Config %#v": fmt.Sprintf("%#v", res.Config),
+			"Config %+v": fmt.Sprintf("%+v", res.Config),
+		} {
+			if strings.Contains(got, plain) || strings.Contains(got, "aHVudGVyMi10aGUtc2VjcmV0") {
+				t.Errorf("%s of %s leaks the secret: %q", name, path, got)
+			}
+		}
 	}
 }
