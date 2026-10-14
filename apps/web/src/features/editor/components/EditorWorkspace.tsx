@@ -98,6 +98,33 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
     return undefined;
   }, [dialogOpen]);
 
+  // Opening the outline from the keyboard (O, the command palette) moves focus into it, so a screen reader reads it; Escape closes it and gives focus back.
+  const outlineRef = useRef<HTMLElement>(null);
+  const focusOutline = useRef(false);
+  const beforeOutline = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (outlineOpen && focusOutline.current) {
+      focusOutline.current = false;
+      outlineRef.current?.focus();
+    }
+  }, [outlineOpen]);
+  const closeOutline = () => {
+    setOutlineOpen(false);
+    const back = beforeOutline.current;
+    requestAnimationFrame(() => {
+      (back?.isConnected ? back : canvas.current?.region())?.focus({ preventScroll: true });
+    });
+  };
+  const toggleOutlineFromKeyboard = () => {
+    if (outlineOpen) {
+      closeOutline();
+      return;
+    }
+    beforeOutline.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    focusOutline.current = true;
+    setOutlineOpen(true);
+  };
+
   const commands = useEditorCommands({
     canvas,
     openFind: () => {
@@ -109,9 +136,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
     openCommands: () => {
       setCommandsOpen(true);
     },
-    toggleOutline: () => {
-      setOutlineOpen((open) => !open);
-    },
+    toggleOutline: toggleOutlineFromKeyboard,
     save: saveNow,
   });
 
@@ -137,7 +162,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
       { id: 'save', label: intl.formatMessage(editorMessages.saveNow), group: edit, shortcut: keys('save'), onSelect: saveNow },
       { id: 'find', label: intl.formatMessage(editorMessages.find), group: view, shortcut: keys('find'), onSelect: () => { setFindOpen(true); } },
       { id: 'fit', label: intl.formatMessage(editorMessages.cmdFit), group: view, shortcut: ['1'], onSelect: () => canvas.current?.fit() },
-      { id: 'outline', label: intl.formatMessage(editorMessages.showOutline), group: view, shortcut: keys('outline'), onSelect: () => { setOutlineOpen((open) => !open); } },
+      { id: 'outline', label: intl.formatMessage(editorMessages.showOutline), group: view, shortcut: keys('outline'), onSelect: () => { commands.run('outline'); } },
       { id: 'shortcuts', label: intl.formatMessage(editorMessages.shortcuts), group: view, shortcut: keys('shortcuts'), onSelect: () => { setShortcutsOpen(true); } },
     ];
   }, [commands, intl, platform, saveNow]);
@@ -261,7 +286,17 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
         <EditorCanvas ref={canvas} />
         <NoticeBar />
         {outlineOpen ? (
-          <aside aria-label={intl.formatMessage(editorMessages.outlineTitle)} className="border-border bg-surface min-h-0 overflow-y-auto border-t p-3 lg:w-canvas-palette-w lg:shrink-0 lg:border-s lg:border-t-0">
+          <aside
+            ref={outlineRef}
+            tabIndex={-1}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                closeOutline();
+              }
+            }}
+            aria-label={intl.formatMessage(editorMessages.outlineTitle)}
+            className="border-border bg-surface min-h-0 overflow-y-auto border-t p-3 lg:w-canvas-palette-w lg:shrink-0 lg:border-s lg:border-t-0">
             <EditorOutline
               editable={editable}
               onFocusNode={(id) => canvas.current?.focusSoon(id)}

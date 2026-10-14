@@ -239,6 +239,40 @@ test.describe('on a computer', () => {
     expect(fragment).toMatchObject({ format: 'orcon/flow-fragment@1', nodes: [{ id: 'validate', type: 'orcon.if@1' }], edges: [] });
   });
 
+  test('O moves focus into the outline, and Escape gives it back to the node', async ({ page }) => {
+    await openEditor(page);
+    await node(page, 'slack').focus();
+    await page.keyboard.press('o');
+    await expect(page.getByRole('complementary', { name: 'Flow outline' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('complementary', { name: 'Flow outline' })).toHaveCount(0);
+    await expect(node(page, 'slack')).toBeFocused();
+  });
+
+  test('the toolbar is one tab stop and the arrow keys move between its buttons', async ({ page }) => {
+    await openEditor(page);
+    const toolbar = page.getByRole('toolbar', { name: 'Flow editor tools' });
+    // Undo and Redo are disabled, so the stops are the buttons that can be used.
+    expect(await toolbar.locator('button[tabindex="0"]').count()).toBe(1);
+    await toolbar.getByRole('button', { name: 'Add node', exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(toolbar.getByRole('button', { name: 'Add sticky note', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    // Undo and Redo are disabled and skipped.
+    await expect(toolbar.getByRole('button', { name: 'Tidy up', exact: true })).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(toolbar.getByRole('button', { name: 'Keyboard shortcuts', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(toolbar.getByRole('button', { name: 'Add node', exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await expect(toolbar.getByRole('button', { name: 'Keyboard shortcuts', exact: true })).toBeFocused();
+    // The button that had focus last is the tab stop.
+    expect(await toolbar.locator('button[tabindex="0"]').count()).toBe(1);
+    await expect(toolbar.locator('button[tabindex="0"]')).toHaveAccessibleName('Keyboard shortcuts');
+    await page.keyboard.press('Tab');
+    expect(await toolbar.evaluate((element) => element.contains(document.activeElement))).toBe(false);
+  });
+
   test('finds a node by name, lists the shortcuts and refuses what comes in a later release', async ({ page }) => {
     await openEditor(page);
     await node(page, 'webhook').focus();
