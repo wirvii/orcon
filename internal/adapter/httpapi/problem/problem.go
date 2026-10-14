@@ -138,17 +138,23 @@ type Problem struct {
 	// the stored confirmation and when it lapses.
 	ConfirmationID *string `json:"confirmationId,omitempty"`
 	ExpiresAt      *string `json:"expiresAt,omitempty"`
+	// CurrentDraftRevision and UpdatedBy are extension members of the 412 of a
+	// draft: the revision stored now and the principal that saved it.
+	CurrentDraftRevision *int    `json:"currentDraftRevision,omitempty"`
+	UpdatedBy            *string `json:"updatedBy,omitempty"`
 }
 
 // Option adjusts one problem response.
 type Option func(*response)
 
 type response struct {
-	detail       string
-	fields       []FieldError
-	header       http.Header
-	confirmation *string
-	expiresAt    *string
+	detail        string
+	fields        []FieldError
+	header        http.Header
+	confirmation  *string
+	expiresAt     *string
+	draftRevision *int
+	updatedBy     string
 }
 
 // Detail sets the explanation of this occurrence. It must never contain secret
@@ -166,6 +172,15 @@ func Confirmation(id string, expiresAt time.Time) Option {
 	return func(r *response) {
 		stamp := expiresAt.UTC().Format(time.RFC3339)
 		r.confirmation, r.expiresAt = &id, &stamp
+	}
+}
+
+// CurrentDraft adds the extension members of the 412 of a draft: the revision
+// stored now and the id of the principal that saved it.
+func CurrentDraft(revision int, updatedBy string) Option {
+	return func(r *response) {
+		r.draftRevision = &revision
+		r.updatedBy = updatedBy
 	}
 }
 
@@ -203,8 +218,12 @@ func New(w http.ResponseWriter, r *http.Request, code Code, opts ...Option) (Pro
 		RequestID: w.Header().Get(RequestIDHeader),
 		Errors:    resp.fields,
 
-		ConfirmationID: resp.confirmation,
-		ExpiresAt:      resp.expiresAt,
+		ConfirmationID:       resp.confirmation,
+		ExpiresAt:            resp.expiresAt,
+		CurrentDraftRevision: resp.draftRevision,
+	}
+	if resp.updatedBy != "" {
+		p.UpdatedBy = &resp.updatedBy
 	}
 	if r != nil && r.URL != nil {
 		p.Instance = r.URL.Path

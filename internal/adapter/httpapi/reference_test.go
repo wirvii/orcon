@@ -31,7 +31,7 @@ func siteFS() fs.FS {
 
 func apiWithSite(t *testing.T, role config.Role) *Router {
 	t.Helper()
-	rt, err := New(&Deps{Role: role, Reference: siteFS()})
+	rt, err := New(&Deps{Role: role, Reference: siteFS(), Idempotency: memStore()})
 	if err != nil {
 		t.Fatalf("New(%s): %v", role, err)
 	}
@@ -74,7 +74,7 @@ func TestAPIReferenceServedInApiAndStandalone(t *testing.T) {
 		}
 	}
 	for _, role := range []config.Role{config.RoleScheduler, config.RoleWorker} {
-		if _, err := New(&Deps{Role: role, Reference: siteFS()}); err == nil {
+		if _, err := New(&Deps{Role: role, Reference: siteFS(), Idempotency: memStore()}); err == nil {
 			t.Errorf("the role %s serves the reference site", role)
 		}
 	}
@@ -160,7 +160,7 @@ func TestAPIReferenceRevalidates(t *testing.T) {
 }
 
 func TestEmbeddedPlaceholderIsServed(t *testing.T) {
-	rt, err := New(&Deps{Role: config.RoleAPI})
+	rt, err := New(&Deps{Role: config.RoleAPI, Idempotency: memStore()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

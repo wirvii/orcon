@@ -101,6 +101,7 @@ func firstExampleRequest(t *testing.T, spec *Spec, op *Operation) *http.Request 
 func TestUnavailableAnswersEveryOperation(t *testing.T) {
 	rt, err := New(&Deps{
 		Role:          config.RoleStandalone,
+		Idempotency:   memStore(),
 		Authenticator: fakeAuthn{"token-a": userA},
 		Authorizer:    authzFunc(func(authz.Request) authz.Decision { return authz.DecisionAllow }),
 		Limits:        middleware.Limits{Read: 100000, Write: 100000, Run: 100000, StreamConcurrent: 100, InteractiveFactor: 1, IP: 100000},
