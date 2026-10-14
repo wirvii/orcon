@@ -6,33 +6,74 @@ package conformance
 import (
 	"flag"
 	"fmt"
+	"os"
 	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/executiontest"
 	"github.com/wirvii/orcon/internal/flow"
 )
 
 // storeFlag selects the engine under test, like the -store of the other
-// conformance criteria. Only the in-memory interpreter exists so far; the
-// durable stores arrive with cuts C2 and C4.
-var storeFlag = flag.String("store", "memory", "engine under test: memory, sqlite, postgres or both")
+// conformance criteria: memory is the in-memory interpreter, session the
+// session driver over a fake database (a development check of the snapshot and
+// the delta), sqlite and postgres the durable engine over the real stores,
+// both the two of them (the suite runs once on each), and auto
+// SQLite plus PostgreSQL when a server is enabled.
 
-// requireStore fails the calling test when the selected store is not wired.
+// requireStore fails the calling test when the selected store is not valid.
 // It never skips: a skipped suite exits 0 without running anything, and the
 // command of criterion E-CF-1 would then look satisfied.
+// Engine under test: the -store flag, or the in-memory interpreter.
+func storeFlag() string { return executiontest.StoreFlag("memory") }
+
 func requireStore(t *testing.T) {
 	t.Helper()
-	switch s := *storeFlag; s {
-	case "memory":
-	case "sqlite", "postgres", "both":
-		t.Fatalf("store %s: not wired until cut C4", s)
+	switch s := storeFlag(); s {
+	case "memory", "session", "sqlite", "postgres", "both", "auto":
 	default:
-		t.Fatalf("store %q: want memory, sqlite, postgres or both", s)
+		t.Fatalf("store %q: want memory, session, sqlite, postgres, both or auto", s)
 	}
+}
+
+// exit ends the test binary with the code of the runs: the suite runs once per
+// store, and returning from TestMain would report the code of the last run only.
+func exit(code int) {
+	os.Exit(code) //nolint:forbidigo // AL-8: a TestMain that runs the suite more than once reports the worst code itself
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	switch storeFlag() {
+	case "memory":
+		exit(m.Run())
+	case "session":
+		executiontest.UseEngine(executiontest.SessionEngine)
+		exit(m.Run())
+	}
+	kinds, err := storetest.KindsFor(storeFlag())
+	if err != nil {
+		// requireStore reports the unknown value in every test.
+		exit(m.Run())
+	}
+	if slices.Contains(kinds, storetest.PostgreSQL) {
+		storetest.EnablePostgres()
+	}
+	stop := storetest.StartPostgres()
+	// The suite runs once per store, so a flow is judged on each of them.
+	code := 0
+	for _, k := range kinds {
+		executiontest.UseEngine(storetest.ExecutionEngine(k, storetest.EngineOptions{Weak: true}))
+		if c := m.Run(); c != 0 {
+			code = c
+		}
+	}
+	stop()
+	exit(code)
 }
 
 // Status of a pattern in the matrix.

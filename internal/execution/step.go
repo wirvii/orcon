@@ -76,7 +76,7 @@ func (r *run) stepNode(ctx context.Context, t *token, n *planNode) (*token, erro
 	if err != nil {
 		return nil, err
 	}
-	ems, err := r.activate(ctx, t, n, ne)
+	ems, err := r.activateNode(ctx, t, n, ne)
 	if err != nil {
 		return nil, r.activationError(t, ne, n, err)
 	}
@@ -120,7 +120,7 @@ func (r *run) activate(ctx context.Context, t *token, n *planNode, ne *nodeExec)
 	case kindParallel:
 		return r.emitEdges(n.out, t.payload), nil
 	case kindExclusive, kindInclusive:
-		return r.emitGateway(ctx, n, t, input)
+		return r.emitGateway(ctx, n, t, ne, input)
 	case kindRouting:
 		return r.emitRouting(ctx, t, n, ne, input)
 	case kindLoop:
@@ -153,7 +153,7 @@ func (r *run) emitPorts(ctx context.Context, n *planNode, ne *nodeExec, ports []
 			return nil, fmt.Errorf("%w: node %q emitted port %q twice", ErrPort, n.node.ID, pb.Port)
 		}
 		ref := outputRef(ne.id, pb.Port)
-		if err := r.payloads.Put(ctx, ref, pb.Batch); err != nil {
+		if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadOutput, NodeExecution: ne.id, Port: pb.Port, Batch: pb.Batch}); err != nil {
 			return nil, fmt.Errorf("store output of node %q port %q: %w", n.node.ID, pb.Port, err)
 		}
 		if pb.Batch.Len() > 0 {
@@ -178,6 +178,7 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 		Node:          n.node,
 		Scope:         t.scope,
 		Input:         input,
+		Env:           r.envOf(ne.id),
 	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {
@@ -192,7 +193,7 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 // one every true edge; none true takes the default edge, or raises NoPathTaken.
 // An edge without a condition is always true, and the default edge is not
 // evaluated, whatever condition it carries.
-func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, input Batch) ([]emission, error) {
+func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, ne *nodeExec, input Batch) ([]emission, error) {
 	var chosen []int
 	for _, ei := range n.out {
 		if ei == n.defaultEdge {
@@ -201,7 +202,7 @@ func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, input Batc
 		e := &r.plan.edges[ei]
 		ok := true
 		if cond := e.edge.Condition; cond != "" {
-			env := EvalEnv{Node: n.node.ID, Edge: e.edge.ID, Scope: t.scope, Items: input}
+			env := EvalEnv{Node: n.node.ID, Edge: e.edge.ID, Scope: t.scope, Items: input, Env: r.envOf(ne.id)}
 			verdict, err := guard(func() (bool, error) { return r.in.deps.Conditions.EvalCondition(ctx, cond, env) })
 			if err != nil {
 				return nil, r.portFailure(ctx, CodeExpressionError, n, fmt.Sprintf("condition of edge %q failed", e.edge.ID), err)
@@ -253,7 +254,7 @@ func (r *run) portFailure(ctx context.Context, code string, n *planNode, what st
 // no edge drops the items it receives: the node matched them, they lead
 // nowhere.
 func (r *run) emitRouting(ctx context.Context, t *token, n *planNode, ne *nodeExec, input Batch) ([]emission, error) {
-	call := RouteCall{Execution: r.req.Execution, NodeExecution: ne.id, Node: n.node, Scope: t.scope, Items: input}
+	call := RouteCall{Execution: r.req.Execution, NodeExecution: ne.id, Node: n.node, Scope: t.scope, Items: input, Env: r.envOf(ne.id)}
 	matches, err := guard(func() ([][]string, error) { return r.in.deps.Router.RouteItems(ctx, call) })
 	if err != nil {
 		return nil, r.portFailure(ctx, "", n, "routing failed", err)
