@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Declarative-format gaps
 
 Status: **Accepted** | Source: ADR-0079 §9, rulebook `.agents/skills/orcon-connector/references/kinds.md` (KD-3 to KD-5)

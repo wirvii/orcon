@@ -10,10 +10,11 @@ sources:
   - ADR-0037
   - ADR-0051
   - ADR-0071
-sourceHash: babaa6657cf979e8f842d62d5a6e077e09bdb3c2c8a9b9d0ecde5a4955b586d8
+sourceHash: 7d4ec8bb938f640dde3a8df78fddb8c88f25c8efe314d3f86336921f5088d86f
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Migrar desde n8n, resumen
 
 n8n is a trademark of its owner; Orcon is an independent project. Esta guía nombra a n8n solo para decir qué es.

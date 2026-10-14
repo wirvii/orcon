@@ -8,6 +8,7 @@ sources:
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Configuration overview
 
 Orcon reads its settings from four places, highest first: command-line flags, ORCON_* environment variables, the YAML file passed with --config (or ORCON_CONFIG), and built-in defaults. Each key is resolved on its own.

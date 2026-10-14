@@ -11,10 +11,11 @@ sources:
   - ADR-0042
   - ADR-0048
   - ADR-0073
-sourceHash: 117a3e5ac36e0ce737a1a3992dbb21e0915a49d1a82d83864bbb63b655db8c15
+sourceHash: 5f4c32b15ee7ba94607c04be61cdd3374e3358fdcfebc40b30564168ef8fb86d
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Alertas
 
 > Esta página describe un comportamiento especificado por el ADR 0083 que aún no está implementado. El corte que entregue el kit de monitoreo quitará esta nota.

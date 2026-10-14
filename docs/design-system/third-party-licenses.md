@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Third-party licenses
 
 Dependencies of the web workspaces (`apps/web`, `packages/js/*`, the root) with the version the lockfile pins (`pnpm-lock.yaml`, committed) and the license read from each installed package. The attribution notices that ship with the binary are in [`NOTICE`](../../NOTICE). Go dependencies are checked by `make licenses`.

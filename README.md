@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="brand/exports/mascot-at-work.png" alt="Orcon mascot: a green orc engineer at a laptop" width="480">
+  <img src="brand/exports/mascot-at-work.png" alt="Orcon mascot: a green orc engineer at a laptop" width="720">
   <br>
   <em>Meet the orc engineer, the face of Orcon.</em>
 </p>
@@ -25,34 +25,44 @@ Available on `main` today:
 - Go engineering standards and a single Go module (`github.com/wirvii/orcon`), enforced by `make check`.
 - The Orcon design system and the flow editor UI, developed and reviewed in Storybook (`@orcon/tokens`, `@orcon/ui`, `apps/web`).
 - The `orcon/flow@1` flow format with reading, writing, upgrade and static validation in `internal/flow` ([format reference](docs/reference/orcon-flow-1.md)).
-- Database standards and automated checks, with SQLite and PostgreSQL migration directories.
+- Database standards and automated checks, and the storage foundation: SQLite and PostgreSQL adapters with versioned migrations and a shared store test suite.
+- An in-memory flow interpreter in `internal/execution`.
+- The expression language: the evaluator in `internal/expr` and its sandbox in `internal/adapter/wazero`.
+- An outbound HTTP client with protection against server-side request forgery in `internal/adapter/egress`.
+- The API contract toolchain: contract linting, breaking-change checks and client generation (`@orcon/openapi-tools`, `@orcon/api-contract`).
 - The contribution workflow: scoped Conventional Commits, pull request rules and signed releases.
+- User documentation pages for installation, first run, configuration, security and support. They describe behavior that is specified in accepted design documents and is not implemented yet; each page says so (see [User documentation](docs/user/README.md)).
 
 In progress:
 
-- An in-memory flow interpreter.
-- The expression language.
+- The execution tables and engine ports.
+- The trigger registry and flow activation.
+- The connector manifest and the installed package store.
+- The organization, project and membership model.
 
 Next:
 
-- Storage.
 - Durable execution.
 - The public API.
+- Installation, first-run and operations commands.
 
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
 | `cmd/orcon` | The multi-role executable |
-| `internal/<area>` | Business areas (`internal/flow`, `internal/execution`) |
-| `internal/adapter` | Adapters: `codec`, `httpapi`, `postgres`, `sqlite`, `storetest`, `webui` |
-| `internal/platform` | Shared platform code (`config`, `jsonvalue`) |
-| `tools` | Project tools: `orconvet`, `provenance`, `spdxcheck`, `dbcheck` and others |
+| `internal/<area>` | Business areas (`internal/flow`, `internal/execution`, `internal/expr`, `internal/identity`) |
+| `internal/adapter` | Adapters: `codec`, `egress`, `httpapi`, `postgres`, `sqlite`, `storetest`, `wazero`, `webui` |
+| `internal/platform` | Shared platform code (`clock`, `config`, `id`, `jsonvalue`, `migration`) |
+| `tools` | Project tools: `orconvet`, `provenance`, `spdxcheck`, `dbcheck`, `prcheck` and others |
 | `apps/web` | The web application (React, Vite, React Flow) |
 | `packages/js/tokens` | `@orcon/tokens`, design tokens |
 | `packages/js/ui` | `@orcon/ui`, themed components and Storybook |
 | `packages/js/lint-config` | `@orcon/lint-config`, shared lint rules |
+| `packages/js/openapi-tools` | `@orcon/openapi-tools`, API contract lint rules and checks |
+| `packages/js/api-contract` | `@orcon/api-contract`, client generation from the API contract |
 | `docs/adr` | Architecture decision records |
+| `docs/user` | User documentation, in English and Spanish |
 | `docs/engineering` | Short human summaries of the engineering standards |
 | `.agents/skills` | Project skills (see below) |
 | `brand` | Approved brand boards and derived exports |
@@ -61,7 +71,7 @@ Go modules are coordinated through `go.work`; JavaScript workspaces use pnpm and
 
 ## Build and run
 
-Requirements: Go 1.25 or newer (`go.mod` sets `go 1.25.0`), Node.js 22 or newer, and pnpm 9.
+Requirements: Go 1.26 or newer (`go.mod` sets `go 1.26.0` and the `toolchain` directive names go1.27.2), Node.js 22 or newer, and pnpm 9.
 
 ```bash
 pnpm install
@@ -102,7 +112,7 @@ Each skill packages a set of accepted standards for contributors and their tools
 - [Architecture decision records](docs/adr)
 - [Engineering summaries](docs/engineering)
 - [Reference pages](docs/reference)
-- [User documentation](docs/user/README.md)
+- [User documentation](docs/user/README.md): [install overview](docs/user/en/install/overview.md), [first run](docs/user/en/configuration/first-run.md), [security overview](docs/user/en/security/overview.md) and [support matrix](docs/user/en/support/matrix.md). Spanish pages are in `docs/user/es`.
 - [Design system](docs/design-system/README.md)
 - [Verifying a release](docs/releases/verifying.md)
 - [Brand](brand/README.md)

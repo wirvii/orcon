@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0047 — Reconciling row-level security with cross-organization claims and group commit
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (policy branch spelled as in ADR-0046)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (policy branch spelled as in ADR-0046); 2026-10-13 (SPEC-004 Amendment 7)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -17,7 +17,7 @@ The engine amortizes the dominant cost — synchronous WAL flush — by batching
 
 ### 2. Engine functions (discovery operations)
 The following are SQL or PL/pgSQL functions in schema `orcon_engine`, `SECURITY DEFINER`, owned by `orcon_engine`, `SET search_path = orcon_engine, public`, with `EXECUTE` granted only to `orcon_application`: `claim_tokens(worker, keys, n, ttl)`, `renew_leases(worker, ids, epochs)`, `reap_expired()`, `fire_due_timers(n)`, `claim_outbox(n)`, `claim_schedule_slots(n)`, `claim_poll_work(n)`, `prune_batch(class, n)`, `seal_audit(chain, n)`, `acquire_refresh_lease(credential_id, lease_owner, lease_duration)`. Each body is fixed, reviewed, returns `org_id` with every row, and touches only the rows it selects. Policies admit all organizations only when `current_user = 'orcon_engine'`. Bodies are covered by `storetest` cases proving they never return or modify rows they did not select.
-Lookups that run before the organization is known (amended by ADR-0077 §6) are engine functions of the same kind that return `org_id` and only the columns the caller needs to continue: `resolve_trigger_address(host, path)` (incoming webhook and form routes), `resolve_api_key(key_id)` (returns `org_id`, token hash and status, ADR-0056 §4), `resolve_oauth_token(token_hash)`, `resolve_wait_secret(secret_hash)` (wait resume URLs), `resolve_public_entry(kind, path)` (public forms and chat). The request then continues in the request plane with organization context set from the returned `org_id`.
+Lookups that run before the organization is known (amended by ADR-0077 §6) are engine functions of the same kind that return `org_id` and only the columns the caller needs to continue: `resolve_trigger_address(host, path)` (incoming webhook and form routes), `resolve_api_key(key_id)` (returns `org_id`, token hash and status, ADR-0056 §4), `resolve_oauth_token(token_hash)`, `resolve_wait_secret(secret_hash)` (wait resume URLs), `resolve_public_entry(kind, path)` (public forms and chat), `resolve_user_organizations(application_user_id, row_limit)` (the organization picker: for an authenticated user, the `org_id`, `slug` and `name` of the organizations where both the user's membership and the organization are active, and nothing else). The request then continues in the request plane with organization context set from the returned `org_id`.
 
 ### 3. Batched writes (default, "V1")
 Checkpoints, journal batches, ingress batches and pending-audit inserts remain **one transaction with one commit**. Rows are grouped by organization; each group is preceded by `SELECT set_config('orcon.org_id', $org, true)` and written with its own statement(s); the whole transaction is sent as one pipelined `pgx.Batch` (one network round trip). Cost: zero extra statements with one organization; k statements instead of 1 for k organizations in the batch (k ≤ batch size).
@@ -50,3 +50,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-005.** `resolve_api_key` and `resolve_oauth_token` are the lookups of ADR-0056 §4 and §7 before the organization is known.
 - **SPEC-006.** `resolve_public_entry` and `resolve_trigger_address` also cover the public entry of the chat trigger and the address of the MCP server trigger.
 - **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.
+- **SPEC-004 Amendment 7 (2026-10-13).** §2: adds `resolve_user_organizations(application_user_id, row_limit)` to the closed list of lookups that run before the organization is known; it serves the organization picker and returns only the `org_id`, `slug` and `name` of organizations where the user's membership and the organization are both active.

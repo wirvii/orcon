@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Chat protocol
 
 Status: **Accepted** | Source: ADR-0070 §1, §3 and §6, ADR-0063 §2–§3 (accepted 2026-10-12 via SPEC-006)
