@@ -139,6 +139,9 @@ func (s *Service) Restore(ctx context.Context, org identity.OrgID, flowID flow.F
 // Purge deletes for good a flow whose recovery window has passed, with its
 // versions, snapshots and trigger rows. A flow inside the window fails with
 // [ErrRecoveryWindow]. Retention calls it (ADR-0077 section 4).
+//
+// Warning: foreign-key cascades delete the executions of the flow too, without
+// batching or checking that none is running; the purge sweep of SPEC-001 C13 owns that order.
 func (s *Service) Purge(ctx context.Context, org identity.OrgID, flowID flow.FlowID) error {
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
