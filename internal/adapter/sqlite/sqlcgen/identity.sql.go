@@ -211,10 +211,20 @@ FROM org
 WHERE id = ?1
 `
 
+type GetOrganizationRow struct {
+	ID                  []byte
+	Name                string
+	Slug                string
+	Status              string
+	DeletionScheduledAt sql.NullInt64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
 // orcon:scope instance
-func (q *Queries) GetOrganization(ctx context.Context, id []byte) (Org, error) {
+func (q *Queries) GetOrganization(ctx context.Context, id []byte) (GetOrganizationRow, error) {
 	row := q.db.QueryRowContext(ctx, getOrganization, id)
-	var i Org
+	var i GetOrganizationRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,

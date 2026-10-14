@@ -90,3 +90,6 @@
 - dialect: sqlite
   query: ResolveUserOrganizations
   reason: lists the active organizations of one user from membership rows of every organization (SPEC-004 R-ID-02, section 7-3); PostgreSQL reads them through orcon_engine.resolve_user_organizations
+- dialect: sqlite
+  query: GetProjectOrganization
+  reason: resolves the organization of a project across organizations so a project of another organization is hidden (ADR-0041 section 6); PostgreSQL uses orcon_engine.project_organization

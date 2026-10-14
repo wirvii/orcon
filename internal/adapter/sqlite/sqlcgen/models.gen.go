@@ -145,6 +145,24 @@ type ConnectorReference struct {
 	UpdatedAt        int64
 }
 
+type CustomRole struct {
+	ID        []byte
+	OrgID     []byte
+	Name      string
+	ScopeKind string
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+type CustomRolePermission struct {
+	ID           []byte
+	OrgID        []byte
+	CustomRoleID []byte
+	Permission   string
+	CreatedAt    int64
+	UpdatedAt    int64
+}
+
 type Execution struct {
 	ID                      []byte
 	OrgID                   []byte
@@ -554,6 +572,7 @@ type Org struct {
 	DeletionScheduledAt sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64
+	AuthorizationEpoch  int64
 }
 
 type OrgKey struct {
@@ -599,6 +618,17 @@ type Project struct {
 	CreatedAt   int64
 	UpdatedAt   int64
 	Handle      sql.NullString
+}
+
+type RoleBinding struct {
+	ID                []byte
+	OrgID             []byte
+	ScopeKind         string
+	ProjectID         []byte
+	ApplicationUserID []byte
+	RoleName          string
+	CreatedAt         int64
+	UpdatedAt         int64
 }
 
 type SchemaMigration struct {

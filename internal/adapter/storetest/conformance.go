@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
@@ -41,6 +42,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	identity.LoginThrottleStore
 	identity.OrganizationResolver
 	envelope.KeyStore
+	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore
 	flow.Store
