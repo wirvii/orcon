@@ -4,7 +4,7 @@ description: Applies the Orcon web application code standards - feature folders 
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with pnpm 9, Node 22, Go, GNU make and uv.
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   pinned: true
   owner: wirvii
 ---

@@ -6,6 +6,7 @@ import { defineMessages, useIntl } from 'react-intl';
 import { BrandMark } from '../components/brand-mark/BrandMark';
 import { Button } from '../components/button/Button';
 import { Link } from '../components/link/Link';
+import { Mascot } from '../components/mascot/Mascot';
 import { ProblemAlert } from '../components/problem-alert/ProblemAlert';
 import type { ProblemDetails } from '../components/problem-alert/problem';
 
@@ -34,8 +35,9 @@ export interface ErrorPageScreenProps {
 }
 
 /**
- * S8 (part 3): the error page. There is no mascot on an error: the page says what
- * happened, that nothing was lost, and shows the request number to report.
+ * S8 (part 3): the error page. The thinking mascot sits above the heading on this
+ * full-page screen only; inline errors never show it. The page says what happened,
+ * that nothing was lost, and shows the request number to report.
  */
 export function ErrorPageScreen({ problem = exampleProblem, onRetry }: ErrorPageScreenProps) {
   const intl = useIntl();
@@ -45,6 +47,7 @@ export function ErrorPageScreen({ problem = exampleProblem, onRetry }: ErrorPage
         <BrandMark />
       </header>
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col gap-4 p-4">
+        <Mascot pose="thinking" className="self-start" />
         <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
         <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.text)}</p>
         <ProblemAlert problem={problem} />

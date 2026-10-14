@@ -64,6 +64,17 @@
   z-index: var(--orcon-z-tooltip);
 }
 
+/*
+ * A select list, a menu or a popover opened from inside a dialog or a sheet must sit above it. Radix
+ * gives the wrapper of floating content the layer of the content (dropdown, 20), which is under the
+ * scrim (30) and the modal panel (40), so a list opened in a dialog would open behind it. These
+ * wrappers take the modal layer instead: floating content is portaled to the end of the page, so at the
+ * same layer it is drawn over the dialog that was already open. Tooltips keep their own layer.
+ */
+[data-radix-popper-content-wrapper]:has(> [role='listbox'], > [role='menu'], > [role='dialog']) {
+  z-index: var(--orcon-z-modal) !important;
+}
+
 /* A control grows with wrapped text, but is never shorter than its density height or the minimum target. */
 @utility min-h-control-target {
   min-height: max(var(--orcon-size-control), var(--orcon-size-target-min));
@@ -109,6 +120,55 @@
  * given a full-size hit area so it meets the contrast and target rules like every other link.
  */
 @layer components {
+  /*
+   * Brand art exists in a dark-theme and a light-theme file. Both are in the page and the theme picks one,
+   * with the same selectors the tokens use (data-theme, or the system setting when none is saved), so there
+   * is no flash and no script. Unknown elements default to the light art, like the tokens do.
+   */
+  .orcon-brand-on-dark {
+    display: none;
+  }
+  .orcon-brand-on-light {
+    display: block;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .orcon-brand-on-dark {
+      display: block;
+    }
+    :root:not([data-theme='light']) .orcon-brand-on-light {
+      display: none;
+    }
+  }
+  [data-theme='dark'] .orcon-brand-on-dark {
+    display: block;
+  }
+  [data-theme='dark'] .orcon-brand-on-light {
+    display: none;
+  }
+  [data-theme='light'] .orcon-brand-on-dark {
+    display: none;
+  }
+  [data-theme='light'] .orcon-brand-on-light {
+    display: block;
+  }
+
+  /* The mascot is at most 160 px tall (foundations: Mascot). The files keep their own proportions. */
+  .orcon-mascot-image {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+  }
+
+  /* The sign-in brand block: 320 px wide, the available width on a phone, never under 280 px. */
+  .orcon-brand-hero-image {
+    width: min(320px, 100%);
+    min-width: 280px;
+    height: auto;
+  }
+
   /* The ring around a running node: a conic sweep masked to a 4 px band. */
   .orcon-run-ring {
     padding: var(--orcon-space-1);

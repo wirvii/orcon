@@ -1,7 +1,7 @@
 ---
 name: docs
 description: Writes and maintains Orcon documentation, ADR files, community documents and the project skills (rulebooks, SKILL.md, scripts) from approved specs.
-model: sonnet
+model: haiku
 tools: Read, Grep, Glob, NotebookRead, NotebookEdit, BashOutput, Edit, Write, MultiEdit, Bash, WebSearch, WebFetch, mcp__mneme__*
 permissionMode: bypassPermissions
 ---

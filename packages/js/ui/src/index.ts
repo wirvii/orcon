@@ -23,6 +23,8 @@ export { Banner } from './components/banner/Banner';
 export type { BannerTone, BannerProps } from './components/banner/Banner';
 export { BrandMark } from './components/brand-mark/BrandMark';
 export type { BrandMarkProps } from './components/brand-mark/BrandMark';
+export { BrandHero } from './components/brand-hero/BrandHero';
+export type { BrandHeroProps } from './components/brand-hero/BrandHero';
 export { Breadcrumb } from './components/breadcrumb/Breadcrumb';
 export type { BreadcrumbItem, BreadcrumbProps } from './components/breadcrumb/Breadcrumb';
 export { buttonVariants, Button } from './components/button/Button';
@@ -164,6 +166,13 @@ export { WorkflowCanvas } from './canvas/WorkflowCanvas';
 export { applyOverlay } from './canvas/WorkflowCanvas';
 export type { EdgeExecutionState, ExecutionOverlay, NodeExecutionState, WorkflowCanvasHandle, WorkflowCanvasProps } from './canvas/WorkflowCanvas';
 export { useAnnouncer, ANNOUNCE_INTERVAL_MS } from './canvas/announcer';
+
+// Node details view (style A): three panes in a dialog from lg, a docked Parameters pane from md
+export { NodeDetailsView } from './editor/node-details-view/NodeDetailsView';
+export type { DetailsTab, NodeDetailsViewProps } from './editor/node-details-view/NodeDetailsView';
+export { DataPane } from './editor/data-pane/DataPane';
+export type { DataPaneProps, OutputPort } from './editor/data-pane/DataPane';
+export type { DataItem, DataRun, DataView, PaneData } from './editor/model';
 export type {
   AiBlockKind,
   AiBlockSpec,

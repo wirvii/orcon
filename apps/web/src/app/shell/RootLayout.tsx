@@ -4,7 +4,7 @@
 import { AppShell, Banner, BrandMark, Toaster, type NavEntry } from '@orcon/ui';
 import { onlineManager } from '@tanstack/react-query';
 import { createRootRouteWithContext, linkOptions, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
-import { House, Settings, Workflow } from 'lucide-react';
+import { Braces, House, Settings, Workflow } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
@@ -21,6 +21,11 @@ const messages = defineMessages({
     description: 'Navigation entry that opens the flow editor on the sample flow, until the list of flows exists.',
   },
   settings: { id: 'app.nav.settings', defaultMessage: 'Settings', description: 'Navigation entry for the settings pages.' },
+  api: {
+    id: 'app.nav.api',
+    defaultMessage: 'API reference',
+    description: 'Navigation entry that opens the API reference page, which the server serves outside the app.',
+  },
   offlineTitle: {
     id: 'app.offline.title',
     defaultMessage: 'You are offline',
@@ -68,12 +73,16 @@ function RootLayout() {
   const liveState = useLiveEventsState();
   const online = useSyncExternalStore(subscribeOnline, isOnline);
 
-  const navigation: NavEntry[] = destinations.map(({ id, icon, link }) => ({
-    id,
-    icon,
-    href: router.buildLocation(link).href,
-    label: intl.formatMessage(messages[id]),
-  }));
+  const navigation: NavEntry[] = [
+    ...destinations.map(({ id, icon, link }) => ({
+      id,
+      icon,
+      href: router.buildLocation(link).href,
+      label: intl.formatMessage(messages[id]),
+    })),
+    // The API reference is a page the server answers, not a route of the app: a plain link that loads it.
+    { id: 'api', icon: Braces, href: '/api/reference/', label: intl.formatMessage(messages.api), fullPage: true },
+  ];
   const current = destinations.find(({ link }) => (link.to === '/' ? pathname === '/' : link.to === '/flows/$flowId' ? pathname.startsWith('/flows/') : pathname.startsWith('/settings')))?.id;
   // The editor needs a page of a definite height to fill; every other page grows with its content.
   const editing = pathname.startsWith('/flows/');

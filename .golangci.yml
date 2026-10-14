@@ -134,6 +134,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/trigger
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/authz
+              desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/credential
               desc: platform packages are leaves (AL-1)
         pgx-confined:
@@ -266,6 +268,8 @@ linters:
             # allowed to them, and no area imports storetest, not even in a test.
             - "!**/test/**"
             - "!**/cmd/**"
+            # AL-2.4 exception: code under test/** may import storetest and nothing else (approved by the owner).
+            - "!**/test/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/storetest
               desc: only cmd/orcon wires adapters (AL-8)
@@ -444,6 +448,11 @@ linters:
         linters:
           - forbidigo
         text: os\.Exit
+      # The generated reference and the key descriptions carry Spanish text (decision P3);
+      # the spell checker only knows American English.
+      - path: ^internal/(platform/config/keys.*|adapter/cli/docs)\.go$
+        linters:
+          - misspell
       # table-driven test functions are long by design
       - path: _test\.go
         linters:

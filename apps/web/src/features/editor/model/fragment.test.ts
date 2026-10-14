@@ -191,3 +191,39 @@ describe('pasting', () => {
     expect(flowFragmentSchema.safeParse({ format: FLOW_FRAGMENT_FORMAT, nodes: [{ id: 'bad id' }], edges: [], editor: {} }).success).toBe(false);
   });
 });
+
+describe('a Call sub-flow node', () => {
+  it('pastes as itself, with its call block, and not as the placeholder of an unknown type', () => {
+    const document = exampleFlowDocument();
+    const call = { target: '01930000-0000-7000-8000-00000000ed61', version: 3, mode: 'WAIT', perItem: true };
+    const fragment = flowFragmentSchema.parse({
+      format: FLOW_FRAGMENT_FORMAT,
+      nodes: [{ id: 'ship', name: 'Ship order', element: 'callActivity', type: 'orcon.callFlow@1', parameters: {}, call }],
+      edges: [],
+      editor: { nodes: { ship: { x: 0, y: 0 } } },
+    });
+    const result = pasteFragment(document, fragment, { offset: { x: 0, y: 0 } });
+    expect(result.placeholders).toBe(0);
+    expect(document.nodes.find((node) => node.id === result.nodeIds[0])).toMatchObject({ type: 'orcon.callFlow@1', element: 'callActivity', call });
+  });
+});
+
+describe('notes on nodes in a fragment', () => {
+  it('are copied with the node and pasted with the new node', () => {
+    const document = exampleFlowDocument();
+    document.editor.nodes = { ...document.editor.nodes, slack: { x: 640, y: 60, note: 'Ask Ana' } };
+    const fragment = flowFragmentSchema.parse(JSON.parse(JSON.stringify(buildFragment(document, new Set(['slack'])))));
+    expect(fragment.editor.nodes?.['slack']?.note).toBe('Ask Ana');
+    const result = pasteFragment(document, fragment, { offset: { x: 40, y: 40 } });
+    const id = result.nodeIds[0] ?? '';
+    expect(document.editor.nodes[id]).toMatchObject({ note: 'Ask Ana' });
+  });
+
+  it('are refused by the fragment schema when empty or longer than 5000 characters', () => {
+    const base = { format: FLOW_FRAGMENT_FORMAT, nodes: [], edges: [] };
+    const parse = (note: string) => flowFragmentSchema.safeParse({ ...base, editor: { nodes: { a: { x: 0, y: 0, note } } } }).success;
+    expect(parse('ok')).toBe(true);
+    expect(parse('')).toBe(false);
+    expect(parse('a'.repeat(5001))).toBe(false);
+  });
+});

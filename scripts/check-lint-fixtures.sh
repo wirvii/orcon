@@ -60,10 +60,10 @@ fixture() {
 }
 
 # 1-4: an area importing what areas must not import.
-fixture internal/zzfixture1 a.go 'import "github.com/wirvii/orcon/internal/adapter/httpapi"
+fixture internal/zzfixture1 a.go 'import "github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 
-// Handler is planted.
-var Handler = httpapi.HealthHandler'
+// Catalog is planted.
+var Catalog = problem.Catalog'
 fixture internal/zzfixture2 a.go 'import "database/sql"
 
 // ErrNone is planted.

@@ -51,7 +51,17 @@ const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(
  * when the document refuses part of what the canvas did. See the report for the primitive that would
  * make this simpler: a canvas that takes its graph as a prop.
  */
-export function EditorCanvas({ ref }: { ref?: Ref<EditorCanvasHandle> | undefined }) {
+export interface EditorCanvasProps {
+  ref?: Ref<EditorCanvasHandle> | undefined;
+  /** Enter, double-click or "Open details" on a node (from the md breakpoint; below it the canvas shows its own status panel). */
+  onOpenDetails?: ((nodeId: string) => void) | undefined;
+  /** A tap on a node below the md breakpoint, where the canvas is read-only: the host opens its own read-only details. */
+  onOpenPhoneDetails?: ((nodeId: string) => void) | undefined;
+  /** True while the node details view is open: what it edits is shown on the canvas as it changes. */
+  syncNodes?: boolean | undefined;
+}
+
+export function EditorCanvas({ ref, onOpenDetails, onOpenPhoneDetails, syncNodes = false }: EditorCanvasProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const channel = useNoticeChannel();
@@ -115,7 +125,7 @@ export function EditorCanvas({ ref }: { ref?: Ref<EditorCanvasHandle> | undefine
       if (step) {
         // The canvas went back or forward by itself, as asked: the store follows and must agree.
         const done = step === 'undo' ? api.getState().undo({ fromCanvas: true }) : api.getState().redo({ fromCanvas: true });
-        if (!done || !graphAgrees(api.getState().document, next)) api.getState().rebuildCanvas();
+        if (!done || !graphAgrees(api.getState().document, next, describe)) api.getState().rebuildCanvas();
         return;
       }
       const report = api.getState().applyCanvasEdit(previous, next);
@@ -130,7 +140,7 @@ export function EditorCanvas({ ref }: { ref?: Ref<EditorCanvasHandle> | undefine
         }, 0);
       }
     },
-    [api, tell],
+    [api, describe, tell],
   );
 
   useEffect(() => {
@@ -180,6 +190,30 @@ export function EditorCanvas({ ref }: { ref?: Ref<EditorCanvasHandle> | undefine
       cancelAnimationFrame(frameId);
     };
   }, [epoch]);
+
+  // While the details view edits a node, the canvas shows the new name, the line under the node and its
+  // ports as they change. The canvas keeps its own copy of the graph, so each difference is told to it
+  // (`updateNode`); the report that comes back is the echo of that and not an edit.
+  const version = useEditorStore((state) => state.version);
+  const pushed = useRef(new Map<string, string>());
+  useEffect(() => {
+    pushed.current.clear();
+  }, [epoch]);
+  useEffect(() => {
+    if (!syncNodes) return;
+    const signature = (node: CanvasGraph['nodes'][number]) => `${node.name}\u0000${node.subtitle ?? ''}\u0000${node.outputs.map((port) => port.id).join('|')}`;
+    const shown = new Map(last.current.nodes.map((node) => [node.id, node]));
+    for (const wanted of toCanvasGraph(api.getState().document, describe).nodes) {
+      const current = shown.get(wanted.id);
+      if (!current) continue;
+      const known = pushed.current.get(wanted.id) ?? signature(current);
+      const next = signature(wanted);
+      if (known === next) continue;
+      pushed.current.set(wanted.id, next);
+      echoes.current += 1;
+      canvas.current?.updateNode(wanted.id, { name: wanted.name, subtitle: wanted.subtitle, outputs: wanted.outputs });
+    }
+  }, [api, describe, syncNodes, version]);
 
   const press = useCallback((key: string, modifiers: { shiftKey?: boolean; primary?: boolean } = {}) => {
     const region = frame.current?.querySelector<HTMLElement>('[data-lod]');
@@ -264,7 +298,18 @@ export function EditorCanvas({ ref }: { ref?: Ref<EditorCanvasHandle> | undefine
         pointer.current = { x: event.clientX, y: event.clientY };
       }}
     >
-      <WorkflowCanvas key={epoch} ref={canvas} defaultGraph={initial} catalog={catalog} onGraphChange={onGraphChange} onRunStep={later} onExecuteWorkflow={later} className="min-w-0 flex-1" />
+      <WorkflowCanvas
+        key={epoch}
+        ref={canvas}
+        defaultGraph={initial}
+        catalog={catalog}
+        onGraphChange={onGraphChange}
+        onOpenDetails={onOpenDetails}
+        onOpenPhoneDetails={onOpenPhoneDetails}
+        onRunStep={later}
+        onExecuteWorkflow={later}
+        className="min-w-0 flex-1"
+      />
     </div>
   );
 }

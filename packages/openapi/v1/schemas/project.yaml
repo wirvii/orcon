@@ -1,0 +1,143 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+Project:
+  type: object
+  description: 'A project: the unit that owns flows, credentials and executions inside an organization.'
+  required:
+    - id
+    - orgId
+    - name
+    - slug
+    - handle
+    - protected
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the project.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+      readOnly: true
+    orgId:
+      type: string
+      format: uuid
+      description: Id of the organization that owns the project.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+    name:
+      type: string
+      description: Display name of the project.
+      examples:
+        - Customer onboarding
+      maxLength: 200
+    slug:
+      type: string
+      description: Short name that is unique inside the organization.
+      examples:
+        - onboarding
+      maxLength: 100
+    handle:
+      type: string
+      description: >-
+        Identifier that is unique across the installation: the slug, or the organization slug and the
+        slug when another project holds the slug.
+      examples:
+        - onboarding
+      maxLength: 201
+    environment:
+      type: string
+      description: >-
+        Free label of the environment the project stands for, for example dev, staging or prod; absent
+        when there is none.
+      examples:
+        - prod
+      maxLength: 100
+    protected:
+      type: boolean
+      description: >-
+        Whether the project is protected. Protected projects require confirmation for actions that change
+        production behavior. New projects are protected.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the project was created, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the project last changed, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+ProjectList:
+  type: object
+  description: One page of projects.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/Project
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+CreateProjectRequest:
+  type: object
+  description: Fields of a new project.
+  required:
+    - name
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      description: Display name of the project.
+      examples:
+        - Customer onboarding
+      maxLength: 200
+    slug:
+      type: string
+      description: Short name that is unique inside the organization; derived from the name when omitted.
+      examples:
+        - onboarding
+      maxLength: 100
+      pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+    environment:
+      type: string
+      description: Free label of the environment, for example dev, staging or prod.
+      examples:
+        - prod
+      maxLength: 100
+    protected:
+      type: boolean
+      description: Whether the project is protected; defaults to true.
+      default: true
+UpdateProjectRequest:
+  type: object
+  description: >-
+    Fields of a project to change (JSON Merge Patch). Send null as the environment to remove the label.
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      description: New display name of the project.
+      examples:
+        - Customer onboarding
+      maxLength: 200
+    environment:
+      type:
+        - string
+        - 'null'
+      description: New environment label, or null to remove it.
+      examples:
+        - staging
+      maxLength: 100
+    protected:
+      type: boolean
+      description: Whether the project is protected. Lowering the protection is audited.

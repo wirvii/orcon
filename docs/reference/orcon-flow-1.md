@@ -3,7 +3,7 @@
 <img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Flow format `orcon/flow@1`
 
-Status: **Accepted** | Source: ADR-0007 (flow format), ADR-0008 §4 (data access), ADR-0010 §11 (static rules), ADR-0073 §1a (attention)
+Status: **Accepted** | Source: ADR-0007 (flow format), ADR-0008 §4 (data access), ADR-0010 §11 (static rules), ADR-0017 §3 (sensitive paths), ADR-0073 §1a (attention)
 
 The JSON document that defines a flow. ADR-0007 is normative; if this page and the ADR disagree, the ADR wins. The machine-readable form is the JSON Schema `internal/adapter/codec/flowjson/schema/orcon-flow-1.schema.json` (draft 2020-12). The schema checks shape; the rules that need the whole graph are checked by the validator in `internal/flow` and are listed below.
 
@@ -74,6 +74,7 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 | `settings.memoryLimit` | whole number of bytes from 1 to 9007199254740991 (2^53-1); the instance maximum is checked at publication with the instance configuration (cut C12), not by the schema |
 | all numbers | every number in a document, including inside `parameters`, `ext`, `editor` and forms, must survive the canonical form exactly (RFC 7493, I-JSON): integers written without a fraction or exponent lie within ±(2^53-1), and decimals have no more digits than a double keeps. Larger values are written as strings. Otherwise two different numbers, for example 9007199254740992 and 9007199254740993, would share one `contentHash` |
 | strings | well-formed Unicode: a `\uD800`-`\uDFFF` escape must be half of a valid pair; a lone surrogate is refused rather than replaced by U+FFFD (RFC 8785) |
+| `nodes[].sensitivePaths[]` | JSON Pointer (RFC 6901) into the `json` of each output item: starts with `/`, 1 to 512 code points, `~` only as `~0` or `~1`; a segment that is exactly `*` matches every array element and every object member at that level; 1 to 64 per node, unique |
 
 ## Node blocks
 
@@ -90,6 +91,7 @@ A node has `id`, `name`, `element`, `type` and `parameters` (an object whose str
 - `wait` `{ kind, timer?, timeout?, form? }` on `receiveTask`, `userTask` and `intermediateCatchEvent`. A `TIMER` wait needs a `timer` with a duration or a date.
 - `attachedTo`, `cancelActivity` and `eventDefinition` on `boundaryEvent` nodes only; the event definition holds exactly one of `timer`, `error` or `compensation`.
 - `attention` `{ notify }` on waits, user tasks and effect nodes.
+- `sensitivePaths` `[string]`: the user-declared sensitive fields of the node's output items (ADR-0017 §3). Part of `contentHash`.
 
 A document that carries `effect` or `writes` is rejected as an unknown member (see "Open points").
 
@@ -132,7 +134,7 @@ The expression scan behind V8 is lexical: it recognises `$('Name')` and `$node["
 
 ## Content hash and versions
 
-`contentHash` is SHA-256 over the JSON Canonicalization Scheme text (RFC 8785) of the document without its `editor` member. Publishing validates the draft and creates version N+1; a test run freezes an immutable snapshot keyed by `contentHash`; rolling back republishes old content as N+1. See ADR-0007 §6.
+`contentHash` is SHA-256 over the JSON Canonicalization Scheme text (RFC 8785) of the document without its `editor` member. Publishing validates the draft and creates version N+1; a test run freezes an immutable snapshot keyed by `contentHash`; rolling back republishes old content as N+1. See ADR-0007 §6. The `editor` member is the editor's own data: node positions in `editor.nodes[<nodeId>]` as `{ x, y }`, an optional plain-text note per node in `editor.nodes[<nodeId>].note` (1 to 5,000 code points) and sticky notes in `editor.stickyNotes[]`. The reader does not check it; the editor enforces these limits. A version keeps the `editor` member it was published with.
 
 ## Evolution
 

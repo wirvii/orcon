@@ -15,3 +15,5 @@
 # line, or one without approved-by:, makes `make licenses` fail. No exception can
 # admit GPL, AGPL, LGPL, SSPL, BUSL, Elastic, Commons Clause or other
 # source-available licenses.
+
+github.com/oapi-codegen/nullable@v1.2.0  Unknown  Apache-2.0 per its LICENSE, which carries only the short notice that go-licenses cannot classify  2026-10-13  approved-by:owner

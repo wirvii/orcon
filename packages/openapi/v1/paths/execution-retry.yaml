@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExecutionId
+post:
+  operationId: retryExecution
+  summary: Retry a failed execution
+  description: >-
+    Starts a new execution that repeats a failed one on the same flow version. The original execution
+    is kept, and the new one records which execution it retries.
+  tags:
+    - executions
+  x-orcon-permission: execution:retry
+  x-orcon-rate-class: run
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: execution.retried
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: executions retry
+  x-orcon-mcp:
+    level: destructive
+    tool: retry_execution
+    description: Retry a failed execution as a new execution.
+  x-orcon-examples:
+    - name: retryFailedExecution
+      scenario: execution-failed
+      request:
+        pathParams:
+          executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+      response:
+        status: 201
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  responses:
+    '201':
+      description: The new execution.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        Location:
+          $ref: ../openapi.yaml#/components/headers/Location
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Execution
+          examples:
+            retryFailedExecution:
+              summary: The retry has been queued
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a65
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                flowVersion: 1
+                mode: RETRY
+                status: QUEUED
+                createdAt: '2026-10-12T15:04:05Z'
+                retryOfExecutionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                dataHidden: false
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

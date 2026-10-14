@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Component checklist
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007
 
 Step-by-step procedure for every new or changed component in `@orcon/ui` (including canvas primitives). Copy the checklist into the pull request and tick each item. Each step links to the rule that governs it.
 
@@ -28,7 +28,7 @@ Step-by-step procedure for every new or changed component in `@orcon/ui` (includ
 - [ ] Visible focus ring, keyboard operable, accessible name ([accessibility.md#focus](accessibility.md#focus), [accessibility.md#keyboard](accessibility.md#keyboard)).
 - [ ] Targets ≥ 44 px on coarse pointers ([accessibility.md#targets](accessibility.md#targets)).
 - [ ] Motion only 120 to 200 ms, functional, off with reduced motion ([foundations.md#motion](foundations.md#motion)).
-- [ ] Mascot only in allowed contexts; connector logos only through `ConnectorIcon` ([foundations.md#mascot](foundations.md#mascot), [foundations.md#iconography](foundations.md#iconography)).
+- [ ] Mascot only in allowed contexts (sign-in and welcome, first-run empty states, full-page error screens; never inline errors, security warnings, toasts, help, canvas or dense views); connector logos only through `ConnectorIcon` ([foundations.md#mascot](foundations.md#mascot), [foundations.md#iconography](foundations.md#iconography)).
 - [ ] Errors through `ProblemAlert` / `FormField`; protected data through `RedactedValue` ([components.md#forms-and-errors](components.md#forms-and-errors), [components.md#redaction](components.md#redaction)).
 - [ ] No n8n code, icons or branding ([foundations.md#principles](foundations.md#principles)).
 - [ ] Comments, stories, commit messages and PR text use neutral contributor wording (no coding-agent product names, no AI authorship trailers).

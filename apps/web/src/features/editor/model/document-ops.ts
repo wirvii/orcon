@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { snap } from './canvas-graph';
-import { editorBlock, findNode, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowEdgeKind, type FlowNode, type Point, type StickyNote } from './flow-document';
+import { fallbackPositions, snap } from './canvas-graph';
+import { codePointLength, editorBlock, findNode, MAX_NODE_NOTE, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowEdgeKind, type FlowNode, type Point, type StickyNote } from './flow-document';
 import { namesOf, uniqueName } from './names';
 import { LOOP_TYPE, START_TYPE, type NodeTypeDef } from './node-types';
 import { renameReferences } from './rename-references';
@@ -98,7 +98,8 @@ export function setPosition(document: FlowDocument, id: string, at: Point): void
     note.x = at.x;
     note.y = at.y;
   } else if (findNode(document, id)) {
-    editor.nodes[id] = { x: at.x, y: at.y };
+    // The entry may hold a note: only the position changes.
+    editor.nodes[id] = { ...editor.nodes[id], x: at.x, y: at.y };
   }
 }
 
@@ -137,6 +138,72 @@ export function setDisabled(document: FlowDocument, id: string, disabled: boolea
   if (!node) return;
   if (disabled) node.disabled = true;
   else delete node.disabled;
+}
+
+/** Sets one parameter of a node; `undefined` removes it. Returns false when the node does not exist. */
+export function setParameter(document: FlowDocument, id: string, name: string, value: unknown): boolean {
+  const node = findNode(document, id);
+  if (!node) return false;
+  if (value === undefined) Reflect.deleteProperty(node.parameters, name);
+  else node.parameters[name] = value;
+  return true;
+}
+
+/** The behaviour and binding blocks a node's configuration form writes (orcon-flow-1.md "Node blocks", ADR-0034 §1, ADR-0057 §4). */
+export type NodeBlock = 'retry' | 'timeouts' | 'onError' | 'concurrency' | 'attention' | 'call' | 'connector' | 'credentials';
+
+/** Replaces one block of a node; `undefined` removes it. Returns false when the node does not exist. */
+export function setNodeBlock(document: FlowDocument, id: string, block: NodeBlock, value: unknown): boolean {
+  const node = findNode(document, id);
+  if (!node) return false;
+  if (value === undefined) Reflect.deleteProperty(node, block);
+  else node[block] = value;
+  return true;
+}
+
+/**
+ * Sets the note of a node (`editor.nodes[<id>].note`); an empty or `undefined` text removes it, so the
+ * document never holds an empty note. Returns false when the node does not exist or the text is longer
+ * than the limit.
+ */
+export function setNodeNote(document: FlowDocument, id: string, text: string | undefined): boolean {
+  if (!findNode(document, id)) return false;
+  const editor = editorBlock(document);
+  const entry = editor.nodes[id];
+  if (text === undefined || text === '') {
+    if (entry) Reflect.deleteProperty(entry, 'note');
+    return true;
+  }
+  if (codePointLength(text) > MAX_NODE_NOTE) return false;
+  if (entry) entry.note = text;
+  else {
+    // A node with no recorded position keeps where the canvas draws it by default.
+    const at = fallbackPositions(document).get(id) ?? { x: 0, y: 0 };
+    editor.nodes[id] = { x: at.x, y: at.y, note: text };
+  }
+  return true;
+}
+
+/** Binds a credential slot of a node to a credential by name (`credentials: { <slot>: { name } }`); `undefined` unbinds it. */
+export function setCredentialBinding(document: FlowDocument, id: string, slot: string, name: string | undefined): boolean {
+  const node = findNode(document, id);
+  if (!node) return false;
+  const held = node['credentials'];
+  const bindings: Record<string, unknown> = typeof held === 'object' && held !== null && !Array.isArray(held) ? { ...(held as Record<string, unknown>) } : {};
+  const current = bindings[slot];
+  const currentName = typeof current === 'object' && current !== null ? (current as Record<string, unknown>)['name'] : undefined;
+  // Binding the name the slot already has, or unbinding a slot that has none, changes nothing: it is not an edit.
+  if (currentName === name) return true;
+  if (name === undefined) Reflect.deleteProperty(bindings, slot);
+  else bindings[slot] = { name };
+  if (Object.keys(bindings).length === 0) delete node['credentials'];
+  else node['credentials'] = bindings;
+  return true;
+}
+
+/** Pins a node to another version of its connector: one edit, whatever the version range holds. */
+export function pinConnector(document: FlowDocument, id: string, version: string, digest: string): boolean {
+  return setNodeBlock(document, id, 'connector', { version, digest });
 }
 
 /** Adds a node of a type at a position and returns its id (`add-<slug>-<n>`). */

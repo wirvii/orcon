@@ -15,9 +15,11 @@ if [ ! -x "$bin" ]; then
   exit 1
 fi
 
-"$bin" --role=standalone --addr="127.0.0.1:${port}" >/dev/null 2>&1 &
+data="$(mktemp -d)"
+export ORCON_DATA_DIR="$data"
+"$bin" serve --role=standalone --http-address="127.0.0.1:${port}" >/dev/null 2>&1 &
 pid=$!
-trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$data"' EXIT
 
 ready=0
 for _ in $(seq 1 30); do
@@ -36,9 +38,9 @@ curl -fsS "$base/healthz" | grep -q '^ok$'
 curl -fsS "$base/" | grep -q 'id="root"'
 
 code=0
-"$bin" --role=invalid >/dev/null 2>&1 || code=$?
-if [ "$code" -ne 2 ]; then
-  echo "smoke: invalid role exit code = $code, want 2" >&2
+"$bin" serve --role=invalid >/dev/null 2>&1 || code=$?
+if [ "$code" -ne 5 ]; then
+  echo "smoke: invalid role exit code = $code, want 5" >&2
   exit 1
 fi
 

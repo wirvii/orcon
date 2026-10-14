@@ -111,6 +111,10 @@ export const editorMessages = defineMessages({
   cmdSelectAll: { id: 'editor.cmd.selectAll', defaultMessage: 'Select all', description: 'Command that selects every node.' },
   cmdDuplicate: { id: 'editor.cmd.duplicate', defaultMessage: 'Duplicate selection', description: 'Command that copies the selected nodes next to the originals.' },
   cmdCopy: { id: 'editor.cmd.copy', defaultMessage: 'Copy selection', description: 'Command that copies the selected nodes to the clipboard.' },
+  dockedData: { id: 'editor.details.dockedData', defaultMessage: 'Data of {name}', description: 'Accessible name of the panel at the bottom of the editor that shows the input and output data of the open node. {name} is the node name.' },
+  dockedSwitch: { id: 'editor.details.dockedSwitch', defaultMessage: 'Data to show', description: 'Accessible name of the buttons that switch the bottom panel between the input and the output data.' },
+  dockedInput: { id: 'editor.details.dockedInput', defaultMessage: 'Input', description: 'Button that shows the data the open node received.' },
+  dockedOutput: { id: 'editor.details.dockedOutput', defaultMessage: 'Output', description: 'Button that shows the data the open node produced.' },
   cmdFit: { id: 'editor.cmd.fit', defaultMessage: 'Zoom to fit', description: 'Command that zooms the canvas to show the whole flow.' },
 
 });
@@ -169,6 +173,8 @@ export const nodeTypeMessages = defineMessages({
   mergeText: { id: 'editor.node.merge.text', defaultMessage: 'Joins several branches into one', description: 'Description of the merge node.' },
   loop: { id: 'editor.node.loop.name', defaultMessage: 'Loop', description: 'Name of the node that repeats part of the flow.' },
   loopText: { id: 'editor.node.loop.text', defaultMessage: 'Repeats part of the flow for each batch of items', description: 'Description of the loop node.' },
+  call: { id: 'editor.node.call.name', defaultMessage: 'Call sub-flow', description: 'Name of the node that runs another flow of the project.' },
+  callText: { id: 'editor.node.call.text', defaultMessage: 'Runs another flow and carries on with its result', description: 'Description of the call sub-flow node.' },
   end: { id: 'editor.node.end.name', defaultMessage: 'End', description: 'Name of the node that ends the flow.' },
   endText: { id: 'editor.node.end.text', defaultMessage: 'Ends the flow', description: 'Description of the end node.' },
 });

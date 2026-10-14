@@ -17,7 +17,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   play: async ({ canvasElement }) => {
-    // Only the first-time empty state carries the mascot placeholder; every empty state says what to do.
+    // Only the first-time empty state carries the happy mascot; every empty state says what to do.
     await expect(canvasElement.querySelectorAll('[data-mascot-pose]')).toHaveLength(1);
     await expect(within(canvasElement).getByRole('button', { name: 'New flow' })).toBeVisible();
   },

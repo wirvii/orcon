@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -50,7 +51,7 @@ func TestAbandonRestartSignal(t *testing.T) {
 	var stdout, stderr syncBuffer
 	done := make(chan int, 1)
 	go func() {
-		done <- runWith(t.Context(), []string{"--addr=127.0.0.1:0", "--shutdown-timeout=5s", "--expr-max-abandoned=5"}, &stdout, &stderr, factory)
+		done <- runServe(t.Context(), []string{"--http-address=127.0.0.1:0", "--http-shutdown-timeout=5s", "--expr-max-abandoned=5"}, &stdout, &stderr, testDeps(t, factory))
 	}()
 	base := "http://" + waitForListenAddr(t, &stderr, done)
 	assertGet(t, base+"/healthz", http.StatusOK, "ok")
@@ -92,11 +93,17 @@ func TestAbandonRestartSignal(t *testing.T) {
 func TestRunRejectsAnInvalidSlotCount(t *testing.T) {
 	for _, v := range []string{"-1", "1000"} {
 		var stdout, stderr syncBuffer
-		code := runWith(t.Context(), []string{"--expr-sandbox-slots=" + v}, &stdout, &stderr, func(int, int, *slog.Logger) exprSandbox {
+		code := runServe(t.Context(), []string{"--expr-sandbox-slots=" + v}, &stdout, &stderr, testDeps(t, func(int, int, *slog.Logger) exprSandbox {
 			t.Error("the sandbox was built with an invalid slot count")
 			return newFakeSandbox()
-		})
-		if code != exitUsage || !strings.Contains(stderr.String(), "invalid --expr-sandbox-slots") {
+		}))
+		// A negative count fails the range of the key (a configuration error); a count above the
+		// processors fails the runtime check.
+		want, text := exitUsage, "invalid --expr-sandbox-slots"
+		if v == "-1" {
+			want, text = exitValidation, "expr.sandboxSlots"
+		}
+		if code != want || !strings.Contains(stderr.String(), text) {
 			t.Errorf("--expr-sandbox-slots=%s: exit %d, stderr %q", v, code, stderr.String())
 		}
 	}
@@ -105,12 +112,20 @@ func TestRunRejectsAnInvalidSlotCount(t *testing.T) {
 func TestRunRejectsAnInvalidAbandonLimit(t *testing.T) {
 	for _, v := range []string{"0", "65", "-1"} {
 		var stdout, stderr syncBuffer
-		code := runWith(t.Context(), []string{"--expr-max-abandoned=" + v}, &stdout, &stderr, func(int, int, *slog.Logger) exprSandbox {
+		code := runServe(t.Context(), []string{"--expr-max-abandoned=" + v}, &stdout, &stderr, testDeps(t, func(int, int, *slog.Logger) exprSandbox {
 			t.Error("the sandbox was built with an invalid limit")
 			return newFakeSandbox()
-		})
-		if code != exitUsage || !strings.Contains(stderr.String(), "invalid --expr-max-abandoned") {
+		}))
+		if code != exitValidation || !strings.Contains(stderr.String(), "expr.maxAbandoned") {
 			t.Errorf("--expr-max-abandoned=%s: exit %d, stderr %q", v, code, stderr.String())
 		}
 	}
+}
+
+// testDeps returns the dependencies of a server of a test: its own data directory, the
+// environment of the test and a fast poll for reload requests.
+func testDeps(t *testing.T, factory sandboxFactory) serveDeps {
+	t.Helper()
+	t.Setenv("ORCON_DATA_DIR", t.TempDir())
+	return serveDeps{newSandbox: factory, environ: os.Environ(), reloadPoll: 20 * time.Millisecond}
 }

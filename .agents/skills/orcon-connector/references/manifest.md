@@ -19,3 +19,4 @@ This file covers what an author writes in the `orcon/connector@1` manifest (ADR-
 - **MF-9** `changelog` has an entry for every version (`versioning.md`).
 - **MF-10** `n8n.types[]` is filled when an n8n node exists (`n8n-mapping.md`).
 - **MF-11** `ai.tool` hooks follow the AI design when it is accepted; never invent semantics here.
+- **MF-12** Never declare a parameter named `operation` or `resource`: they are reserved for operation selection (ADR-0029 §4). Conditions in `displayWhen` may use them; `resource` is the part of the operation name before the dot.

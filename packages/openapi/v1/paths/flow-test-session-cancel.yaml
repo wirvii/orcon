@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+  - $ref: ../openapi.yaml#/components/parameters/TestSessionId
+post:
+  operationId: cancelTestSession
+  summary: Cancel a test session
+  description: >-
+    Ends the session now and takes its test addresses down. The session stays readable with the status
+    EXPIRED, and canceling one that already ended returns it unchanged.
+  tags:
+    - testing
+  x-orcon-permission: flow:execute
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: none
+  x-orcon-audit-reason: >-
+    A test session is a short-lived window; opening it is audited and its events are recorded as executions.
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - idempotency-in-progress
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows test-sessions cancel
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: cancelActiveSession
+      scenario: flow-with-test-session
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+          testSessionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+      response:
+        status: 200
+        body: cancelActiveSession
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  responses:
+    '200':
+      description: The session after the cancel request.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/TestSession
+          examples:
+            cancelActiveSession:
+              summary: The session has ended
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69
+                flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                status: EXPIRED
+                draftRevision: 1
+                eventCount: 0
+                maximumEventCount: 1
+                addresses: []
+                createdAt: '2026-10-12T15:04:05Z'
+                expiresAt: '2026-10-12T15:06:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

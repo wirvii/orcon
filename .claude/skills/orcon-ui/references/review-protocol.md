@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Review protocol
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007
 
 How a UI change is reviewed visually before the owner sees it, and how the owner gate works. The rules being checked live in [foundations.md](foundations.md), [components.md](components.md) and [canvas.md](canvas.md); this document only describes the procedure.
 
@@ -30,7 +30,7 @@ Place each capture side by side with `brand/reference/orcon-board-primary.png` (
 | Nothing copied from n8n | No n8n code, CSS, icons, assets or branding; familiarity comes from measures, layout and interactions implemented with Lucide, Orcon icons and the Orcon palette |
 | Style A mockup | For canvas and editor work, compare each capture with `docs/design-system/mockups/editor-style-a.html` (style A tab, light and dark) and the measures of [canvas.md](canvas.md); the only deviations are the ones the specification lists |
 | Editor parity | Walk every row of [canvas.md#parity](canvas.md#parity) with the pointer and with the keyboard; each is equal to or better than the n8n editor experience and within its maximum steps |
-| Brand assets | BrandMark and Mascot show the neutral placeholders until approved assets exist; nothing tries to redraw the symbol or the character |
+| Brand assets | BrandMark, BrandHero and Mascot use only the approved files of brand/manifest.json; nothing redraws the symbol or the character |
 | Themes and densities | Dark is designed (stepped surfaces, lighter accents), not inverted; compact keeps hierarchy and readability |
 
 ## Findings table
@@ -50,7 +50,7 @@ Attach this table to the pull request, one row per finding (or a single row "No 
 
 1. **Record**: "Owner review status" in `docs/design-system/README.md` has one row per base component (the inventory in [components.md#inventory](components.md#inventory)) and per screen template S1 to S9. New or reset rows use `assets/review-record-template.md` with status `Pending`.
 2. **Owner review**: the owner reviews in the static Storybook of the commit named in the row and sets each row to `Approved` or `Changes requested`, with date and notes. Only the owner sets `Approved`.
-3. `BrandMark` and `Mascot` are reviewed as neutral placeholders; their final versions are reviewed when the approved brand assets are delivered.
+3. `BrandMark`, `BrandHero` and `Mascot` are reviewed against the boards in `brand/review/` and the owner's approval is recorded in `brand/manifest.json`.
 4. **Acceptance**: when every row is `Approved`, every normative reference changes its status line to `Status: Accepted` and `metadata.version` in `SKILL.md` becomes `1.1.0`. Until then, product screens must not rely on the design system as an accepted source.
 5. **Re-approval**: changing the visual baseline of an `Approved` component or template returns its row to `Pending`.
 6. **Editor parity review**: "Editor parity review" in `docs/design-system/README.md` has one row per row of [canvas.md#parity](canvas.md#parity) (P-01 to P-30). The owner records `Equal`, `Better` or `Worse — changes requested` with date and the commit of the reviewed Storybook; no row may stay `Worse` when the canvas and editor rows are approved. Visual baselines of the canvas and editor are generated only by the `visual-baselines` workflow in the pinned container.

@@ -1,0 +1,259 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: item
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+get:
+  operationId: getFlow
+  summary: Get a flow
+  description: >-
+    Returns one flow with the ETag of its current representation. Use the ETag as If-Match when you change
+    or delete the flow.
+  tags:
+    - flows
+  x-orcon-permission: flow:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows get
+  x-orcon-mcp:
+    level: read
+    tool: get_flow
+    description: Get one flow by id.
+  x-orcon-examples:
+    - name: getExistingFlow
+      scenario: project-with-flows
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      response:
+        status: 200
+        body: getExistingFlow
+  responses:
+    '200':
+      description: The flow.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Flow
+          examples:
+            getExistingFlow:
+              summary: A flow that was never published
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                name: Welcome email
+                activationState: INACTIVE
+                hasUnpublishedChanges: true
+                draftRevision: 0
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
+patch:
+  operationId: updateFlow
+  summary: Update a flow
+  description: >-
+    Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you
+    read in If-Match; a stale ETag is refused so concurrent edits are never lost. Request body limit:
+    1 MiB.
+  tags:
+    - flows
+  x-orcon-permission: flow:update
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: flow.updated
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - project-managed-by-git
+    - precondition-failed
+    - payload-too-large
+    - unsupported-media-type
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows update
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: renameFlow
+      scenario: project-with-flows
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        headers:
+          If-Match: '"0"'
+        body: renameFlow
+      response:
+        status: 200
+        body: renameFlow
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+  requestBody:
+    required: true
+    content:
+      application/merge-patch+json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/UpdateFlowRequest
+        examples:
+          renameFlow:
+            summary: Rename the flow
+            value:
+              name: Welcome email v2
+  responses:
+    '200':
+      description: The updated flow.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+        ETag:
+          $ref: ../openapi.yaml#/components/headers/ETag
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/Flow
+          examples:
+            renameFlow:
+              summary: The renamed flow
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                name: Welcome email v2
+                activationState: INACTIVE
+                hasUnpublishedChanges: true
+                draftRevision: 0
+                createdAt: '2026-10-12T15:04:05Z'
+                updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
+delete:
+  operationId: deleteFlow
+  summary: Delete a flow
+  description: >-
+    Deletes the flow and switches its automatic triggers off at once. Executions that are running continue
+    on their version, and the flow can be restored within 30 days, inactive.
+  tags:
+    - flows
+  x-orcon-permission: flow:delete
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-audit: flow.deleted
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - project-managed-by-git
+    - precondition-failed
+    - precondition-required
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows delete
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: deleteFlow
+      scenario: project-with-flows
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63
+        headers:
+          If-Match: '"0"'
+      response:
+        status: 204
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
+  responses:
+    '204':
+      description: The flow was deleted.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

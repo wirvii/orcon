@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
+import { Banner } from '../../components/banner/Banner';
 import { Button } from '../../components/button/Button';
 import { IconButton } from '../../components/icon-button/IconButton';
 import { Tabs } from '../../components/tabs/Tabs';
@@ -13,7 +14,7 @@ import { NodeGlyph } from '../../canvas/NodeGlyph';
 import { NodeStatusChip } from '../../canvas/node-status-chip/NodeStatusChip';
 import type { GraphNode } from '../../canvas/model';
 import { cn } from '../../lib/cn';
-import { scrim } from '../../lib/control';
+import { InsideModal, useScrim } from '../../lib/modal-nesting';
 import { PaneSplitter } from '../pane-splitter/PaneSplitter';
 import { editorMessages } from '../messages';
 
@@ -23,8 +24,11 @@ export interface NodeDetailsViewProps {
   node: GraphNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** `dialog` (lg and wider): three panes over the canvas. `docked` (md to lg): only the parameters pane, docked at the right of the canvas. */
-  layout?: 'dialog' | 'docked' | undefined;
+  /**
+   * `dialog` (lg and wider): three panes over the canvas. `docked` (md to lg): only the parameters pane, docked at the right of the canvas.
+   * `fullscreen` (below md, phones): the parameters pane alone, filling the screen.
+   */
+  layout?: 'dialog' | 'docked' | 'fullscreen' | undefined;
   /** The Input pane. A trigger has none. */
   input?: ReactNode | undefined;
   /** The Output pane. */
@@ -40,6 +44,11 @@ export interface NodeDetailsViewProps {
   onRename?: ((name: string) => void) | undefined;
   /** Moves focus back to the node tile on the canvas when the view closes. */
   onReturnFocus?: (() => void) | undefined;
+  /**
+   * Shows every value and no control that writes: the tab content is disabled, and the rename and
+   * execute actions are not offered. A notice above the tabs says why.
+   */
+  readOnly?: boolean | undefined;
   className?: string | undefined;
 }
 
@@ -161,8 +170,12 @@ function Header({ node, onBack, onExecute, onRename, compact = false }: { node: 
  * the canvas, and the editor shows the data in a panel at the bottom. The panes are separated by
  * handles that resize with the pointer and with the arrow keys. A trigger has no Input pane.
  */
-export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', input, output, tabs, alert, tab: tabProp, onTabChange, onExecute, onRename, onReturnFocus, className }: NodeDetailsViewProps) {
+export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', input, output, tabs, alert, tab: tabProp, onTabChange, onExecute, onRename, onReturnFocus, readOnly = false, className }: NodeDetailsViewProps) {
   const intl = useIntl();
+  const backdrop = useScrim();
+  // A read-only view offers no action that writes or runs anything.
+  const executeAction = readOnly ? undefined : onExecute;
+  const renameAction = readOnly ? undefined : onRename;
   const [localTab, setLocalTab] = useState<DetailsTab>('parameters');
   const tab = tabProp ?? localTab;
   const frame = useRef<HTMLDivElement>(null);
@@ -172,7 +185,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
   const trigger = node.kind === 'trigger';
   const minParams = 420;
   const maxParams = 640;
-  const paneMin = 280;
+  const paneMin = 260;
 
   useLayoutEffect(() => {
     if (layout !== 'dialog' || !open) return;
@@ -198,18 +211,37 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
 
   const tabItems = (['parameters', 'settings', 'docs', ...(node.kind === 'agent' ? (['agent'] as const) : [])] as DetailsTab[])
     .filter((id) => tabs[id] !== undefined)
-    .map((id) => ({
-      value: id,
-      label: intl.formatMessage(tabMessages[id]),
-      content: (
-        <div className="flex flex-col gap-3 pt-4">
+    .map((id) => {
+      const body = (
+        <>
           {id === 'parameters' ? alert : null}
           {tabs[id]}
-        </div>
-      ),
-    }));
+        </>
+      );
+      return {
+        value: id,
+        label: intl.formatMessage(tabMessages[id]),
+        // A disabled fieldset disables every control inside it, so a read-only view cannot be edited by any of them.
+        content: readOnly ? (
+          <fieldset disabled className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0 pt-4">
+            {body}
+          </fieldset>
+        ) : (
+          <div className="flex flex-col gap-3 pt-4">{body}</div>
+        ),
+      };
+    });
   const parameters = (
-    <Tabs tabs={tabItems} label={intl.formatMessage(editorMessages.tabsLabel)} value={tab} onValueChange={switchTab} className="min-h-0 flex-1 overflow-auto px-4 pt-2 pb-4" />
+    <>
+      {readOnly ? (
+        <div className="shrink-0 px-4 pt-3">
+          <Banner tone="info" title={intl.formatMessage(editorMessages.readOnlyTitle)}>
+            {intl.formatMessage(editorMessages.readOnlyText)}
+          </Banner>
+        </div>
+      ) : null}
+      <Tabs tabs={tabItems} label={intl.formatMessage(editorMessages.tabsLabel)} value={tab} onValueChange={switchTab} className="min-h-0 flex-1 overflow-auto px-4 pt-2 pb-4" />
+    </>
   );
 
   if (layout === 'docked') {
@@ -220,9 +252,35 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
         data-node-details="docked"
         className={cn('bg-surface border-border flex min-h-0 w-editor-docked-panel max-w-full shrink-0 flex-col border-s', className)}
       >
-        <Header node={node} compact onBack={() => { onOpenChange(false); onReturnFocus?.(); }} onExecute={onExecute} onRename={onRename} />
+        <Header node={node} compact onBack={() => { onOpenChange(false); onReturnFocus?.(); }} onExecute={executeAction} onRename={renameAction} />
         {parameters}
       </aside>
+    );
+  }
+
+  if (layout === 'fullscreen') {
+    return (
+      <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+        <DialogPrimitive.Portal>
+          <InsideModal.Provider value>
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            data-node-details="fullscreen"
+            onCloseAutoFocus={(event) => {
+              if (onReturnFocus) {
+                event.preventDefault();
+                onReturnFocus();
+              }
+            }}
+            className={cn('bg-surface text-fg fixed inset-0 z-modal flex min-w-0 flex-col overflow-hidden', className)}
+          >
+            <DialogPrimitive.Title className="sr-only">{intl.formatMessage(editorMessages.detailsTitle, { name: node.name })}</DialogPrimitive.Title>
+            <Header node={node} compact onBack={() => onOpenChange(false)} onExecute={executeAction} onRename={renameAction} />
+            {parameters}
+          </DialogPrimitive.Content>
+          </InsideModal.Provider>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     );
   }
 
@@ -232,7 +290,8 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={scrim} />
+        <DialogPrimitive.Overlay className={backdrop} />
+        <InsideModal.Provider value>
         <DialogPrimitive.Content
           aria-describedby={undefined}
           data-node-details="dialog"
@@ -245,7 +304,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
           className={cn('bg-surface text-fg border-border fixed inset-6 z-modal flex flex-col overflow-hidden rounded-lg border shadow-lg', className)}
         >
           <DialogPrimitive.Title className="sr-only">{intl.formatMessage(editorMessages.detailsTitle, { name: node.name })}</DialogPrimitive.Title>
-          <Header node={node} onBack={() => onOpenChange(false)} onExecute={onExecute} onRename={onRename} />
+          <Header node={node} onBack={() => onOpenChange(false)} onExecute={executeAction} onRename={renameAction} />
           <div ref={frame} className="flex min-h-0 flex-1">
             {!trigger ? (
               <>
@@ -271,6 +330,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
             </div>
           </div>
         </DialogPrimitive.Content>
+        </InsideModal.Provider>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );

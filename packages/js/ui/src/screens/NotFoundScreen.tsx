@@ -19,7 +19,7 @@ const messages = defineMessages({
   back: { id: 'screen.notFound.back', defaultMessage: 'Go back', description: 'Link on the page not found that goes to the previous page.' },
 });
 
-/** S8 (part 2): the 404 page. The mascot placeholder (explorer) is allowed here. */
+/** S8 (part 2): the 404 page. The thinking mascot is allowed on this full-page error screen. */
 export function NotFoundScreen() {
   const intl = useIntl();
   return (
@@ -28,7 +28,7 @@ export function NotFoundScreen() {
         <BrandMark />
       </header>
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col items-center justify-center gap-4 p-4 text-center">
-        <Mascot pose="explorer" />
+        <Mascot pose="thinking" />
         <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
         <p className="text-fg-muted max-w-screen-sm wrap-anywhere">{intl.formatMessage(messages.text)}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">

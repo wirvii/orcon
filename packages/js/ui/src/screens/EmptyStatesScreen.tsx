@@ -40,7 +40,7 @@ const messages = defineMessages({
 });
 
 /**
- * S8 (part 1): the empty states. The mascot placeholder appears only where nothing
+ * S8 (part 1): the empty states. The happy mascot appears only where nothing
  * has been created yet; a search with no results and a dense list use text only.
  */
 export function EmptyStatesScreen() {
@@ -53,7 +53,7 @@ export function EmptyStatesScreen() {
           <EmptyState
             title={intl.formatMessage(messages.firstTitle)}
             description={intl.formatMessage(messages.firstText)}
-            mascot={<Mascot pose="thinking" />}
+            mascot={<Mascot pose="happy" />}
             headingLevel={2}
             action={<Button>{intl.formatMessage(messages.firstAction)}</Button>}
           />

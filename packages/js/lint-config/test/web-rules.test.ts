@@ -55,6 +55,7 @@ interface PlantedCase {
 
 const planted: PlantedCase[] = [
   { folder: 'cross-feature-import', rule: 'boundaries/element-types', forbids: 'a feature importing another feature' },
+  { folder: 'components-import-forms', rule: 'boundaries/element-types', forbids: 'the components of a feature other than the editor importing its forms' },
   { folder: 'model-imports-react-component', rule: 'boundaries/element-types', forbids: 'model/ importing a React component' },
   { folder: 'utils-folder', rule: 'boundaries/no-unknown-files', forbids: 'a utils/ folder inside a feature' },
   { folder: 'barrel-index', rule: 'boundaries/no-unknown-files', forbids: 'a barrel index.ts inside a feature' },
@@ -84,8 +85,8 @@ describe('web rules: the planted cases are exactly the folders on disk', () => {
     expect(onDisk).toEqual(planted.map((entry) => entry.folder).sort());
   });
 
-  it('plants the 19 violations of the lint-case table in checks.md', () => {
-    expect(planted).toHaveLength(19);
+  it('plants the 19 violations of the lint-case table in checks.md and the one that bounds the editor exception', () => {
+    expect(planted).toHaveLength(20);
   });
 });
 

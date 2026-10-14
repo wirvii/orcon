@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+Flow:
+  type: object
+  description: >-
+    A flow of a project: an automation with one editable draft and immutable published versions.
+  required:
+    - id
+    - projectId
+    - name
+    - activationState
+    - hasUnpublishedChanges
+    - draftRevision
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the flow.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      readOnly: true
+    projectId:
+      type: string
+      format: uuid
+      description: Id of the project that owns the flow.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+    name:
+      type: string
+      description: Display name of the flow; unique among the flows of the project.
+      examples:
+        - Welcome email
+      maxLength: 200
+    activationState:
+      type: string
+      description: Whether the automatic triggers of the flow are on.
+      enum:
+        - ACTIVE
+        - INACTIVE
+      examples:
+        - INACTIVE
+    activeVersion:
+      type: integer
+      description: Number of the version new executions use; absent until the first publication.
+      examples:
+        - 3
+      minimum: 1
+    hasUnpublishedChanges:
+      type: boolean
+      description: Whether the draft differs from the active version.
+    draftRevision:
+      type: integer
+      description: Revision number of the draft, the value of its ETag.
+      examples:
+        - 7
+      minimum: 0
+    createdAt:
+      type: string
+      format: date-time
+      description: When the flow was created, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the flow last changed, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+FlowList:
+  type: object
+  description: One page of flows.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/Flow
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+CreateFlowRequest:
+  type: object
+  description: Fields of a new flow.
+  required:
+    - name
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      description: Display name of the flow; unique among the flows of the project.
+      examples:
+        - Welcome email
+      maxLength: 200
+UpdateFlowRequest:
+  type: object
+  description: Fields of a flow to change (JSON Merge Patch).
+  additionalProperties: false
+  properties:
+    name:
+      type: string
+      description: New display name of the flow.
+      examples:
+        - Welcome email v2
+      maxLength: 200

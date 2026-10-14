@@ -56,7 +56,7 @@ export default defineConfig({
   webServer: [
     staticServer
       ? { command: `node perf/serve-static.mjs ${String(appPort)}`, url: `http://127.0.0.1:${String(appPort)}/healthz`, timeout: 30_000, reuseExistingServer: false }
-      : { command: `${binary} --role=standalone --addr=127.0.0.1:${String(appPort)}`, url: `http://127.0.0.1:${String(appPort)}/healthz`, timeout: 30_000, reuseExistingServer: false },
+      : { command: `${binary} serve --role=standalone --http-address=127.0.0.1:${String(appPort)}`, url: `http://127.0.0.1:${String(appPort)}/healthz`, timeout: 30_000, reuseExistingServer: false },
     {
       command: `pnpm exec vite preview --config vite.perf.config.ts --host 127.0.0.1 --port ${String(editorPort)} --strictPort`,
       url: `http://127.0.0.1:${String(editorPort)}/`,

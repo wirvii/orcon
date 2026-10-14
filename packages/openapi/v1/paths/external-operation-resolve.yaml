@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: action
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/ExternalOperationId
+post:
+  operationId: resolveExternalOperation
+  summary: Resolve an uncertain external operation
+  description: >-
+    Closes an external operation whose outcome is not known, with one of four supervised resolutions and
+    the evidence you checked. Accepting a risk is recorded in the audit log and is never proof that the
+    operation happened. Request body limit: 1 MiB.
+  tags:
+    - executions
+  x-orcon-permission: execution:resolve
+  x-orcon-rate-class: write
+  x-orcon-stability: stable
+  x-orcon-idempotency: optional
+  x-orcon-audit: execution.uncertain_resolved
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - conflict
+    - idempotency-in-progress
+    - payload-too-large
+    - unsupported-media-type
+    - idempotency-key-reused
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: external-operations resolve
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: markSucceeded
+      scenario: execution-with-uncertain-operation
+      request:
+        pathParams:
+          externalOperationId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a67
+        body: markSucceeded
+      response:
+        status: 200
+        body: markSucceeded
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../openapi.yaml#/components/schemas/ResolveExternalOperationRequest
+        examples:
+          markSucceeded:
+            summary: The operation happened
+            value:
+              resolution: MARK_SUCCEEDED
+              evidence: 'Checked in the CRM: contact 4711 exists and has the welcome tag.'
+              acceptRisk: true
+  responses:
+    '200':
+      description: The resolved external operation.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/ExternalOperation
+          examples:
+            markSucceeded:
+              summary: Resolved as succeeded
+              value:
+                id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a67
+                executionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                nodeExecutionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a66
+                status: RESOLVED_SUCCEEDED
+                resolvedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+                resolvedAt: '2026-10-12T15:04:09Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '409':
+      $ref: ../openapi.yaml#/components/responses/Conflict
+    '413':
+      $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
+    '422':
+      $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

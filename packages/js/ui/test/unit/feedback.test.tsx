@@ -6,7 +6,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Banner } from '../../src/components/banner/Banner';
-import { BrandMark } from '../../src/components/brand-mark/BrandMark';
 import { ConnectorIcon } from '../../src/components/connector-icon/ConnectorIcon';
 import { EmptyState } from '../../src/components/empty-state/EmptyState';
 import { ErrorBoundary } from '../../src/components/error-boundary/ErrorBoundary';
@@ -14,7 +13,6 @@ import { ErrorSummary } from '../../src/components/error-summary/ErrorSummary';
 import { FormField } from '../../src/components/form-field/FormField';
 import { ProblemErrorsProvider } from '../../src/components/form-field/problem-errors';
 import { Input } from '../../src/components/input/Input';
-import { Mascot } from '../../src/components/mascot/Mascot';
 import { ProblemAlert } from '../../src/components/problem-alert/ProblemAlert';
 import { fieldIdForName, problemFieldErrors, type ProblemDetails } from '../../src/components/problem-alert/problem';
 import { ProtectedValue, RedactedValue } from '../../src/components/redacted-value/RedactedValue';
@@ -196,24 +194,11 @@ describe('RedactedValue', () => {
   });
 });
 
-describe('EmptyState, Mascot, BrandMark, ConnectorIcon', () => {
+describe('EmptyState, ConnectorIcon', () => {
   it('EmptyState uses the requested heading level and renders its action', () => {
     renderWithProviders(<EmptyState title="No flows yet" headingLevel={3} action={<button type="button">Create</button>} />);
     expect(screen.getByRole('heading', { level: 3, name: 'No flows yet' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
-  });
-
-  it('Mascot is a hidden, text-free placeholder', () => {
-    const { container } = renderWithProviders(<Mascot pose="explorer" />);
-    const frame = container.firstElementChild;
-    expect(frame).toHaveAttribute('aria-hidden', 'true');
-    expect(frame).toHaveAttribute('data-placeholder');
-    expect(frame?.textContent).toBe('');
-  });
-
-  it('BrandMark is named Orcon and flagged as a placeholder', () => {
-    renderWithProviders(<BrandMark />);
-    expect(screen.getByRole('img', { name: 'Orcon' })).toHaveAttribute('data-placeholder');
   });
 
   it('ConnectorIcon renders an <img> named after the connector, never inline SVG', () => {

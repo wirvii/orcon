@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { fallbackPositions, snap } from './canvas-graph';
 import { edgeKindFor, edgeProblem } from './document-ops';
 import { FLOW_FRAGMENT_FORMAT } from './clipboard-format';
-import { deepCopy, editorBlock, editorSchema, flowEdgeSchema, flowNodeSchema, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowNode, type Point, type StickyNote } from './flow-document';
+import { deepCopy, editorBlock, editorSchema, flowEdgeSchema, flowNodeSchema, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowNode, type NodeEditor, type Point, type StickyNote } from './flow-document';
 import { namesOf, uniqueName } from './names';
 import { NODE_TYPES, UNSUPPORTED_TYPE } from './node-types';
 
@@ -42,10 +42,11 @@ export function buildFragment(document: FlowDocument, ids: ReadonlySet<string>):
   const fallback = document.nodes.some((node) => document.editor.nodes?.[node.id] === undefined) ? fallbackPositions(document) : undefined;
   const nodes = document.nodes.filter((node) => ids.has(node.id)).map((node) => deepCopy(node));
   nodes.forEach(nameOnlyCredentials);
-  const positions: Record<string, Point> = {};
+  const positions: Record<string, NodeEditor> = {};
   for (const node of nodes) {
     const at = document.editor.nodes?.[node.id] ?? fallback?.get(node.id) ?? { x: 0, y: 0 };
-    positions[node.id] = { x: at.x, y: at.y };
+    const note = document.editor.nodes?.[node.id]?.note;
+    positions[node.id] = { x: at.x, y: at.y, ...(note === undefined ? {} : { note }) };
   }
   return {
     format: FLOW_FRAGMENT_FORMAT,
@@ -126,7 +127,8 @@ export function pasteFragment(document: FlowDocument, fragment: FlowFragment, op
     if ('attachedTo' in node) node['attachedTo'] = remap(node['attachedTo']);
     document.nodes.push(node);
     const at = sourcePositions[source.id] ?? { x: 0, y: 0 };
-    editor.nodes[node.id] = { x: bound(snap(at.x + delta.x)), y: bound(snap(at.y + delta.y)) };
+    const note = fragment.editor.nodes?.[source.id]?.note;
+    editor.nodes[node.id] = { x: bound(snap(at.x + delta.x)), y: bound(snap(at.y + delta.y)), ...(note === undefined ? {} : { note }) };
     nodeIds.push(node.id);
   }
 

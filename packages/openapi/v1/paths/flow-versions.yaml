@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/FlowId
+get:
+  operationId: listFlowVersions
+  summary: List the versions of a flow
+  description: >-
+    Returns the published versions of a flow, one page at a time, without their documents. Use it to find
+    the number of the version to read or to roll back to.
+  tags:
+    - flows
+  x-orcon-permission: flow:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: flows versions
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: versionsOfPublishedFlow
+      scenario: flow-published
+      request:
+        pathParams:
+          flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+      response:
+        status: 200
+        body: versionsOfPublishedFlow
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+    - name: sort
+      in: query
+      required: false
+      description: Sort expression; a leading minus sorts in descending order.
+      x-orcon-sort-default: -version
+      schema:
+        type: string
+        enum:
+          - version
+          - -version
+        x-orcon-enum-kind: identifier
+        default: -version
+  responses:
+    '200':
+      description: One page of versions.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/FlowVersionList
+          examples:
+            versionsOfPublishedFlow:
+              summary: The published versions, newest first
+              value:
+                items:
+                  - flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                    version: 1
+                    contentHash: sha256:4f2a9c0d7e8b1a36c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f00112233445566778
+                    publishedAt: '2026-10-12T15:10:00Z'
+                    publishedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+                    warnings: []
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

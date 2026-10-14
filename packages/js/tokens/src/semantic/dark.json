@@ -20,6 +20,13 @@
       "$value": "{color.slate.50}"
     }
   },
+  "mascot": {
+    "$type": "color",
+    "panel": {
+      "$value": "{color.slate.600}",
+      "$description": "Soft rounded box behind the mascot. The dark theme uses a lighter tone so the dark question mark of the thinking pose stays legible."
+    }
+  },
   "fg": {
     "$type": "color",
     "default": {

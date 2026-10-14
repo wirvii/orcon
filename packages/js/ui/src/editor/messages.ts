@@ -13,6 +13,12 @@ export const editorMessages = defineMessages({
   tabsLabel: { id: 'editor.tabs.label', defaultMessage: 'Node settings', description: 'Accessible name of the tabs of the node settings pane.' },
   backToCanvas: { id: 'editor.details.back', defaultMessage: 'Back to canvas', description: 'Button that closes the node details and returns to the flow canvas.' },
   executeStep: { id: 'editor.details.executeStep', defaultMessage: 'Execute step', description: 'Button that runs the node being edited with the data it has.' },
+  readOnlyTitle: { id: 'editor.details.readOnly.title', defaultMessage: 'Read-only on this screen', description: 'Title of the notice that a node cannot be edited on a phone.' },
+  readOnlyText: {
+    id: 'editor.details.readOnly.text',
+    defaultMessage: 'You can read every value here. Open the flow on a larger screen to change it.',
+    description: 'Explains the read-only notice: values are shown, and editing needs a wider screen.',
+  },
   detailsTitle: { id: 'editor.details.title', defaultMessage: '{name} details', description: 'Accessible name of the node details view. {name} is the node name.' },
   detailsDescription: {
     id: 'editor.details.description',

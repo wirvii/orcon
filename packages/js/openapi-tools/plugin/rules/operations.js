@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
 import { MUTATING, isObject } from '../model.js';
-import { SNAKE, STABILITIES, defineRule, lastLiteral } from '../rule.js';
+import { KEBAB, SNAKE, STABILITIES, defineRule, lastLiteral } from '../rule.js';
 import { READ_VERBS, RUN_VERBS } from '../verbs.js';
 
 const headerParam = (model, entry, name) => model.parameters(entry).find((p) => p.in === 'header' && p.name.toLowerCase() === name.toLowerCase());
@@ -135,6 +135,16 @@ export const stability = defineRule((model, report) => {
       report('VER-1', `${entry.kind === 'webhook' ? 'Webhook' : entry.method.toUpperCase()} ${entry.key} declares x-orcon-stability: ${STABILITIES.join(' | ')}.`, entry.loc);
       continue;
     }
+    // The feature that Orcon-Experimental must name (SPEC-005 Amendment 8, Q-API-B): required if and
+    // only if the operation is experimental.
+    const feature = entry.op['x-orcon-experimental-feature'];
+    if (value === 'experimental') {
+      if (typeof feature !== 'string' || !KEBAB.test(feature)) {
+        report('VER-1', 'An experimental operation declares x-orcon-experimental-feature, a kebab-case feature name.', entry.loc.child(['x-orcon-experimental-feature']));
+      }
+    } else if (feature !== undefined) {
+      report('VER-1', 'x-orcon-experimental-feature is only for experimental operations.', entry.loc.child(['x-orcon-experimental-feature']));
+    }
     if (value === 'experimental' && entry.kind === 'path') {
       if (!headerParam(model, entry, 'Orcon-Experimental')) report('VER-1', 'An experimental operation takes the Orcon-Experimental header.', entry.loc);
       const problems = entry.op['x-orcon-problems'];
@@ -242,6 +252,15 @@ export const permission = defineRule((model, report, options) => {
     const loc = entry.loc.child(['x-orcon-permission']);
     if (value === undefined) {
       report('CHAN-7', `${entry.method.toUpperCase()} ${entry.key} declares x-orcon-permission.`, entry.loc);
+      continue;
+    }
+    // An empty security list opens an operation to everyone, so it is allowed only together with the
+    // anonymous permission (SPEC-005 BL-088); the server refuses the other combinations too.
+    if (Array.isArray(entry.op.security) && entry.op.security.length === 0 && value !== 'anonymous') {
+      report('CHAN-7', 'security: [] is only for operations with the anonymous permission.', entry.loc.child(['security']));
+    }
+    if (isObject(value) && 'allOf' in value && 'anyOf' in value) {
+      report('CHAN-7', 'x-orcon-permission declares allOf or anyOf, not both.', loc);
       continue;
     }
     const names = permissionNames(value);

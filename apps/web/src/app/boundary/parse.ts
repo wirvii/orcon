@@ -26,3 +26,17 @@ export function tryParse<T>(schema: ZodType<T>, input: unknown, source = 'value'
   const result = schema.safeParse(input);
   return result.success ? { ok: true, value: result.data } : { ok: false, error: new ContractError(source, result.error.issues) };
 }
+
+/** The value a text holds as JSON, or a failure when it is not JSON. The value is `unknown`: check it before use. */
+export function parseJsonText(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Whether a text is valid JSON. */
+export function isJsonText(text: string): boolean {
+  return parseJsonText(text).ok;
+}

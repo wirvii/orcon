@@ -7,8 +7,9 @@ import type { ReactElement, ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 import { cn } from '../../lib/cn';
-import { modalPanel, scrim } from '../../lib/control';
+import { modalPanel } from '../../lib/control';
 import { commonMessages } from '../../lib/messages';
+import { InsideModal, useScrim } from '../../lib/modal-nesting';
 import { IconButton } from '../icon-button/IconButton';
 
 export interface DialogProps {
@@ -33,11 +34,12 @@ export interface DialogProps {
  */
 export function Dialog({ open, defaultOpen, onOpenChange, trigger, title, description, children, footer, className }: DialogProps) {
   const intl = useIntl();
+  const backdrop = useScrim();
   return (
     <DialogPrimitive.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={scrim} />
+        <DialogPrimitive.Overlay className={backdrop} />
         <div className="pointer-events-none fixed inset-0 z-modal flex items-center justify-center p-4">
           <DialogPrimitive.Content
             {...(description ? {} : { 'aria-describedby': undefined })}
@@ -54,7 +56,7 @@ export function Dialog({ open, defaultOpen, onOpenChange, trigger, title, descri
               </DialogPrimitive.Close>
             </div>
             {description ? <DialogPrimitive.Description className="text-fg-muted">{description}</DialogPrimitive.Description> : null}
-            {children}
+            <InsideModal.Provider value>{children}</InsideModal.Provider>
             {footer ? <div className="flex flex-wrap justify-end gap-2 pt-1">{footer}</div> : null}
           </DialogPrimitive.Content>
         </div>

@@ -150,6 +150,12 @@ export interface WorkflowCanvasProps {
   onGraphChange?: ((graph: Graph) => void) | undefined;
   /** Enter, double-click or "Open details" on a node. Without it, a node opens a panel with its state and counts. */
   onOpenDetails?: ((nodeId: string, tab?: 'agent') => void) | undefined;
+  /**
+   * Below the md breakpoint, where the canvas is read-only: a tap on a node. Without it, a phone
+   * shows the short panel with the node's state and counts. A host that opens its own details view
+   * on phones passes this.
+   */
+  onOpenPhoneDetails?: ((nodeId: string) => void) | undefined;
   /** Run one node (the toolbar and the R key). */
   onRunStep?: ((nodeId: string) => void) | undefined;
   /** Run the whole flow from a trigger. */
@@ -287,6 +293,7 @@ function Canvas({
   overlay,
   onGraphChange,
   onOpenDetails,
+  onOpenPhoneDetails,
   onRunStep,
   onExecuteWorkflow,
   executionHref,
@@ -510,9 +517,10 @@ function Canvas({
         return;
       }
       if (wide && onOpenDetails) onOpenDetails(id, tab);
+      else if (!wide && onOpenPhoneDetails) onOpenPhoneDetails(id);
       else setDetailsId(id);
     },
-    [wide, onOpenDetails],
+    [wide, onOpenDetails, onOpenPhoneDetails],
   );
 
   const lastFocus = useRef<HTMLElement | null>(null);
@@ -1091,7 +1099,9 @@ function Canvas({
                 commit(setPositions(baseRef.current, new Map(dragged.map((node) => [node.id, node.position]))));
               }}
               onNodeClick={(_event, node) => {
-                if (!editable && node.type === 'tile') setDetailsId(node.id);
+                if (editable || node.type !== 'tile') return;
+                if (!wide && onOpenPhoneDetails) onOpenPhoneDetails(node.id);
+                else setDetailsId(node.id);
               }}
               onNodeDoubleClick={(_event, node) => {
                 if (editable && node.type === 'tile') openDetails(node.id);
