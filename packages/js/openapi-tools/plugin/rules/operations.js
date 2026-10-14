@@ -245,6 +245,13 @@ export function permissionNames(value) {
   return undefined;
 }
 
+/**
+ * The only non-protocol operations that may declare the anonymous permission: the sign-in, the sign-in
+ * state read and the first-run setup (ADR-0080 section 4, as amended by SPEC-016). The list is closed; a
+ * new anonymous operation needs an amendment of that section before it can be added here.
+ */
+const ANONYMOUS_OPERATION_IDS = Object.freeze(['createSession', 'getSetupState', 'createSetupSession']);
+
 export const permission = defineRule((model, report, options) => {
   const catalog = typeof options.permissionsFile === 'string' ? loadPermissions(options.permissionsFile) : undefined;
   for (const entry of model.pathOperations) {
@@ -270,7 +277,8 @@ export const permission = defineRule((model, report, options) => {
     }
     for (const name of names) {
       if (name === 'anonymous') {
-        if (!entry.protocol || typeof value !== 'string') report('CHAN-7', 'anonymous is allowed only on protocol operations.', loc);
+        const allowed = entry.protocol || ANONYMOUS_OPERATION_IDS.includes(entry.op.operationId);
+        if (!allowed || typeof value !== 'string') report('CHAN-7', 'anonymous is allowed only on protocol operations.', loc);
       } else if (name !== 'authenticated' && catalog?.names && !catalog.names.has(name)) {
         report('CHAN-7', `Permission "${name}" is not in the permission catalog.`, loc);
       }
