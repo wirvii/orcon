@@ -356,8 +356,9 @@ func (t *pgTx) InsertToken(ctx context.Context, tok *store.Token) error {
 		ID: pgUUID(tok.ID), OrgID: pgUUID(tok.OrgID), ExecutionID: pgUUID(tok.ExecutionID), Status: tok.Status,
 		NodeID: tok.NodeID, EdgeID: nullText(tok.EdgeID), ScopePath: tok.ScopePath, ForkLineageDocument: tok.ForkLineage,
 		PayloadReference: nullText(tok.PayloadReference), FairnessKey: tok.FairnessKey, EffectivePriority: tok.EffectivePriority,
-		AvailableAt: timestamp(tok.AvailableAt), LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
-		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
+		AvailableAt: nullTimestamp(tok.AvailableAt), QueueOrder: tok.QueueOrder, LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
+		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), LeaseMilliseconds: tok.LeaseTTL.Milliseconds(),
+		CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
 	})
 }
 
@@ -367,7 +368,7 @@ func (t *pgTx) InsertNodeExecution(ctx context.Context, n store.NodeExecution) e
 	}
 	return t.q.InsertNodeExecution(ctx, sqlcgen.InsertNodeExecutionParams{
 		ID: pgUUID(n.ID), OrgID: pgUUID(n.OrgID), ExecutionID: pgUUID(n.ExecutionID), TokenID: pgUUID(n.TokenID),
-		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt), FinishedAt: nullTimestamp(n.FinishedAt),
 		CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/wirvii/orcon/internal/execution/executiontest" // defines the flags the criteria commands pass to every package
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/platform/id"
 )

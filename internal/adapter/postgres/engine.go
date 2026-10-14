@@ -116,17 +116,19 @@ func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThres
 }
 
 // ReleaseWorkerLeases implements [store.WorkQueue].
-func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, now time.Time) ([]store.TokenRef, error) {
-	var out []store.TokenRef
+func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]store.Reaped, error) {
+	var out []store.Reaped
 	err := s.engineRows(ctx, "release worker leases",
-		`SELECT org_id, id FROM orcon_engine.release_worker_leases($1, $2)`,
-		[]any{pgUUID(worker), timestamp(now)},
+		`SELECT org_id, id, execution_id, abandoned_count, is_poisoned FROM orcon_engine.release_worker_leases($1, $2, $3)`,
+		[]any{pgUUID(worker), poisonThreshold, timestamp(now)},
 		func(rows pgx.Rows) error {
-			var org, tok pgtype.UUID
-			if err := rows.Scan(&org, &tok); err != nil {
+			var org, tok, exec pgtype.UUID
+			var abandoned int64
+			var poisoned bool
+			if err := rows.Scan(&org, &tok, &exec, &abandoned, &poisoned); err != nil {
 				return err
 			}
-			out = append(out, store.TokenRef{OrgID: fromPGUUID[identity.OrgID](org), TokenID: fromPGUUID[store.TokenID](tok)})
+			out = append(out, store.Reaped{OrgID: fromPGUUID[identity.OrgID](org), TokenID: fromPGUUID[store.TokenID](tok), ExecutionID: fromPGUUID[store.ExecutionID](exec), AbandonedCount: abandoned, Poisoned: poisoned})
 			return nil
 		})
 	return out, err

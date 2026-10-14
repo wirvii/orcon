@@ -322,7 +322,7 @@ func engineCalls() []dbrules.EngineCall {
 		{Name: "claim_tokens with fairness keys", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", ARRAY['k'], 10, 1000, now())"},
 		{Name: "renew_leases", SQL: "SELECT org_id FROM orcon_engine.renew_leases(" + worker + ", 1000, now())"},
 		{Name: "release_expired_leases", SQL: "SELECT org_id FROM orcon_engine.release_expired_leases(10, 3, now())"},
-		{Name: "release_worker_leases", SQL: "SELECT org_id FROM orcon_engine.release_worker_leases(" + worker + ", now())"},
+		{Name: "release_worker_leases", SQL: "SELECT org_id FROM orcon_engine.release_worker_leases(" + worker + ", 3, now())"},
 		{Name: "fire_due_timers", List: true, SQL: "SELECT org_id FROM orcon_engine.fire_due_timers(10, now())"},
 		{Name: "claim_outbox", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_outbox(" + worker + ", 10, 1000, now())"},
 		{Name: "resolve_wait_secret", SQL: "SELECT org_id FROM orcon_engine.resolve_wait_secret(" + worker + ")"},

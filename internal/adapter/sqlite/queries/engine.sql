@@ -35,13 +35,16 @@ RETURNING org_id, id, lease_epoch,
 UPDATE token
 SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
     suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
-    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = sqlc.arg(now)
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
+    updated_at = sqlc.arg(now)
 WHERE id IN (
   SELECT t.id FROM token t
   WHERE t.status = 'LEASED' AND t.lease_expires_at < sqlc.arg(now)
   ORDER BY t.lease_expires_at
   LIMIT sqlc.arg(page_size))
-RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
 
 -- name: MarkTokenAttemptsAbandoned :execrows
 -- orcon:scope engine
@@ -54,17 +57,35 @@ WHERE task_attempt.org_id = sqlc.arg(org_id) AND task_attempt.status = 'STARTED'
 -- orcon:scope engine
 -- orcon:hot
 UPDATE token
-SET status = 'RUNNABLE', lease_owner = NULL, lease_expires_at = NULL, updated_at = sqlc.arg(now)
-WHERE lease_owner = sqlc.arg(worker_id) AND status = 'LEASED'
-RETURNING org_id, id;
+SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
+    updated_at = sqlc.arg(now)
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.lease_owner = sqlc.arg(worker_id) AND t.status = 'LEASED'
+  LIMIT sqlc.arg(page_size))
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
 
 -- Startup of a standalone process: the lock file guarantees no other holder can exist, so every lease is released at
--- once (ADR-0013 section 9).
--- name: ReleaseAllLeases :execrows
+-- once (ADR-0013 section 9). A lease a crashed predecessor left counts as an abandonment, so that a token that
+-- crashes the process every time reaches the poison threshold.
+-- name: ReleaseAllLeases :many
 -- orcon:scope engine
 UPDATE token
-SET status = 'RUNNABLE', lease_owner = NULL, lease_expires_at = NULL, updated_at = sqlc.arg(now)
-WHERE status = 'LEASED';
+SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
+    updated_at = sqlc.arg(now)
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'LEASED'
+  LIMIT sqlc.arg(page_size))
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
 
 -- name: MarkDueTimersFired :many
 -- orcon:scope engine
@@ -104,3 +125,25 @@ SELECT count(*) AS arrival_count, count(*) FILTER (WHERE is_live = 1) AS live_co
 FROM join_arrival
 WHERE org_id = sqlc.arg(org_id) AND execution_id = sqlc.arg(execution_id) AND node_id = sqlc.arg(node_id)
   AND scope_path = sqlc.arg(scope_path) AND round_number = sqlc.arg(round_number);
+
+-- A timer fired: the token that waits for it runs again. The conditional update leaves a token that moved on alone.
+-- name: UpdateWokenToken :execrows
+-- orcon:scope engine
+UPDATE token
+SET status = 'RUNNABLE', available_at = sqlc.arg(now), updated_at = sqlc.arg(now)
+WHERE token.org_id = sqlc.arg(org_id) AND token.id = sqlc.arg(token_id) AND token.status = 'WAITING';
+
+-- The status an execution takes from its counters after recovery or a wake-up (ADR-0009 section 1).
+-- name: UpdateExecutionStatus :execrows
+-- orcon:scope engine
+UPDATE execution
+SET status = sqlc.arg(status), updated_at = sqlc.arg(now)
+WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id);
+
+-- The first claim of a token of an execution starts it (ADR-0009 section 1: QUEUED to RUNNING when the first token is
+-- claimed).
+-- name: UpdateStartedExecution :execrows
+-- orcon:scope engine
+UPDATE execution
+SET status = 'RUNNING', started_at = COALESCE(execution.started_at, sqlc.arg(now)), updated_at = sqlc.arg(now)
+WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id) AND execution.status = 'QUEUED';

@@ -65,6 +65,10 @@ type Options struct {
 	Clock clock.Clock
 	// Synchronous is the durability mode; [SynchronousFull] when zero.
 	Synchronous Synchronous
+	// PoisonThreshold is the number of abandonments after which a token is
+	// suspended as poison, counting the leases released when the process starts;
+	// [DefaultPoisonThreshold] when zero.
+	PoisonThreshold int64
 	// Readers is the size of the read connection pool; GOMAXPROCS when zero.
 	Readers int
 	// BusyTimeout bounds the wait for a locked database; 5 s when zero.
@@ -104,6 +108,9 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	}
 	if opts.Synchronous == 0 {
 		opts.Synchronous = SynchronousFull
+	}
+	if opts.PoisonThreshold <= 0 {
+		opts.PoisonThreshold = DefaultPoisonThreshold
 	}
 	if opts.Readers <= 0 {
 		opts.Readers = runtime.GOMAXPROCS(0)

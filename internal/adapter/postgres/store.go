@@ -170,6 +170,12 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 // inOrg runs fn in a READ COMMITTED transaction whose organization context is
 // org (orcon-db TI-6: a transaction-local setting, never a session one).
 func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	return s.inOrgIso(ctx, op, org, pgx.ReadCommitted, readOnly, fn)
+}
+
+// inOrgIso is inOrg at an isolation level of the caller's choosing: a read
+// that must see one snapshot of several statements asks for REPEATABLE READ.
+func (s *Store) inOrgIso(ctx context.Context, op string, org fmt.Stringer, iso pgx.TxIsoLevel, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
@@ -179,7 +185,7 @@ func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly
 	if readOnly {
 		mode = pgx.ReadOnly
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: mode})
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: iso, AccessMode: mode})
 	if err != nil {
 		return mapError(op, err)
 	}

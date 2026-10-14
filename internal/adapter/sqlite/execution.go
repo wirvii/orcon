@@ -20,6 +20,7 @@ import (
 
 var (
 	_ store.Reader       = (*Store)(nil)
+	_ store.EngineReader = (*Store)(nil)
 	_ store.Inbox        = (*Store)(nil)
 	_ store.Transactor   = (*Store)(nil)
 	_ store.WorkQueue    = (*Store)(nil)
@@ -327,13 +328,16 @@ func (s *Store) GetJoinInstance(ctx context.Context, key store.JoinKey) (store.J
 // under a savepoint of the group commit, so an error rolls back its writes only.
 func (s *Store) InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error {
 	return s.write(ctx, "transaction", func(ctx context.Context, q *sqlcgen.Queries) error {
-		return fn(ctx, &sqliteTx{q: q, org: org})
+		return fn(ctx, &sqliteTx{q: q, org: org, now: s.clock.Now})
 	})
 }
 
 type sqliteTx struct {
 	q   *sqlcgen.Queries
 	org identity.OrgID
+	// now is the clock of the store: the instants a lease and the availability of a
+	// token are counted from.
+	now func() time.Time
 }
 
 var errOtherOrganization = errors.New("the record belongs to another organization than the transaction")
@@ -407,8 +411,8 @@ func (t *sqliteTx) InsertToken(ctx context.Context, tok *store.Token) error {
 		ID: uuidBytes(tok.ID), OrgID: uuidBytes(tok.OrgID), ExecutionID: uuidBytes(tok.ExecutionID), Status: tok.Status,
 		NodeID: tok.NodeID, EdgeID: nullText(tok.EdgeID), ScopePath: tok.ScopePath, ForkLineageDocument: tok.ForkLineage,
 		PayloadReference: nullText(tok.PayloadReference), FairnessKey: tok.FairnessKey, EffectivePriority: tok.EffectivePriority,
-		AvailableAt: micros(tok.AvailableAt), LeaseOwner: nullUUIDBytes(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
-		LeaseExpiresAt: nullMicros(tok.LeaseExpiresAt), CreatedAt: micros(tok.CreatedAt), UpdatedAt: micros(tok.UpdatedAt),
+		AvailableAt: availableAt(tok.AvailableAt, t.now(), tok.QueueOrder), LeaseOwner: nullUUIDBytes(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
+		LeaseExpiresAt: leaseExpiry(tok, t.now()), CreatedAt: micros(tok.CreatedAt), UpdatedAt: micros(tok.UpdatedAt),
 	})
 }
 
@@ -418,7 +422,7 @@ func (t *sqliteTx) InsertNodeExecution(ctx context.Context, n store.NodeExecutio
 	}
 	return t.q.InsertNodeExecution(ctx, sqlcgen.InsertNodeExecutionParams{
 		ID: uuidBytes(n.ID), OrgID: uuidBytes(n.OrgID), ExecutionID: uuidBytes(n.ExecutionID), TokenID: uuidBytes(n.TokenID),
-		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt), FinishedAt: nullMicros(n.FinishedAt),
 		CreatedAt: micros(n.CreatedAt), UpdatedAt: micros(n.UpdatedAt),
 	})
 }
@@ -588,13 +592,17 @@ func boolToInt(b bool) int64 {
 // ClaimTokens implements [store.WorkQueue].
 func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
 	var out []store.Claimed
+	// One process owns the file, so its clock is the database clock: the instant of the
+	// caller is not used, and a worker whose clock is off cannot make a lease
+	// expire early or late (ADR-0013 section 4).
+	now := s.clock.Now()
 	keys := r.FairnessKeys
 	if len(keys) == 0 {
 		keys = []string{""} // the slice is never empty; AnyFairnessKey decides
 	}
 	err := s.write(ctx, "claim tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
-			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(r.Now.Add(r.LeaseTTL)), Valid: true}, Now: micros(r.Now),
+			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
 			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PageSize: clampPage(r.Limit),
 		})
 		if err != nil {
@@ -612,6 +620,9 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 			if d.err != nil {
 				return d.err
 			}
+			if err := startExecution(ctx, q, row.OrgID, row.ExecutionID, now); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -619,8 +630,9 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 }
 
 // RenewLeases implements [store.WorkQueue].
-func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]store.Renewed, error) {
+func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, _ time.Time) ([]store.Renewed, error) {
 	var out []store.Renewed
+	now := s.clock.Now()
 	err := s.write(ctx, "renew leases", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.RenewLeases(ctx, sql.NullInt64{Int64: micros(now.Add(ttl)), Valid: true}, micros(now), uuidBytes(worker))
 		if err != nil {
@@ -641,81 +653,10 @@ func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl 
 	return out, err
 }
 
-// ReleaseExpiredLeases implements [store.WorkQueue].
-func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]store.Reaped, error) {
-	var out []store.Reaped
-	err := s.write(ctx, "release expired leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ReleaseExpiredLeases(ctx, poisonThreshold, micros(now), clampPage(limit))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			r := store.Reaped{
-				OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TokenID: uuidField[store.TokenID](&d, rows[i].ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, rows[i].ExecutionID), AbandonedCount: rows[i].AbandonedCount,
-				Poisoned: rows[i].Column5 == 1,
-			}
-			if d.err != nil {
-				return d.err
-			}
-			if _, err := q.MarkTokenAttemptsAbandoned(ctx, sql.NullInt64{Int64: micros(now), Valid: true}, rows[i].OrgID, rows[i].ID); err != nil {
-				return err
-			}
-			out = append(out, r)
-		}
-		return nil
-	})
-	return out, err
-}
-
-// ReleaseWorkerLeases implements [store.WorkQueue].
-func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, now time.Time) ([]store.TokenRef, error) {
-	var out []store.TokenRef
-	err := s.write(ctx, "release worker leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ReleaseWorkerLeases(ctx, micros(now), uuidBytes(worker))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			out = append(out, store.TokenRef{OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TokenID: uuidField[store.TokenID](&d, rows[i].ID)})
-			if d.err != nil {
-				return d.err
-			}
-		}
-		return nil
-	})
-	return out, err
-}
-
-// FireDueTimers implements [store.WorkQueue].
-func (s *Store) FireDueTimers(ctx context.Context, limit int, now time.Time) ([]store.FiredTimer, error) {
-	var out []store.FiredTimer
-	err := s.write(ctx, "fire due timers", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.MarkDueTimersFired(ctx, micros(now), clampPage(limit))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			out = append(out, store.FiredTimer{
-				OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TimerID: uuidField[store.TimerID](&d, rows[i].ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, rows[i].ExecutionID), TokenID: uuidField[store.TokenID](&d, rows[i].TokenID),
-				Kind: rows[i].Kind, DueAt: instant(rows[i].DueAt),
-			})
-			if d.err != nil {
-				return d.err
-			}
-		}
-		return nil
-	})
-	return out, err
-}
-
 // ClaimOutbox implements [store.Deliveries].
-func (s *Store) ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, now time.Time) ([]store.ClaimedOutbox, error) {
+func (s *Store) ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, _ time.Time) ([]store.ClaimedOutbox, error) {
 	var out []store.ClaimedOutbox
+	now := s.clock.Now()
 	err := s.write(ctx, "claim outbox", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ClaimOutbox(ctx, sqlcgen.ClaimOutboxParams{
 			WorkerID: uuidBytes(worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(ttl)), Valid: true}, Now: micros(now), PageSize: clampPage(limit),
@@ -754,19 +695,6 @@ func (s *Store) ResolveWaitSecret(ctx context.Context, wait store.WaitID) (store
 		return d.err
 	})
 	return out, err
-}
-
-// releaseAllLeases is what a standalone process does at start (ADR-0013
-// section 9): the lock file guarantees no other holder exists, so every token
-// still LEASED is released. It reports how many.
-func (s *Store) releaseAllLeases(ctx context.Context) (int64, error) {
-	var n int64
-	err := s.write(ctx, "release all leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		var err error
-		n, err = q.ReleaseAllLeases(ctx, micros(s.clock.Now()))
-		return err
-	})
-	return n, err
 }
 
 // defaultText returns v, or fallback when v is empty.

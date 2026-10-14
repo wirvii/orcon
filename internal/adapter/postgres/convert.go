@@ -118,3 +118,13 @@ func notFoundAs(err, target error) error {
 	}
 	return err
 }
+
+func errorsIsNoRows(err error) bool { return errors.Is(err, pgx.ErrNoRows) }
+
+func conflictf(format string, args ...any) error {
+	return fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), flow.ErrConflict)
+}
+
+func invalidf(format string, args ...any) error {
+	return fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), flow.ErrInvalidRecord)
+}

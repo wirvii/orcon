@@ -61,6 +61,29 @@ func (q *Queries) AppendExecutionEvent(ctx context.Context, arg AppendExecutionE
 	return sequence_number, err
 }
 
+const getEngineState = `-- name: GetEngineState :one
+SELECT status, engine_state_revision, engine_state_document
+FROM execution
+WHERE org_id = ?1 AND id = ?2
+`
+
+type GetEngineStateRow struct {
+	Status              string
+	EngineStateRevision int64
+	EngineStateDocument []byte
+}
+
+// The engine state of an execution: its status, the number of commits that wrote its tracker document and the
+// document (SPEC-001 C4a). A worker opens an execution from this row and its live tokens.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetEngineState(ctx context.Context, orgID []byte, iD []byte) (GetEngineStateRow, error) {
+	row := q.db.QueryRowContext(ctx, getEngineState, orgID, iD)
+	var i GetEngineStateRow
+	err := row.Scan(&i.Status, &i.EngineStateRevision, &i.EngineStateDocument)
+	return i, err
+}
+
 const getExecution = `-- name: GetExecution :one
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
@@ -220,6 +243,21 @@ func (q *Queries) GetJoinInstance(ctx context.Context, arg GetJoinInstanceParams
 	return i, err
 }
 
+const getNodeOutputDocument = `-- name: GetNodeOutputDocument :one
+SELECT inline_document
+FROM node_output
+WHERE org_id = ?1 AND id = ?2
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetNodeOutputDocument(ctx context.Context, orgID []byte, iD []byte) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, getNodeOutputDocument, orgID, iD)
+	var inline_document []byte
+	err := row.Scan(&inline_document)
+	return inline_document, err
+}
+
 const getTimer = `-- name: GetTimer :one
 SELECT id, org_id, execution_id, token_id, kind, due_at, status
 FROM timer
@@ -305,6 +343,21 @@ func (q *Queries) GetToken(ctx context.Context, orgID []byte, iD []byte) (GetTok
 		&i.SuspendReason,
 	)
 	return i, err
+}
+
+const getTokenInputDocument = `-- name: GetTokenInputDocument :one
+SELECT inline_document
+FROM token_input
+WHERE org_id = ?1 AND id = ?2
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetTokenInputDocument(ctx context.Context, orgID []byte, iD []byte) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, getTokenInputDocument, orgID, iD)
+	var inline_document []byte
+	err := row.Scan(&inline_document)
+	return inline_document, err
 }
 
 const insertAttentionRequest = `-- name: InsertAttentionRequest :exec
@@ -546,9 +599,9 @@ func (q *Queries) InsertJoinInstance(ctx context.Context, arg InsertJoinInstance
 }
 
 const insertNodeExecution = `-- name: InsertNodeExecution :exec
-INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, created_at, updated_at)
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6,
-        ?7, 0, ?8, ?9, ?10)
+        ?7, 0, ?8, ?9, ?10, ?11)
 `
 
 type InsertNodeExecutionParams struct {
@@ -560,6 +613,7 @@ type InsertNodeExecutionParams struct {
 	ScopePath   string
 	Status      string
 	StartedAt   sql.NullInt64
+	FinishedAt  sql.NullInt64
 	CreatedAt   int64
 	UpdatedAt   int64
 }
@@ -575,8 +629,78 @@ func (q *Queries) InsertNodeExecution(ctx context.Context, arg InsertNodeExecuti
 		arg.ScopePath,
 		arg.Status,
 		arg.StartedAt,
+		arg.FinishedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertNodeOutput = `-- name: InsertNodeOutput :exec
+INSERT INTO node_output (id, org_id, execution_id, node_execution_id, port, item_count, encoding, inline_document,
+                         inline_document_format, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6,
+        ?7, ?8, 'orcon/items@1', ?9, ?9)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertNodeOutputParams struct {
+	ID              []byte
+	OrgID           []byte
+	ExecutionID     []byte
+	NodeExecutionID []byte
+	Port            string
+	ItemCount       int64
+	Encoding        string
+	InlineDocument  []byte
+	CreatedAt       int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertNodeOutput(ctx context.Context, arg InsertNodeOutputParams) error {
+	_, err := q.db.ExecContext(ctx, insertNodeOutput,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.Port,
+		arg.ItemCount,
+		arg.Encoding,
+		arg.InlineDocument,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertNondeterminismRecord = `-- name: InsertNondeterminismRecord :exec
+INSERT INTO nondeterminism_record (id, org_id, execution_id, node_execution_id, sequence_number, value_document, value_document_format, created_at)
+VALUES (?1, ?2, ?3, ?4, ?5,
+        ?6, 'orcon/value@1', ?7)
+ON CONFLICT (org_id, node_execution_id, sequence_number) DO NOTHING
+`
+
+type InsertNondeterminismRecordParams struct {
+	ID              []byte
+	OrgID           []byte
+	ExecutionID     []byte
+	NodeExecutionID []byte
+	SequenceNumber  int64
+	ValueDocument   []byte
+	CreatedAt       int64
+}
+
+// The environment (activation instant and seed) recorded for an activation: sequence 1 of its node execution.
+// orcon:scope org
+func (q *Queries) InsertNondeterminismRecord(ctx context.Context, arg InsertNondeterminismRecordParams) error {
+	_, err := q.db.ExecContext(ctx, insertNondeterminismRecord,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.SequenceNumber,
+		arg.ValueDocument,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -605,6 +729,45 @@ func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) erro
 		arg.PayloadDocument,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertTaskAttempt = `-- name: InsertTaskAttempt :exec
+INSERT INTO task_attempt (id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at,
+                          created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6,
+        ?7, ?8, ?9, ?10, ?11, ?11)
+`
+
+type InsertTaskAttemptParams struct {
+	ID              []byte
+	OrgID           []byte
+	ExecutionID     []byte
+	NodeExecutionID []byte
+	AttemptNumber   int64
+	LeaseEpoch      int64
+	WorkerID        []byte
+	Status          string
+	StartedAt       int64
+	FinishedAt      sql.NullInt64
+	CreatedAt       int64
+}
+
+// orcon:scope org
+func (q *Queries) InsertTaskAttempt(ctx context.Context, arg InsertTaskAttemptParams) error {
+	_, err := q.db.ExecContext(ctx, insertTaskAttempt,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.AttemptNumber,
+		arg.LeaseEpoch,
+		arg.WorkerID,
+		arg.Status,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -691,6 +854,38 @@ func (q *Queries) InsertToken(ctx context.Context, arg InsertTokenParams) error 
 		arg.LeaseExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertTokenInput = `-- name: InsertTokenInput :exec
+INSERT INTO token_input (id, org_id, execution_id, item_count, encoding, inline_document, inline_document_format, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6,
+        'orcon/items@1', ?7, ?7)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertTokenInputParams struct {
+	ID             []byte
+	OrgID          []byte
+	ExecutionID    []byte
+	ItemCount      int64
+	Encoding       string
+	InlineDocument []byte
+	CreatedAt      int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertTokenInput(ctx context.Context, arg InsertTokenInputParams) error {
+	_, err := q.db.ExecContext(ctx, insertTokenInput,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.ItemCount,
+		arg.Encoding,
+		arg.InlineDocument,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -1261,6 +1456,189 @@ func (q *Queries) ListFlowExecutions(ctx context.Context, arg ListFlowExecutions
 	return items, nil
 }
 
+const listLiveTokens = `-- name: ListLiveTokens :many
+SELECT id, org_id, execution_id, status, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+       effective_priority, available_at, lease_owner, lease_epoch, lease_expires_at, claim_count, abandoned_count, suspend_reason
+FROM token
+WHERE org_id = ?1 AND execution_id = ?2
+  AND status IN ('RUNNABLE', 'LEASED', 'WAITING', 'DEFERRED', 'SUSPENDED') AND id > CAST(?3 AS BLOB)
+ORDER BY id
+LIMIT ?4
+`
+
+type ListLiveTokensParams struct {
+	OrgID       []byte
+	ExecutionID []byte
+	AfterID     []byte
+	PageSize    int64
+}
+
+type ListLiveTokensRow struct {
+	ID                  []byte
+	OrgID               []byte
+	ExecutionID         []byte
+	Status              string
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	FairnessKey         string
+	EffectivePriority   int64
+	AvailableAt         int64
+	LeaseOwner          []byte
+	LeaseEpoch          int64
+	LeaseExpiresAt      sql.NullInt64
+	ClaimCount          int64
+	AbandonedCount      int64
+	SuspendReason       sql.NullString
+}
+
+// The tokens of an execution that are not terminal, in id order, one page at a time (the page size is clamped).
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListLiveTokens(ctx context.Context, arg ListLiveTokensParams) ([]ListLiveTokensRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLiveTokens,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveTokensRow{}
+	for rows.Next() {
+		var i ListLiveTokensRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.Status,
+			&i.NodeID,
+			&i.EdgeID,
+			&i.ScopePath,
+			&i.ForkLineageDocument,
+			&i.PayloadReference,
+			&i.FairnessKey,
+			&i.EffectivePriority,
+			&i.AvailableAt,
+			&i.LeaseOwner,
+			&i.LeaseEpoch,
+			&i.LeaseExpiresAt,
+			&i.ClaimCount,
+			&i.AbandonedCount,
+			&i.SuspendReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskAttempts = `-- name: ListTaskAttempts :many
+SELECT id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at
+FROM task_attempt
+WHERE org_id = ?1 AND node_execution_id = ?2
+ORDER BY attempt_number, id
+LIMIT ?3
+`
+
+type ListTaskAttemptsRow struct {
+	ID              []byte
+	OrgID           []byte
+	ExecutionID     []byte
+	NodeExecutionID []byte
+	AttemptNumber   int64
+	LeaseEpoch      int64
+	WorkerID        []byte
+	Status          string
+	StartedAt       int64
+	FinishedAt      sql.NullInt64
+}
+
+// orcon:scope org
+func (q *Queries) ListTaskAttempts(ctx context.Context, orgID []byte, nodeExecutionID []byte, pageSize int64) ([]ListTaskAttemptsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskAttempts, orgID, nodeExecutionID, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaskAttemptsRow{}
+	for rows.Next() {
+		var i ListTaskAttemptsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.NodeExecutionID,
+			&i.AttemptNumber,
+			&i.LeaseEpoch,
+			&i.WorkerID,
+			&i.Status,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTokenNondeterminism = `-- name: ListTokenNondeterminism :many
+SELECT r.node_execution_id, r.sequence_number, r.value_document
+FROM nondeterminism_record r
+JOIN node_execution n ON n.org_id = r.org_id AND n.id = r.node_execution_id
+WHERE r.org_id = ?1 AND n.token_id = ?2
+ORDER BY r.node_execution_id, r.sequence_number
+LIMIT ?3
+`
+
+type ListTokenNondeterminismRow struct {
+	NodeExecutionID []byte
+	SequenceNumber  int64
+	ValueDocument   []byte
+}
+
+// orcon:scope org
+func (q *Queries) ListTokenNondeterminism(ctx context.Context, orgID []byte, tokenID []byte, pageSize int64) ([]ListTokenNondeterminismRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTokenNondeterminism, orgID, tokenID, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTokenNondeterminismRow{}
+	for rows.Next() {
+		var i ListTokenNondeterminismRow
+		if err := rows.Scan(&i.NodeExecutionID, &i.SequenceNumber, &i.ValueDocument); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markExternalOperationDispatching = `-- name: MarkExternalOperationDispatching :execrows
 UPDATE external_operation
 SET state = 'DISPATCHING', dispatch_deadline_at = ?1,
@@ -1406,6 +1784,208 @@ type MarkTokenFencedParams struct {
 // orcon:scope org
 func (q *Queries) MarkTokenFenced(ctx context.Context, arg MarkTokenFencedParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, markTokenFenced,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.LeaseEpoch,
+		arg.LeaseOwner,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const releaseDeferredToken = `-- name: ReleaseDeferredToken :execrows
+UPDATE token
+SET status = 'RUNNABLE', available_at = ?1, updated_at = ?2
+WHERE org_id = ?3 AND id = ?4 AND status = 'DEFERRED'
+`
+
+type ReleaseDeferredTokenParams struct {
+	AvailableAt int64
+	UpdatedAt   int64
+	OrgID       []byte
+	ID          []byte
+}
+
+// A token the step does not hold changes state: a deferred sibling is released.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ReleaseDeferredToken(ctx context.Context, arg ReleaseDeferredTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, releaseDeferredToken,
+		arg.AvailableAt,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateAdvancedToken = `-- name: UpdateAdvancedToken :execrows
+UPDATE token
+SET node_id = ?1, edge_id = ?2, scope_path = ?3,
+    fork_lineage_document = ?4, payload_reference = ?5,
+    updated_at = ?6
+WHERE org_id = ?7 AND id = ?8 AND lease_epoch = ?9
+  AND lease_owner = ?10 AND status = 'LEASED'
+`
+
+type UpdateAdvancedTokenParams struct {
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	UpdatedAt           int64
+	OrgID               []byte
+	ID                  []byte
+	LeaseEpoch          int64
+	LeaseOwner          []byte
+}
+
+// A held token moves along the flow and stays leased: the fence is the one of every write of a lease holder.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateAdvancedToken(ctx context.Context, arg UpdateAdvancedTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAdvancedToken,
+		arg.NodeID,
+		arg.EdgeID,
+		arg.ScopePath,
+		arg.ForkLineageDocument,
+		arg.PayloadReference,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.LeaseEpoch,
+		arg.LeaseOwner,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateCanceledToken = `-- name: UpdateCanceledToken :execrows
+UPDATE token
+SET status = 'CANCELED', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?1
+WHERE org_id = ?2 AND id = ?3 AND status NOT IN ('CONSUMED', 'COMPLETED', 'CANCELED', 'FAILED')
+`
+
+// A token is canceled whatever lease it holds: its holder is fenced out when it next commits.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateCanceledToken(ctx context.Context, updatedAt int64, orgID []byte, iD []byte) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateCanceledToken, updatedAt, orgID, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateEngineState = `-- name: UpdateEngineState :execrows
+UPDATE execution
+SET status = ?1,
+    engine_state_document = COALESCE(?2, engine_state_document),
+    engine_state_document_format = CASE WHEN ?2 IS NULL THEN engine_state_document_format ELSE 'orcon/engine-state@1' END,
+    engine_state_revision = engine_state_revision + 1,
+    started_at = COALESCE(started_at, ?3),
+    finished_at = COALESCE(?4, finished_at),
+    updated_at = ?5
+WHERE org_id = ?6 AND id = ?7 AND engine_state_revision = ?8
+`
+
+type UpdateEngineStateParams struct {
+	Status           string
+	Document         []byte
+	StartedAt        sql.NullInt64
+	FinishedAt       sql.NullInt64
+	UpdatedAt        int64
+	OrgID            []byte
+	ID               []byte
+	ExpectedRevision int64
+}
+
+// Commits the engine state of an execution. The revision must still be the one the committing step read, so a step
+// built on an older state cannot overwrite a newer one; the caller already holds the row (single writer on SQLite,
+// LockExecution on PostgreSQL), so a mismatch means the step has to be recomputed.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateEngineState(ctx context.Context, arg UpdateEngineStateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateEngineState,
+		arg.Status,
+		arg.Document,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.ExpectedRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateExecutionCounters = `-- name: UpdateExecutionCounters :exec
+UPDATE execution
+SET runnable_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'RUNNABLE'),
+    leased_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'LEASED'),
+    waiting_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'WAITING'),
+    suspended_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'SUSPENDED'),
+    updated_at = ?1
+WHERE execution.org_id = ?2 AND execution.id = ?3
+`
+
+// Recomputes the token counters of an execution from its live tokens (ADR-0009 section 1).
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateExecutionCounters(ctx context.Context, updatedAt int64, orgID []byte, iD []byte) error {
+	_, err := q.db.ExecContext(ctx, updateExecutionCounters, updatedAt, orgID, iD)
+	return err
+}
+
+const updateMovedToken = `-- name: UpdateMovedToken :execrows
+UPDATE token
+SET status = ?1, node_id = ?2, edge_id = ?3, scope_path = ?4,
+    fork_lineage_document = ?5, payload_reference = ?6,
+    available_at = COALESCE(?7, available_at), lease_owner = NULL, lease_expires_at = NULL,
+    updated_at = ?8
+WHERE org_id = ?9 AND id = ?10 AND lease_epoch = ?11
+  AND lease_owner = ?12 AND status = 'LEASED'
+`
+
+type UpdateMovedTokenParams struct {
+	Status              string
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	AvailableAt         sql.NullInt64
+	UpdatedAt           int64
+	OrgID               []byte
+	ID                  []byte
+	LeaseEpoch          int64
+	LeaseOwner          []byte
+}
+
+// A held token ends its lease while it moves: it ends, waits, or goes back to RUNNABLE.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateMovedToken(ctx context.Context, arg UpdateMovedTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateMovedToken,
+		arg.Status,
+		arg.NodeID,
+		arg.EdgeID,
+		arg.ScopePath,
+		arg.ForkLineageDocument,
+		arg.PayloadReference,
+		arg.AvailableAt,
 		arg.UpdatedAt,
 		arg.OrgID,
 		arg.ID,

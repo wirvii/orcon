@@ -94,9 +94,9 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_epoch = sqlc.arg
 
 -- name: InsertNodeExecution :exec
 -- orcon:scope org
-INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, created_at, updated_at)
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(token_id), sqlc.arg(node_id), sqlc.arg(scope_path),
-        sqlc.arg(status), 0, sqlc.arg(started_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+        sqlc.arg(status), 0, sqlc.arg(started_at), sqlc.arg(finished_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- The sequence number is one more than the newest of the execution, assigned in the transaction that writes the
 -- event (orcon-db ID-6); the caller holds the execution row (single writer on SQLite, LockExecution on PostgreSQL).
@@ -243,4 +243,155 @@ FROM attention_request
 WHERE org_id = sqlc.arg(org_id) AND status = sqlc.arg(status)
   AND (created_at, id) > (sqlc.arg(after_created_at), CAST(sqlc.arg(after_id) AS BLOB))
 ORDER BY created_at, id
+LIMIT sqlc.arg(page_size);
+
+-- The engine state of an execution: its status, the number of commits that wrote its tracker document and the
+-- document (SPEC-001 C4a). A worker opens an execution from this row and its live tokens.
+-- name: GetEngineState :one
+-- orcon:scope org
+-- orcon:hot
+SELECT status, engine_state_revision, engine_state_document
+FROM execution
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
+
+-- Commits the engine state of an execution. The revision must still be the one the committing step read, so a step
+-- built on an older state cannot overwrite a newer one; the caller already holds the row (single writer on SQLite,
+-- LockExecution on PostgreSQL), so a mismatch means the step has to be recomputed.
+-- name: UpdateEngineState :execrows
+-- orcon:scope org
+-- orcon:hot
+UPDATE execution
+SET status = sqlc.arg(status),
+    engine_state_document = COALESCE(sqlc.narg(document), engine_state_document),
+    engine_state_document_format = CASE WHEN sqlc.narg(document) IS NULL THEN engine_state_document_format ELSE 'orcon/engine-state@1' END,
+    engine_state_revision = engine_state_revision + 1,
+    started_at = COALESCE(started_at, sqlc.narg(started_at)),
+    finished_at = COALESCE(sqlc.narg(finished_at), finished_at),
+    updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND engine_state_revision = sqlc.arg(expected_revision);
+
+-- The tokens of an execution that are not terminal, in id order, one page at a time (the page size is clamped).
+-- name: ListLiveTokens :many
+-- orcon:scope org
+-- orcon:hot
+SELECT id, org_id, execution_id, status, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+       effective_priority, available_at, lease_owner, lease_epoch, lease_expires_at, claim_count, abandoned_count, suspend_reason
+FROM token
+WHERE org_id = sqlc.arg(org_id) AND execution_id = sqlc.arg(execution_id)
+  AND status IN ('RUNNABLE', 'LEASED', 'WAITING', 'DEFERRED', 'SUSPENDED') AND id > CAST(sqlc.arg(after_id) AS BLOB)
+ORDER BY id
+LIMIT sqlc.arg(page_size);
+
+-- A held token moves along the flow and stays leased: the fence is the one of every write of a lease holder.
+-- name: UpdateAdvancedToken :execrows
+-- orcon:scope org
+-- orcon:hot
+UPDATE token
+SET node_id = sqlc.arg(node_id), edge_id = sqlc.arg(edge_id), scope_path = sqlc.arg(scope_path),
+    fork_lineage_document = sqlc.arg(fork_lineage_document), payload_reference = sqlc.arg(payload_reference),
+    updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_epoch = sqlc.arg(lease_epoch)
+  AND lease_owner = sqlc.arg(lease_owner) AND status = 'LEASED';
+
+-- A held token ends its lease while it moves: it ends, waits, or goes back to RUNNABLE.
+-- name: UpdateMovedToken :execrows
+-- orcon:scope org
+-- orcon:hot
+UPDATE token
+SET status = sqlc.arg(status), node_id = sqlc.arg(node_id), edge_id = sqlc.arg(edge_id), scope_path = sqlc.arg(scope_path),
+    fork_lineage_document = sqlc.arg(fork_lineage_document), payload_reference = sqlc.arg(payload_reference),
+    available_at = COALESCE(sqlc.narg(available_at), available_at), lease_owner = NULL, lease_expires_at = NULL,
+    updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_epoch = sqlc.arg(lease_epoch)
+  AND lease_owner = sqlc.arg(lease_owner) AND status = 'LEASED';
+
+-- A token the step does not hold changes state: a deferred sibling is released.
+-- name: ReleaseDeferredToken :execrows
+-- orcon:scope org
+-- orcon:hot
+UPDATE token
+SET status = 'RUNNABLE', available_at = sqlc.arg(available_at), updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND status = 'DEFERRED';
+
+-- A token is canceled whatever lease it holds: its holder is fenced out when it next commits.
+-- name: UpdateCanceledToken :execrows
+-- orcon:scope org
+-- orcon:hot
+UPDATE token
+SET status = 'CANCELED', lease_owner = NULL, lease_expires_at = NULL, updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND status NOT IN ('CONSUMED', 'COMPLETED', 'CANCELED', 'FAILED');
+
+-- Recomputes the token counters of an execution from its live tokens (ADR-0009 section 1).
+-- name: UpdateExecutionCounters :exec
+-- orcon:scope org
+-- orcon:hot
+UPDATE execution
+SET runnable_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'RUNNABLE'),
+    leased_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'LEASED'),
+    waiting_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'WAITING'),
+    suspended_count = (SELECT count(*) FROM token t WHERE t.org_id = execution.org_id AND t.execution_id = execution.id AND t.status = 'SUSPENDED'),
+    updated_at = sqlc.arg(updated_at)
+WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id);
+
+-- name: InsertNodeOutput :exec
+-- orcon:scope org
+-- orcon:hot
+INSERT INTO node_output (id, org_id, execution_id, node_execution_id, port, item_count, encoding, inline_document,
+                         inline_document_format, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(node_execution_id), sqlc.arg(port), sqlc.arg(item_count),
+        sqlc.arg(encoding), sqlc.arg(inline_document), 'orcon/items@1', sqlc.arg(created_at), sqlc.arg(created_at))
+ON CONFLICT (id) DO NOTHING;
+
+-- name: InsertTokenInput :exec
+-- orcon:scope org
+-- orcon:hot
+INSERT INTO token_input (id, org_id, execution_id, item_count, encoding, inline_document, inline_document_format, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(item_count), sqlc.arg(encoding), sqlc.arg(inline_document),
+        'orcon/items@1', sqlc.arg(created_at), sqlc.arg(created_at))
+ON CONFLICT (id) DO NOTHING;
+
+-- name: GetNodeOutputDocument :one
+-- orcon:scope org
+-- orcon:hot
+SELECT inline_document
+FROM node_output
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
+
+-- name: GetTokenInputDocument :one
+-- orcon:scope org
+-- orcon:hot
+SELECT inline_document
+FROM token_input
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
+
+-- The environment (activation instant and seed) recorded for an activation: sequence 1 of its node execution.
+-- name: InsertNondeterminismRecord :exec
+-- orcon:scope org
+INSERT INTO nondeterminism_record (id, org_id, execution_id, node_execution_id, sequence_number, value_document, value_document_format, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(node_execution_id), sqlc.arg(sequence_number),
+        sqlc.arg(value_document), 'orcon/value@1', sqlc.arg(created_at))
+ON CONFLICT (org_id, node_execution_id, sequence_number) DO NOTHING;
+
+-- name: ListTokenNondeterminism :many
+-- orcon:scope org
+SELECT r.node_execution_id, r.sequence_number, r.value_document
+FROM nondeterminism_record r
+JOIN node_execution n ON n.org_id = r.org_id AND n.id = r.node_execution_id
+WHERE r.org_id = sqlc.arg(org_id) AND n.token_id = sqlc.arg(token_id)
+ORDER BY r.node_execution_id, r.sequence_number
+LIMIT sqlc.arg(page_size);
+
+-- name: InsertTaskAttempt :exec
+-- orcon:scope org
+INSERT INTO task_attempt (id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at,
+                          created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(node_execution_id), sqlc.arg(attempt_number), sqlc.arg(lease_epoch),
+        sqlc.arg(worker_id), sqlc.arg(status), sqlc.arg(started_at), sqlc.arg(finished_at), sqlc.arg(created_at), sqlc.arg(created_at));
+
+-- name: ListTaskAttempts :many
+-- orcon:scope org
+SELECT id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at
+FROM task_attempt
+WHERE org_id = sqlc.arg(org_id) AND node_execution_id = sqlc.arg(node_execution_id)
+ORDER BY attempt_number, id
 LIMIT sqlc.arg(page_size);
