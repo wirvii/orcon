@@ -292,3 +292,17 @@ describe('the editor store: configuring a node', () => {
     expect(graph.nodes.find((node) => node.id === 'slack')?.outputs.map((port) => port.id)).toEqual(['main', 'error']);
   });
 });
+
+describe('the editor store: notes', () => {
+  const noteOf = (store: EditorStore) => store.getState().document.editor.nodes?.['slack']?.note;
+
+  it('can be undone and redone', () => expectUndoable((state) => state.setNodeNote('slack', 'Ask Ana')));
+
+  it('is one history entry for what is typed while the field keeps focus', () => {
+    const store = open();
+    for (const text of ['A', 'As', 'Ask']) store.getState().setNodeNote('slack', text, 'note#1');
+    expect(store.getState().history.past).toHaveLength(1);
+    store.getState().undo();
+    expect(noteOf(store)).toBeUndefined();
+  });
+});

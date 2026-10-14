@@ -207,3 +207,23 @@ describe('a Call sub-flow node', () => {
     expect(document.nodes.find((node) => node.id === result.nodeIds[0])).toMatchObject({ type: 'orcon.callFlow@1', element: 'callActivity', call });
   });
 });
+
+describe('notes on nodes in a fragment', () => {
+  it('are copied with the node and pasted with the new node', () => {
+    const document = exampleFlowDocument();
+    document.editor.nodes = { ...document.editor.nodes, slack: { x: 640, y: 60, note: 'Ask Ana' } };
+    const fragment = flowFragmentSchema.parse(JSON.parse(JSON.stringify(buildFragment(document, new Set(['slack'])))));
+    expect(fragment.editor.nodes?.['slack']?.note).toBe('Ask Ana');
+    const result = pasteFragment(document, fragment, { offset: { x: 40, y: 40 } });
+    const id = result.nodeIds[0] ?? '';
+    expect(document.editor.nodes[id]).toMatchObject({ note: 'Ask Ana' });
+  });
+
+  it('are refused by the fragment schema when empty or longer than 5000 characters', () => {
+    const base = { format: FLOW_FRAGMENT_FORMAT, nodes: [], edges: [] };
+    const parse = (note: string) => flowFragmentSchema.safeParse({ ...base, editor: { nodes: { a: { x: 0, y: 0, note } } } }).success;
+    expect(parse('ok')).toBe(true);
+    expect(parse('')).toBe(false);
+    expect(parse('a'.repeat(5001))).toBe(false);
+  });
+});

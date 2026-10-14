@@ -103,7 +103,10 @@ export const configMessages = defineMessages({
   attentionOn: { id: 'editor.settings.attention.on', defaultMessage: 'Always tell', description: 'Choice that always notifies when the step needs a decision.' },
   attentionOff: { id: 'editor.settings.attention.off', defaultMessage: 'Do not tell', description: 'Choice that never notifies when the step needs a decision.' },
   attentionOffRefused: { id: 'editor.settings.attention.offRefused', defaultMessage: 'A step that changes something outside cannot be silenced: publishing refuses “Do not tell”.', description: 'Warns that notifications cannot be switched off for a step that changes something outside.' },
-  settingsLater: { id: 'editor.settings.later', defaultMessage: 'Notes on the step and marks for sensitive values come with a later release.', description: 'Tells that two settings of a step are not available yet.' },
+  settingsLater: { id: 'editor.settings.later', defaultMessage: 'Marks for sensitive values come with a later release.', description: 'Tells that one setting of a step is not available yet.' },
+  settingsNotes: { id: 'editor.settings.notes', defaultMessage: 'Notes', description: 'Heading of the free text a person keeps with a step.' },
+  note: { id: 'editor.settings.note.label', defaultMessage: 'Note on this step', description: 'Label of the free text a person keeps with a step.' },
+  noteHint: { id: 'editor.settings.note.hint', defaultMessage: 'Plain text for the people who work on the flow, up to {max} characters. It is saved with the draft and does not change what the flow does.', description: 'Explains the note of a step. {max} is the longest note.' },
   wholeNumber: { id: 'editor.settings.wholeNumber', defaultMessage: 'Enter a whole number of 1 or more.', description: 'Error under a setting that must be a whole number from 1.' },
   atLeastOne: { id: 'editor.settings.factor.error', defaultMessage: 'Enter a number of 1 or more.', description: 'Error under the retry factor when it is smaller than 1.' },
 

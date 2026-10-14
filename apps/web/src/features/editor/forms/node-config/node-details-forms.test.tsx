@@ -344,6 +344,34 @@ describe('the settings of a step', () => {
   });
 });
 
+describe('the note of a step', () => {
+  it('is kept beside the position, as one undo step, and removed when emptied', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<Settings id="slack" />);
+    const field = await screen.findByRole('textbox', { name: 'Note on this step' });
+    expect(field).toHaveValue('');
+    await user.type(field, 'Ask Ana');
+    const entry = () => store.getState().document.editor.nodes?.['slack'];
+    expect(entry()).toEqual({ x: 640, y: 60, note: 'Ask Ana' });
+    expect(store.getState().history.past).toHaveLength(1);
+    await user.clear(field);
+    expect(entry()).toEqual({ x: 640, y: 60 });
+    act(() => {
+      store.getState().undo();
+    });
+    // Typing and clearing in one focus are one step: undo goes back to no note.
+    expect(entry()).toEqual({ x: 640, y: 60 });
+    expect(field).toHaveValue('');
+  });
+
+  it('says the limit and stops there', async () => {
+    renderWithStore(<Settings id="slack" />);
+    const field = await screen.findByRole('textbox', { name: 'Note on this step' });
+    expect(field).toHaveAttribute('maxlength', '5000');
+    expect(screen.getByText(/up to 5000 characters/)).toBeInTheDocument();
+  });
+});
+
 describe('the connector update', () => {
   it('offers the newest version with a changelog that opens on demand', async () => {
     const user = userEvent.setup();

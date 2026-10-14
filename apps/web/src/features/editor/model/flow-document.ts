@@ -21,7 +21,27 @@ const TYPE_PATTERN = /^[a-z][a-z0-9-]*(\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$/;
 export const MAX_NOTE_LENGTH = 10_000;
 export const STICKY_COLORS = [1, 2, 3, 4, 5, 6] as const;
 
-const pointSchema = z.object({ x: z.number(), y: z.number() });
+/** The number of code points of a text (a note is limited in code points, not UTF-16 units). */
+export function codePointLength(text: string): number {
+  return Array.from(text).length;
+}
+
+/** The longest note a node may have, in code points (SPEC-014 plan, Enmienda 5 section 5-2). */
+export const MAX_NODE_NOTE = 5000;
+
+/**
+ * What the editor block records for one node: its position and, when it has one, a note. A note is
+ * plain text of 1 to 5000 code points, never stored empty, and lives outside `contentHash` because
+ * it changes nothing that runs.
+ */
+const nodeEditorSchema = z.looseObject({
+  x: z.number(),
+  y: z.number(),
+  note: z
+    .string()
+    .refine((text) => text.length > 0 && codePointLength(text) <= MAX_NODE_NOTE)
+    .optional(),
+});
 
 export const stickyNoteSchema = z.object({
   id: z.string().regex(ID_PATTERN),
@@ -53,7 +73,7 @@ export const flowEdgeSchema = z.looseObject({
 });
 
 export const editorSchema = z.looseObject({
-  nodes: z.record(z.string(), pointSchema).optional(),
+  nodes: z.record(z.string(), nodeEditorSchema).optional(),
   stickyNotes: z.array(stickyNoteSchema).optional(),
 });
 
@@ -69,7 +89,11 @@ export const flowDocumentSchema = z.looseObject({
   editor: editorSchema,
 });
 
-export type Point = z.infer<typeof pointSchema>;
+export interface Point {
+  x: number;
+  y: number;
+}
+export type NodeEditor = z.infer<typeof nodeEditorSchema>;
 export type StickyNote = z.infer<typeof stickyNoteSchema>;
 export type FlowNode = z.infer<typeof flowNodeSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
@@ -93,7 +117,7 @@ export function findNode(document: FlowDocument, id: string): FlowNode | undefin
 }
 
 /** Creates the editor members a write needs (`editor.nodes`, `editor.stickyNotes`) and returns them. */
-export function editorBlock(document: FlowDocument): { nodes: Record<string, Point>; stickyNotes: StickyNote[] } {
+export function editorBlock(document: FlowDocument): { nodes: Record<string, NodeEditor>; stickyNotes: StickyNote[] } {
   document.editor.nodes ??= {};
   document.editor.stickyNotes ??= [];
   return { nodes: document.editor.nodes, stickyNotes: document.editor.stickyNotes };

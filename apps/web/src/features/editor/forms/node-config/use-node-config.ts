@@ -43,6 +43,9 @@ export function useNodeActions(nodeId: string) {
       setBlock: (block: NodeBlock, value: unknown, group?: string) => {
         api.getState().setNodeBlock(nodeId, block, value, group);
       },
+      setNote: (text: string | undefined, group?: string) => {
+        api.getState().setNodeNote(nodeId, text, group);
+      },
       setCredential: (slot: string, name: string | undefined) => {
         api.getState().setCredential(nodeId, slot, name);
       },

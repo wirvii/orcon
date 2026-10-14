@@ -211,7 +211,7 @@
   "editor.settings.concurrency.label": "Elementos a la vez",
   "editor.settings.errors": "Cuando el paso falla",
   "editor.settings.factor.error": "Escribe un número de 1 o más.",
-  "editor.settings.later": "Las notas del paso y las marcas de valores sensibles llegarán en una versión posterior.",
+  "editor.settings.later": "Las marcas de valores sensibles llegarán en una versión posterior.",
   "editor.settings.onError": "Cuando falla el último intento",
   "editor.settings.onError.continue": "Continuar con el error como dato",
   "editor.settings.onError.output": "Enviar los elementos fallidos a una salida de error",
@@ -288,5 +288,8 @@
   "validation.unrecognized_keys": "Algunos de los valores no se reconocen.",
   "editor.cred.optionTyped": "{name} ({type}), actualizada {date}",
   "editor.node.call.name": "Llamar a un subflujo",
-  "editor.node.call.text": "Ejecuta otro flujo y continúa con su resultado"
+  "editor.node.call.text": "Ejecuta otro flujo y continúa con su resultado",
+  "editor.settings.notes": "Notas",
+  "editor.settings.note.label": "Nota sobre este paso",
+  "editor.settings.note.hint": "Texto sin formato para las personas que trabajan en el flujo, de hasta {max} caracteres. Se guarda con el borrador y no cambia lo que hace el flujo."
 }

@@ -19,6 +19,7 @@ import {
   setCredentialBinding,
   setDisabled,
   setNodeBlock,
+  setNodeNote,
   setParameter,
   updateStickyNote,
   type EdgeProblem,
@@ -78,6 +79,8 @@ export interface EditorState {
   setParameter: (id: string, name: string, value: unknown, group?: string) => void;
   /** Replaces a behaviour or binding block of a node (retry, timeouts, onError, concurrency, attention, call). */
   setNodeBlock: (id: string, block: NodeBlock, value: unknown, group?: string) => void;
+  /** Sets or removes the note of a node (`editor.nodes[<id>].note`). Edits with the same `group` in a row are one history entry. */
+  setNodeNote: (id: string, text: string | undefined, group?: string) => void;
   /** Binds a credential slot of a node to a credential by name; `undefined` unbinds it. */
   setCredential: (id: string, slot: string, name: string | undefined) => void;
   /** Pins a node to another version of its connector; one history entry. */
@@ -230,6 +233,10 @@ export function createEditorStore(initial: EditorInit): EditorStore {
 
       setNodeBlock: (id, block, value, group) => {
         commit('configureNode', (draft) => setNodeBlock(draft, id, block, value), { rebuild: false, ...(group === undefined ? {} : { group }) });
+      },
+
+      setNodeNote: (id, text, group) => {
+        commit('configureNode', (draft) => setNodeNote(draft, id, text), { rebuild: false, ...(group === undefined ? {} : { group }) });
       },
 
       setCredential: (id, slot, name) => {

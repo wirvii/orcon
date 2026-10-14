@@ -1,16 +1,19 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Banner, FormField, Input, Select, Switch } from '@orcon/ui';
+import { Banner, FormField, Input, Select, Switch, Textarea } from '@orcon/ui';
 import { useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 import { formatDuration, parseDuration } from '../../model/duration';
+import { MAX_NODE_NOTE } from '../../model/flow-document';
 import type { FlowNode } from '../../model/flow-document';
 import { withoutUndefined } from '../../model/node-config';
 import { effectOf, type NodeManifest } from '../../model/node-manifests';
 
 import { configMessages } from './messages';
+import { useEditorStore } from '../../store/editor-context';
+
 import { useFieldGroup, useNodeActions } from './use-node-config';
 
 type Block = Record<string, unknown>;
@@ -243,6 +246,10 @@ export function NodeSettingsForm({ node, manifest }: { node: FlowNode; manifest:
         </Section>
       ) : null}
 
+      <Section title={intl.formatMessage(configMessages.settingsNotes)}>
+        <NoteField nodeId={node.id} />
+      </Section>
+
       <Banner tone="info" title={intl.formatMessage(configMessages.settingsLater)} />
     </div>
   );
@@ -280,5 +287,26 @@ function ConcurrencyInput({ value, onChange }: { value: unknown; onChange: (valu
         }
       }}
     />
+  );
+}
+
+/** The note of a node: plain text kept with the draft, outside the part of the flow that runs. */
+function NoteField({ nodeId }: { nodeId: string }) {
+  const intl = useIntl();
+  const actions = useNodeActions(nodeId);
+  const group = useFieldGroup('note');
+  const note = useEditorStore((state) => state.document.editor.nodes?.[nodeId]?.note) ?? '';
+  return (
+    <FormField label={intl.formatMessage(configMessages.note)} description={intl.formatMessage(configMessages.noteHint, { max: MAX_NODE_NOTE })} name="/editor/note">
+      <Textarea
+        rows={4}
+        maxLength={MAX_NODE_NOTE}
+        value={note}
+        onFocus={group.renew}
+        onChange={(event) => {
+          actions.setNote(event.target.value === '' ? undefined : event.target.value, group.group());
+        }}
+      />
+    </FormField>
   );
 }

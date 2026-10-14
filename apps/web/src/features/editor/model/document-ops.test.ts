@@ -19,6 +19,7 @@ import {
   setCredentialBinding,
   setDisabled,
   setNodeBlock,
+  setNodeNote,
   setParameter,
   setPosition,
   updateStickyNote,
@@ -219,5 +220,49 @@ describe('configuring a node', () => {
     const document = exampleFlowDocument();
     expect(pinConnector(document, 'slack', '1.2.0', 'sha256:abc')).toBe(true);
     expect(findNode(document, 'slack')?.['connector']).toEqual({ version: '1.2.0', digest: 'sha256:abc' });
+  });
+});
+
+describe('notes on nodes', () => {
+  it('keeps a note beside the position, and removes it when the text is empty', () => {
+    const document = exampleFlowDocument();
+    expect(setNodeNote(document, 'slack', 'Ask Ana before changing the channel')).toBe(true);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 640, y: 60, note: 'Ask Ana before changing the channel' });
+    expect(setNodeNote(document, 'slack', '')).toBe(true);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 640, y: 60 });
+    setNodeNote(document, 'slack', 'again');
+    expect(setNodeNote(document, 'slack', undefined)).toBe(true);
+    expect(document.editor.nodes?.['slack']).not.toHaveProperty('note');
+  });
+
+  it('refuses a note of more than 5000 characters, counted as code points, and a node that does not exist', () => {
+    const document = exampleFlowDocument();
+    expect(setNodeNote(document, 'slack', 'a'.repeat(5000))).toBe(true);
+    expect(setNodeNote(document, 'slack', 'a'.repeat(5001))).toBe(false);
+    // 5000 emoji are 5000 characters even though they take two UTF-16 units each.
+    expect(setNodeNote(document, 'slack', '\u{1F600}'.repeat(5000))).toBe(true);
+    expect(setNodeNote(document, 'ghost', 'x')).toBe(false);
+  });
+
+  it('keeps the position the canvas draws for a node that has none recorded', () => {
+    const document = exampleFlowDocument();
+    document.editor.nodes = {};
+    setNodeNote(document, 'validate', 'note');
+    expect(document.editor.nodes['validate']).toMatchObject({ note: 'note' });
+    expect(Object.keys(document.editor.nodes)).toEqual(['validate']);
+  });
+
+  it('survives moving the node', () => {
+    const document = exampleFlowDocument();
+    setNodeNote(document, 'slack', 'stay');
+    moveNodes(document, ['slack'], 40, 20);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 680, y: 80, note: 'stay' });
+  });
+
+  it('goes with the node when it is deleted', () => {
+    const document = exampleFlowDocument();
+    setNodeNote(document, 'slack', 'gone');
+    removeNodes(document, ['slack']);
+    expect(document.editor.nodes).not.toHaveProperty('slack');
   });
 });

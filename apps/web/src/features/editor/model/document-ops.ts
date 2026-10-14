@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { snap } from './canvas-graph';
-import { editorBlock, findNode, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowEdgeKind, type FlowNode, type Point, type StickyNote } from './flow-document';
+import { fallbackPositions, snap } from './canvas-graph';
+import { codePointLength, editorBlock, findNode, MAX_NODE_NOTE, nextId, takenIds, type FlowDocument, type FlowEdge, type FlowEdgeKind, type FlowNode, type Point, type StickyNote } from './flow-document';
 import { namesOf, uniqueName } from './names';
 import { LOOP_TYPE, START_TYPE, type NodeTypeDef } from './node-types';
 import { renameReferences } from './rename-references';
@@ -98,7 +98,8 @@ export function setPosition(document: FlowDocument, id: string, at: Point): void
     note.x = at.x;
     note.y = at.y;
   } else if (findNode(document, id)) {
-    editor.nodes[id] = { x: at.x, y: at.y };
+    // The entry may hold a note: only the position changes.
+    editor.nodes[id] = { ...editor.nodes[id], x: at.x, y: at.y };
   }
 }
 
@@ -157,6 +158,29 @@ export function setNodeBlock(document: FlowDocument, id: string, block: NodeBloc
   if (!node) return false;
   if (value === undefined) Reflect.deleteProperty(node, block);
   else node[block] = value;
+  return true;
+}
+
+/**
+ * Sets the note of a node (`editor.nodes[<id>].note`); an empty or `undefined` text removes it, so the
+ * document never holds an empty note. Returns false when the node does not exist or the text is longer
+ * than the limit.
+ */
+export function setNodeNote(document: FlowDocument, id: string, text: string | undefined): boolean {
+  if (!findNode(document, id)) return false;
+  const editor = editorBlock(document);
+  const entry = editor.nodes[id];
+  if (text === undefined || text === '') {
+    if (entry) Reflect.deleteProperty(entry, 'note');
+    return true;
+  }
+  if (codePointLength(text) > MAX_NODE_NOTE) return false;
+  if (entry) entry.note = text;
+  else {
+    // A node with no recorded position keeps where the canvas draws it by default.
+    const at = fallbackPositions(document).get(id) ?? { x: 0, y: 0 };
+    editor.nodes[id] = { x: at.x, y: at.y, note: text };
+  }
   return true;
 }
 
