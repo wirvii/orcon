@@ -92,6 +92,8 @@ func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error
 		problem.Write(w, r, problem.NotFound)
 	case errors.Is(err, identity.ErrInvalidInput):
 		problem.Write(w, r, problem.ValidationFailed)
+	case errors.Is(err, errInvalidPageToken):
+		problem.Write(w, r, problem.InvalidPageToken)
 	default:
 		h.logger.ErrorContext(r.Context(), "request failed",
 			"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
