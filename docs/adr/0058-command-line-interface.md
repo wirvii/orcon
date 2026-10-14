@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0058 — Command-line interface
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 §5 CLI coverage)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 §5 CLI coverage; amended 2026-10-13: `orcon serve` is the only server command)
 
 Accepted by the owner on 2026-10-12 via SPEC-005.
 
@@ -12,7 +12,7 @@ Given (BL-005): the CLI covers the full public API and is built on it. P3 needs 
 ## Decision
 
 ### 1. Same binary, client and server
-- Server: `orcon serve --role <standalone|api|scheduler|worker>`; `orcon --role ...` at the root keeps working.
+- Server: `orcon serve --role <standalone|api|scheduler|worker>`. The root command starts no server: `orcon` with no subcommand or an unknown one prints usage and exits 2.
 - Local administrative commands of SPEC-001/003/004 (store migration, key ceremony and rotation, audit verification, database roles) keep operating on the local instance and are documented as such.
 - Client commands only call the public API (ADR-0052) through the Go SDK (ADR-0054); they never access the database. Offline exceptions: `flows validate`, `flows fmt`, `flows export --bpmn` of local files (same Go packages as the server).
 - A client-only build of the same source (build tag; no embedded UI, no store adapters, no server roles) is published next to the full binary for lightweight CI (owner decision Q6). It offers the same client commands and offline validation; `orcon serve` and local administrative commands exit with a clear error. A CI check verifies the client-only binary links no store adapter or UI package.
@@ -49,3 +49,4 @@ Separate CLI binary/repository (duplicates validation and versioning); CLI talki
 Changes applied on 2026-10-12 by specifications the owner accepted together with this ADR; each entry names its source.
 
 - **SPEC-014 (Amendment 5, carried by SPEC-005).** §3 gains generated commands and `interactive-session-only` exemptions. Additive only (ADR-0054 §3): no existing operation, field, permission, MCP level or tool changes; semantics of test runs, pinned data and effect confirmation: ADR-0082 (SPEC-014).
+- **SPEC-015 (Amendment 2, 2026-10-13).** §1: the server runs only as `orcon serve`, with `--role`, `--http-address` and `--http-shutdown-timeout` generated from the configuration schema. The root invocation `orcon --role ...` and the `--addr` and `--shutdown-timeout` flags are removed without aliases, because nothing has been released. A fixed command dispatcher exits 2 for a missing or unknown command. The default listen address is `127.0.0.1:8080`.

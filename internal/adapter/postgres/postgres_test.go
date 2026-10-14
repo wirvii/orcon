@@ -192,9 +192,28 @@ func TestLintSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range dbrules.LintPostgres(t.Context(), connect(t, dsn), policy) {
-		t.Errorf("%s", f)
-	}
+	findings := dbrules.LintPostgres(t.Context(), connect(t, dsn), policy)
+	// The trigger registry (SPEC-002 T1, criterion E-DB-1) reports under its own name.
+	t.Run("trigger", func(t *testing.T) {
+		for _, f := range findings {
+			if isTriggerObject(f) {
+				t.Errorf("%s", f)
+			}
+		}
+	})
+	t.Run("other", func(t *testing.T) {
+		for _, f := range findings {
+			if !isTriggerObject(f) {
+				t.Errorf("%s", f)
+			}
+		}
+	})
+}
+
+// isTriggerObject reports whether a schema finding is about the trigger
+// registry: its tables, its engine function and the activation state of the flow.
+func isTriggerObject(f dbrules.Finding) bool {
+	return strings.Contains(f.Object, "trigger") || strings.Contains(f.Object, "activation_state") || strings.Contains(f.Object, "is_route_taken")
 }
 
 func TestHotQueryPlans(t *testing.T) {
@@ -326,5 +345,6 @@ func engineCalls() []dbrules.EngineCall {
 		{Name: "fire_due_timers", List: true, SQL: "SELECT org_id FROM orcon_engine.fire_due_timers(10, now())"},
 		{Name: "claim_outbox", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_outbox(" + worker + ", 10, 1000, now())"},
 		{Name: "resolve_wait_secret", SQL: "SELECT org_id FROM orcon_engine.resolve_wait_secret(" + worker + ")"},
+		{Name: "is_route_taken", SQL: "SELECT orcon_engine.is_route_taken('PRODUCTION', '/hooks/alpha/orders', 'POST', timestamptz '2026-01-01 00:00:00+00')"},
 	}
 }

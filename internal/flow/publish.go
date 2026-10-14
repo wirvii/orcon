@@ -4,6 +4,7 @@
 package flow
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
@@ -114,18 +115,37 @@ func (f *Flow) SaveDraft(expectedRevision int, draft jsonvalue.Value) (int, erro
 // next immutable version (maximum number plus one), recording the warnings.
 // Publishing identical content again still creates a new version.
 func (f *Flow) Publish() (Version, error) {
-	return f.publish(f.draft)
+	return f.publish(f.draft, nil)
+}
+
+// PublishWith is [Flow.Publish] with the node-type rules of validation level 5
+// applied: a node type the catalog does not know, an invalid safety contract
+// and a connector pin that is not installed, not granted or blocked by policy
+// all stop the publication (ADR-0007 section 9).
+func (f *Flow) PublishWith(ctx context.Context, types NodeTypes) (Version, error) {
+	return f.publish(f.draft, &typeCheck{ctx: ctx, types: types})
 }
 
 // Rollback publishes the content of an earlier version as a new version;
 // version history is linear and nothing is ever edited or deleted. The draft
 // becomes that content, so the editor shows what is live.
 func (f *Flow) Rollback(number int) (Version, error) {
+	return f.rollback(number, nil)
+}
+
+// RollbackWith is [Flow.Rollback] with the node-type rules of validation
+// level 5 applied to the content being republished, so a version that pins a
+// connector that is no longer installed or allowed cannot go live again.
+func (f *Flow) RollbackWith(ctx context.Context, number int, types NodeTypes) (Version, error) {
+	return f.rollback(number, &typeCheck{ctx: ctx, types: types})
+}
+
+func (f *Flow) rollback(number int, tc *typeCheck) (Version, error) {
 	old, err := f.Version(number)
 	if err != nil {
 		return Version{}, fmt.Errorf("roll back flow %s: %w", f.id, err)
 	}
-	published, err := f.publish(old.doc)
+	published, err := f.publish(old.doc, tc)
 	if err != nil {
 		return Version{}, fmt.Errorf("roll back flow %s to version %d: %w", f.id, number, err)
 	}
@@ -134,23 +154,34 @@ func (f *Flow) Rollback(number int) (Version, error) {
 	return published, nil
 }
 
+// typeCheck carries the node-type catalog and the context its lookups use.
+type typeCheck struct {
+	ctx   context.Context //nolint:containedctx // scoped to one validation call, never stored
+	types NodeTypes
+}
+
 // validated reads and validates a draft value, returning the normalized
 // document value and the report. A draft that does not read cleanly (wrong
-// shape) fails with its structure errors.
-func validated(v jsonvalue.Value) (jsonvalue.Value, Report, error) {
+// shape) fails with its structure errors. A nil tc skips the node-type rules.
+func validated(v jsonvalue.Value, tc *typeCheck) (jsonvalue.Value, Report, error) {
 	doc, err := FromValue(v)
 	if err != nil {
 		return jsonvalue.Value{}, Report{}, err
 	}
-	report := Validate(&doc)
+	var report Report
+	if tc == nil {
+		report = Validate(&doc)
+	} else {
+		report = ValidateWithTypes(tc.ctx, &doc, tc.types)
+	}
 	if err := report.Err(); err != nil {
 		return jsonvalue.Value{}, report, err
 	}
 	return doc.Value(), report, nil
 }
 
-func (f *Flow) publish(draft jsonvalue.Value) (Version, error) {
-	normalized, report, err := validated(draft)
+func (f *Flow) publish(draft jsonvalue.Value, tc *typeCheck) (Version, error) {
+	normalized, report, err := validated(draft, tc)
 	if err != nil {
 		return Version{}, fmt.Errorf("publish flow %s: %w", f.id, err)
 	}
@@ -196,7 +227,17 @@ func (f *Flow) Active() (Version, bool) {
 // validation errors. The snapshot is keyed by content hash: freezing the same
 // content again returns the existing snapshot instead of creating another.
 func (f *Flow) Snapshot() (Snapshot, error) {
-	normalized, _, err := validated(f.draft)
+	return f.snapshot(nil)
+}
+
+// SnapshotWith is [Flow.Snapshot] with the node-type rules of validation
+// level 5 applied.
+func (f *Flow) SnapshotWith(ctx context.Context, types NodeTypes) (Snapshot, error) {
+	return f.snapshot(&typeCheck{ctx: ctx, types: types})
+}
+
+func (f *Flow) snapshot(tc *typeCheck) (Snapshot, error) {
+	normalized, _, err := validated(f.draft, tc)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("snapshot flow %s: %w", f.id, err)
 	}

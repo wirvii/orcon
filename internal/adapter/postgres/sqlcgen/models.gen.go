@@ -96,6 +96,44 @@ type CallEdge struct {
 	CreatedAt     pgtype.Timestamptz
 }
 
+type ConnectorGrant struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ConnectorPackageID   pgtype.UUID
+	ProjectID            pgtype.UUID
+	PermissionsDigest    string
+	GrantedByPrincipalID pgtype.UUID
+	GrantedAt            pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type ConnectorPackage struct {
+	ID                     pgtype.UUID
+	ConnectorID            string
+	Version                string
+	Digest                 string
+	Kind                   string
+	ManifestDocument       []byte
+	ManifestDocumentFormat string
+	Status                 string
+	InstalledAt            pgtype.Timestamptz
+	InstalledByPrincipalID pgtype.UUID
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+type ConnectorReference struct {
+	ID               pgtype.UUID
+	OrgID            pgtype.UUID
+	FlowID           pgtype.UUID
+	FlowVersionID    pgtype.UUID
+	ConnectorID      string
+	ConnectorVersion string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type Execution struct {
 	ID                      pgtype.UUID
 	OrgID                   pgtype.UUID
@@ -184,6 +222,7 @@ type Flow struct {
 	DeletedByPrincipalID pgtype.UUID
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
+	ActivationState      string
 }
 
 type FlowDataOperation struct {
@@ -217,6 +256,22 @@ type FlowSnapshot struct {
 	Document       []byte
 	DocumentFormat string
 	CreatedAt      pgtype.Timestamptz
+}
+
+type FlowTrigger struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	FlowID            pgtype.UUID
+	NodeID            string
+	Family            string
+	Type              string
+	ConfigurationHash string
+	FlowVersionID     pgtype.UUID
+	Status            string
+	Health            string
+	LastError         pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type FlowVersion struct {
@@ -549,6 +604,45 @@ type Token struct {
 	SuspendReason             pgtype.Text
 	CreatedAt                 pgtype.Timestamptz
 	UpdatedAt                 pgtype.Timestamptz
+}
+
+type TriggerAddress struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	FlowTriggerID   pgtype.UUID
+	Family          string
+	Scope           string
+	Pattern         string
+	StaticPrefix    string
+	Host            pgtype.Text
+	RandomSuffix    pgtype.Text
+	ResponseProfile string
+	Status          string
+	RetiredAt       pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type TriggerAddressMethod struct {
+	ID               pgtype.UUID
+	OrgID            pgtype.UUID
+	TriggerAddressID pgtype.UUID
+	Method           string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type TriggerEvent struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	OccurredAt         pgtype.Timestamptz
+	FlowID             pgtype.UUID
+	NodeID             pgtype.Text
+	Type               string
+	SchemaVersion      int64
+	DataDocument       []byte
+	DataDocumentFormat string
+	CreatedAt          pgtype.Timestamptz
 }
 
 type TriggerRate struct {

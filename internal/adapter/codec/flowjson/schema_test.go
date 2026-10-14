@@ -144,6 +144,8 @@ func TestSchemaPatternsMatchTheDomain(t *testing.T) {
 	from, _ := edgeProps.Get("from")
 	fromProps, _ := from.Get("properties")
 	port, _ := fromProps.Get("port")
+	pin := mustGet(t, defs, "connectorPin")
+	pinProps, _ := pin.Get("properties")
 	ext, _ := defs.Get("ext")
 	names, _ := ext.Get("propertyNames")
 	allOf, _ := names.Get("allOf")
@@ -166,6 +168,8 @@ func TestSchemaPatternsMatchTheDomain(t *testing.T) {
 		{"cycle", patternOf(mustGet(t, defs, "cycle")), flow.CyclePattern},
 		{"node type", patternOf(nodeType), flow.NodeTypePattern},
 		{"port", patternOf(port), flow.PortPattern},
+		{"connector version", patternOf(mustGet(t, pinProps, "version")), flow.ConnectorVersionPattern},
+		{"connector digest", patternOf(mustGet(t, pinProps, "digest")), flow.ConnectorDigestPattern},
 		{"ext key", patternOf(allOf.Items()[0]), flow.ExtKeyPattern},
 	}
 	for _, tt := range checks {
@@ -253,6 +257,13 @@ func TestSchemaRejectsStructuralViolations(t *testing.T) {
 		{"importedFrom without report", "effects-calls-and-settings", "/settings/importedFrom/reportId", ""},
 		{"variable without scope", "loop", "/variables/0/scope", ""},
 		{"variable name starts with a digit", "loop", "/variables/0/name", `"1x"`},
+		{"connector pin without a digest", "connector-node", "/nodes/1/connector/digest", ""},
+		{"connector pin without a version", "connector-node", "/nodes/1/connector/version", ""},
+		{"connector pin with a version that is not SemVer", "connector-node", "/nodes/1/connector/version", `"1.2"`},
+		{"connector pin with an upper-case digest", "connector-node", "/nodes/1/connector/digest", `"SHA256:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"`},
+		{"connector pin with a digest of another length", "connector-node", "/nodes/1/connector/digest", `"sha256:abc"`},
+		{"connector pin with an unknown member", "connector-node", "/nodes/1/connector/seal", `"official"`},
+		{"connector pin that is not an object", "connector-node", "/nodes/1/connector", `"1.2.0"`},
 		{"node without parameters", "linear", "/nodes/1/parameters", ""},
 		{"parameters not an object", "linear", "/nodes/1/parameters", `[]`},
 		{"node type without major", "linear", "/nodes/1/type", `"orcon.http"`},
@@ -374,6 +385,7 @@ func TestSchemaLeavesSemanticRulesToTheValidator(t *testing.T) {
 		{"element shape: start event with an incoming edge", "linear", "/edges/1/to/node", `"start"`, flow.CodeElement},
 		{"V3 loop block missing is a shape-valid document", "loop", "/nodes/1/loop", ``, flow.CodeV3},
 		{"reference to an undeclared variable", "variables", "/nodes/2/parameters/assignments/0/variable", `"ghost"`, flow.CodeReference},
+		{"a connector pin on a node the engine defines", "linear", "/nodes/1/connector", `{"version":"1.2.0","digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}`, flow.CodeConnector},
 		{"V12 duplicate names", "linear", "/nodes/2/name", `"Fetch"`, flow.CodeV12},
 		{"reference to an unknown node", "linear", "/edges/1/to/node", `"ghost"`, flow.CodeReference},
 		{"V8 read of a downstream node", "linear", "/nodes/1/parameters", `{"v":"={{ $('Done').item }}"}`, flow.CodeV8},

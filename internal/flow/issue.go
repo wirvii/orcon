@@ -8,7 +8,33 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
+
+// WarningsFormat is the format tag of the warning document stored with a
+// published version.
+const WarningsFormat = "orcon/flow-warnings@1"
+
+// WarningsValue returns the warnings of the report as the JSON array stored
+// with a version: one object per warning with severity, code, path and
+// message. It is the zero value when the report has no warnings.
+func (r Report) WarningsValue() jsonvalue.Value {
+	warnings := r.Warnings()
+	if len(warnings) == 0 {
+		return jsonvalue.Value{}
+	}
+	items := make([]jsonvalue.Value, len(warnings))
+	for i, w := range warnings {
+		var b builder
+		b.str("severity", string(w.Severity))
+		b.str("code", w.Code)
+		b.str("path", w.Path)
+		b.str("message", w.Message)
+		items[i] = b.build()
+	}
+	return jsonvalue.Array(items...)
+}
 
 // Severity tells whether an [Issue] blocks publication.
 type Severity string
@@ -41,6 +67,10 @@ const (
 	CodeBlock = "BLOCK"
 	// CodeAttention marks an attention notification that cannot be turned off.
 	CodeAttention = "ATTENTION"
+	// CodeConnector marks a node whose connector pin is out of place (on a type
+	// no package owns) or that level 5 cannot accept: the version is not
+	// installed, not granted, or blocked by the policy.
+	CodeConnector = "CONNECTOR"
 	// CodeV1 is rule V1: every node is reachable from a start event.
 	CodeV1 = "V1"
 	// CodeV2 is rule V2: every cycle has a loop control and back edges target one.

@@ -10,7 +10,7 @@ import { defineConfig } from '@playwright/test';
 const here = dirname(fileURLToPath(import.meta.url));
 const binary = resolve(here, '../../bin/orcon');
 const appPort = 18081;
-const harnessPort = 4174;
+const editorPort = 4174;
 
 // The first-useful-screen budget is measured against the real binary (`make build` first). Where the
 // binary is not built, ORCON_PERF_SERVER=static serves the same build from a small compressed server.
@@ -38,7 +38,7 @@ export default defineConfig({
     {
       name: 'perf-desktop',
       use: { browserName: 'chromium', viewport: { width: 1440, height: 900 }, baseURL: `http://127.0.0.1:${String(appPort)}` },
-      metadata: { profile: 'desktop', harnessURL: `http://127.0.0.1:${String(harnessPort)}` },
+      metadata: { profile: 'desktop', editorURL: `http://127.0.0.1:${String(editorPort)}` },
     },
     {
       name: 'perf-phone',
@@ -58,8 +58,8 @@ export default defineConfig({
       ? { command: `node perf/serve-static.mjs ${String(appPort)}`, url: `http://127.0.0.1:${String(appPort)}/healthz`, timeout: 30_000, reuseExistingServer: false }
       : { command: `${binary} serve --role=standalone --http-address=127.0.0.1:${String(appPort)}`, url: `http://127.0.0.1:${String(appPort)}/healthz`, timeout: 30_000, reuseExistingServer: false },
     {
-      command: `pnpm exec vite preview --config vite.perf.config.ts --host 127.0.0.1 --port ${String(harnessPort)} --strictPort`,
-      url: `http://127.0.0.1:${String(harnessPort)}/`,
+      command: `pnpm exec vite preview --config vite.perf.config.ts --host 127.0.0.1 --port ${String(editorPort)} --strictPort`,
+      url: `http://127.0.0.1:${String(editorPort)}/`,
       timeout: 30_000,
       reuseExistingServer: false,
     },

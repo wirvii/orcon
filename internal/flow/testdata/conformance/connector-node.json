@@ -1,0 +1,25 @@
+{
+  "format": "orcon/flow@1",
+  "id": "01930000-0000-7000-8000-000000000020",
+  "name": "A node of an installed connector",
+  "description": "A connector node pins the version and the digest of the package it was built against (ADR-0034 section 1).",
+  "settings": {},
+  "variables": [],
+  "nodes": [
+    { "id": "start", "name": "Start", "element": "startEvent", "type": "orcon.start@1", "parameters": {} },
+    {
+      "id": "create",
+      "name": "Create order",
+      "element": "serviceTask",
+      "type": "acme.shop.order@1",
+      "parameters": { "operation": "order.create", "customerId": "=$json.customer" },
+      "connector": { "version": "1.2.0", "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+    },
+    { "id": "done", "name": "Done", "element": "endEvent", "type": "orcon.end@1", "parameters": {} }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "start", "port": "main" }, "to": { "node": "create" }, "kind": "SEQUENCE" },
+    { "id": "e2", "from": { "node": "create", "port": "main" }, "to": { "node": "done" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}
