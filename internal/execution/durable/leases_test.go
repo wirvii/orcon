@@ -6,6 +6,7 @@ package durable_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -208,6 +209,68 @@ func TestDispatchLoopDeliversTheOutbox(t *testing.T) {
 		})
 		if entries, _ := eng.Plans().Len(); entries != 1 {
 			t.Errorf("%d documents cached, want 1", entries)
+		}
+	})
+}
+
+// gateRunner blocks the node t1 of one execution until the test lets it go.
+type gateRunner struct {
+	block   atomic.Value // execution.ID
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (g *gateRunner) Execute(ctx context.Context, call execution.NodeCall) (execution.NodeOutput, error) {
+	if blocked, _ := g.block.Load().(execution.ID); call.Execution == blocked && call.Node.ID == "t1" {
+		g.once.Do(func() { close(g.started) })
+		select {
+		case <-ctx.Done():
+			return execution.NodeOutput{}, ctx.Err()
+		case <-g.release:
+		}
+	}
+	return execution.NodeOutput{Ports: []execution.PortBatch{{Port: flow.PortMain, Batch: call.Input}}}, nil
+}
+
+// TestFailedStepGivesItsLeaseBack (BL-065): a step that fails with an ordinary
+// error must not leave its token LEASED. Renewals go by worker, so while the
+// worker holds any other lease (here, execution A is blocked in a node) a lease
+// that was only dropped locally would be renewed for ever.
+func TestFailedStepGivesItsLeaseBack(t *testing.T) {
+	eachStore(t, storetest.EngineOptions{Weak: true}, func(t *testing.T, env *storetest.EngineEnv) {
+		t.Helper()
+		pub := env.Publish(docOf(sequence(2)))
+		g := &gateRunner{started: make(chan struct{}), release: make(chan struct{})}
+		// The first step to reach its commit fails once: A is blocked before that, so it is B's.
+		faults := &faultPlan{only: []durable.Point{durable.PointWorked}, failAt: 1, err: errInjected}
+		cfg := durable.Config{Concurrency: 2, RenewEvery: 30 * time.Millisecond, PollEvery: 10 * time.Millisecond, ReapEvery: 50 * time.Millisecond, LeaseTTL: time.Minute, Faults: faults}
+		eng := env.Engine(cfg, execution.Deps{Runner: g})
+		a := env.Start(eng, pub, input())
+		g.block.Store(execution.ID(a.String()))
+		b := env.Start(eng, pub, input())
+		ctx, stop := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- eng.Run(ctx) }()
+		defer func() {
+			close(g.release)
+			stop()
+			if err := <-done; err != nil {
+				t.Errorf("Run() = %v", err)
+			}
+		}()
+		select {
+		case <-g.started:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the activation of A never started")
+		}
+		// B finishes while A still holds its lease: the lease of B came back after the failure.
+		waitFor(t, "B to finish after its failed step", 20*time.Second, func() bool { return statusOf(env, b) == execution.ExecSucceeded })
+		for _, tk := range env.LiveTokens(b) {
+			t.Errorf("token %s of B is still %s", tk.ID, tk.Status)
+		}
+		if got := countEvents(env, b, "lease.expired"); got != 1 {
+			t.Errorf("%d lease.expired events for B, want 1: the failure counts as one abandonment", got)
 		}
 	})
 }

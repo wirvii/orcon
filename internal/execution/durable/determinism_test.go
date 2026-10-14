@@ -158,16 +158,13 @@ func runProgram(t *testing.T, env *storetest.EngineEnv, pub *storetest.Published
 		if crashes > 1 {
 			t.Fatal("the injected failure happened twice")
 		}
-		// The process died: its leases come back, a new process takes over with nothing in memory.
-		if _, err := env.Store.ReleaseWorkerLeases(t.Context(), worker, 100, time.Now()); err != nil {
-			t.Fatalf("release the leases of the dead worker: %v", err)
-		}
+		// The process died: the lease of the token came back with the failure, and a new process takes over with nothing in memory.
 		worker = execution.WorkerID(env.IDs.New())
 		cfg.Worker, cfg.Faults = worker, nil
 		eng = env.Engine(cfg, deps)
 	}
 	if got := statusOf(env, execID); got != execution.ExecSucceeded && got != execution.ExecFailed {
-		t.Fatalf("execution is %s after the run", got)
+		t.Fatalf("execution is %s after the run; tokens %+v", got, env.LiveTokens(execID))
 	}
 	return col.result(), faults.count()
 }

@@ -45,6 +45,8 @@ type leaseTable struct {
 
 	mu   sync.Mutex
 	held map[store.TokenID]*heldLease
+	// orphans are leases of failed tokens that could not be released yet.
+	orphans map[store.TokenID]store.Fence
 }
 
 func newLeaseTable(ttl time.Duration) *leaseTable {
@@ -52,7 +54,7 @@ func newLeaseTable(ttl time.Duration) *leaseTable {
 	if q := ttl / 4; q < margin {
 		margin = q
 	}
-	return &leaseTable{ttl: ttl, margin: margin, held: make(map[store.TokenID]*heldLease)}
+	return &leaseTable{ttl: ttl, margin: margin, held: make(map[store.TokenID]*heldLease), orphans: make(map[store.TokenID]store.Fence)}
 }
 
 // add registers a lease granted by a claim or created by a commit that started
@@ -83,6 +85,10 @@ func (t *leaseTable) extend(l *heldLease, f store.Fence, start time.Time) {
 	defer t.mu.Unlock()
 	if t.held[l.fence.Token] == l {
 		delete(t.held, l.fence.Token)
+	}
+	if f.Epoch == 0 { // the token left the worker: nothing is held
+		l.fence = store.Fence{}
+		return
 	}
 	l.fence = f
 	l.registered = time.Now()
@@ -139,4 +145,29 @@ func (t *leaseTable) count() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return len(t.held)
+}
+
+// orphan remembers the lease of a failed token that could not be released.
+func (t *leaseTable) orphan(f store.Fence) {
+	t.mu.Lock()
+	t.orphans[f.Token] = f
+	t.mu.Unlock()
+}
+
+// settle forgets an orphan once its lease is settled.
+func (t *leaseTable) settle(f store.Fence) {
+	t.mu.Lock()
+	delete(t.orphans, f.Token)
+	t.mu.Unlock()
+}
+
+// orphaned lists the leases still to be released.
+func (t *leaseTable) orphaned() []store.Fence {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]store.Fence, 0, len(t.orphans))
+	for _, f := range t.orphans {
+		out = append(out, f)
+	}
+	return out
 }

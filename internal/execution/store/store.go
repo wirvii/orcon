@@ -710,6 +710,12 @@ type WorkQueue interface {
 	// reason POISON at the threshold, and the started attempts of its node
 	// executions become ABANDONED.
 	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ReleaseTokenLease gives up the lease of one token the worker could not go on
+	// with (the engine failed on a step of it). It counts as an abandonment, like an
+	// expired lease, but at once: renewing by worker would keep the lease alive for
+	// as long as the worker holds any other. It reports false when the fence no
+	// longer holds (the lease was lost or already released).
+	ReleaseTokenLease(ctx context.Context, f Fence, poisonThreshold int64, now time.Time) (Reaped, bool, error)
 	// FireDueTimers marks up to limit due timers FIRED and, in the same
 	// transaction, wakes the WAITING token of each (RUNNABLE, counters and status
 	// of the execution refreshed, event timer.fired); concurrent callers never

@@ -258,6 +258,33 @@ BEGIN
 END
 $$;
 
+-- Gives up the lease of one token the worker could not go on with (ADR-0013 sections 4 and 9). The fence (epoch and
+-- owner) keeps a lease that was lost meanwhile out of it. The execution is locked before the token, like a commit does.
+CREATE FUNCTION orcon_engine.release_token_lease(p_token_id uuid, p_lease_epoch bigint, p_worker_id uuid, p_poison_threshold bigint, p_now timestamptz)
+RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, is_poisoned boolean)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+DECLARE
+  v_org uuid;
+  v_execution uuid;
+  v_ids uuid[];
+BEGIN
+  SELECT t.org_id, t.execution_id INTO v_org, v_execution FROM token t WHERE t.id = p_token_id;
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+  PERFORM 1 FROM execution e WHERE e.org_id = v_org AND e.id = v_execution FOR NO KEY UPDATE;
+  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_ids
+  FROM (
+    SELECT t.id FROM token t
+    WHERE t.id = p_token_id AND t.status = 'LEASED' AND t.lease_epoch = p_lease_epoch AND t.lease_owner = p_worker_id
+    FOR UPDATE
+  ) x;
+  RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now) a;
+END
+$$;
+
 -- Fires due timers with FOR UPDATE SKIP LOCKED (ADR-0010 section 8) and wakes the token that waits for each in the
 -- same transaction: a crash can no longer leave a FIRED timer next to a WAITING token that nothing wakes.
 CREATE OR REPLACE FUNCTION orcon_engine.fire_due_timers(p_limit integer, p_now timestamptz)
@@ -383,6 +410,9 @@ GRANT EXECUTE ON FUNCTION orcon_engine.release_expired_leases(integer, bigint, t
 ALTER FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) TO orcon_application;
+ALTER FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) TO orcon_application;
 ALTER FUNCTION orcon_engine.fire_due_timers(integer, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.fire_due_timers(integer, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.fire_due_timers(integer, timestamptz) TO orcon_application;

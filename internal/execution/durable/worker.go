@@ -30,11 +30,22 @@ func (e *Engine) Claim(ctx context.Context, limit int) ([]store.Claimed, time.Ti
 // each confirmation point. It returns nil when the token was handled, including
 // when its lease was lost (the work is then done by whoever holds the token
 // now), and an error only when the engine could not process the token: the lease
-// is then left to expire and the reaper counts an abandonment.
+// is then given back at once and counts as an abandonment (ADR-0013 sections 4
+// and 9), because renewing by worker would otherwise keep it alive for as long
+// as the worker holds any other token.
 func (e *Engine) Work(ctx context.Context, c store.Claimed, claimedAt time.Time) error {
 	f := store.Fence{OrgID: c.OrgID, Token: c.TokenID, Epoch: c.LeaseEpoch, Owner: e.cfg.Worker}
 	lctx, l := e.leases.add(ctx, f, claimedAt)
 	defer e.leases.drop(l)
+	err := e.drive(ctx, lctx, l, c)
+	if err != nil && ctx.Err() == nil {
+		e.abandonLease(ctx, l.fence)
+	}
+	return err
+}
+
+// drive works the token and reports why it stopped.
+func (e *Engine) drive(ctx, lctx context.Context, l *heldLease, c store.Claimed) error {
 	if e.cfg.Faults != nil {
 		if err := e.cfg.Faults.Hit(lctx, PointClaimed, c.TokenID); err != nil {
 			return err
@@ -54,6 +65,36 @@ func (e *Engine) Work(ctx context.Context, c store.Claimed, claimedAt time.Time)
 			return err
 		}
 	}
+}
+
+// abandonLease gives the lease of a failed token back. When the database cannot
+// be reached the lease is remembered and given back by the renewal loop as soon
+// as it can: until then renewals keep it alive.
+func (e *Engine) abandonLease(ctx context.Context, f store.Fence) {
+	if f.Epoch == 0 {
+		return // the token had left the worker when the failure came
+	}
+	if !e.releaseLease(ctx, f) {
+		e.leases.orphan(f)
+	}
+}
+
+// releaseLease tries once to give a lease back. It reports whether the lease is
+// settled: released, or no longer the worker's.
+func (e *Engine) releaseLease(ctx context.Context, f store.Fence) bool {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	reaped, ok, err := e.store.ReleaseTokenLease(rctx, f, e.cfg.PoisonThreshold, e.cfg.Clock.Now())
+	if err != nil {
+		e.cfg.Logger.WarnContext(ctx, "lease of a failed token not released; it is retried", slog.Any("error", err))
+		return false
+	}
+	if ok {
+		e.cfg.Logger.WarnContext(ctx, "lease of a failed token released", slog.String("execution", reaped.ExecutionID.String()),
+			slog.Int64("abandoned", reaped.AbandonedCount), slog.Bool("poisoned", reaped.Poisoned))
+		e.signal(1)
+	}
+	return true
 }
 
 // segment runs the held token from where it is to the next confirmation point
@@ -130,6 +171,9 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 		return false, err
 	}
 	e.afterCommit(ctx, &out)
+	// The lease table follows the commit at once: a failure from here on gives back
+	// the lease the worker holds now, not the one it held before.
+	e.leases.extend(l, out.held, commitStart)
 	if e.cfg.Faults != nil {
 		if err := e.cfg.Faults.Hit(ctx, PointCommitted, l.fence.Token); err != nil {
 			return false, err
@@ -145,7 +189,6 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 	if out.held.Epoch == 0 {
 		return false, nil
 	}
-	e.leases.extend(l, out.held, commitStart)
 	return true, nil
 }
 

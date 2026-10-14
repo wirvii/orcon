@@ -154,6 +154,11 @@ func (e *Engine) renewLoop(ctx context.Context, record execution.WorkerRecord) {
 			return
 		case <-tick.C:
 		}
+		for _, f := range e.leases.orphaned() {
+			if e.releaseLease(ctx, f) {
+				e.leases.settle(f)
+			}
+		}
 		if e.leases.count() > 0 {
 			start := time.Now()
 			renewed, err := e.store.RenewLeases(ctx, e.cfg.Worker, e.cfg.LeaseTTL, e.cfg.Clock.Now())

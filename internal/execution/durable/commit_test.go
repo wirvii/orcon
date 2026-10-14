@@ -38,10 +38,7 @@ func runToEnd(t *testing.T, env *storetest.EngineEnv, eng *durable.Engine, worke
 			if !errors.Is(err, errInjected) {
 				t.Fatalf("work: %v", err)
 			}
-			failed++
-			if _, err := env.Store.ReleaseWorkerLeases(t.Context(), worker, 100, time.Now()); err != nil {
-				t.Fatalf("release leases: %v", err)
-			}
+			failed++ // the engine gave the lease of the failed token back by itself
 		}
 	}
 }
@@ -78,10 +75,7 @@ func TestAtomicCheckpoint(t *testing.T) {
 				if got := countEvents(env, execID, "execution.succeeded"); got != 0 {
 					t.Error("the failed commit ended the execution")
 				}
-				// The retry, by the same engine after the lease is given back, commits the whole step once.
-				if _, err := env.Store.ReleaseWorkerLeases(t.Context(), worker, 100, time.Now()); err != nil {
-					t.Fatal(err)
-				}
+				// The engine gave the lease back when the step failed: the retry commits the whole step once.
 				env.Drain(eng)
 				if got := statusOf(env, execID); got != execution.ExecSucceeded {
 					t.Errorf("execution is %s, want SUCCEEDED", got)

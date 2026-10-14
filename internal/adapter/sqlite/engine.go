@@ -512,6 +512,31 @@ func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.Worker
 	return out, err
 }
 
+// ReleaseTokenLease implements [store.WorkQueue].
+func (s *Store) ReleaseTokenLease(ctx context.Context, f store.Fence, poisonThreshold int64, _ time.Time) (store.Reaped, bool, error) {
+	var out []store.Reaped
+	now := s.clock.Now()
+	err := s.write(ctx, "release token lease", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ReleaseTokenLease(ctx, sqlcgen.ReleaseTokenLeaseParams{
+			PoisonThreshold: poisonThreshold, Now: micros(now), OrgID: uuidBytes(f.OrgID), TokenID: uuidBytes(f.Token),
+			LeaseEpoch: f.Epoch, WorkerID: uuidBytes(f.Owner),
+		})
+		if err != nil {
+			return err
+		}
+		moved := make([]abandoned, len(rows))
+		for i, r := range rows {
+			moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
+		}
+		out, err = afterAbandon(ctx, q, moved, now)
+		return err
+	})
+	if err != nil || len(out) == 0 {
+		return store.Reaped{}, false, err
+	}
+	return out[0], true, nil
+}
+
 // releaseAllLeases is what a standalone process does at start (ADR-0013
 // section 9): the lock file guarantees no other holder exists, so every token
 // still LEASED is released, and the release counts as an abandonment so that a

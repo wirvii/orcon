@@ -69,6 +69,21 @@ WHERE id IN (
 RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
           CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
 
+-- One token the worker could not go on with (ADR-0013 sections 4 and 9): the fence names the epoch and the owner, so
+-- a lease that was lost meanwhile is left alone.
+-- name: ReleaseTokenLease :many
+-- orcon:scope engine
+UPDATE token
+SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
+    updated_at = sqlc.arg(now)
+WHERE token.org_id = sqlc.arg(org_id) AND token.id = sqlc.arg(token_id) AND token.lease_epoch = sqlc.arg(lease_epoch)
+  AND token.lease_owner = sqlc.arg(worker_id) AND token.status = 'LEASED'
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned;
+
 -- Startup of a standalone process: the lock file guarantees no other holder can exist, so every lease is released at
 -- once (ADR-0013 section 9). A lease a crashed predecessor left counts as an abandonment, so that a token that
 -- crashes the process every time reaches the poison threshold.

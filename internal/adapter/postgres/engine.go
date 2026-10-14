@@ -134,6 +134,28 @@ func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.Worker
 	return out, err
 }
 
+// ReleaseTokenLease implements [store.WorkQueue].
+func (s *Store) ReleaseTokenLease(ctx context.Context, f store.Fence, poisonThreshold int64, now time.Time) (store.Reaped, bool, error) {
+	var out []store.Reaped
+	err := s.engineRows(ctx, "release token lease",
+		`SELECT org_id, id, execution_id, abandoned_count, is_poisoned FROM orcon_engine.release_token_lease($1, $2, $3, $4, $5)`,
+		[]any{pgUUID(f.Token), f.Epoch, pgUUID(f.Owner), poisonThreshold, timestamp(now)},
+		func(rows pgx.Rows) error {
+			var org, tok, exec pgtype.UUID
+			var abandoned int64
+			var poisoned bool
+			if err := rows.Scan(&org, &tok, &exec, &abandoned, &poisoned); err != nil {
+				return err
+			}
+			out = append(out, store.Reaped{OrgID: fromPGUUID[identity.OrgID](org), TokenID: fromPGUUID[store.TokenID](tok), ExecutionID: fromPGUUID[store.ExecutionID](exec), AbandonedCount: abandoned, Poisoned: poisoned})
+			return nil
+		})
+	if err != nil || len(out) == 0 {
+		return store.Reaped{}, false, err
+	}
+	return out[0], true, nil
+}
+
 // FireDueTimers implements [store.WorkQueue].
 func (s *Store) FireDueTimers(ctx context.Context, limit int, now time.Time) ([]store.FiredTimer, error) {
 	var out []store.FiredTimer

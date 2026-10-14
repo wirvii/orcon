@@ -396,6 +396,79 @@ func (q *Queries) ReleaseExpiredLeases(ctx context.Context, poisonThreshold int6
 	return items, nil
 }
 
+const releaseTokenLease = `-- name: ReleaseTokenLease :many
+UPDATE token
+SET status = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= ?1 THEN token.available_at ELSE ?2 END,
+    updated_at = ?2
+WHERE token.org_id = ?3 AND token.id = ?4 AND token.lease_epoch = ?5
+  AND token.lease_owner = ?6 AND token.status = 'LEASED'
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
+`
+
+type ReleaseTokenLeaseParams struct {
+	PoisonThreshold int64
+	Now             int64
+	OrgID           []byte
+	TokenID         []byte
+	LeaseEpoch      int64
+	WorkerID        []byte
+}
+
+type ReleaseTokenLeaseRow struct {
+	OrgID          []byte
+	ID             []byte
+	ExecutionID    []byte
+	AbandonedCount int64
+	LeaseEpoch     int64
+	NodeID         string
+	Column7        int64
+}
+
+// One token the worker could not go on with (ADR-0013 sections 4 and 9): the fence names the epoch and the owner, so
+// a lease that was lost meanwhile is left alone.
+// orcon:scope engine
+func (q *Queries) ReleaseTokenLease(ctx context.Context, arg ReleaseTokenLeaseParams) ([]ReleaseTokenLeaseRow, error) {
+	rows, err := q.db.QueryContext(ctx, releaseTokenLease,
+		arg.PoisonThreshold,
+		arg.Now,
+		arg.OrgID,
+		arg.TokenID,
+		arg.LeaseEpoch,
+		arg.WorkerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReleaseTokenLeaseRow{}
+	for rows.Next() {
+		var i ReleaseTokenLeaseRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.AbandonedCount,
+			&i.LeaseEpoch,
+			&i.NodeID,
+			&i.Column7,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const releaseWorkerLeases = `-- name: ReleaseWorkerLeases :many
 UPDATE token
 SET status = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
