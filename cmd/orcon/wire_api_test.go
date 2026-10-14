@@ -46,3 +46,24 @@ func TestMountAPIRefusesRolesThatDoNotServeIt(t *testing.T) {
 		}
 	}
 }
+
+func TestServeHandlerMountsTheAPIBeforeTheWebUI(t *testing.T) {
+	h, err := newHandler(config.RoleStandalone, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("newHandler: %v", err)
+	}
+	get := func(target string) *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+		req.RemoteAddr = "192.0.2.1:1"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := get("/api/reference/"); rec.Code != http.StatusOK {
+		t.Errorf("GET /api/reference/ = %d, want 200", rec.Code)
+	}
+	rec := get("/api/v1/unknown")
+	if rec.Code != http.StatusNotFound || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/problem+json") {
+		t.Errorf("GET /api/v1/unknown = %d %q, want 404 problem+json", rec.Code, rec.Header().Get("Content-Type"))
+	}
+}

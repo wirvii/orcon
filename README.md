@@ -76,12 +76,12 @@ Requirements: Go 1.26 or newer (`go.mod` sets `go 1.26.0` and the `toolchain` di
 ```bash
 pnpm install
 make build                                   # builds the web app, embeds it, builds bin/orcon
-./bin/orcon --role=standalone --addr=:8080
+./bin/orcon serve --role=standalone --http-address=:8080
 ```
 
 Open http://localhost:8080. The `/healthz` endpoint responds with `ok`.
 
-The `--role` flag accepts `standalone`, `api`, `scheduler` and `worker`. Only `standalone` and `api` serve HTTP; `scheduler` and `worker` are placeholders.
+The `--role` flag of `orcon serve` accepts `standalone`, `api`, `scheduler` and `worker`. Only `standalone` and `api` serve HTTP; `scheduler` and `worker` are placeholders.
 
 Other commands:
 

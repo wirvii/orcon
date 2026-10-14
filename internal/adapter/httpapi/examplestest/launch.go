@@ -26,8 +26,9 @@ const (
 type LaunchConfig struct {
 	// Binary is the path of the orcon binary (ORCON_BIN, default bin/orcon).
 	Binary string
-	// Args are the arguments before the listen address; the default is
-	// "--role standalone".
+	// Args are the arguments before the listen address ("--addr <addr>" is
+	// appended). The default replaces them with
+	// "serve --role standalone --http-address <port> --data-dir <tmp>".
 	Args []string
 	// Env is added to the environment of the process (KEY=value), for example the
 	// database settings of the engine under test.
@@ -57,16 +58,20 @@ func Launch(ctx context.Context, cfg LaunchConfig) (*Server, error) {
 	if cfg.StartTimeout <= 0 {
 		cfg.StartTimeout = defaultStartTimeout
 	}
-	args := cfg.Args
-	if args == nil {
-		args = []string{"--role", "standalone"}
-	}
 	addr, err := freeLoopbackAddr(ctx)
 	if err != nil {
 		return nil, err
 	}
+	args := append(append([]string{}, cfg.Args...), "--addr", addr)
+	if cfg.Args == nil { // the default is a real serve invocation, which takes the address as --http-address
+		dataDir, err := os.MkdirTemp("", "orcon-examples-")
+		if err != nil {
+			return nil, fmt.Errorf("launch: data dir: %w", err)
+		}
+		args = []string{"serve", "--role", "standalone", "--http-address", addr, "--data-dir", dataDir}
+	}
 	procCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	cmd := exec.CommandContext(procCtx, cfg.Binary, append(append([]string{}, args...), "--addr", addr)...) //nolint:gosec // the binary path is chosen by the test harness, not by input
+	cmd := exec.CommandContext(procCtx, cfg.Binary, args...) //nolint:gosec // the binary path is chosen by the test harness, not by input
 	cmd.Dir = cfg.Dir
 	cmd.Env = append(os.Environ(), cfg.Env...)
 	cmd.Stderr = cfg.Stderr

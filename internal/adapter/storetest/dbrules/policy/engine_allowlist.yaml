@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Reviewed statements of the engine plane (tenant-isolation.md TI-9, ADR-0047
+# section 2): the only queries allowed to carry "-- orcon:scope engine", that is,
+# to touch organization data without an org_id restriction. tools/sqlcheck
+# rejects a scope engine query that is not listed here and an entry that matches
+# no query. Every addition is reviewed on its own: say why the statement must
+# cross organizations.
+#
+# Format (a restricted YAML that sqlcheck reads without a YAML library):
+#
+#   - dialect: postgres        # sqlite or postgres
+#     query: ClaimDueTimer     # the name after "-- name:"
+#     reason: cross-organization scan of due timers (ADR-0047 section 2)
+#
+
+- dialect: postgres
+  query: ExistsRouteTakenByOtherOrganization
+  reason: route uniqueness check must see every organization (SPEC-002 T1)
+- dialect: postgres
+  query: LockTriggerRoute
+  reason: route lock is global across organizations (SPEC-002 T1)
+- dialect: postgres
+  query: MarkTriggerRoutesChanged
+  reason: route change marker is global across organizations (SPEC-002 T1)
+- dialect: sqlite
+  query: ClaimTokens
+  reason: engine claims tokens across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: RenewLeases
+  reason: lease renewal by the engine plane across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: ReleaseExpiredLeases
+  reason: expired lease sweep across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: MarkTokenAttemptsAbandoned
+  reason: abandoned attempt sweep across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: ReleaseWorkerLeases
+  reason: worker lease release across organizations (ADR-0047 section 2, SPEC-001 C4a)
+- dialect: sqlite
+  query: ReleaseAllLeases
+  reason: startup lease release across organizations (ADR-0047 section 2, SPEC-001 C4a)
+- dialect: sqlite
+  query: MarkDueTimersFired
+  reason: due timer scan across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: ClaimOutbox
+  reason: outbox claim across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: ResolveWaitSecret
+  reason: wait secret lookup by the engine plane across organizations (ADR-0047 section 2, SPEC-001 C2b)
+- dialect: sqlite
+  query: ExistsRouteTakenByOtherOrganization
+  reason: route uniqueness check must see every organization (SPEC-002 T1)

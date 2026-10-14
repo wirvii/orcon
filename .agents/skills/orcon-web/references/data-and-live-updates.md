@@ -32,7 +32,7 @@ Precedence: accepted ADRs > accepted `orcon-go` rules > `orcon-ui` rules for any
   ```
 
   Components and loaders use these options; no inline keys.
-- **DT-4** Every key starts with the active organization id; switching organization clears the cache.
+- **DT-4** Every key starts with the active organization id; switching organization clears the cache. Data read before an organization is active (the current user, the list of the user's organizations) uses keys that start with the constant `'session'`; signing out clears the whole cache.
 - **DT-5** `queryFn` parses the SDK result with the generated Zod schema (`parseWith`); a parse failure is a contract error (`errors.md` ER-5).
 - **DT-7** Client defaults (`app/query-client.ts`): `staleTime` 30 s, `gcTime` 5 min, `retry` only for network failures (at most 2; HTTP 429/503 are already retried by the SDK), `refetchOnWindowFocus` on.
 - **DT-8** Every screen that renders a query uses `app/query-state/QueryState` so loading (skeleton), empty, error with retry, forbidden (403: permission message, no retry) and data look and behave the same.

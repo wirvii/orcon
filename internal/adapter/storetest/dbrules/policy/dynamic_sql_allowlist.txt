@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Go files allowed to carry the //orcon:dynamic-sql <reason> annotation, which
+# lets a driver call in the data-access layer run SQL text that is not a
+# constant (tools/orconvet orgscope, rule 2). In any other file the annotation
+# is itself a finding. Only a pull request approved by the owner may add a line.
+# Format, fields separated by two or more spaces:
+#   <path from the repository root>  <reason>  <YYYY-MM-DD>  approved-by:<owner>
+# Empty at birth: the migration runners (SPEC-001 C2a) add theirs if they need it.
+internal/adapter/postgres/migrate.go  the migration runner executes the embedded migration files  2026-10-13  approved-by:owner
+internal/adapter/sqlite/migrate.go  the migration runner executes the embedded migration files  2026-10-13  approved-by:owner
+internal/adapter/postgres/pgtest_test.go  test helper that names a throwaway database or runs a rule-check statement  2026-10-13  approved-by:owner
+internal/adapter/postgres/postgres_test.go  test helper that runs the statements of the migration and rule checks  2026-10-13  approved-by:owner
+internal/adapter/postgres/session_test.go  test helper that names a throwaway login role  2026-10-13  approved-by:owner
+internal/adapter/sqlite/sqlite_test.go  test helper that runs the statements of the rule checks  2026-10-13  approved-by:owner
+internal/adapter/postgres/engine.go  the engine plane runs statements built by the engine functions (engineRows)  2026-10-14  approved-by:owner
+internal/adapter/sqlite/sqlcgen/engine.sql.go  sqlc slice expansion of the fairness_keys list  2026-10-14  approved-by:owner

@@ -141,6 +141,7 @@ func apply(ctx context.Context, conn *sql.Conn, m migration.Migration, opts Migr
 			}
 		}
 	}()
+	//orcon:dynamic-sql the migration runner executes the embedded migration files
 	if _, err := conn.ExecContext(ctx, m.SQL); err != nil {
 		return err
 	}

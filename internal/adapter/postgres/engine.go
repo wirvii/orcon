@@ -31,6 +31,7 @@ func (s *Store) engineRows(ctx context.Context, op, statement string, args []any
 	if s.closed {
 		return fmt.Errorf("%s: %w", op, ErrClosed)
 	}
+	//orcon:dynamic-sql the engine functions hand this helper their own reviewed statement text
 	rows, err := s.pool.Query(ctx, statement, args...)
 	if err != nil {
 		return mapError(op, err)

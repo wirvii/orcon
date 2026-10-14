@@ -4,7 +4,7 @@ description: Applies the Orcon public API design standards - resource paths with
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with Go, Node 22 with pnpm 9, GNU make and git; PostgreSQL only to reproduce the nightly example run.
 metadata:
-  version: 1.2.2
+  version: 1.2.4
   pinned: true
   owner: wirvii
 ---
