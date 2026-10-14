@@ -32,7 +32,20 @@ The pages below are routes under `docs/user/en/` and, mirrored, under `docs/user
 
 ## Pages that exist today
 
-`getting-started/quickstart.md`, `configuration/overview.md`, `operations/upgrade-and-rollback.md`, `operations/backup-and-restore.md`, `operations/alerts.md` and `migrating-from-n8n/overview.md`, in English and Spanish, and `support-matrix.yaml`. The other routes are written by the slices that deliver their features.
+These pages exist in English and Spanish, together with `support-matrix.yaml`:
+
+- Start: `getting-started/quickstart.md`.
+- Install: `install/overview.md`, `install/binary.md`, `install/container.md`, `install/docker-compose.md`, `install/kubernetes-helm.md`, `install/verifying-releases.md` and `install/uninstall.md`.
+- Configuration: `configuration/overview.md`, `configuration/secrets.md`, `configuration/first-run.md`, `configuration/master-key-and-kms.md`, `configuration/tls-and-reverse-proxy.md` and `configuration/network-connections.md`.
+- Operations: `operations/upgrade-and-rollback.md`, `operations/backup-and-restore.md` and `operations/alerts.md`.
+- Security: `security/overview.md`, `security/authentication-and-sso.md`, `security/authorization.md`, `security/credentials-and-secret-stores.md`, `security/encryption-and-keys.md`, `security/multi-organization.md`, `security/audit-and-siem.md`, `security/connector-trust.md`, `security/hardening-checklist.md` and `security/reporting-vulnerabilities.md`.
+- Building flows: `building-flows/editor.md`.
+- Migrating from n8n: `migrating-from-n8n/overview.md`.
+- Support: `support/matrix.md`, `support/versioning-policy.md` and `support/getting-help.md`.
+
+Two of these pages are hand-written stand-ins for pages that the site will generate: `configuration/network-connections.md` (from the registry of outgoing connections) and `support/matrix.md` (from `support-matrix.yaml`). Each says so in its opening note, and the generated page replaces it when the tool exists.
+
+The other routes are written by the slices that deliver their features.
 
 ## Front matter
 

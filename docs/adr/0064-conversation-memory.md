@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0064 — Conversation memory: persisted, ordered, retrievable, retained
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: table names per ADR-0077; UPPER_SNAKE values per ADR-0080 §3)

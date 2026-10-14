@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0065 — Knowledge stores, ingestion and hybrid retrieval on SQLite and PostgreSQL
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: table names per ADR-0077; metadata filters on real columns per the Go rulebook DA-3 as amended; `reindex` action per ADR-0080 §2; UPPER_SNAKE values per ADR-0080 §3) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)

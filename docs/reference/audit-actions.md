@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Audited actions
 
 Status: **Accepted** | Source: SPEC-004 Annex B (accepted 2026-10-12 via SPEC-004), with the actions added by the amendments of [ADR-0048](../adr/0048-tamper-evident-audit-log.md)

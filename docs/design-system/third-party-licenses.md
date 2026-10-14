@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Third-party licenses
 
 Dependencies of the web workspaces (`apps/web`, `packages/js/*`, the root) with the version the lockfile pins (`pnpm-lock.yaml`, committed) and the license read from each installed package. The attribution notices that ship with the binary are in [`NOTICE`](../../NOTICE). Go dependencies are checked by `make licenses`.
@@ -12,6 +13,8 @@ The Vite build bundles these into `internal/adapter/webui/dist/`, which the bina
 
 | Package | Version | License |
 |---|---|---|
+| `@dagrejs/dagre` | 3.1.1 | MIT |
+| `@dagrejs/graphlib` | 4.0.5 | MIT |
 | `@fontsource-variable/inter` | 5.3.0 | OFL-1.1 |
 | `@fontsource-variable/jetbrains-mono` | 5.3.0 | OFL-1.1 |
 | `@scalar/api-reference` | 1.74.0 | MIT |
@@ -19,6 +22,7 @@ The Vite build bundles these into `internal/adapter/webui/dist/`, which the bina
 | `class-variance-authority` | 0.7.1 | Apache-2.0 |
 | `clsx` | 2.1.1 | MIT |
 | `cmdk` | 1.1.1 | MIT |
+| `immer` | 10.2.0 | MIT |
 | `lucide-react` | 0.577.0 | ISC |
 | `radix-ui` | 1.8.0 | MIT |
 | `react` | 19.3.0 | MIT |
@@ -26,6 +30,9 @@ The Vite build bundles these into `internal/adapter/webui/dist/`, which the bina
 | `react-intl` | 7.1.14 | BSD-3-Clause |
 | `sonner` | 2.0.8 | MIT |
 | `tailwind-merge` | 3.7.0 | MIT |
+| `zustand` | 5.0.15 | MIT |
+
+`@dagrejs/dagre` (with its dependency `@dagrejs/graphlib`) lays out the flow editor when somebody tidies up (SPEC-014 R-ED-CAN-03); it runs in a web worker and loads outside the initial chunks (ADR 0078 decision 14). `zustand` and `immer` hold the editor store and its undo history (ADR 0078 decision 3).
 
 `@scalar/api-reference` is the API reference site (`scalar.standalone.js`, served at `/api/reference`, built by `packages/js/openapi-tools`); the licenses of the packages bundled in that script are in `third-party-notices.txt`, written next to it and checked against the allowed list by `build-reference.mjs`.
 

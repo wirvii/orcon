@@ -4,3 +4,4 @@
 # Table names that end in s and are still singular (naming.md NM-2).
 # Format: <name>  # reason
 # Empty at birth.
+trigger_address  # one web address of a trigger; "address" is a singular noun that ends in s (SPEC-002, ADR-0021 section 5)

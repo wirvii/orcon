@@ -8,6 +8,7 @@ sources:
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Upgrade and rollback
 
 > This page describes behavior specified by ADR 0083 that is not implemented yet. The slice that delivers `orcon store schema` removes this note.
@@ -66,6 +67,8 @@ You can skip minor versions when `orcon store schema plan` says `ROLLING_SAFE`. 
 Automatic migration at startup applies only when the verdict is `ROLLING_SAFE`. Otherwise the process does not start, and its message names the processes that would fall below the floor and the command `orcon store schema apply --full-stop`. Setting `store.migrations.auto` to `false` turns the automatic migration off.
 
 Every process compares its version with the effective floor on each heartbeat. A process that falls below it stops taking new work and new requests, finishes the work in flight as it does on shutdown, and exits with code 75. The log states the cause.
+
+On shutdown, Orcon gives work in flight a grace period of 30 seconds. The platform's kill timeout must exceed it by at least 15 seconds; on Kubernetes, set `terminationGracePeriodSeconds` to 45 or more.
 
 ### SQLite: automatic backup before migrating
 

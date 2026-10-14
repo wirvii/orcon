@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Nightly run of the executable API examples against PostgreSQL (orcon-api, SPEC-012 P2).
+# Not required to merge and never run on a pull request; a failure is treated as a failure
+# of main and is fixed before other API work (documentation.md DOC-10).
+name: API nightly
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  examples-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+        env:
+          POSTGRES_USER: orcon
+          POSTGRES_PASSWORD: orcon
+          POSTGRES_DB: orcon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orcon"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ORCON_TEST_POSTGRES_DSN: postgres://orcon:orcon@127.0.0.1:5432/orcon?sslmode=disable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - name: Run the examples against PostgreSQL
+        run: make api-examples DB=postgres

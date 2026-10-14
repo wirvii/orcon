@@ -1,0 +1,8 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+  <title>Orcon symbol</title>
+  <defs><linearGradient id="g"><stop offset="0" stop-color="#22C55E"/><stop offset="1" stop-color="#06B6D4"/></linearGradient><path id="a" d="M0 0h10v10z"/><clipPath id="c"><rect width="9" height="9"/></clipPath></defs>
+  <use href="#a" fill="url(#g)"/>
+  <circle cx="5" cy="5" r="2" fill="url(#g)" transform="translate(1 2)" clip-path="url(#c)"/>
+</svg>

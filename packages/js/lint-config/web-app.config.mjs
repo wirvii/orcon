@@ -118,9 +118,10 @@ function elementTypeRules() {
   const app = ['app-module', 'app-root'];
   return [
     { from: 'feature-routes', allow: [['feature-routes', sameArea], ['feature-screens', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], ...app] },
-    { from: 'feature-screens', allow: [['feature-screens', sameArea], ['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], ...app] },
-    { from: 'feature-forms', allow: [['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], ...app] },
-    { from: 'feature-components', allow: [['feature-components', sameArea], ['feature-model', sameArea], ...app] },
+    // `store` exists only in the editor (no-unknown-files), and its screens, forms and components subscribe to it (orcon-web ST-6).
+    { from: 'feature-screens', allow: [['feature-screens', sameArea], ['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
+    { from: 'feature-forms', allow: [['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
+    { from: 'feature-components', allow: [['feature-components', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
     { from: 'feature-api', allow: [['feature-api', sameArea], ['feature-model', sameArea], ...app] },
     { from: 'feature-model', allow: [['feature-model', sameArea]] },
     { from: 'feature-store', allow: ['feature-store', ['feature-model', { area: 'editor' }]] },

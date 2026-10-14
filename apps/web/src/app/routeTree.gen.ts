@@ -8,11 +8,17 @@
 
 import { Route as rootRouteImport } from './shell/RootLayout'
 import { Route as shellHomeRouteImport } from './shell/Home'
+import { Route as FlowsFlowIdRouteImport } from './../features/editor/routes/$flowId'
 import { Route as SettingsAppearanceRouteImport } from './../features/settings/routes/appearance'
 
 const shellHomeRoute = shellHomeRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlowsFlowIdRoute = FlowsFlowIdRouteImport.update({
+  id: '/flows/$flowId',
+  path: '/flows/$flowId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
@@ -23,27 +29,31 @@ const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof shellHomeRoute
+  '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof shellHomeRoute
+  '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof shellHomeRoute
+  '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings/appearance'
+  fullPaths: '/' | '/flows/$flowId' | '/settings/appearance'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings/appearance'
-  id: '__root__' | '/' | '/settings/appearance'
+  to: '/' | '/flows/$flowId' | '/settings/appearance'
+  id: '__root__' | '/' | '/flows/$flowId' | '/settings/appearance'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   shellHomeRoute: typeof shellHomeRoute
+  FlowsFlowIdRoute: typeof FlowsFlowIdRoute
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
 }
 
@@ -54,6 +64,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof shellHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flows/$flowId': {
+      id: '/flows/$flowId'
+      path: '/flows/$flowId'
+      fullPath: '/flows/$flowId'
+      preLoaderRoute: typeof FlowsFlowIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/appearance': {
@@ -68,6 +85,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   shellHomeRoute: shellHomeRoute,
+  FlowsFlowIdRoute: FlowsFlowIdRoute,
   SettingsAppearanceRoute: SettingsAppearanceRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Deploys the protected preview of main to Cloud Run (docs/engineering/preview.md).
+# Runs only on main and on manual dispatch, never for pull requests. Authentication uses Workload
+# Identity Federation: the provider only accepts tokens issued for refs/heads/main of this repository.
+name: Preview
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: preview-deploy
+  cancel-in-progress: true
+jobs:
+  deploy:
+    if: github.repository == 'wirvii/orcon' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGION: ${{ vars.PREVIEW_REGION }}
+      IMAGE: ${{ vars.PREVIEW_REGION }}-docker.pkg.dev/${{ vars.PREVIEW_PROJECT_ID }}/orcon/orcon-preview:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.PREVIEW_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_DEPLOYER_SA }}
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: Build and push the image
+        run: |
+          docker build -f build/preview/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+      - name: Deploy a new revision
+        run: |
+          gcloud run services update orcon-preview \
+            --project "${{ vars.PREVIEW_PROJECT_ID }}" \
+            --region "$REGION" \
+            --image "$IMAGE"

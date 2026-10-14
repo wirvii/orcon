@@ -15,7 +15,7 @@ import (
 )
 
 const getFlow = `-- name: GetFlow :one
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = $1 AND id = $2 AND deleted_at IS NULL
 `
@@ -28,6 +28,7 @@ type GetFlowRow struct {
 	DraftDocument        []byte
 	DraftRevision        int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
 	CreatedAt            pgtype.Timestamptz
@@ -46,6 +47,7 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 		&i.DraftDocument,
 		&i.DraftRevision,
 		&i.ActiveFlowVersionID,
+		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
 		&i.CreatedAt,
@@ -55,7 +57,7 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 }
 
 const getFlowByName = `-- name: GetFlowByName :one
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = $1 AND project_id = $2 AND name = $3 AND deleted_at IS NULL
 `
@@ -68,6 +70,7 @@ type GetFlowByNameRow struct {
 	DraftDocument        []byte
 	DraftRevision        int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
 	CreatedAt            pgtype.Timestamptz
@@ -87,6 +90,7 @@ func (q *Queries) GetFlowByName(ctx context.Context, orgID pgtype.UUID, projectI
 		&i.DraftDocument,
 		&i.DraftRevision,
 		&i.ActiveFlowVersionID,
+		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
 		&i.CreatedAt,
@@ -457,7 +461,7 @@ func (q *Queries) ListFlowVersions(ctx context.Context, arg ListFlowVersionsPara
 }
 
 const listFlows = `-- name: ListFlows :many
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
 WHERE org_id = $1 AND project_id = $2 AND id > $3 AND deleted_at IS NULL
 ORDER BY id
@@ -479,6 +483,7 @@ type ListFlowsRow struct {
 	DraftDocument        []byte
 	DraftRevision        int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
 	CreatedAt            pgtype.Timestamptz
@@ -509,6 +514,7 @@ func (q *Queries) ListFlows(ctx context.Context, arg ListFlowsParams) ([]ListFlo
 			&i.DraftDocument,
 			&i.DraftRevision,
 			&i.ActiveFlowVersionID,
+			&i.ActivationState,
 			&i.DeletedAt,
 			&i.DeletedByPrincipalID,
 			&i.CreatedAt,

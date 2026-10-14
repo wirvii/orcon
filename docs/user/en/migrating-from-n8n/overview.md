@@ -13,6 +13,7 @@ sources:
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Migrating from n8n, overview
 
 n8n is a trademark of its owner; Orcon is an independent project. This guide names n8n only to say what it is.
