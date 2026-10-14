@@ -24,7 +24,7 @@ func hotSwitchLoad() triggertest.Load {
 	d := *durationFlag
 	if d == 0 {
 		d = 5 * time.Second
-		if *storeFlag == "sqlite" || *storeFlag == "postgres" {
+		if storeFlag() == "sqlite" || storeFlag() == "postgres" {
 			d = time.Minute
 		}
 	}
