@@ -12,24 +12,43 @@ import (
 	"github.com/wirvii/orcon/internal/identity"
 )
 
-// Catalog is the node-type catalog of one project. It implements
-// [flow.ConnectorNodeTypes], so validation level 5 can ask it about the
-// connector nodes of a flow (ADR-0007 section 9, ADR-0034 section 1).
+// CoreTypes describes node types that no connector package owns: orcon.http@1
+// and the Annex B nodes of SPEC-003. It is implemented outside this package
+// and wired by the composition root; a [Catalog] built without one knows none.
+type CoreTypes interface {
+	// Lookup is the type-level answer used by palettes and views: the worst
+	// case over the node's parameters.
+	flow.NodeTypes
+	// ResolveCore is the node-aware answer publication uses; the same rule
+	// must drive dispatch. It reports false for a type it does not define.
+	ResolveCore(ctx context.Context, n *flow.Node) (flow.NodeType, bool)
+}
+
+// Catalog is the node-type catalog of one project. It is the composite catalog
+// of level 5: connector packages answer for package node types and the
+// [CoreTypes] for every other type. It implements [flow.ConnectorNodeTypes]
+// (ADR-0007 section 9, ADR-0034 section 1).
 type Catalog struct {
 	registry *Registry
 	org      identity.OrgID
 	project  identity.ProjectID
+	core     CoreTypes
 }
 
 var _ flow.ConnectorNodeTypes = (*Catalog)(nil)
 
-// Lookup implements [flow.NodeTypes]. It describes the node type as its newest
-// installed version defines it, which is what a node without a pin would use.
-// A lookup that fails to reach the store reports the type as unknown.
+// Lookup implements [flow.NodeTypes]. A package type is described as its
+// newest installed version defines it, with its riskiest operation: this is
+// informative, publication uses [Catalog.ResolveNode]. Any other type is asked
+// of the core types. A lookup that fails to reach the store reports the type
+// as unknown.
 func (c *Catalog) Lookup(ctx context.Context, nodeType string) (flow.NodeType, bool) {
 	connectorID, ok := flow.ConnectorIDOf(nodeType)
 	if !ok {
-		return flow.NodeType{}, false
+		if c.core == nil {
+			return flow.NodeType{}, false
+		}
+		return c.core.Lookup(ctx, nodeType)
 	}
 	_, m, found, err := c.registry.latest(ctx, connectorID, nodeType)
 	if err != nil || !found {
@@ -39,15 +58,22 @@ func (c *Catalog) Lookup(ctx context.Context, nodeType string) (flow.NodeType, b
 	return nodeTypeOf(n), true
 }
 
-// ResolveNode implements [flow.ConnectorNodeTypes]. A node pins the exact
-// package version it uses, so the answer comes from that version's manifest.
-func (c *Catalog) ResolveNode(ctx context.Context, nodeType string, pin *flow.ConnectorPin, operation string) flow.NodeResolution {
-	connectorID, owned := flow.ConnectorIDOf(nodeType)
+// ResolveNode implements [flow.ConnectorNodeTypes]. A node of a type no package
+// owns is answered by the core types and never meets pin or selection rules.
+// A package node pins the exact package version it uses, so the answer comes
+// from that version's manifest, with the contract of the operation it selects.
+func (c *Catalog) ResolveNode(ctx context.Context, n *flow.Node) flow.NodeResolution {
+	connectorID, owned := flow.ConnectorIDOf(n.Type)
 	if !owned {
-		return flow.NodeResolution{}
+		if c.core == nil {
+			return flow.NodeResolution{}
+		}
+		nt, known := c.core.ResolveCore(ctx, n)
+		return flow.NodeResolution{Type: nt, Known: known}
 	}
+	pin := n.Connector
 	if pin == nil {
-		return c.resolveWithoutPin(ctx, connectorID, nodeType, operation)
+		return c.resolveWithoutPin(ctx, connectorID, n)
 	}
 	rec, err := c.registry.packages.GetPackage(ctx, connectorID, pin.Version)
 	if errors.Is(err, ErrNotFound) {
@@ -60,29 +86,28 @@ func (c *Catalog) ResolveNode(ctx context.Context, nodeType string, pin *flow.Co
 	if err != nil {
 		return flow.NodeResolution{Problems: []string{fmt.Sprintf("the installed manifest of %s %s is unreadable: %v", connectorID, pin.Version, err)}}
 	}
-	n, has := m.NodeByType(nodeType)
+	node, has := m.NodeByType(n.Type)
 	if !has {
-		return flow.NodeResolution{Problems: []string{fmt.Sprintf("%s version %s has no node type %s", connectorID, pin.Version, nodeType)}}
+		return flow.NodeResolution{Problems: []string{fmt.Sprintf("%s version %s has no node type %s", connectorID, pin.Version, n.Type)}}
 	}
-	res := flow.NodeResolution{Known: true}
+	res := resolveSelection(node, flow.SelectionOf(n))
 	res.Problems = c.pinProblems(ctx, &rec, &m, pin)
-	res.Type, res.UnknownOperation = resolveOperation(n, operation)
 	return res
 }
 
-func (c *Catalog) resolveWithoutPin(ctx context.Context, connectorID, nodeType, operation string) flow.NodeResolution {
-	rec, m, found, err := c.registry.latest(ctx, connectorID, nodeType)
+func (c *Catalog) resolveWithoutPin(ctx context.Context, connectorID string, n *flow.Node) flow.NodeResolution {
+	rec, m, found, err := c.registry.latest(ctx, connectorID, n.Type)
 	if err != nil {
 		return flow.NodeResolution{Problems: []string{fmt.Sprintf("could not read the installed %s versions: %v", connectorID, err)}}
 	}
 	if !found {
 		return flow.NodeResolution{}
 	}
-	n, _ := m.NodeByType(nodeType)
-	res := flow.NodeResolution{Known: true, Problems: []string{
+	node, _ := m.NodeByType(n.Type)
+	res := resolveSelection(node, flow.SelectionOf(n))
+	res.Problems = []string{
 		fmt.Sprintf("has no connector pin; nodes of %s record the version and digest they were built against (latest installed is %s)", connectorID, rec.Version),
-	}}
-	res.Type, res.UnknownOperation = resolveOperation(n, operation)
+	}
 	return res
 }
 
@@ -108,19 +133,38 @@ func (c *Catalog) pinProblems(ctx context.Context, rec *PackageRecord, m *Manife
 	return problems
 }
 
-// resolveOperation describes a node as validation needs it. A node that selects
-// an operation gets that operation's purity and contract. A node that selects
-// none gets the most restrictive of its operations, so no flow looks safer than
-// the riskiest thing the node can do.
-func resolveOperation(n *Node, operation string) (flow.NodeType, bool) {
-	if operation != "" {
-		op, ok := n.OperationByName(operation)
-		if !ok {
-			return flow.NodeType{}, true
+// resolveSelection describes a package node as publication needs it. An action
+// node runs exactly the operation it selects: its purity and contract are that
+// operation's, and a missing, non-literal or unknown selection is reported
+// instead of guessing the riskiest operation (SPEC-003 rules S-1 to S-4).
+// A trigger node selects nothing and must not carry a selector.
+func resolveSelection(n *Node, sel flow.Selection) flow.NodeResolution {
+	res := flow.NodeResolution{Known: true}
+	if n.Group == GroupTrigger {
+		res.Type = nodeTypeOf(n)
+		if sel.Present {
+			res.Selection = flow.SelectionOnTrigger
 		}
-		return nodeTypeOfOperation(n, op), false
+		return res
 	}
-	return nodeTypeOf(n), false
+	res.Operations = make([]string, len(n.Operations))
+	for i := range n.Operations {
+		res.Operations[i] = n.Operations[i].Name
+	}
+	switch {
+	case !sel.Present:
+		res.Selection = flow.SelectionMissing
+	case !sel.Literal:
+		res.Selection = flow.SelectionNotLiteral
+	default:
+		op, ok := n.OperationByName(sel.Operation)
+		if !ok {
+			res.Selection = flow.SelectionUnknown
+			return res
+		}
+		res.Type = nodeTypeOfOperation(n, op)
+	}
+	return res
 }
 
 func nodeTypeOf(n *Node) flow.NodeType {
