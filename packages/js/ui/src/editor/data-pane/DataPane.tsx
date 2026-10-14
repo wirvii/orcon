@@ -183,7 +183,7 @@ export function DataPane({
                 type="button"
                 aria-pressed={view === id}
                 onClick={() => setView(id)}
-                className="text-fg bg-surface hover:bg-surface-sunken aria-pressed:bg-fg aria-pressed:text-app min-h-target px-3 text-sm aria-pressed:font-semibold"
+                className="text-fg bg-surface hover:bg-surface-sunken aria-pressed:bg-fg aria-pressed:text-app min-h-target px-2 text-sm aria-pressed:font-semibold"
               >
                 {intl.formatMessage(message)}
               </button>

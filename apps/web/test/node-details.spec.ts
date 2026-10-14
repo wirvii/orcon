@@ -91,6 +91,32 @@ test('the create credential dialog and an open list have no accessibility violat
   await expectNoViolations(page);
 });
 
+for (const locale of ['en', 'es'] as const) {
+  test(`at exactly 1024 px the three panes fit inside the dialog and the data headers stay on one line in ${locale}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.addInitScript((value) => {
+      window.localStorage.setItem('orcon.locale', value);
+    }, locale);
+    await page.goto(FLOW);
+    await page.waitForSelector('[data-fitted="true"]');
+    await openDetails(page, 'slack', 'dialog');
+    const measures = await page.evaluate(() => {
+      const dialog = document.querySelector('[data-node-details="dialog"]');
+      if (!dialog) throw new Error('no dialog');
+      const right = (selector: string) => dialog.querySelector(selector)?.getBoundingClientRect().right ?? 0;
+      return {
+        dialog: dialog.getBoundingClientRect().right,
+        output: right('[data-pane="output"]'),
+        headers: Array.from(dialog.querySelectorAll('[data-data-pane] > header')).map((header) => Math.round(header.getBoundingClientRect().height)),
+      };
+    });
+    expect(measures.output).toBeLessThanOrEqual(measures.dialog);
+    // One line: the header of a data pane is a single row of controls.
+    expect(new Set(measures.headers).size).toBe(1);
+    expect(measures.headers[0]).toBeLessThan(50);
+  });
+}
+
 test.describe('on a computer', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 

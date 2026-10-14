@@ -173,7 +173,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
   const trigger = node.kind === 'trigger';
   const minParams = 420;
   const maxParams = 640;
-  const paneMin = 280;
+  const paneMin = 260;
 
   useLayoutEffect(() => {
     if (layout !== 'dialog' || !open) return;

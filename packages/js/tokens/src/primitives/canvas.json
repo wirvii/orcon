@@ -129,8 +129,8 @@
     },
     "pane-min": {
       "$type": "dimension",
-      "$value": "280px",
-      "$description": "Minimum width of the Input and Output panes."
+      "$value": "260px",
+      "$description": "Minimum width of the Input and Output panes. At 1024 px the dialog is 974 px wide inside its border: two panes, the Parameters pane at its minimum and two handles need 956."
     },
     "docked-panel": {
       "$type": "dimension",
