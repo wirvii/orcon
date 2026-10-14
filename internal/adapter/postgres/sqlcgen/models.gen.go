@@ -145,6 +145,24 @@ type ConnectorReference struct {
 	UpdatedAt        pgtype.Timestamptz
 }
 
+type CustomRole struct {
+	ID        pgtype.UUID
+	OrgID     pgtype.UUID
+	Name      string
+	ScopeKind string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type CustomRolePermission struct {
+	ID           pgtype.UUID
+	OrgID        pgtype.UUID
+	CustomRoleID pgtype.UUID
+	Permission   string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type Execution struct {
 	ID                      pgtype.UUID
 	OrgID                   pgtype.UUID
@@ -554,6 +572,7 @@ type Org struct {
 	DeletionScheduledAt pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+	AuthorizationEpoch  int64
 }
 
 type OrgKey struct {
@@ -599,6 +618,17 @@ type Project struct {
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 	Handle      pgtype.Text
+}
+
+type RoleBinding struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	ScopeKind         string
+	ProjectID         pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	RoleName          string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type SchemaMigration struct {

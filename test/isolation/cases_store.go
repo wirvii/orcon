@@ -40,6 +40,12 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	// Organizations of a user (engine plane: membership rows of every organization).
 	"ResolveUserOrganizations":  caseResolveUserOrganizations,
 	"GetUserCredentialsByEmail": caseGetUserCredentialsByEmail,
+	// Authorization evaluator reads (ADR-0041 section 6).
+	"Epoch":               caseEpoch,
+	"ActiveMember":        caseActiveMember,
+	"Bindings":            caseBindings,
+	"CustomRoles":         caseCustomRoles,
+	"ProjectOrganization": caseProjectOrganization,
 	// Key store (ADR-0042).
 	"MasterCanary":    caseMasterCanary,
 	"PutMasterCanary": caseMasterCanary,
