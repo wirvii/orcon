@@ -5,7 +5,7 @@ sources:
   - ADR-0083
   - ADR-0015
   - ADR-0004
-sourceHash: 58ea90d52cc9254ee811e06a06baa9e9eef31a390dc2a5b752b6e4f697ef2edf
+sourceHash: aa580cbfc32db2b7e5060b6545e4cc5c18f0221df875ca2a093eac31032ebef7
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
