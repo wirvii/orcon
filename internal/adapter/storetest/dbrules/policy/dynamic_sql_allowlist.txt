@@ -14,3 +14,5 @@ internal/adapter/postgres/pgtest_test.go  test helper that names a throwaway dat
 internal/adapter/postgres/postgres_test.go  test helper that runs the statements of the migration and rule checks  2026-10-13  approved-by:owner
 internal/adapter/postgres/session_test.go  test helper that names a throwaway login role  2026-10-13  approved-by:owner
 internal/adapter/sqlite/sqlite_test.go  test helper that runs the statements of the rule checks  2026-10-13  approved-by:owner
+internal/adapter/postgres/engine.go  the engine plane runs statements built by the engine functions (engineRows)  2026-10-14  approved-by:owner
+internal/adapter/sqlite/sqlcgen/engine.sql.go  sqlc slice expansion of the fairness_keys list  2026-10-14  approved-by:owner

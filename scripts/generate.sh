@@ -67,6 +67,20 @@ else
   echo "oapi-codegen: $bundle does not exist yet; skipped"
 fi
 
+# sqlc expands a slice parameter by rewriting the statement text at run time, so
+# the generated call is not a constant. Mark that one reviewed call (owner
+# approval in dynamic_sql_allowlist.txt) every time sqlc rewrites the file.
+slice_file="$sqlite_out/engine.sql.go"
+if [ -f "$slice_file" ] && ! grep -q 'orcon:dynamic-sql' "$slice_file"; then
+  awk '
+    /rows, err := q\.db\.QueryContext\(ctx, query, queryParams\.\.\.\)/ && !done {
+      print "\t//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text"
+      done = 1
+    }
+    { print }
+  ' "$slice_file" >"$slice_file.tmp" && mv "$slice_file.tmp" "$slice_file"
+fi
+
 # Generated files carry the SPDX header like every other file (CFG-6).
 existing=""
 for dir in $generated; do
