@@ -134,16 +134,12 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
     setOutlineOpen(true);
   };
 
-  // The details view needs the md breakpoint: on a phone the canvas is view-only and shows its own status panel.
   const openDetails = useCallback((id: string) => {
     setDetails((current) => ({ id, tab: current?.id === id ? current.tab : 'parameters' }));
   }, []);
   const closeDetails = useCallback(() => {
     setDetails(undefined);
   }, []);
-  useEffect(() => {
-    if (!editable) setDetails(undefined);
-  }, [editable]);
   const detailsId = details?.id;
   const returnFocus = useCallback(() => {
     if (detailsId) canvas.current?.focusSoon(detailsId);
@@ -322,7 +318,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="flex min-h-0 min-w-0 flex-1">
-            <EditorCanvas ref={canvas} onOpenDetails={openDetails} syncNodes={details !== undefined} />
+            <EditorCanvas ref={canvas} onOpenDetails={openDetails} onOpenPhoneDetails={openDetails} syncNodes={details !== undefined} />
             {showDocked ? (
               <Suspense fallback={null}>
                 <NodeDetails
@@ -366,6 +362,11 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
           </Suspense>
         ) : null}
       </div>
+      {details !== undefined && !editable ? (
+        <Suspense fallback={null}>
+          <NodeDetails nodeId={details.id} layout="fullscreen" tab={details.tab} onTabChange={(tab) => { setDetails({ id: details.id, tab }); }} onClose={closeDetails} onReturnFocus={returnFocus} />
+        </Suspense>
+      ) : null}
       {details !== undefined && editable && dialogLayout ? (
         <Suspense fallback={null}>
           <NodeDetails

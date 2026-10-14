@@ -211,6 +211,8 @@
   "editor.details.back": "Volver al lienzo",
   "editor.details.description": "Datos de entrada, ajustes y datos de salida del nodo.",
   "editor.details.executeStep": "Ejecutar paso",
+  "editor.details.readOnly.text": "Aquí puedes ver todos los valores. Abre el flujo en una pantalla más grande para cambiarlo.",
+  "editor.details.readOnly.title": "Solo lectura en esta pantalla",
   "editor.details.rename": "Nombre del nodo",
   "editor.details.title": "Detalle de {name}",
   "editor.frame.execute": "Ejecutar flujo",

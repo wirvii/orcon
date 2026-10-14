@@ -21,7 +21,7 @@ Elige **Editor de flujos** en la navegación. Abre un flujo de ejemplo en `/flow
 
 La página dice **Vista previa con un flujo de ejemplo**. Tus cambios se quedan en la pestaña del navegador y se pierden al recargar.
 
-En un teléfono el flujo se muestra solo para leer: puedes desplazarlo, acercarlo y tocar un nodo para ver su estado. Para editar hace falta una tableta o un computador.
+En un teléfono el flujo se muestra solo para leer: puedes desplazarlo, acercarlo y tocar un nodo para abrir sus detalles. Para editar hace falta una tableta o un computador.
 
 ## Cambiar el flujo
 
@@ -41,7 +41,7 @@ Los nodos se apoyan en una cuadrícula de 20 px. Los nombres son únicos dentro 
 
 ## Definir lo que hace un nodo
 
-Pulsa `Enter` en un nodo enfocado, o haz doble clic en él, para abrir sus detalles. En una pantalla ancha (1024 px o más) los detalles son una ventana sobre el lienzo con tres paneles: **Entrada** a la izquierda, los **Parámetros** del nodo en el centro y **Salida** a la derecha. Un disparador no tiene panel de entrada. En una tableta los parámetros se acoplan a la derecha del lienzo y los datos de entrada y de salida se muestran en un panel debajo, uno cada vez. Pulsa `Esc` o elige **Volver al lienzo** para cerrar los detalles: el foco vuelve al nodo. En un móvil los detalles no están disponibles; al tocar un nodo se muestra su estado.
+Pulsa `Enter` en un nodo enfocado, o haz doble clic en él, para abrir sus detalles. En una pantalla ancha (1024 px o más) los detalles son una ventana sobre el lienzo con tres paneles: **Entrada** a la izquierda, los **Parámetros** del nodo en el centro y **Salida** a la derecha. Un disparador no tiene panel de entrada. En una tableta los parámetros se acoplan a la derecha del lienzo y los datos de entrada y de salida se muestran en un panel debajo, uno cada vez. Pulsa `Esc` o elige **Volver al lienzo** para cerrar los detalles: el foco vuelve al nodo. En un móvil los detalles ocupan toda la pantalla en modo de solo lectura: se ven los parámetros, los ajustes y la documentación del nodo, y ningún control cambia ni ejecuta nada. Ciérralos con **Volver al lienzo**; el foco vuelve al nodo.
 
 El panel central tiene tres pestañas:
 

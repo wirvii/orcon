@@ -211,6 +211,8 @@
   "editor.details.back": "Back to canvasSSSSSSSSSSSSSSSSSSSSSSSSS",
   "editor.details.description": "Input data, settings and output data of the node.SSSSSSSSSSSSSSSSSSSSSSSSS",
   "editor.details.executeStep": "Execute stepSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "editor.details.readOnly.text": "You can read every value here. Open the flow on a larger screen to change it.SSSSSSSSSSSSSSSSSSSSSSSSS",
+  "editor.details.readOnly.title": "Read-only on this screenSSSSSSSSSSSSSSSSSSSSSSSSS",
   "editor.details.rename": "Node nameSSSSSSSSSSSSSSSSSSSSSSSSS",
   "editor.details.title": "{name} detailsSSSSSSSSSSSSSSSSSSSSSSSSS",
   "editor.frame.execute": "Execute workflowSSSSSSSSSSSSSSSSSSSSSSSSS",

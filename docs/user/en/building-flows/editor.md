@@ -20,7 +20,7 @@ Choose **Flow editor** in the navigation. It opens a sample flow at `/flows/0193
 
 The page says **Preview with a sample flow**. Your changes stay in the browser tab and are lost when you reload.
 
-On a phone the flow is shown read-only: you can pan, zoom and tap a node to see its state. Editing needs a tablet or a computer.
+On a phone the flow is shown read-only: you can pan, zoom and tap a node to open its details. Editing needs a tablet or a computer.
 
 ## Change the flow
 
@@ -40,7 +40,7 @@ Nodes sit on a 20 px grid. Names are unique in a flow: when you add a node whose
 
 ## Set what a node does
 
-Press `Enter` on a focused node, or double-click it, to open its details. From a wide screen (1024 px and more) the details are a window over the canvas with three panes: **Input** on the left, the node's **Parameters** in the middle and **Output** on the right. A trigger has no input pane. On a tablet the parameters dock at the right of the canvas and the input and output data show in a panel under it, one side at a time. Press `Esc` or choose **Back to canvas** to close the details: focus goes back to the node. On a phone the details are not available; tapping a node shows its state.
+Press `Enter` on a focused node, or double-click it, to open its details. From a wide screen (1024 px and more) the details are a window over the canvas with three panes: **Input** on the left, the node's **Parameters** in the middle and **Output** on the right. A trigger has no input pane. On a tablet the parameters dock at the right of the canvas and the input and output data show in a panel under it, one side at a time. Press `Esc` or choose **Back to canvas** to close the details: focus goes back to the node. On a phone the details fill the screen in read-only mode: the parameters, settings and documentation of the node are visible, and no control changes or runs anything. Close them with **Back to canvas**; focus goes back to the node.
 
 The middle pane has three tabs:
 

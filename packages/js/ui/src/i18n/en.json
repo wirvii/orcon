@@ -211,6 +211,8 @@
   "editor.details.back": "Back to canvas",
   "editor.details.description": "Input data, settings and output data of the node.",
   "editor.details.executeStep": "Execute step",
+  "editor.details.readOnly.text": "You can read every value here. Open the flow on a larger screen to change it.",
+  "editor.details.readOnly.title": "Read-only on this screen",
   "editor.details.rename": "Node name",
   "editor.details.title": "{name} details",
   "editor.frame.execute": "Execute workflow",

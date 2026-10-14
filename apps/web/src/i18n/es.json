@@ -4,6 +4,7 @@
   "app.error.retry": "Intentar de nuevo",
   "app.live.paused.text": "La página se reconecta sola y actualiza lo que muestra.",
   "app.live.paused.title": "Las actualizaciones en vivo están en pausa",
+  "app.nav.api": "Referencia de la API",
   "app.nav.editor": "Editor de flujos",
   "app.nav.home": "Inicio",
   "app.nav.settings": "Ajustes",

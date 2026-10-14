@@ -56,6 +56,17 @@ test('the editor is reachable from the navigation at a stable address', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
 });
 
+test('the navigation links to the API reference, a page the server serves, in the same tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('orcon.locale', 'en');
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  const link = page.getByRole('link', { name: 'API reference' }).first();
+  await expect(link).toHaveAttribute('href', '/api/reference/');
+  await expect(link).not.toHaveAttribute('target', '_blank');
+});
+
 test('an address that is not a flow id is a page that does not exist', async ({ page }) => {
   await page.goto('/flows/not-a-flow');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
