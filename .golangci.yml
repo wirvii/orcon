@@ -134,6 +134,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/trigger
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/authz
+              desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/credential
               desc: platform packages are leaves (AL-1)
         pgx-confined:

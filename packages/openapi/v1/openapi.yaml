@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The public API contract of Orcon, version 1. It is the source of truth of the API: the
+# server (oapi-codegen), the SDKs, the CLI tree, the MCP catalog and the reference site
+# are generated from it. Rules: .agents/skills/orcon-api/references/. Check: make api-check.
+openapi: 3.1.0
+info:
+  title: Orcon API
+  version: 1.0.0
+  summary: The management API of Orcon.
+  description: |
+    The one API behind the editor, the CLI, the SDKs and the MCP server.
+    Every capability of the product is an operation of this document.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /api/v1
+    description: This installation.
+security:
+  - bearer: []
+tags: []
+paths: {}
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: An API key, a service account token or a session token, sent as a bearer credential.

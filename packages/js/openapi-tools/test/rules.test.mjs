@@ -240,6 +240,14 @@ const REPORTS = [
   ['experimental operation without the header', 'stability', 'Orcon-Experimental', (d) => {
     getFlow(d)['x-orcon-stability'] = 'experimental';
   }],
+  ['experimental operation without a feature name', 'stability', 'x-orcon-experimental-feature', (d) => {
+    getFlow(d)['x-orcon-stability'] = 'experimental';
+    getFlow(d).parameters = [{ name: 'Orcon-Experimental', in: 'header', required: true, description: 'Feature flag.', schema: { type: 'string', maxLength: 64, examples: ['flows-get'] } }];
+    getFlow(d)['x-orcon-problems'].push('experimental-not-enabled');
+  }],
+  ['feature name on a stable operation', 'stability', 'only for experimental', (d) => {
+    getFlow(d)['x-orcon-experimental-feature'] = 'flows-get';
+  }],
   ['sunset without deprecated', 'deprecation', 'not deprecated: true', (d) => {
     getFlow(d)['x-orcon-sunset'] = '2027-01-01';
   }],
@@ -249,6 +257,8 @@ const REPORTS = [
   ['deprecated field without a guide', 'deprecation', 'x-orcon-deprecation-guide', (d) => {
     Object.assign(schemas(d).Flow.properties.name, { deprecated: true, 'x-orcon-sunset': '2027-01-01' });
   }],
+  ['security [] with a permission', 'permission', 'security: []', (d) => void (getFlow(d).security = [])],
+  ['allOf and anyOf together', 'permission', 'not both', (d) => void (getFlow(d)['x-orcon-permission'] = { allOf: ['flow:read'], anyOf: ['flow:update'] })],
   ['anonymous on a normal operation', 'permission', 'protocol operations', (d) => void (getFlow(d)['x-orcon-permission'] = 'anonymous')],
   ['allOf with an unknown permission', 'permission', 'not in the permission catalog', (d) => {
     getFlow(d)['x-orcon-permission'] = { allOf: ['flow:read', 'flow:peek'] };
@@ -356,6 +366,7 @@ const CLEAN = [
   ['x-orcon-* values that are not UPPER_SNAKE', (d) => void (getFlow(d)['x-orcon-note'] = { kind: 'lower-case' })],
   ['an experimental operation with its header and problem', (d) => {
     getFlow(d)['x-orcon-stability'] = 'experimental';
+    getFlow(d)['x-orcon-experimental-feature'] = 'flows-get';
     getFlow(d).parameters = [{ name: 'Orcon-Experimental', in: 'header', required: true, description: 'Feature flag.', schema: { type: 'string', maxLength: 64, examples: ['flows-get'] } }];
     getFlow(d)['x-orcon-problems'].push('experimental-not-enabled');
     delete getFlow(d)['x-orcon-examples'];

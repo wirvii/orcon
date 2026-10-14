@@ -20,6 +20,8 @@ tools/licenses/exceptions.txt  # plain-text data file read by licensecheck (it c
 tools/licenses/npm-exceptions.txt  # plain-text data file read by the web license check (it carries the SPDX lines as comments)
 
 **/tsconfig*.json  # JSON has no comment syntax
+packages/openapi/v1/openapi.bundle.json  # generated JSON bundle of the API contract for Go tests; JSON has no comment syntax
+internal/adapter/httpapi/reference/dist/**  # build output of the API reference site, replaced by make build
 packages/js/tokens/src/**/*.json  # design token sources in the W3C format; JSON has no comment syntax
 packages/js/tokens/src/*.json  # design token sources in the W3C format; JSON has no comment syntax
 packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has no comment syntax
@@ -30,6 +32,7 @@ internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is sta
 docs/reference/configuration.schema.json  # generated JSON Schema; the licence is stated in its $comment member
 internal/connector/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 internal/flow/testdata/conformance/*.json  # conformance flows are pure JSON data read by tests
+internal/adapter/httpapi/examplestest/testdata/*.json  # contracts of the examples runner self-test; pure JSON data read by tests
 
 internal/expr/prelude/luxon.min.js  # Luxon 3.7.2 (MIT), vendored byte for byte and unmodified; its licence is in internal/expr/prelude/LICENSE.luxon
 internal/expr/prelude/LICENSE.luxon  # licence text of Luxon, must stay byte-identical

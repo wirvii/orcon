@@ -293,13 +293,16 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 }
 
 // newHandler assembles the HTTP routes served by the standalone and api roles.
-func newHandler() (http.Handler, error) {
+func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
 	assets, err := webui.Assets()
 	if err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux := http.NewServeMux()
 	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
+	if err := mountAPI(mux, role, logger); err != nil {
+		return nil, fmt.Errorf("build handler: %w", err)
+	}
 	mux.Handle("/", webui.Handler(assets))
 	return mux, nil
 }
@@ -307,7 +310,7 @@ func newHandler() (http.Handler, error) {
 // serve listens on addr and serves HTTP until ctx is canceled, then drains
 // in-flight requests for at most shutdownTimeout.
 func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration) error {
-	handler, err := newHandler()
+	handler, err := newHandler(role, logger)
 	if err != nil {
 		return err
 	}
