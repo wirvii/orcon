@@ -68,12 +68,13 @@ func TestOperationSelectionMessages(t *testing.T) {
 	}
 }
 
-// safetyNet is a catalog whose resolver does not know the core type that its
-// plain lookup does know.
+// safetyNet is a catalog whose resolver knows nothing, while its plain lookup
+// knows the core types and also the package type acme.shop.order@1, so the
+// package test fails if the retry ever stops being limited to unowned types.
 type safetyNet struct{ resolved *int }
 
 func (safetyNet) Lookup(_ context.Context, nodeType string) (flow.NodeType, bool) {
-	if strings.HasPrefix(nodeType, "orcon.") {
+	if strings.HasPrefix(nodeType, "orcon.") || nodeType == "acme.shop.order@1" {
 		return flow.NodeType{Purity: flow.PurityRead}, true
 	}
 	return flow.NodeType{}, false
