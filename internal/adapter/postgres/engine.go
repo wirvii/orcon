@@ -106,6 +106,7 @@ func (s *Store) engineRowsRouted(ctx context.Context, op, statement string, args
 
 // queryAll runs a query on a transaction and hands every row to scan.
 func queryAll(ctx context.Context, tx pgx.Tx, statement string, args []any, scan func(pgx.Rows) error) error {
+	//orcon:dynamic-sql the engine functions hand this helper their own reviewed statement text
 	rows, err := tx.Query(ctx, statement, args...)
 	if err != nil {
 		return err //nolint:wrapcheck // the caller maps the driver error once

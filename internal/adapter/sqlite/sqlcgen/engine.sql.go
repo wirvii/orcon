@@ -527,7 +527,7 @@ type ReleaseTokenLeaseRow struct {
 
 // One token the worker could not go on with (ADR-0013 sections 4 and 9): the fence names the epoch and the owner, so
 // a lease that was lost meanwhile is left alone.
-// orcon:scope engine
+// orcon:scope org
 func (q *Queries) ReleaseTokenLease(ctx context.Context, arg ReleaseTokenLeaseParams) ([]ReleaseTokenLeaseRow, error) {
 	rows, err := q.db.QueryContext(ctx, releaseTokenLease,
 		arg.PoisonThreshold,
@@ -726,7 +726,7 @@ type UpdateExecutionStatusParams struct {
 }
 
 // The status an execution takes from its counters after recovery or a wake-up (ADR-0009 section 1).
-// orcon:scope engine
+// orcon:scope org
 func (q *Queries) UpdateExecutionStatus(ctx context.Context, arg UpdateExecutionStatusParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateExecutionStatus,
 		arg.Status,
@@ -748,7 +748,7 @@ WHERE execution.org_id = ?2 AND execution.id = ?3 AND execution.status = 'QUEUED
 
 // The first claim of a token of an execution starts it (ADR-0009 section 1: QUEUED to RUNNING when the first token is
 // claimed).
-// orcon:scope engine
+// orcon:scope org
 func (q *Queries) UpdateStartedExecution(ctx context.Context, now int64, orgID []byte, iD []byte) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateStartedExecution, now, orgID, iD)
 	if err != nil {
@@ -764,7 +764,7 @@ WHERE token.org_id = ?2 AND token.id = ?3 AND token.status = 'WAITING'
 `
 
 // A timer fired: the token that waits for it runs again. The conditional update leaves a token that moved on alone.
-// orcon:scope engine
+// orcon:scope org
 func (q *Queries) UpdateWokenToken(ctx context.Context, now int64, orgID []byte, tokenID []byte) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateWokenToken, now, orgID, tokenID)
 	if err != nil {

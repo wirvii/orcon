@@ -28,6 +28,12 @@
   query: ClaimTokens
   reason: engine claims tokens across organizations (ADR-0047 section 2, SPEC-001 C2b)
 - dialect: sqlite
+  query: ClaimLastChanceToken
+  reason: last-chance claim across organizations (ADR-0047 section 2, SPEC-001 C4a)
+- dialect: sqlite
+  query: GetOldestLastChance
+  reason: oldest last-chance wait across organizations (ADR-0047 section 2, SPEC-001 C4a)
+- dialect: sqlite
   query: RenewLeases
   reason: lease renewal by the engine plane across organizations (ADR-0047 section 2, SPEC-001 C2b)
 - dialect: sqlite

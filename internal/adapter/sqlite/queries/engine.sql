@@ -96,7 +96,7 @@ RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, tok
 -- One token the worker could not go on with (ADR-0013 sections 4 and 9): the fence names the epoch and the owner, so
 -- a lease that was lost meanwhile is left alone.
 -- name: ReleaseTokenLease :many
--- orcon:scope engine
+-- orcon:scope org
 UPDATE token
 SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
     suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
@@ -167,14 +167,14 @@ WHERE org_id = sqlc.arg(org_id) AND execution_id = sqlc.arg(execution_id) AND no
 
 -- A timer fired: the token that waits for it runs again. The conditional update leaves a token that moved on alone.
 -- name: UpdateWokenToken :execrows
--- orcon:scope engine
+-- orcon:scope org
 UPDATE token
 SET status = 'RUNNABLE', available_at = sqlc.arg(now), updated_at = sqlc.arg(now)
 WHERE token.org_id = sqlc.arg(org_id) AND token.id = sqlc.arg(token_id) AND token.status = 'WAITING';
 
 -- The status an execution takes from its counters after recovery or a wake-up (ADR-0009 section 1).
 -- name: UpdateExecutionStatus :execrows
--- orcon:scope engine
+-- orcon:scope org
 UPDATE execution
 SET status = sqlc.arg(status), updated_at = sqlc.arg(now)
 WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id);
@@ -182,7 +182,7 @@ WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id);
 -- The first claim of a token of an execution starts it (ADR-0009 section 1: QUEUED to RUNNING when the first token is
 -- claimed).
 -- name: UpdateStartedExecution :execrows
--- orcon:scope engine
+-- orcon:scope org
 UPDATE execution
 SET status = 'RUNNING', started_at = COALESCE(execution.started_at, sqlc.arg(now)), updated_at = sqlc.arg(now)
 WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id) AND execution.status = 'QUEUED';
