@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Foundations
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Visual values (colors, sizes, durations) live only in this file, [tokens.md](tokens.md), [canvas.md](canvas.md) and the generated [contrast-report.md](contrast-report.md). Code never uses these values directly: it uses the tokens that carry them ([tokens.md#usage-in-code](tokens.md#usage-in-code)).
 
@@ -113,16 +113,17 @@ The exact shade of every status color is defined once in [tokens.md#semantic-col
 
 ## Mascot
 
-1. Allowed contexts only: welcome and onboarding (expression "welcome"), empty states ("thinking"), successful n8n import completion ("thumbs up"), the 404 page ("explorer") and documentation.
-2. Forbidden contexts: real execution errors, error pages, security warnings, the canvas, and dense views (tables, execution detail, the attention inbox). The lint rule of [SKILL.md](../SKILL.md) "Mascot and connector icon boundaries" enforces this.
+1. Allowed contexts only: the sign-in screen and welcome/onboarding (pose "welcome", the crossed-arms cut-out), first-run empty states where nothing exists yet (pose "happy"), successful n8n import completion (pose "happy"), full-page error screens — the not-found page and the generic error page — (pose "thinking"), and documentation.
+2. Forbidden contexts: inline errors (ProblemAlert), real execution errors, security warnings and approvals, toasts, help, the canvas, and dense views (tables, execution detail, the attention inbox). The lint rule of [SKILL.md](../SKILL.md) "Mascot and connector icon boundaries" enforces this.
 3. The mascot is lazy-loaded and decorative: `alt=""` and `aria-hidden="true"`. The adjacent text carries all meaning.
 4. Maximum height inside the app: 160 px.
-5. Until production mascot assets are delivered and approved against the boards (separate backlog item), `Mascot` renders a **neutral placeholder**: an empty outlined frame with no drawing. The placeholder MUST NOT attempt to draw the character.
+5. `Mascot` renders the approved cut-outs of the primary board listed in `brand/manifest.json` (`welcome` = crossed arms, `happy` = laughing expression, `thinking` = thinking expression). The cut-outs are never redrawn, simplified or recolored; a new pose comes only from a new approved cut-out.
+6. The mascot sits on a soft rounded panel in a token color in both themes, like the panel behind the crossed-arms pose on the primary board.
 
 ## Brand mark
 
-1. `BrandMark` renders the approved production SVG symbol and wordmark (light and dark variants) once they exist under `brand/` (separate backlog item).
-2. Until then it renders a neutral placeholder: a symbol-sized empty rounded frame followed by "Orcon" in Inter 700. The placeholder is labeled as a placeholder in Storybook.
+1. `BrandMark` renders the approved production lockups from `brand/logo/` (`orcon-lockup-on-dark.svg` in the dark theme, `orcon-lockup-on-light.svg` in the light theme), chosen by CSS from the active theme. `BrandHero` renders the lockup with the descriptor and the tagline on the sign-in screen.
+2. Every brand SVG is a true vector: no `<image>`, no `data:` URI, no base64, no external reference and no `<text>`; `make brand-check` enforces it.
 3. The symbol MUST NEVER be redrawn, approximated or substituted with a generic hexagon.
 4. Replacing the placeholder with the final asset keeps the component contract (props, sizes, accessible name) unchanged.
 5. Accessible name: "Orcon" (from the catalog) when the mark is the only identification; `aria-hidden` when adjacent text already says "Orcon".

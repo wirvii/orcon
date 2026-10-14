@@ -4,7 +4,7 @@ description: Builds and reviews Orcon web UI (apps/web, packages/js) with the Or
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with pnpm 9 and Node 22.
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   pinned: true
   owner: wirvii
 ---
@@ -58,7 +58,7 @@ Reference map (load only what the task needs):
 14. Interactive targets are at least 44×44 px on coarse pointers and 24×24 px otherwise ([targets](references/accessibility.md#targets)).
 15. Visible focus ring on every interactive element, never obscured by sticky UI; full keyboard operation ([focus](references/accessibility.md#focus), [keyboard](references/accessibility.md#keyboard)).
 16. Motion is 120 to 200 ms, functional only, and off with reduced motion ([motion](references/foundations.md#motion)).
-17. Mascot only in welcome, empty states, n8n import success, 404 and docs; never on errors, security warnings, canvas or dense views; neutral placeholder until approved assets exist ([mascot](references/foundations.md#mascot)).
+17. Mascot only on sign-in and welcome, first-run empty states, n8n import success, full-page error screens (not found, generic error page) and docs; never on inline errors, execution errors, security warnings, toasts, help, canvas or dense views ([mascot](references/foundations.md#mascot)).
 18. Brand mark is a neutral placeholder until approved assets exist; never redraw the symbol ([brand mark](references/foundations.md#brand-mark)).
 19. Connector logos only through `ConnectorIcon` (`<img>`, never inline SVG) ([iconography](references/foundations.md#iconography)).
 20. Canvas is read-only below md; editing needs tablet or desktop ([canvas mobile](references/canvas.md#mobile)).
@@ -77,7 +77,7 @@ Reference map (load only what the task needs):
 | Token lint (TS/TSX) | No hex/rgb/hsl literals in code; no Tailwind arbitrary classes (`[…]`); no default palette or scale utilities; spacing only on the scale; inline `style` only for canvas positions with a reason comment | Use or create a token in `@orcon/tokens` |
 | Token lint (CSS) | No hex, color or size values outside `packages/js/tokens`; color, space and radius only through `var(--orcon-*)` | Move the value to a token |
 | Hard-coded strings | No literal JSX text or visible attribute (`aria-label`, `title`, `placeholder`, `alt`, `label`); valid ICU messages; en and es have the same keys and no unused keys | Use `FormattedMessage` or `intl.formatMessage` and add the key to en and es |
-| Mascot and connector icon boundaries | `Mascot` is not imported in canvas, execution, error, security or dense views; `ConnectorIcon` is the only path for connector SVGs | Remove the import or use `EmptyState` in an allowed context |
+| Mascot and connector icon boundaries | `Mascot` is not imported in canvas, execution, error, security or dense views, except the full-page `*NotFound*` and `*ErrorPage*` screens; `ConnectorIcon` is the only path for connector SVGs | Remove the import or use `EmptyState` in an allowed context |
 | Contrast | Every fg/bg pair × theme meets 4.5:1 (text) or 3:1 (UI); every color token is in a pair or marked decorative; no text pair uses an exact brand hue; every pair a component uses is declared; the report is current | Adjust the semantic token or declare the correct pair; never lower a minimum |
 | Accessibility (axe) | Zero axe violations (WCAG A/AA 2.0 to 2.2) in every story in light and dark, every template and the `apps/web` screen | Fix semantics, accessible names, roles or rendered contrast |
 | Story coverage | Every component, canvas primitive and editor component has `meta.ts` with `states`, one story per state and `Matrix`; the visual configuration covers theme × viewport × density | Add the missing stories or states |
