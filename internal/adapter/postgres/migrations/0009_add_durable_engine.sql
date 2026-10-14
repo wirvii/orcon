@@ -154,6 +154,24 @@ BEGIN
 END
 $$;
 
+-- Lock order. A worker commit locks the execution row and then the token rows it moves (ADR-0009 section 7), so
+-- every function that writes both takes the execution first and the token second. Taking a token first and then
+-- the execution (through append_event or refresh_execution) deadlocks against a commit (SQLSTATE 40P01). The
+-- functions below pick candidate tokens without a lock, lock their executions in key order, and only then lock
+-- and re-check the tokens.
+CREATE FUNCTION orcon_engine.lock_executions_of_tokens(p_ids uuid[])
+RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+BEGIN
+  PERFORM 1
+  FROM execution e
+  WHERE (e.org_id, e.id) IN (SELECT t.org_id, t.execution_id FROM token t WHERE t.id = ANY (p_ids))
+  ORDER BY e.org_id, e.id
+  FOR NO KEY UPDATE OF e;
+END
+$$;
+
 -- Gives up the leases of the given tokens: each goes back to RUNNABLE, or to SUSPENDED with reason POISON once it
 -- was abandoned p_poison_threshold times (ADR-0013 section 9). The started attempts of its node executions become
 -- ABANDONED, and the events, the attention request and the counters follow in the same transaction. The callers
@@ -166,6 +184,7 @@ $$
 DECLARE
   r record;
 BEGIN
+  PERFORM orcon_engine.lock_executions_of_tokens(p_ids);
   FOR r IN
     UPDATE token AS t
     SET status = CASE WHEN t.abandoned_count + 1 >= p_poison_threshold THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
@@ -220,15 +239,23 @@ RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, 
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
 $$
 DECLARE
+  v_candidates uuid[];
   v_ids uuid[];
 BEGIN
-  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_ids
+  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_candidates
   FROM (
     SELECT t.id
     FROM token t
     WHERE t.status = 'LEASED' AND t.lease_expires_at < clock_timestamp()
     ORDER BY t.lease_expires_at
     LIMIT p_limit
+  ) x;
+  PERFORM orcon_engine.lock_executions_of_tokens(v_candidates);
+  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_ids
+  FROM (
+    SELECT t.id
+    FROM token t
+    WHERE t.id = ANY (v_candidates) AND t.status = 'LEASED' AND t.lease_expires_at < clock_timestamp()
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
@@ -244,13 +271,17 @@ RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, 
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
 $$
 DECLARE
+  v_candidates uuid[];
   v_ids uuid[];
 BEGIN
+  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_candidates
+  FROM (SELECT t.id FROM token t WHERE t.lease_owner = p_worker_id AND t.status = 'LEASED') x;
+  PERFORM orcon_engine.lock_executions_of_tokens(v_candidates);
   SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_ids
   FROM (
     SELECT t.id
     FROM token t
-    WHERE t.lease_owner = p_worker_id AND t.status = 'LEASED'
+    WHERE t.id = ANY (v_candidates) AND t.lease_owner = p_worker_id AND t.status = 'LEASED'
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
@@ -294,15 +325,29 @@ $$
 #variable_conflict use_column
 DECLARE
   r record;
+  v_candidates uuid[];
   v_woken boolean;
 BEGIN
+  SELECT COALESCE(array_agg(x.id), ARRAY[]::uuid[]) INTO v_candidates
+  FROM (
+    SELECT tm.id
+    FROM timer tm
+    WHERE tm.status = 'SCHEDULED' AND tm.due_at <= clock_timestamp()
+    ORDER BY tm.due_at, tm.id
+    LIMIT p_limit
+  ) x;
+  -- The executions first, in key order, like a commit does; then the timers, re-checked under their lock.
+  PERFORM 1
+  FROM execution e
+  WHERE (e.org_id, e.id) IN (SELECT tm.org_id, tm.execution_id FROM timer tm WHERE tm.id = ANY (v_candidates))
+  ORDER BY e.org_id, e.id
+  FOR NO KEY UPDATE OF e;
   FOR r IN
     WITH due AS (
       SELECT tm.id
       FROM timer tm
-      WHERE tm.status = 'SCHEDULED' AND tm.due_at <= clock_timestamp()
+      WHERE tm.id = ANY (v_candidates) AND tm.status = 'SCHEDULED' AND tm.due_at <= clock_timestamp()
       ORDER BY tm.due_at, tm.id
-      LIMIT p_limit
       FOR UPDATE SKIP LOCKED
     )
     UPDATE timer AS tm
@@ -401,6 +446,8 @@ REVOKE ALL ON FUNCTION orcon_engine.append_event(uuid, uuid, uuid, text, text, t
 ALTER FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) TO orcon_application;
+ALTER FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) FROM PUBLIC;
 ALTER FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz) FROM PUBLIC;
 ALTER FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz) OWNER TO orcon_engine;
