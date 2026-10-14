@@ -160,7 +160,7 @@ func TestEnvironmentsSurviveACrash(t *testing.T) {
 		cfg := durable.Config{Worker: worker, Concurrency: 1, CheckpointActivations: 2, Faults: faults}
 		eng := env.Engine(cfg, runner())
 		execID := env.Start(eng, pub, input())
-		if failed := runToEnd(t, env, eng, worker); failed != 1 {
+		if failed := runToEnd(t, eng); failed != 1 {
 			t.Fatalf("%d steps failed, want 1", failed)
 		}
 		if got := statusOf(env, execID); got != execution.ExecSucceeded {

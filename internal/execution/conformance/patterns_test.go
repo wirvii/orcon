@@ -6,74 +6,44 @@ package conformance
 import (
 	"flag"
 	"fmt"
-	"os"
 	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/executiontest"
 	"github.com/wirvii/orcon/internal/flow"
 )
 
-// storeFlag selects the engine under test, like the -store of the other
-// conformance criteria: memory is the in-memory interpreter, session the
-// session driver over a fake database (a development check of the snapshot and
-// the delta), sqlite and postgres the durable engine over the real stores,
-// both the two of them (the suite runs once on each), and auto
-// SQLite plus PostgreSQL when a server is enabled.
-
-// requireStore fails the calling test when the selected store is not valid.
-// It never skips: a skipped suite exits 0 without running anything, and the
-// command of criterion E-CF-1 would then look satisfied.
-// Engine under test: the -store flag, or the in-memory interpreter.
+// storeFlag returns the engine under test, like the -store of the other conformance
+// criteria: memory is the in-memory interpreter, session the session driver over a
+// fake database (a development check of the snapshot and the delta). The durable
+// stores are not reachable from here: an area test does not import an adapter
+// (AL-2.1), so the suite runs on them from test/engine when the cut that repoints
+// the conformance criteria wires it.
 func storeFlag() string { return executiontest.StoreFlag("memory") }
 
+// requireStore fails the calling test when the selected store is not wired.
+// It never skips: a skipped suite exits 0 without running anything, and the
+// command of criterion E-CF-1 would then look satisfied.
 func requireStore(t *testing.T) {
 	t.Helper()
 	switch s := storeFlag(); s {
-	case "memory", "session", "sqlite", "postgres", "both", "auto":
+	case "memory", "session":
+	case "sqlite", "postgres", "both", "auto":
+		t.Fatalf("store %s: the conformance suite does not run on the durable stores from here yet", s)
 	default:
-		t.Fatalf("store %q: want memory, session, sqlite, postgres, both or auto", s)
+		t.Fatalf("store %q: want memory, session, sqlite, postgres or both", s)
 	}
-}
-
-// exit ends the test binary with the code of the runs: the suite runs once per
-// store, and returning from TestMain would report the code of the last run only.
-func exit(code int) {
-	os.Exit(code) //nolint:forbidigo // AL-8: a TestMain that runs the suite more than once reports the worst code itself
 }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	switch storeFlag() {
-	case "memory":
-		exit(m.Run())
-	case "session":
+	if storeFlag() == "session" {
 		executiontest.UseEngine(executiontest.SessionEngine)
-		exit(m.Run())
 	}
-	kinds, err := storetest.KindsFor(storeFlag())
-	if err != nil {
-		// requireStore reports the unknown value in every test.
-		exit(m.Run())
-	}
-	if slices.Contains(kinds, storetest.PostgreSQL) {
-		storetest.EnablePostgres()
-	}
-	stop := storetest.StartPostgres()
-	// The suite runs once per store, so a flow is judged on each of them.
-	code := 0
-	for _, k := range kinds {
-		executiontest.UseEngine(storetest.ExecutionEngine(k, storetest.EngineOptions{Weak: true}))
-		if c := m.Run(); c != 0 {
-			code = c
-		}
-	}
-	stop()
-	exit(code)
+	m.Run()
 }
 
 // Status of a pattern in the matrix.

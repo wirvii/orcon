@@ -19,7 +19,7 @@ test-fault:
 # test-engine runs the criteria commands of the durable engine on both stores, the
 # way E-REC-1, E-REC-2, E-REC-4 and E-FMT-6 of SPEC-001 state them.
 test-engine:
-	go test ./internal/execution/... -count=1 -run 'TestFencing|TestLeaseExpiry|TestReaper' -args -store=both
-	go test ./internal/execution/... -count=1 -run 'TestAtomicCheckpoint|TestForkAtomic|TestJoinExactlyOneContinuation' -args -store=both
-	go test ./internal/execution/... -count=1 -run 'TestRecomputeDeterminism' -args -iterations=500
+	go test ./test/engine/... -count=1 -timeout 870s -run 'TestFencing|TestLeaseExpiry|TestReaper' -args -store=both
+	go test ./test/engine/... -count=1 -timeout 870s -run 'TestAtomicCheckpoint|TestForkAtomic|TestJoinExactlyOneContinuation' -args -store=both
+	go test ./test/engine/... -count=1 -timeout 870s -run 'TestRecomputeDeterminism' -args -iterations=500
 	go test ./internal/execution/... -count=1 -run 'TestUpgradedDocumentCache'

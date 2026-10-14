@@ -22,9 +22,8 @@ import (
 var errInjected = errors.New("injected failure")
 
 // runToEnd claims and works until nothing is left, tolerating the errors a fault
-// plan injects: a worker that fails leaves its token leased and the test gives
-// the lease back, as the reaper does once it expires.
-func runToEnd(t *testing.T, env *storetest.EngineEnv, eng *durable.Engine, worker execution.WorkerID) (failed int) {
+// plan injects: a worker that fails gives the lease of its token back by itself.
+func runToEnd(t *testing.T, eng *durable.Engine) (failed int) {
 	t.Helper()
 	for {
 		claimed, start, err := eng.Claim(t.Context(), 1)
@@ -100,7 +99,7 @@ func TestForkAtomic(t *testing.T) {
 		faults := &faultPlan{only: []durable.Point{durable.PointInCommit}, failAt: 1, err: errInjected}
 		eng := env.Engine(durable.Config{Worker: worker, Concurrency: 1, Faults: faults}, runner())
 		execID := env.Start(eng, pub, input())
-		if failed := runToEnd(t, env, eng, worker); failed != 1 {
+		if failed := runToEnd(t, eng); failed != 1 {
 			t.Fatalf("%d steps failed, want 1", failed)
 		}
 		if got := statusOf(env, execID); got != execution.ExecSucceeded {

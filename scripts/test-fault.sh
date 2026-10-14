@@ -24,7 +24,7 @@ esac
 
 # Rows, by id: the package, the tests, and whether the row needs a process (SQLite).
 #   fault:   internal/adapter/storetest/fault (real processes)
-#   durable: internal/execution/durable (the engine over the store, in the test process)
+#   durable: test/engine/durable (the engine over the store, in the test process)
 all_rows="FI-04 FI-05 FI-09 FI-10 FI-11 FI-12 FI-15 FI-16"
 if [ -z "$rows" ]; then
   rows=$(echo "$all_rows" | tr ' ' ',')
@@ -45,15 +45,15 @@ for row in $(echo "$rows" | tr ',' ' '); do
   case "$row" in
     FI-04) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestKillDuringForkAndJoin' ;;
     FI-05) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestStoppedWorkerIsFenced' ;;
-    FI-09) run ./internal/execution/durable/ 'TestFencing' ;;
-    FI-10) run ./internal/execution/durable/ 'TestClockSkew' ;;
-    FI-11) run ./internal/execution/durable/ 'TestClaimIsExclusive|TestOutbox' ;;
+    FI-09) run ./test/engine/durable/ 'TestFencing' ;;
+    FI-10) run ./test/engine/durable/ 'TestClockSkew' ;;
+    FI-11) run ./test/engine/durable/ 'TestClaimIsExclusive|TestOutbox' ;;
     FI-12)
       [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestPoisonItem'
-      run ./internal/execution/durable/ 'TestReaper|TestGracefulReleaseCountsAbandonment'
+      run ./test/engine/durable/ 'TestReaper|TestGracefulReleaseCountsAbandonment'
       ;;
     FI-15) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestKillDuringWrites|TestDiskFull' ;;
-    FI-16) run ./internal/execution/durable/ 'TestRecomputeDeterminism' ;;
+    FI-16) run ./test/engine/durable/ 'TestRecomputeDeterminism' ;;
     FI-01 | FI-02 | FI-03 | FI-06)
       echo "test-fault: $row is a row of the effects journal (cut C6); it is not implemented yet" >&2
       status=1
