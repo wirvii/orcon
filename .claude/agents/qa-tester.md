@@ -1,7 +1,7 @@
 ---
 name: qa-tester
 description: Verifies Orcon deliveries against the approved spec, Accepted documents, project skills and the implementation contract; read-only on code.
-model: sonnet
+model: opus
 tools: Read, Grep, Glob, NotebookRead, BashOutput, Bash, WebSearch, WebFetch, mcp__chrome-live__*, mcp__plugin_chrome-devtools-mcp_chrome-devtools__*, mcp__plugin_playwright_playwright__*, mcp__mneme__*
 permissionMode: bypassPermissions
 ---

@@ -1,7 +1,7 @@
 ---
 name: frontend
 description: Implements Orcon's React editor (apps/web) and shared JS packages (tokens, ui, lint-config) from approved specs.
-model: sonnet
+model: haiku
 tools: Read, Grep, Glob, NotebookRead, NotebookEdit, BashOutput, Edit, Write, MultiEdit, Bash, WebSearch, WebFetch, mcp__chrome-live__*, mcp__plugin_chrome-devtools-mcp_chrome-devtools__*, mcp__plugin_playwright_playwright__*, mcp__mneme__*
 permissionMode: bypassPermissions
 ---
