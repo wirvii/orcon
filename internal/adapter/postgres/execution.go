@@ -16,6 +16,7 @@ import (
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 var (
@@ -65,10 +66,10 @@ func executionFrom(row *sqlcgen.GetExecutionRow) store.Execution {
 }
 
 // GetExecution implements [store.Reader].
-func (s *Store) GetExecution(ctx context.Context, org identity.OrgID, execID store.ExecutionID) (store.Execution, error) {
+func (s *Store) GetExecution(ctx context.Context, org orgscope.Org, execID store.ExecutionID) (store.Execution, error) {
 	var out store.Execution
-	err := s.inOrg(ctx, "get execution", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetExecution(ctx, pgUUID(org), pgUUID(execID))
+	err := s.inScope(ctx, "get execution", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetExecution(ctx, pgUUID(org.UUID()), pgUUID(execID))
 		if err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ func (s *Store) GetExecution(ctx context.Context, org identity.OrgID, execID sto
 }
 
 // ListExecutions implements [store.Reader].
-func (s *Store) ListExecutions(ctx context.Context, org identity.OrgID, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
+func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
 	set := 0
 	if !filter.ProjectID.IsZero() {
 		set++
@@ -95,11 +96,11 @@ func (s *Store) ListExecutions(ctx context.Context, org identity.OrgID, filter s
 	}
 	beforeAt, beforeID := beforeCursor(after)
 	var out []store.Execution
-	err := s.inOrg(ctx, "list executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.inScope(ctx, "list executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
 		var rows []sqlcgen.GetExecutionRow
 		switch {
 		case !filter.ProjectID.IsZero():
-			r, err := q.ListExecutions(ctx, sqlcgen.ListExecutionsParams{OrgID: pgUUID(org), ProjectID: pgUUID(filter.ProjectID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+			r, err := q.ListExecutions(ctx, sqlcgen.ListExecutionsParams{OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
 			if err != nil {
 				return err
 			}
@@ -107,7 +108,7 @@ func (s *Store) ListExecutions(ctx context.Context, org identity.OrgID, filter s
 				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
 			}
 		case !filter.FlowID.IsZero():
-			r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+			r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org.UUID()), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
 			if err != nil {
 				return err
 			}
@@ -115,7 +116,7 @@ func (s *Store) ListExecutions(ctx context.Context, org identity.OrgID, filter s
 				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
 			}
 		default:
-			r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+			r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
 			if err != nil {
 				return err
 			}
@@ -132,10 +133,10 @@ func (s *Store) ListExecutions(ctx context.Context, org identity.OrgID, filter s
 }
 
 // GetToken implements [store.Reader].
-func (s *Store) GetToken(ctx context.Context, org identity.OrgID, token store.TokenID) (store.Token, error) {
+func (s *Store) GetToken(ctx context.Context, org orgscope.Org, token store.TokenID) (store.Token, error) {
 	var out store.Token
-	err := s.inOrg(ctx, "get token", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetToken(ctx, pgUUID(org), pgUUID(token))
+	err := s.inScope(ctx, "get token", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetToken(ctx, pgUUID(org.UUID()), pgUUID(token))
 		if err != nil {
 			return err
 		}
@@ -155,10 +156,10 @@ func (s *Store) GetToken(ctx context.Context, org identity.OrgID, token store.To
 }
 
 // ListExecutionEvents implements [store.Reader].
-func (s *Store) ListExecutionEvents(ctx context.Context, org identity.OrgID, execID store.ExecutionID, after int64, limit int) ([]store.Event, error) {
+func (s *Store) ListExecutionEvents(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after int64, limit int) ([]store.Event, error) {
 	var out []store.Event
-	err := s.inOrg(ctx, "list execution events", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExecutionEvents(ctx, sqlcgen.ListExecutionEventsParams{OrgID: pgUUID(org), ExecutionID: pgUUID(execID), AfterSequenceNumber: after, PageSize: clampPage(limit)})
+	err := s.inScope(ctx, "list execution events", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListExecutionEvents(ctx, sqlcgen.ListExecutionEventsParams{OrgID: pgUUID(org.UUID()), ExecutionID: pgUUID(execID), AfterSequenceNumber: after, PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -187,10 +188,10 @@ func operationFrom(row *sqlcgen.GetExternalOperationRow) store.ExternalOperation
 }
 
 // GetExternalOperation implements [store.Reader].
-func (s *Store) GetExternalOperation(ctx context.Context, org identity.OrgID, operation store.ExternalOperationID) (store.ExternalOperation, error) {
+func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, operation store.ExternalOperationID) (store.ExternalOperation, error) {
 	var out store.ExternalOperation
-	err := s.inOrg(ctx, "get external operation", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetExternalOperation(ctx, pgUUID(org), pgUUID(operation))
+	err := s.inScope(ctx, "get external operation", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetExternalOperation(ctx, pgUUID(org.UUID()), pgUUID(operation))
 		if err != nil {
 			return err
 		}
@@ -201,10 +202,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org identity.OrgID, op
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org identity.OrgID, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
-	err := s.inOrg(ctx, "list external operations", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+	err := s.inScope(ctx, "list external operations", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -218,11 +219,11 @@ func (s *Store) ListExternalOperations(ctx context.Context, org identity.OrgID, 
 }
 
 // ListAttentionRequests implements [store.Inbox].
-func (s *Store) ListAttentionRequests(ctx context.Context, org identity.OrgID, status string, after store.Cursor, limit int) ([]store.AttentionRequest, error) {
+func (s *Store) ListAttentionRequests(ctx context.Context, org orgscope.Org, status string, after store.Cursor, limit int) ([]store.AttentionRequest, error) {
 	afterAt, afterID := afterCursor(after)
 	var out []store.AttentionRequest
-	err := s.inOrg(ctx, "list attention requests", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListAttentionRequests(ctx, sqlcgen.ListAttentionRequestsParams{OrgID: pgUUID(org), Status: status, AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit)})
+	err := s.inScope(ctx, "list attention requests", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListAttentionRequests(ctx, sqlcgen.ListAttentionRequestsParams{OrgID: pgUUID(org.UUID()), Status: status, AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -242,10 +243,10 @@ func (s *Store) ListAttentionRequests(ctx context.Context, org identity.OrgID, s
 }
 
 // GetTimer implements [store.Inbox].
-func (s *Store) GetTimer(ctx context.Context, org identity.OrgID, timer store.TimerID) (store.Timer, error) {
+func (s *Store) GetTimer(ctx context.Context, org orgscope.Org, timer store.TimerID) (store.Timer, error) {
 	var out store.Timer
-	err := s.inOrg(ctx, "get timer", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetTimer(ctx, pgUUID(org), pgUUID(timer))
+	err := s.inScope(ctx, "get timer", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetTimer(ctx, pgUUID(org.UUID()), pgUUID(timer))
 		if err != nil {
 			return err
 		}
@@ -280,9 +281,9 @@ func (s *Store) GetJoinInstance(ctx context.Context, key store.JoinKey) (store.J
 
 // InTx implements [store.Transactor]: one READ COMMITTED transaction with the
 // organization context set.
-func (s *Store) InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error {
-	return s.inOrg(ctx, "transaction", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
-		return fn(ctx, &pgTx{q: q, org: org})
+func (s *Store) InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error {
+	return s.inScope(ctx, "transaction", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+		return fn(ctx, &pgTx{q: q, org: identity.OrgID(org.UUID())})
 	})
 }
 
@@ -529,7 +530,10 @@ func (t *pgTx) InsertAttentionRequest(ctx context.Context, a *store.AttentionReq
 	})
 }
 
-var _ store.Tx = (*pgTx)(nil)
+// pgTx is not asserted to implement [store.Tx] with a variable declaration: the
+// orgscope analyzer (rule 3) reads such assertions as store ports, and the
+// methods of a transaction act on the organization that InTx scoped. InTx passes
+// the value as the interface, so the compiler still checks the implementation.
 
 // defaultText returns v, or fallback when v is empty.
 func defaultText(v, fallback string) string {

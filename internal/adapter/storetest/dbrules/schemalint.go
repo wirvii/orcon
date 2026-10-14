@@ -146,6 +146,10 @@ func LoadPolicyFS(fsys fs.FS, now time.Time) (*Policy, error) {
 	return p, nil
 }
 
+// IsInstanceTable reports whether the table is listed in instance_tables.txt:
+// it belongs to the instance and carries no org_id (orcon-db TI-1).
+func (p *Policy) IsInstanceTable(table string) bool { return p.instanceTables[table] }
+
 type policyLine struct {
 	text string
 	line int

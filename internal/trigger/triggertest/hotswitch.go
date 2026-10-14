@@ -46,21 +46,21 @@ func HotSwitchUnderLoad(t *testing.T, f Factory, load Load) {
 	hook := Node{ID: "hook", Block: WebhookBlock("hot")}
 	cron := Node{ID: "cron", Type: TypeSchedule, Block: `{"family":"SCHEDULE","schedule":{"rules":[{"kind":"MINUTES","every":5}]}}`}
 	poll := Node{ID: "poll", Type: TypePoll, Block: `{"family":"POLL","poll":{"rules":[{"kind":"MINUTES","every":2}]}}`}
-	id := e.newFlow(e.orgA, e.projA, "hot", Build(DocSpec{Name: "v1", Starts: []Node{hook, cron, poll}}))
-	e.publish(e.orgA, id)
-	must(t, "activate", e.svc.Activate(e.ctx(), e.orgA, id))
-	before := entriesByNode(e.triggers(e.orgA, id))
+	id := e.newFlow(e.scopeA, e.projA, "hot", Build(DocSpec{Name: "v1", Starts: []Node{hook, cron, poll}}))
+	e.publish(e.scopeA, id)
+	must(t, "activate", e.svc.Activate(e.ctx(), e.scopeA, id))
+	before := entriesByNode(e.triggers(e.scopeA, id))
 
-	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Starts: []Node{hook, cron, poll}}))
+	e.saveDraft(e.scopeA, id, Build(DocSpec{Name: "v2", Starts: []Node{hook, cron, poll}}))
 	var publishStart, publishEnd time.Time
 	obs := runLoad(t, e, id, load, func() {
 		publishStart = time.Now()
-		e.publish(e.orgA, id)
+		e.publish(e.scopeA, id)
 		publishEnd = time.Now()
 	})
 
 	checkObservations(t, obs, publishStart, publishEnd)
-	after := entriesByNode(e.triggers(e.orgA, id))
+	after := entriesByNode(e.triggers(e.scopeA, id))
 	for node, was := range before {
 		now, ok := after[node]
 		if !ok {
@@ -107,7 +107,7 @@ func runLoad(t *testing.T, e *env, id flow.FlowID, load Load, midway func()) [][
 			for time.Now().Before(deadline) {
 				<-tick.C
 				start := time.Now()
-				acc, err := e.svc.Accept(e.ctx(), e.orgA, id, "hook")
+				acc, err := e.svc.Accept(e.ctx(), e.scopeA, id, "hook")
 				results[w] = append(results[w], observation{start: start, end: time.Now(), version: acc.VersionNumber, accepting: acc.Accepting, err: err})
 			}
 		}()

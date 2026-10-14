@@ -12,6 +12,7 @@ import (
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // ErrDigestConflict means a version of the connector is already installed with
@@ -111,7 +112,7 @@ func (r *Registry) record(ctx context.Context, m *Manifest, digest Digest, by id
 // Grant records an organization's approval of an installed package for the
 // whole organization, or for one project when project is not the zero value.
 // The permissions that were approved are recorded by digest.
-func (r *Registry) Grant(ctx context.Context, org identity.OrgID, project identity.ProjectID, pkg PackageRecord, by identity.PrincipalID) (GrantRecord, error) {
+func (r *Registry) Grant(ctx context.Context, org orgscope.Org, project identity.ProjectID, pkg PackageRecord, by identity.PrincipalID) (GrantRecord, error) {
 	m, err := Parse(pkg.Manifest, Options{Official: true})
 	if err != nil {
 		return GrantRecord{}, fmt.Errorf("grant %s %s: stored manifest: %w", pkg.ConnectorID, pkg.Version, err)
@@ -122,10 +123,10 @@ func (r *Registry) Grant(ctx context.Context, org identity.OrgID, project identi
 	}
 	now := clock.Micros(r.clock.Now())
 	g := GrantRecord{
-		ID: GrantID(r.ids.New()), OrgID: org, PackageID: pkg.ID, ProjectID: project, PermissionsDigest: digest,
+		ID: GrantID(r.ids.New()), OrgID: identity.OrgIDOf(org), PackageID: pkg.ID, ProjectID: project, PermissionsDigest: digest,
 		GrantedByPrincipalID: by, GrantedAt: now, CreatedAt: now, UpdatedAt: now,
 	}
-	if err := r.grants.InsertGrant(ctx, g); err != nil {
+	if err := r.grants.InsertGrant(ctx, org, g); err != nil {
 		return GrantRecord{}, fmt.Errorf("grant %s %s: %w", pkg.ConnectorID, pkg.Version, err)
 	}
 	return g, nil
@@ -136,7 +137,7 @@ func (r *Registry) Grant(ctx context.Context, org identity.OrgID, project identi
 // installed, granted to the organization or project, and allowed by the policy.
 // The catalog delegates the node types no package owns to core, which may be
 // nil when there are none.
-func (r *Registry) Catalog(org identity.OrgID, project identity.ProjectID, core CoreTypes) *Catalog {
+func (r *Registry) Catalog(org orgscope.Org, project identity.ProjectID, core CoreTypes) *Catalog {
 	return &Catalog{registry: r, org: org, project: project, core: core}
 }
 

@@ -54,3 +54,36 @@
 - dialect: sqlite
   query: ExistsRouteTakenByOtherOrganization
   reason: route uniqueness check must see every organization (SPEC-002 T1)
+- dialect: sqlite
+  query: UpdateFlowDeletedByPrincipalToNull
+  reason: clears flow.deleted_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateFlowVersionPublishedByPrincipalToNull
+  reason: clears flow_version.published_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateMembershipInvitedByPrincipalToNull
+  reason: clears membership.invited_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateInstanceAlertAcknowledgedByPrincipalToNull
+  reason: clears instance_alert.acknowledged_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateExternalOperationResolvedByPrincipalToNull
+  reason: clears external_operation.resolved_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateHumanTaskResolvedByPrincipalToNull
+  reason: clears human_task.resolved_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateAttentionRequestAcknowledgedByPrincipalToNull
+  reason: clears attention_request.acknowledged_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateAttentionRequestResolvedByPrincipalToNull
+  reason: clears attention_request.resolved_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateOperationalAlertAcknowledgedByPrincipalToNull
+  reason: clears operational_alert.acknowledged_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateConnectorPackageInstalledByPrincipalToNull
+  reason: clears connector_package.installed_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
+- dialect: sqlite
+  query: UpdateConnectorGrantGrantedByPrincipalToNull
+  reason: clears connector_grant.granted_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references

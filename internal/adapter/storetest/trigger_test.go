@@ -7,8 +7,23 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 	"github.com/wirvii/orcon/internal/trigger/triggertest"
 )
+
+// scopeFor is the scope of an organization of a trigger scenario. The battery
+// receives it through [triggertest.Backend.Scope]: only the tests create scopes.
+func scopeFor(org identity.OrgID) orgscope.Org {
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		panic(err)
+	}
+	return scope
+}
 
 // The trigger battery (internal/trigger/triggertest) runs the lifecycle of
 // SPEC-002 cut T1 against the stores the -store flag selects. The same
@@ -17,14 +32,14 @@ import (
 
 func sqliteBackend(t *testing.T) triggertest.Backend {
 	t.Helper()
-	s := openSQLite(t, filepath.Join(t.TempDir(), "orcon.db"))
-	return triggertest.Backend{Triggers: s, Flows: s}
+	s := storetest.OpenSQLite(t, filepath.Join(t.TempDir(), "orcon.db"))
+	return triggertest.Backend{Triggers: s, Flows: s, Scope: scopeFor}
 }
 
 func postgresBackend(t *testing.T) triggertest.Backend {
 	t.Helper()
-	s := openPostgres(t, newPostgresDatabase(t))
-	return triggertest.Backend{Triggers: s, Flows: s}
+	s := storetest.OpenPostgres(t, newPostgresDatabase(t))
+	return triggertest.Backend{Triggers: s, Flows: s, Scope: scopeFor}
 }
 
 // onSelectedStores runs one scenario once per store the -store flag selects.

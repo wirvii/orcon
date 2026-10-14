@@ -41,5 +41,7 @@ const (
 // WorkerStore persists the worker registry.
 type WorkerStore interface {
 	// RegisterWorker inserts the worker or refreshes its heartbeat and version.
+	//
+	//orcon:scope instance worker is an instance table, not owned by an organization
 	RegisterWorker(ctx context.Context, w WorkerRecord) error
 }

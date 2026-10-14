@@ -1,0 +1,106 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package identity
+
+import (
+	"context"
+	"time"
+
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+)
+
+// The ports below are what the identity area needs from durable storage
+// (ADR-0015 section 1, architecture-layers.md AL-3). The adapters
+// internal/adapter/sqlite and internal/adapter/postgres implement them and
+// internal/adapter/storetest proves both behave the same.
+//
+// Row identities are typed values created by the caller as UUIDv7 (orcon-db
+// ID-1). A method of organization data takes the [orgscope.Org] first after the
+// context and binds it to the org_id of its statement: a row of another
+// organization is never visible and a record that names another organization
+// than its scope is refused. A method that does not take one declares why in an
+// "orcon:scope" directive line of its comment, which the orgscope analyzer of
+// tools/orconvet requires (ADR-0046 section 2).
+
+// OrgStore persists organizations.
+type OrgStore interface {
+	// CreateOrganization inserts an organization. A repeated slug fails with
+	// [ErrConflict].
+	//
+	//orcon:scope instance the organization does not exist before this call, so there is no scope to hold
+	CreateOrganization(ctx context.Context, o OrgRecord) error
+	// GetOrganization returns the organization of the scope, or [ErrNotFound].
+	GetOrganization(ctx context.Context, org orgscope.Org) (OrgRecord, error)
+}
+
+// PrincipalStore persists principals, the rows of whoever acts.
+type PrincipalStore interface {
+	// CreatePrincipal inserts a principal. A second SYSTEM principal fails with
+	// [ErrConflict].
+	//
+	//orcon:scope instance principal is an instance table (orcon-db IN-12)
+	CreatePrincipal(ctx context.Context, p PrincipalRecord) error
+	// GetSystemPrincipal returns the single SYSTEM principal, or [ErrNotFound]
+	// before the instance is bootstrapped.
+	//
+	//orcon:scope instance principal is an instance table (orcon-db IN-12)
+	GetSystemPrincipal(ctx context.Context) (PrincipalRecord, error)
+	// DeletePrincipal deletes a principal without deleting any history: in
+	// batches of at most batchSize rows it sets to NULL every actor column that
+	// names the principal, in every organization, and then deletes the principal
+	// row, which takes its user with it. Each batch is its own short transaction.
+	// An unknown principal fails with [ErrNotFound].
+	//
+	//orcon:scope engine the actor columns to clear are in every organization (orcon-db IN-12, QY-8)
+	DeletePrincipal(ctx context.Context, principal PrincipalID, batchSize int) error
+}
+
+// UserStore persists users.
+type UserStore interface {
+	// CreateUser inserts the user together with its principal row (kind USER),
+	// in one transaction. A repeated address fails with [ErrConflict].
+	//
+	//orcon:scope instance application_user is an instance table
+	CreateUser(ctx context.Context, u UserRecord) error
+	// GetUser returns a user by identity, or [ErrNotFound].
+	//
+	//orcon:scope instance application_user is an instance table
+	GetUser(ctx context.Context, user UserID) (UserRecord, error)
+	// GetUserByEmail returns the user with that normalized address, or [ErrNotFound].
+	//
+	//orcon:scope instance application_user is an instance table
+	GetUserByEmail(ctx context.Context, emailNormalized string) (UserRecord, error)
+}
+
+// MembershipStore persists the memberships of an organization.
+type MembershipStore interface {
+	// CreateMembership inserts a membership. A second membership of the same user
+	// in the organization fails with [ErrConflict]; an unknown user with [ErrReference].
+	CreateMembership(ctx context.Context, org orgscope.Org, m MembershipRecord) error
+	// GetMembership returns one membership of the organization, or [ErrNotFound].
+	GetMembership(ctx context.Context, org orgscope.Org, membership MembershipID) (MembershipRecord, error)
+	// GetMembershipOfUser returns the membership of the user in the organization,
+	// or [ErrNotFound].
+	GetMembershipOfUser(ctx context.Context, org orgscope.Org, user UserID) (MembershipRecord, error)
+	// ListMemberships returns at most limit memberships of the organization with
+	// an identity greater than after, ordered by identity (keyset pagination).
+	ListMemberships(ctx context.Context, org orgscope.Org, after MembershipID, limit int) ([]MembershipRecord, error)
+	// UpdateMembershipStatus sets the status and the update instant of one
+	// membership of the organization, or fails with [ErrNotFound].
+	UpdateMembershipStatus(ctx context.Context, org orgscope.Org, membership MembershipID, status string, now time.Time) error
+}
+
+// ProjectStore persists projects.
+type ProjectStore interface {
+	// CreateProject inserts a project. A second project with the same slug in the
+	// organization fails with [ErrConflict]; a handle held by any project of the
+	// instance fails with [ErrHandleTaken]; an unknown organization with
+	// [ErrReference].
+	CreateProject(ctx context.Context, org orgscope.Org, p ProjectRecord) error
+	// GetProject returns one project of the organization, or [ErrNotFound].
+	GetProject(ctx context.Context, org orgscope.Org, project ProjectID) (ProjectRecord, error)
+	// ListProjects returns at most limit projects of the organization with an
+	// identity greater than after, ordered by identity (keyset pagination).
+	ListProjects(ctx context.Context, org orgscope.Org, after ProjectID, limit int) ([]ProjectRecord, error)
+}

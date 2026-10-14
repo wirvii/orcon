@@ -18,6 +18,7 @@ import (
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // The execution cases run against the ports of internal/execution/store. The
@@ -30,17 +31,20 @@ type execFixture struct {
 	*fixture
 	flow flow.Record
 	ver  flow.VersionRecord
+	// scopeA and scopeB are the scopes of the two organizations, which the store
+	// methods take (ADR-0046).
+	scopeA, scopeB orgscope.Org
 }
 
 func newExecFixture(t *testing.T, newStore Factory) *execFixture {
 	t.Helper()
 	f := newFixture(t, newStore)
 	rec := f.flow(f.orgA, f.projA, "executions")
-	return &execFixture{fixture: f, flow: rec, ver: f.firstVersion(rec)}
+	return &execFixture{fixture: f, flow: rec, ver: f.firstVersion(rec), scopeA: scopeOf(f.orgA), scopeB: scopeOf(f.orgB)}
 }
 
 func (e *execFixture) tx(org identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error {
-	return e.s.InTx(e.ctx(), org, fn)
+	return e.s.InTx(e.ctx(), scopeOf(org), fn)
 }
 
 func mustTx(t *testing.T, err error, what string) {
@@ -120,7 +124,7 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 		created = append(created, ex)
 		mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertExecution(ctx, &ex) }), "insert")
 	}
-	got, err := e.s.GetExecution(e.ctx(), e.orgA, created[0].ID)
+	got, err := e.s.GetExecution(e.ctx(), e.scopeA, created[0].ID)
 	if err != nil || got.Status != "QUEUED" || got.RootExecutionID != created[0].ID || got.FlowVersionID != e.ver.ID || !got.FlowSnapshotID.IsZero() ||
 		got.RunnableCount != 1 || !got.ParentExecutionID.IsZero() {
 		t.Fatalf("execution = %+v, %v", got, err)
@@ -130,7 +134,7 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 		var all []store.Execution
 		var cursor store.Cursor
 		for {
-			rows, err := e.s.ListExecutions(e.ctx(), e.orgA, filter, cursor, 2)
+			rows, err := e.s.ListExecutions(e.ctx(), e.scopeA, filter, cursor, 2)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -159,14 +163,14 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 			}
 		}
 	}
-	if rows, err := e.s.ListExecutions(e.ctx(), e.orgA, store.ExecutionFilter{Status: "RUNNING"}, store.Cursor{}, 10); err != nil || len(rows) != 0 {
+	if rows, err := e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "RUNNING"}, store.Cursor{}, 10); err != nil || len(rows) != 0 {
 		t.Fatalf("running executions = %d, %v", len(rows), err)
 	}
-	_, err = e.s.ListExecutions(e.ctx(), e.orgA, store.ExecutionFilter{}, store.Cursor{}, 10)
+	_, err = e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{}, store.Cursor{}, 10)
 	wantErr(t, "a list without a filter", err, flow.ErrInvalidRecord)
-	_, err = e.s.ListExecutions(e.ctx(), e.orgA, store.ExecutionFilter{Status: "QUEUED", FlowID: e.flow.ID}, store.Cursor{}, 10)
+	_, err = e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "QUEUED", FlowID: e.flow.ID}, store.Cursor{}, 10)
 	wantErr(t, "a list with two filters", err, flow.ErrInvalidRecord)
-	_, err = e.s.GetExecution(e.ctx(), e.orgA, next[store.ExecutionID](e.ids))
+	_, err = e.s.GetExecution(e.ctx(), e.scopeA, next[store.ExecutionID](e.ids))
 	wantErr(t, "an unknown execution", err, flow.ErrNotFound)
 
 	// Exactly one of version and snapshot.
@@ -182,7 +186,7 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 	child := created[0]
 	child.ID, child.ParentExecutionID, child.RootExecutionID, child.CallDepth = next[store.ExecutionID](e.ids), created[0].ID, created[0].ID, 1
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertExecution(ctx, &child) }), "insert child")
-	if got, err = e.s.GetExecution(e.ctx(), e.orgA, child.ID); err != nil || got.ParentExecutionID != created[0].ID || got.RootExecutionID != created[0].ID || got.CallDepth != 1 {
+	if got, err = e.s.GetExecution(e.ctx(), e.scopeA, child.ID); err != nil || got.ParentExecutionID != created[0].ID || got.RootExecutionID != created[0].ID || got.CallDepth != 1 {
 		t.Fatalf("child = %+v, %v", got, err)
 	}
 
@@ -200,7 +204,7 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 			t.Fatalf("event %d got sequence number %d", i, seq)
 		}
 	}
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 2, 10)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 2, 10)
 	if err != nil || len(events) != 3 || events[0].SequenceNumber != 3 || events[2].Type != "test.event_4" || string(events[0].Data) != `{"i":1}` || events[0].RootExecutionID != ex.ID {
 		t.Fatalf("events after 2 = %+v, %v", events, err)
 	}
@@ -235,7 +239,7 @@ func rollbackCase(t *testing.T, newStore Factory) {
 	if !errors.Is(err, boom) {
 		t.Fatalf("error %v, want boom", err)
 	}
-	_, err = e.s.GetExecution(e.ctx(), e.orgA, ex.ID)
+	_, err = e.s.GetExecution(e.ctx(), e.scopeA, ex.ID)
 	wantErr(t, "the rolled back execution", err, flow.ErrNotFound)
 	// A failed statement inside the transaction also leaves nothing of it.
 	err = e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
@@ -246,7 +250,7 @@ func rollbackCase(t *testing.T, newStore Factory) {
 		return tx.InsertExecution(ctx, &dup)
 	})
 	wantErr(t, "a duplicate identity", err, flow.ErrConflict)
-	_, err = e.s.GetExecution(e.ctx(), e.orgA, ex.ID)
+	_, err = e.s.GetExecution(e.ctx(), e.scopeA, ex.ID)
 	wantErr(t, "the execution of a failed transaction", err, flow.ErrNotFound)
 	// A record of another organization is refused before it is written.
 	other := ex
@@ -333,7 +337,7 @@ func firstKey(m map[store.TokenID]identity.OrgID, org identity.OrgID) store.Toke
 
 func (e *execFixture) mustToken(org identity.OrgID, tok store.TokenID) store.Token {
 	e.t.Helper()
-	got, err := e.s.GetToken(e.ctx(), org, tok)
+	got, err := e.s.GetToken(e.ctx(), scopeOf(org), tok)
 	if err != nil {
 		e.t.Fatalf("get token: %v", err)
 	}
@@ -442,7 +446,7 @@ func fencingCase(t *testing.T, newStore Factory) {
 		return tx.AssertFence(ctx, store.Fence{OrgID: e.orgA, Token: tok.ID, Epoch: fence.Epoch + 7, Owner: w}, base)
 	})
 	wantErr(t, "a step with a lost lease", err, store.ErrFenced)
-	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 10); len(evs) != 0 {
+	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10); len(evs) != 0 {
 		t.Fatalf("a fenced transaction left %d events", len(evs))
 	}
 	// Moving the token ends the lease; the same fence then fails.
@@ -683,7 +687,7 @@ func timersCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conform
 			t.Fatalf("timer %s fired %d times", id, n)
 		}
 	}
-	got, err := e.s.GetTimer(e.ctx(), e.orgA, due0[0])
+	got, err := e.s.GetTimer(e.ctx(), e.scopeA, due0[0])
 	if err != nil || got.Status != "FIRED" {
 		t.Fatalf("fired timer = %+v, %v", got, err)
 	}
@@ -722,7 +726,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		}
 		return tx.AppendJournal(ctx, ops)
 	}), "journal intent")
-	listed, err := e.s.ListExternalOperations(e.ctx(), e.orgA, ne.ID, 0, 100)
+	listed, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 0, 100)
 	if err != nil || len(listed) != items {
 		t.Fatalf("journal has %d entries, %v", len(listed), err)
 	}
@@ -732,7 +736,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 			t.Fatalf("entry %d = %+v", i, o)
 		}
 	}
-	if rest, err := e.s.ListExternalOperations(e.ctx(), e.orgA, ne.ID, 20, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
+	if rest, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 20, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
 		t.Fatalf("journal from item 20 = %d entries, %v", len(rest), err)
 	}
 	// A repeated correlation key rejects the whole batch.
@@ -741,7 +745,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		{ID: next[store.ExternalOperationID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, NodeExecutionID: ne.ID, ItemIndex: 101, CorrelationKey: "key-00", ContractReference: "c", CreatedAt: base},
 	}
 	wantErr(t, "a repeated correlation key", e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AppendJournal(ctx, dup) }), flow.ErrConflict)
-	if all, _ := e.s.ListExternalOperations(e.ctx(), e.orgA, ne.ID, 100, 100); len(all) != 0 {
+	if all, _ := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 100, 100); len(all) != 0 {
 		t.Fatalf("a rejected batch left %d entries", len(all))
 	}
 	// DISPATCHING is marked under the fence, before any send; it moves only PREPARED entries once.
@@ -766,7 +770,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 	if moved != 5 {
 		t.Fatalf("%d entries moved on the second call, want 5 (only PREPARED ones)", moved)
 	}
-	gotOp, err := e.s.GetExternalOperation(e.ctx(), e.orgA, ids[0])
+	gotOp, err := e.s.GetExternalOperation(e.ctx(), e.scopeA, ids[0])
 	if err != nil || gotOp.State != "DISPATCHING" || !gotOp.DispatchDeadlineAt.Equal(deadline) || gotOp.FirstDispatchedAt.IsZero() {
 		t.Fatalf("dispatching entry = %+v, %v", gotOp, err)
 	}
@@ -781,7 +785,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		return err
 	})
 	wantErr(t, "a dispatch mark with a lost lease", err, store.ErrFenced)
-	if g, _ := e.s.GetExternalOperation(e.ctx(), e.orgA, ids[20]); g.State != "PREPARED" {
+	if g, _ := e.s.GetExternalOperation(e.ctx(), e.scopeA, ids[20]); g.State != "PREPARED" {
 		t.Fatalf("entry 20 is %s", g.State)
 	}
 	// Outcomes: only from the expected state.
@@ -797,7 +801,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 	if !ok || wrong {
 		t.Fatalf("resolve = %v, %v; want true, false", ok, wrong)
 	}
-	if g, _ := e.s.GetExternalOperation(e.ctx(), e.orgA, ids[0]); g.State != "SUCCEEDED" || g.ResponseReference != "response/1" {
+	if g, _ := e.s.GetExternalOperation(e.ctx(), e.scopeA, ids[0]); g.State != "SUCCEEDED" || g.ResponseReference != "response/1" {
 		t.Fatalf("resolved entry = %+v", g)
 	}
 	// An unknown state is rejected by the database.
@@ -943,7 +947,7 @@ func attentionCase(t *testing.T, newStore Factory) {
 	var all []store.AttentionRequest
 	var cursor store.Cursor
 	for {
-		page, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "OPEN", cursor, 3)
+		page, err := e.s.ListAttentionRequests(e.ctx(), e.scopeA, "OPEN", cursor, 3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -966,10 +970,10 @@ func attentionCase(t *testing.T, newStore Factory) {
 			t.Fatalf("request %d = %+v (oldest first)", i, r)
 		}
 	}
-	if got, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "RESOLVED", store.Cursor{}, 10); err != nil || len(got) != 0 {
+	if got, err := e.s.ListAttentionRequests(e.ctx(), e.scopeA, "RESOLVED", store.Cursor{}, 10); err != nil || len(got) != 0 {
 		t.Fatalf("resolved requests = %d, %v", len(got), err)
 	}
-	if got, err := e.s.ListAttentionRequests(e.ctx(), e.orgB, "OPEN", store.Cursor{}, 10); err != nil || len(got) != 0 {
+	if got, err := e.s.ListAttentionRequests(e.ctx(), e.scopeB, "OPEN", store.Cursor{}, 10); err != nil || len(got) != 0 {
 		t.Fatalf("organization B sees %d requests, %v", len(got), err)
 	}
 	// One request per cause reference, per organization.
@@ -977,11 +981,11 @@ func attentionCase(t *testing.T, newStore Factory) {
 	silent := store.AttentionRequest{ID: next[store.AttentionRequestID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, ProjectID: e.projA, FlowID: e.flow.ID, NodeID: "n",
 		Cause: "END_USER_WAIT", CauseReference: "wait-1", NotifyClass: "SILENT", Status: "RESOLVED", Level: 2, GroupKey: "g", Summary: "done", CreatedAt: base}
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.InsertAttentionRequest(ctx, &silent) }), "insert a silent request")
-	resolved, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "RESOLVED", store.Cursor{}, 10)
+	resolved, err := e.s.ListAttentionRequests(e.ctx(), e.scopeA, "RESOLVED", store.Cursor{}, 10)
 	if err != nil || len(resolved) != 1 || resolved[0].ID != silent.ID || resolved[0].NotifyClass != "SILENT" || resolved[0].Level != 2 || resolved[0].Status != "RESOLVED" {
 		t.Fatalf("resolved requests = %+v, %v", resolved, err)
 	}
-	if open, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "OPEN", store.Cursor{}, 100); err != nil || len(open) != n {
+	if open, err := e.s.ListAttentionRequests(e.ctx(), e.scopeA, "OPEN", store.Cursor{}, 100); err != nil || len(open) != n {
 		t.Fatalf("a resolved request appeared in the open inbox: %d, %v", len(open), err)
 	}
 	dup := store.AttentionRequest{ID: next[store.AttentionRequestID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, ProjectID: e.projA, FlowID: e.flow.ID, NodeID: "n",
@@ -997,16 +1001,16 @@ func executionIsolationCase(t *testing.T, newStore Factory) {
 	ex := e.execution()
 	tok := e.token(ex, "secret", 0, realNow().Add(time.Hour))
 	ctx := e.ctx()
-	if _, err := e.s.GetExecution(ctx, e.orgB, ex.ID); !errors.Is(err, flow.ErrNotFound) {
+	if _, err := e.s.GetExecution(ctx, e.scopeB, ex.ID); !errors.Is(err, flow.ErrNotFound) {
 		t.Errorf("execution of another organization: %v", err)
 	}
-	if _, err := e.s.GetToken(ctx, e.orgB, tok.ID); !errors.Is(err, flow.ErrNotFound) {
+	if _, err := e.s.GetToken(ctx, e.scopeB, tok.ID); !errors.Is(err, flow.ErrNotFound) {
 		t.Errorf("token of another organization: %v", err)
 	}
-	if got, err := e.s.ListExecutions(ctx, e.orgB, store.ExecutionFilter{FlowID: e.flow.ID}, store.Cursor{}, 10); err != nil || len(got) != 0 {
+	if got, err := e.s.ListExecutions(ctx, e.scopeB, store.ExecutionFilter{FlowID: e.flow.ID}, store.Cursor{}, 10); err != nil || len(got) != 0 {
 		t.Errorf("executions of another organization: %d, %v", len(got), err)
 	}
-	if got, err := e.s.ListExecutionEvents(ctx, e.orgB, ex.ID, 0, 10); err != nil || len(got) != 0 {
+	if got, err := e.s.ListExecutionEvents(ctx, e.scopeB, ex.ID, 0, 10); err != nil || len(got) != 0 {
 		t.Errorf("events of another organization: %d, %v", len(got), err)
 	}
 	// Organization B cannot write into A's execution: the composite foreign key refuses it.
@@ -1042,7 +1046,7 @@ func eventsCase(t *testing.T, newStore Factory) {
 		})
 	}
 	wg.Wait()
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 100)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 100)
 	if err != nil || len(events) != writers*each {
 		t.Fatalf("%d events, %v; want %d", len(events), err, writers*each)
 	}
@@ -1104,7 +1108,7 @@ func stepsCase(t *testing.T, newStore Factory) {
 	if failed.Load() != 0 {
 		t.Fatalf("%d of %d steps failed", failed.Load(), workers*steps)
 	}
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 1000)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 1000)
 	if err != nil || len(events) != workers*steps {
 		t.Fatalf("%d events, %v; want %d", len(events), err, workers*steps)
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // The ports below are what the connector area needs from durable storage
@@ -55,22 +56,34 @@ type PackageRecord struct {
 	UpdatedAt              time.Time
 }
 
-// PackageStore persists installed packages.
+// PackageStore persists installed packages. The packages of an instance are
+// shared by its organizations: the table has no organization column, and a grant
+// (GrantStore) is what makes a package usable by an organization.
 type PackageStore interface {
 	// InsertPackage stores a package. A second row for the same connector id and
 	// version, or the same digest, fails with [ErrConflict].
+	//
+	//orcon:scope instance connector_package is an instance table (ADR-0029 section 3)
 	InsertPackage(ctx context.Context, p PackageRecord) error
 	// GetPackage returns one version of a connector, or [ErrNotFound].
+	//
+	//orcon:scope instance connector_package is an instance table (ADR-0029 section 3)
 	GetPackage(ctx context.Context, connectorID, version string) (PackageRecord, error)
 	// GetPackageByID returns a package by row identity, or [ErrNotFound].
+	//
+	//orcon:scope instance connector_package is an instance table (ADR-0029 section 3)
 	GetPackageByID(ctx context.Context, id PackageID) (PackageRecord, error)
 	// ListPackages returns at most limit packages with an identity greater than
 	// after, ordered by identity (keyset pagination).
+	//
+	//orcon:scope instance connector_package is an instance table (ADR-0029 section 3)
 	ListPackages(ctx context.Context, after PackageID, limit int) ([]PackageRecord, error)
 	// ListPackageVersions returns at most limit versions of a connector whose
 	// version text sorts after afterVersion, in that order. The order is the
 	// text order of the store, not SemVer precedence; callers compare versions
 	// with [CompareVersions].
+	//
+	//orcon:scope instance connector_package is an instance table (ADR-0029 section 3)
 	ListPackageVersions(ctx context.Context, connectorID, afterVersion string, limit int) ([]PackageRecord, error)
 }
 
@@ -99,10 +112,11 @@ type GrantRecord struct {
 type GrantStore interface {
 	// InsertGrant stores a grant. A second grant of the same package for the
 	// same scope fails with [ErrConflict]; an unknown package or project with
-	// [ErrReference].
-	InsertGrant(ctx context.Context, g GrantRecord) error
+	// [ErrReference]. A grant that names another organization than the scope
+	// fails with identity.ErrScopeMismatch.
+	InsertGrant(ctx context.Context, org orgscope.Org, g GrantRecord) error
 	// FindGrant returns the grant that lets the project use the package: the
 	// project's own grant or the organization-wide one. It fails with
 	// [ErrNotFound] when neither exists.
-	FindGrant(ctx context.Context, org identity.OrgID, pkg PackageID, project identity.ProjectID) (GrantRecord, error)
+	FindGrant(ctx context.Context, org orgscope.Org, pkg PackageID, project identity.ProjectID) (GrantRecord, error)
 }

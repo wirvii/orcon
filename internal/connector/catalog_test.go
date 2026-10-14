@@ -57,7 +57,7 @@ func (w *world) install(version string) connector.PackageRecord {
 
 func (w *world) grant(org identity.OrgID, project identity.ProjectID, rec connector.PackageRecord) {
 	w.t.Helper()
-	if _, err := w.registry.Grant(w.t.Context(), org, project, rec, w.admin); err != nil {
+	if _, err := w.registry.Grant(w.t.Context(), scopeFor(org), project, rec, w.admin); err != nil {
 		w.t.Fatalf("Grant() failed: %v", err)
 	}
 }
@@ -138,7 +138,7 @@ func TestGrantRecordsThePermissionsDigest(t *testing.T) {
 	w := newWorld(t)
 	rec := w.install("1.2.0")
 	w.grant(w.orgA, identity.ProjectID{}, rec)
-	g, err := w.store.FindGrant(t.Context(), w.orgA, rec.ID, w.project)
+	g, err := w.store.FindGrant(t.Context(), scopeFor(w.orgA), rec.ID, w.project)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestGrantRecordsThePermissionsDigest(t *testing.T) {
 	if g.PermissionsDigest != want || g.GrantedByPrincipalID != w.admin {
 		t.Errorf("grant = %+v, want permissions digest %s", g, want)
 	}
-	if _, err := w.registry.Grant(t.Context(), w.orgA, identity.ProjectID{}, rec, w.admin); !errors.Is(err, connector.ErrConflict) {
+	if _, err := w.registry.Grant(t.Context(), scopeFor(w.orgA), identity.ProjectID{}, rec, w.admin); !errors.Is(err, connector.ErrConflict) {
 		t.Errorf("a second organization-wide grant = %v, want ErrConflict", err)
 	}
 }
@@ -158,7 +158,7 @@ func TestLookupDescribesTheNewestVersion(t *testing.T) {
 	w.install("1.2.0")
 	w.install("1.10.0")
 	w.install("1.9.0")
-	cat := w.registry.Catalog(w.orgA, w.project, nil)
+	cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 
 	nt, ok := cat.Lookup(t.Context(), "acme.shop.order@1")
 	if !ok || nt.Purity != flow.PurityEffect || nt.Contract == nil || nt.Contract.Level != flow.SafetyUnsafe {
@@ -191,7 +191,7 @@ func TestResolveNodeUsesThePinnedVersion(t *testing.T) {
 	}
 	w.grant(w.orgA, identity.ProjectID{}, old)
 	w.grant(w.orgA, identity.ProjectID{}, newer)
-	cat := w.registry.Catalog(w.orgA, w.project, nil)
+	cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 
 	res := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: old.Digest}, "order.create"))
 	if !res.Known || len(res.Problems) != 0 || res.Type.Contract.Level != flow.SafetyIdempotencyKey {
@@ -216,7 +216,7 @@ func TestResolveNodeNamesEveryPinProblem(t *testing.T) {
 	w := newWorld(t)
 	rec := w.install("1.2.0")
 	w.policy.block("acme.shop", "1.2.0", "revoked by the test")
-	cat := w.registry.Catalog(w.orgA, w.project, nil)
+	cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 	wrongDigest := "sha256:" + strings.Repeat("0", 64)
 
 	res := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", &flow.ConnectorPin{Version: "1.2.0", Digest: wrongDigest}, ""))
@@ -246,7 +246,7 @@ func TestGrantsAreScopedToTheOrganizationAndProject(t *testing.T) {
 	w.grant(w.orgA, otherProject, rec)
 
 	problems := func(org identity.OrgID, project identity.ProjectID) int {
-		return len(w.registry.Catalog(org, project, nil).ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", pin, "")).Problems)
+		return len(w.registry.Catalog(scopeFor(org), project, nil).ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", pin, "")).Problems)
 	}
 	if problems(w.orgA, w.project) == 0 {
 		t.Error("another organization's grant, and another project's, let this project use the package")

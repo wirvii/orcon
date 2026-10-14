@@ -14,106 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, slug, status, deletion_scheduled_at, created_at, updated_at
-FROM org
-WHERE id = $1
-`
-
-// orcon:scope instance
-func (q *Queries) GetOrganization(ctx context.Context, id pgtype.UUID) (Org, error) {
-	row := q.db.QueryRow(ctx, getOrganization, id)
-	var i Org
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Slug,
-		&i.Status,
-		&i.DeletionScheduledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getSystemPrincipal = `-- name: GetSystemPrincipal :one
-SELECT id, kind, created_at, updated_at
-FROM principal
-WHERE kind = 'SYSTEM'
-`
-
-// orcon:scope instance
-func (q *Queries) GetSystemPrincipal(ctx context.Context) (Principal, error) {
-	row := q.db.QueryRow(ctx, getSystemPrincipal)
-	var i Principal
-	err := row.Scan(
-		&i.ID,
-		&i.Kind,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const insertOrganization = `-- name: InsertOrganization :exec
-
-
-INSERT INTO org (id, name, slug, status, deletion_scheduled_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-`
-
-type InsertOrganizationParams struct {
-	ID                  pgtype.UUID
-	Name                string
-	Slug                string
-	Status              string
-	DeletionScheduledAt pgtype.Timestamptz
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
-}
-
-// SPDX-FileCopyrightText: The Orcon Authors
-// SPDX-License-Identifier: Apache-2.0
-// Queries of the instance tables (org, principal, worker, schema_migration).
-// The PostgreSQL file of the same name holds the same query names.
-// orcon:scope instance
-func (q *Queries) InsertOrganization(ctx context.Context, arg InsertOrganizationParams) error {
-	_, err := q.db.Exec(ctx, insertOrganization,
-		arg.ID,
-		arg.Name,
-		arg.Slug,
-		arg.Status,
-		arg.DeletionScheduledAt,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	return err
-}
-
-const insertPrincipal = `-- name: InsertPrincipal :exec
-INSERT INTO principal (id, kind, created_at, updated_at)
-VALUES ($1, $2, $3, $4)
-`
-
-type InsertPrincipalParams struct {
-	ID        pgtype.UUID
-	Kind      string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
-}
-
-// orcon:scope instance
-func (q *Queries) InsertPrincipal(ctx context.Context, arg InsertPrincipalParams) error {
-	_, err := q.db.Exec(ctx, insertPrincipal,
-		arg.ID,
-		arg.Kind,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	return err
-}
-
 const upsertWorker = `-- name: UpsertWorker :exec
+
+
 INSERT INTO worker (id, role, host, version, started_at, heartbeat_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (id) DO UPDATE
@@ -133,6 +36,10 @@ type UpsertWorkerParams struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+// Queries of the worker registry. The organization and principal queries are in identity.sql.
+// The SQLite file of the same name holds the same query names.
 // orcon:scope instance
 func (q *Queries) UpsertWorker(ctx context.Context, arg UpsertWorkerParams) error {
 	_, err := q.db.Exec(ctx, upsertWorker,

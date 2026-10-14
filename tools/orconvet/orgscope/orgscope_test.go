@@ -33,6 +33,7 @@ func TestOrgScope(t *testing.T) {
 		"fixture/internal/adapter/sqlite/reviewed",
 		"fixture/internal/adapter/sqlite/rogue",
 		"fixture/internal/adapter/postgres/store",
+		"fixture/internal/adapter/sqlite/ports",
 		"fixture/internal/adapter/storetest",
 		"fixture/internal/adapter/connectors/postgres",
 	)

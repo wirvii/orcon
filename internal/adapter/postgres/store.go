@@ -22,9 +22,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
-	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // ApplicationRole is the runtime role every pooled connection switches to
@@ -205,6 +206,27 @@ func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly
 	return nil
 }
 
+// inScope is [Store.inOrg] for a caller-supplied scope. The zero scope scopes to
+// nothing and is refused before a transaction starts (orcon-db TI-2).
+func (s *Store) inScope(ctx context.Context, op string, org orgscope.Org, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	if org.IsZero() {
+		return fmt.Errorf("%s: %w", op, identity.ErrNoScope)
+	}
+	return s.inOrg(ctx, op, org, readOnly, fn)
+}
+
+// inScopeRecord is [Store.inScope] for a write of a record that names its
+// organization: the record must belong to the organization of the scope.
+func (s *Store) inScopeRecord(ctx context.Context, op string, org orgscope.Org, recordOrg identity.OrgID, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	if org.IsZero() {
+		return fmt.Errorf("%s: %w", op, identity.ErrNoScope)
+	}
+	if !recordOrg.Matches(org) {
+		return fmt.Errorf("%s: %w", op, identity.ErrScopeMismatch)
+	}
+	return s.inOrg(ctx, op, org, false, fn)
+}
+
 // instance runs fn for statements on instance tables, which row-level security
 // does not scope.
 func (s *Store) instance(ctx context.Context, op string, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
@@ -216,14 +238,33 @@ func (s *Store) instance(ctx context.Context, op string, fn func(ctx context.Con
 	return mapError(op, fn(ctx, sqlcgen.New(s.pool)))
 }
 
-var (
-	_ flow.InstanceStore    = (*Store)(nil)
-	_ flow.ProjectStore     = (*Store)(nil)
-	_ flow.Store            = (*Store)(nil)
-	_ flow.VersionStore     = (*Store)(nil)
-	_ flow.SnapshotStore    = (*Store)(nil)
-	_ execution.WorkerStore = (*Store)(nil)
-)
+// instanceTx runs fn in one transaction for statements on instance tables,
+// which row-level security does not scope but which must commit together.
+func (s *Store) instanceTx(ctx context.Context, op string, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
+		return fmt.Errorf("%s: %w", op, ErrClosed)
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadWrite})
+	if err != nil {
+		return mapError(op, err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(context.WithoutCancel(ctx))
+		}
+	}()
+	if err := fn(ctx, sqlcgen.New(tx)); err != nil {
+		return mapError(op, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return mapError(op, err)
+	}
+	committed = true
+	return nil
+}
 
 // ErrSession means a pooled connection is not in the state every transaction
 // must start from; the transaction is not run.
