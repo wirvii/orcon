@@ -4,7 +4,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { goInApp, mockDraftApi } from './draft-api';
+import { goInApp, isFlowDataRequest, mockDraftApi } from './draft-api';
 
 // The node details view in a real browser, against the production build: the dialog and the docked
 // panel are laid out by the browser, and the lists of the Select fields open in a layer above the
@@ -240,8 +240,8 @@ test.describe('on a computer', () => {
     await form.getByLabel(/Header value/).fill('x');
     await form.getByRole('button', { name: 'Create credential' }).click();
     await expect(form).toHaveCount(0);
-    // The only data the editor asks for is its draft; a credential is created in the page, without a request.
-    expect(requests.filter((url) => !url.endsWith('/draft'))).toEqual([]);
+    // The only data the editor asks for is its flow and draft; a credential is created in the page, without a request.
+    expect(requests.filter((url) => !isFlowDataRequest(url))).toEqual([]);
   });
 
   test('says test runs come later when a pane or the header offers the run', async ({ page }) => {

@@ -7,6 +7,7 @@ import { EXAMPLE_FLOW_ID, exampleFlowDocument, PERF_FLOW_ID, SAMPLE_SUBFLOWS, su
 
 import type { CredentialSource } from './credential-source';
 import type { DraftSource } from './draft-source';
+import { getFlow } from './flow-operations';
 import type { FlowTargetSource } from './flow-target-source';
 import { createLocalCredentialSource } from './local-credential-source';
 import { createLocalDraftSource, type DraftSeed } from './local-draft-source';
@@ -24,6 +25,7 @@ export const editorKeys = {
   draft: (organizationId: string, flowId: string) => [organizationId, 'editor', 'draft', flowId] as const,
   credentials: (organizationId: string) => [organizationId, 'editor', 'credentials'] as const,
   flowTargets: (organizationId: string) => [organizationId, 'editor', 'flow-targets'] as const,
+  flow: (organizationId: string, flowId: string) => [organizationId, 'editor', 'flow', flowId] as const,
 };
 
 const seeds = new Map<string, DraftSeed>([
@@ -81,5 +83,17 @@ export function draftQueryOptions(flowId: string) {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+  });
+}
+
+/**
+ * The state of a flow (activation, the published version, unpublished changes) with the entity tag the
+ * activation is based on. It is read when the publish controls show and after every change to the flow.
+ */
+export function flowQueryOptions(flowId: string) {
+  return queryOptions({
+    queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId),
+    queryFn: () => getFlow(flowId),
+    staleTime: 0,
   });
 }
