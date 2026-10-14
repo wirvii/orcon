@@ -356,9 +356,9 @@ func abandonmentCase(t *testing.T, newStore Factory) { //nolint:gocognit // a co
 		return tx.InsertAttempt(ctx, attempt(2, "STARTED"))
 	}), "seed the attempts")
 
-	// The worker gives up its leases (BL-051): each token counts one abandonment, the started attempt is abandoned,
-	// and the execution records it.
-	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w, 3, realNow())
+	// The leases a previous incarnation of the worker left (BL-051): nobody returned them, so each token counts
+	// one abandonment, the started attempt is abandoned, and the execution records it.
+	released, err := e.s.ReleaseLostLeases(e.ctx(), w, 3, realNow())
 	if err != nil || len(released) != 2 {
 		t.Fatalf("released = %+v, %v; want both tokens", released, err)
 	}
@@ -397,7 +397,7 @@ func abandonmentCase(t *testing.T, newStore Factory) { //nolint:gocognit // a co
 	if c, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: w, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: time.Hour, Now: realNow()}); err != nil || len(c) != 1 {
 		t.Fatalf("claim of the token = %d tokens, %v", len(c), err)
 	}
-	released, err = e.s.ReleaseWorkerLeases(e.ctx(), w, 2, realNow())
+	released, err = e.s.ReleaseLostLeases(e.ctx(), w, 2, realNow())
 	if err != nil || len(released) != 1 || released[0].TokenID != tok.ID || !released[0].Poisoned || released[0].AbandonedCount != 2 {
 		t.Fatalf("second release = %+v, %v; want the token poisoned at its second abandonment", released, err)
 	}

@@ -433,6 +433,10 @@ type TokenUpdate struct {
 	// QueueOrder microseconds.
 	AvailableAt time.Time
 	QueueOrder  int64
+	// ResetAbandoned sets the abandon count of the token back to zero in the same
+	// fenced statement: the step stored at least one new result of the token, so
+	// whatever abandoned it before is behind it (SPEC-001 Enmienda 12 section 12-1).
+	ResetAbandoned bool
 }
 
 // NodeOutput is the batch a node execution emitted on a port.
@@ -633,7 +637,19 @@ type ClaimRequest struct {
 	// PostgreSQL and by Now on SQLite (one process).
 	LeaseTTL time.Duration
 	Now      time.Time
+	// PoisonThreshold is the number of abandonments that suspends a token. A normal
+	// claim skips the tokens one abandonment short of it ([WorkQueue.ClaimLastChanceToken]
+	// takes those); [DefaultPoisonThreshold] when zero.
+	PoisonThreshold int64
 }
+
+// DefaultPoisonThreshold is the number of abandonments after which a token is
+// suspended as poison (ADR-0013 section 9).
+const DefaultPoisonThreshold = 3
+
+// MinPoisonThreshold is the smallest threshold allowed: with 1 every token would
+// have to run alone (SPEC-001 Enmienda 12 section 12-1).
+const MinPoisonThreshold = 2
 
 // Claimed is a leased token with the epoch the worker must present.
 type Claimed struct {
@@ -715,6 +731,17 @@ type WorkQueue interface {
 	// RenewLeases extends every lease of the worker that has not expired. A
 	// lease the worker held and that is not returned was lost.
 	RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]Renewed, error)
+	// FireDueTimers marks up to limit due timers FIRED and, in the same
+	// transaction, wakes the WAITING token of each (RUNNABLE, counters and status
+	// of the execution refreshed, event timer.fired); concurrent callers never
+	// fire the same timer.
+	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
+}
+
+// LeaseRecovery gives leases back: the reaper's expired ones, the ones an owner
+// returns or loses, and the one of a token whose step failed. Whether the abandon
+// count grows depends on who gave the lease up (SPEC-001 Enmienda 12 section 12-1).
+type LeaseRecovery interface {
 	// ReleaseExpiredLeases returns up to limit expired leases to RUNNABLE, or to
 	// SUSPENDED with reason POISON once a token was abandoned poisonThreshold
 	// times, marks the started attempts of their node executions ABANDONED, and in
@@ -722,23 +749,38 @@ type WorkQueue interface {
 	// opens the attention request of a poisoned token (cause POISON_TOKEN) and
 	// refreshes the counters and status of the execution.
 	ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]Reaped, error)
-	// ReleaseWorkerLeases gives up every lease of the worker that is still held
-	// (graceful shutdown, ADR-0013 section 9). It counts as an abandonment like
-	// an expired lease does: the token goes back to RUNNABLE, or to SUSPENDED with
-	// reason POISON at the threshold, and the started attempts of its node
-	// executions become ABANDONED.
+	// ReleaseWorkerLeases returns every lease of the worker that is still held to
+	// RUNNABLE (graceful shutdown, ADR-0013 section 9): the owner gives the tokens
+	// back, so the abandon count does not grow, no lease.expired event is appended
+	// and the started attempts of their node executions become ABANDONED.
 	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ReleaseLostLeases gives up the leases a previous incarnation of the worker
+	// left behind. Nobody returned them, so each counts as an abandonment, like an
+	// expired lease: the token goes back to RUNNABLE, or to SUSPENDED with reason
+	// POISON at the threshold.
+	ReleaseLostLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ClaimLastChanceToken leases the one runnable token that is one abandonment
+	// short of the poison threshold, if there is one (same order as ClaimTokens).
+	// The caller must hold no other token and claim nothing else while it holds this
+	// one: the abandonment that reaches the threshold then happens with the token
+	// alone in its process (SPEC-001 Enmienda 12 section 12-1).
+	ClaimLastChanceToken(ctx context.Context, r ClaimRequest) ([]Claimed, error)
+	// LastChanceWaiting reports since when a runnable token one abandonment short
+	// of the threshold has been claimable, for the worker to decide that it must
+	// empty itself to take it.
+	LastChanceWaiting(ctx context.Context, poisonThreshold int64) (since time.Time, found bool, err error)
 	// ReleaseTokenLease gives up the lease of one token the worker could not go on
 	// with (the engine failed on a step of it). It counts as an abandonment, like an
 	// expired lease, but at once: renewing by worker would keep the lease alive for
 	// as long as the worker holds any other. It reports false when the fence no
 	// longer holds (the lease was lost or already released).
 	ReleaseTokenLease(ctx context.Context, f Fence, poisonThreshold int64, now time.Time) (Reaped, bool, error)
-	// FireDueTimers marks up to limit due timers FIRED and, in the same
-	// transaction, wakes the WAITING token of each (RUNNABLE, counters and status
-	// of the execution refreshed, event timer.fired); concurrent callers never
-	// fire the same timer.
-	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
+}
+
+// Work is everything the workers of the engine do across organizations.
+type Work interface {
+	WorkQueue
+	LeaseRecovery
 }
 
 // Deliveries leases outbox rows to dispatchers (ADR-0013 section 8).

@@ -47,7 +47,7 @@ func TestEveryEventGoesThroughTheOutboxRule(t *testing.T) {
 		execID := env.Start(eng, pub, input())
 		// The token is claimed and its lease expires, three times: the third abandonment poisons it.
 		for round := 1; round <= 3; round++ {
-			if claimed, _, err := eng.Claim(ctx, 1); err != nil || len(claimed) != 1 {
+			if claimed, _, err := claimRound(ctx, eng, round, 3); err != nil || len(claimed) != 1 {
 				t.Fatalf("round %d: claim = %d, %v", round, len(claimed), err)
 			}
 			time.Sleep(150 * time.Millisecond)

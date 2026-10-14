@@ -318,11 +318,13 @@ func TestUpgradeFromSeededPreviousVersion(t *testing.T) {
 func engineCalls() []dbrules.EngineCall {
 	const worker = "'00000000-0000-0000-0000-000000000001'::uuid"
 	return []dbrules.EngineCall{
-		{Name: "claim_tokens", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", NULL, 10, 1000, now())"},
-		{Name: "claim_tokens with fairness keys", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", ARRAY['k'], 10, 1000, now())"},
+		{Name: "claim_tokens", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", NULL, 10, 1000, now(), 3)"},
+		{Name: "claim_tokens with fairness keys", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", ARRAY['k'], 10, 1000, now(), 3)"},
 		{Name: "renew_leases", SQL: "SELECT org_id FROM orcon_engine.renew_leases(" + worker + ", 1000, now())"},
+		{Name: "claim_last_chance_token", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_last_chance_token(" + worker + ", 1000, now(), 3)"},
+		{Name: "oldest_last_chance", SQL: "SELECT orcon_engine.oldest_last_chance(3)"},
 		{Name: "release_expired_leases", SQL: "SELECT org_id FROM orcon_engine.release_expired_leases(10, 3, now())"},
-		{Name: "release_worker_leases", SQL: "SELECT org_id FROM orcon_engine.release_worker_leases(" + worker + ", 3, now())"},
+		{Name: "release_worker_leases", SQL: "SELECT org_id FROM orcon_engine.release_worker_leases(" + worker + ", 3, now(), FALSE)"},
 		{Name: "release_token_lease", SQL: "SELECT org_id FROM orcon_engine.release_token_lease(" + worker + ", 1, " + worker + ", 3, now())"},
 		{Name: "appended_events", List: true, SQL: "SELECT org_id FROM orcon_engine.appended_events()"},
 		{Name: "enqueue_outbox", SQL: "SELECT orcon_engine.enqueue_outbox(" + worker + ", " + worker + ", 't', 'x'::bytea, now())"},

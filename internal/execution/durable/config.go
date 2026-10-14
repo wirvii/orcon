@@ -23,7 +23,7 @@ type Store interface {
 	store.Reader
 	store.EngineReader
 	store.Transactor
-	store.WorkQueue
+	store.Work
 	store.Deliveries
 	execution.WorkerStore
 }
@@ -57,6 +57,10 @@ type Delivery struct {
 	// section 8).
 	Attempt int64
 }
+
+// DefaultConcurrency is the number of tokens a process works at the same time
+// when the configuration does not say.
+const DefaultConcurrency = 4
 
 // Deliverer sends an outbox row out of the database.
 type Deliverer interface {
@@ -122,8 +126,12 @@ type Config struct {
 	// Concurrency is the number of tokens the process works at the same time (4).
 	Concurrency int
 	// PoisonThreshold is the number of abandonments after which a token is
-	// suspended (3).
+	// suspended (3, at least 2: with 1 every token would have to run alone).
 	PoisonThreshold int64
+	// IsolationWait is how long a token one abandonment short of the threshold may
+	// wait for a worker with nothing else to do before the busy workers stop
+	// claiming and empty themselves for it (10 s).
+	IsolationWait time.Duration
 	// CheckpointActivations bounds the node activations between two commits
 	// (64), and CheckpointInterval the time (2 s) (ADR-0013 section 6).
 	CheckpointActivations int
@@ -170,10 +178,13 @@ func (c *Config) defaults() {
 		c.ShutdownGrace = 30 * time.Second
 	}
 	if c.Concurrency <= 0 {
-		c.Concurrency = 4
+		c.Concurrency = DefaultConcurrency
 	}
-	if c.PoisonThreshold <= 0 {
-		c.PoisonThreshold = 3
+	if c.PoisonThreshold == 0 {
+		c.PoisonThreshold = store.DefaultPoisonThreshold
+	}
+	if c.IsolationWait <= 0 {
+		c.IsolationWait = 10 * time.Second
 	}
 	if c.CheckpointActivations <= 0 {
 		c.CheckpointActivations = 64

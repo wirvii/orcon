@@ -6,10 +6,12 @@ package storetest_test
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"go.uber.org/goleak"
 
+	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/internal/execution/executiontest"
 )
@@ -62,6 +64,31 @@ func TestConformance(t *testing.T) {
 	}
 }
 
+// TestAbandonCount runs the contract of the abandon count on the selected
+// stores (E-REC-5): the parts that need a worker are in test/engine/durable.
+func TestAbandonCount(t *testing.T) {
+	switch storeFlag() {
+	case "auto", "sqlite", "postgres", "both":
+	default:
+		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", storeFlag())
+	}
+	if wantSQLite() {
+		t.Run("sqlite", func(t *testing.T) {
+			storetest.AbandonCount(t, sqliteFactory())
+			t.Run("StartupReleaseAddsOne", func(t *testing.T) { sqliteStartupCounts(t) })
+			t.Run("ThresholdBelowTwoIsRejected", func(t *testing.T) {
+				_, err := sqlite.Open(t.Context(), sqlite.Options{Path: filepath.Join(t.TempDir(), "orcon.db"), BinaryVersion: binaryVersion(), PoisonThreshold: 1})
+				if err == nil {
+					t.Fatal("a poison threshold of 1 was accepted")
+				}
+			})
+		})
+	}
+	if wantPostgres() {
+		t.Run("postgres", func(t *testing.T) { storetest.AbandonCount(t, postgresFactory()) })
+	}
+}
+
 // TestFloorSmoke is what a binary of an older release runs against a database
 // migrated by the current binary (make test-compat-floor, E-STO-5). It needs the
 // database the script prepared and fails, never skips, without it.
@@ -76,4 +103,31 @@ func TestFloorSmoke(t *testing.T) {
 	if dsn != "" {
 		t.Run("postgres", func(t *testing.T) { storetest.Smoke(t, attachPostgres(dsn)) })
 	}
+}
+
+// sqliteStartupCounts closes a database with a token leased and opens it again:
+// the open releases the lease and counts one abandonment, because the process
+// that held it did not return it (SQLite has one process, so nothing else can).
+func sqliteStartupCounts(t *testing.T) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "orcon.db")
+	open := func() *sqlite.Store {
+		s, err := sqlite.Open(t.Context(), sqlite.Options{Path: path, BinaryVersion: binaryVersion()})
+		if err != nil {
+			t.Fatalf("open sqlite store: %v", err)
+		}
+		return s
+	}
+	first := open()
+	left := storetest.SeedLeftLeased(t, first)
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second := open()
+	t.Cleanup(func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("close sqlite store: %v", err)
+		}
+	})
+	storetest.CheckStartupRelease(t, second, left)
 }

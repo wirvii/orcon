@@ -289,6 +289,7 @@ LIMIT sqlc.arg(page_size);
 UPDATE token
 SET node_id = sqlc.arg(node_id), edge_id = sqlc.arg(edge_id), scope_path = sqlc.arg(scope_path),
     fork_lineage_document = sqlc.arg(fork_lineage_document), payload_reference = sqlc.arg(payload_reference),
+    abandoned_count = CASE WHEN sqlc.arg(reset_abandoned) = 1 THEN 0 ELSE abandoned_count END,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_epoch = sqlc.arg(lease_epoch)
   AND lease_owner = sqlc.arg(lease_owner) AND status = 'LEASED';
@@ -301,6 +302,7 @@ UPDATE token
 SET status = sqlc.arg(status), node_id = sqlc.arg(node_id), edge_id = sqlc.arg(edge_id), scope_path = sqlc.arg(scope_path),
     fork_lineage_document = sqlc.arg(fork_lineage_document), payload_reference = sqlc.arg(payload_reference),
     available_at = COALESCE(sqlc.narg(available_at), available_at), lease_owner = NULL, lease_expires_at = NULL,
+    abandoned_count = CASE WHEN sqlc.arg(reset_abandoned) = 1 THEN 0 ELSE abandoned_count END,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND lease_epoch = sqlc.arg(lease_epoch)
   AND lease_owner = sqlc.arg(lease_owner) AND status = 'LEASED';

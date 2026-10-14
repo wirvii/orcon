@@ -143,27 +143,65 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 	}
 	err := s.engineRowsRouted(ctx, "claim tokens",
 		`SELECT org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key, lease_epoch, lease_expires_at
-		 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5)`,
-		[]any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now)},
+		 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5, $6)`,
+		[]any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r)},
 		r.Now,
-		func(rows pgx.Rows) error {
-			var org, tok, exec pgtype.UUID
-			var nodeID, scope, fairness string
-			var edge, payload pgtype.Text
-			var lineage []byte
-			var epoch int64
-			var expires pgtype.Timestamptz
-			if err := rows.Scan(&org, &tok, &exec, &nodeID, &edge, &scope, &lineage, &payload, &fairness, &epoch, &expires); err != nil {
-				return err
-			}
-			out = append(out, store.Claimed{
-				OrgID: fromPGUUID[identity.OrgID](org), TokenID: fromPGUUID[store.TokenID](tok), ExecutionID: fromPGUUID[store.ExecutionID](exec),
-				NodeID: nodeID, EdgeID: edge.String, ScopePath: scope, ForkLineage: lineage, PayloadReference: payload.String,
-				FairnessKey: fairness, LeaseEpoch: epoch, LeaseExpiresAt: instant(expires),
-			})
-			return nil
-		})
+		scanClaimed(&out))
 	return out, err
+}
+
+// ClaimLastChanceToken implements [store.WorkQueue].
+func (s *Store) ClaimLastChanceToken(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
+	var out []store.Claimed
+	err := s.engineRowsRouted(ctx, "claim last chance token",
+		`SELECT org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key, lease_epoch, lease_expires_at
+		 FROM orcon_engine.claim_last_chance_token($1, $2, $3, $4)`,
+		[]any{pgUUID(r.Worker), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r)},
+		r.Now,
+		scanClaimed(&out))
+	return out, err
+}
+
+// LastChanceWaiting implements [store.WorkQueue].
+func (s *Store) LastChanceWaiting(ctx context.Context, poisonThreshold int64) (time.Time, bool, error) {
+	var since pgtype.Timestamptz
+	err := s.engineRows(ctx, "read the oldest last chance token",
+		`SELECT orcon_engine.oldest_last_chance($1)`,
+		[]any{poisonThreshold},
+		func(rows pgx.Rows) error { return rows.Scan(&since) })
+	if err != nil || !since.Valid {
+		return time.Time{}, false, err
+	}
+	return instant(since), true, nil
+}
+
+// thresholdOf returns the poison threshold of a claim.
+func thresholdOf(r store.ClaimRequest) int64 {
+	if r.PoisonThreshold <= 0 {
+		return store.DefaultPoisonThreshold
+	}
+	return r.PoisonThreshold
+}
+
+// scanClaimed appends the rows of a claim statement to out.
+func scanClaimed(out *[]store.Claimed) func(pgx.Rows) error {
+	return func(rows pgx.Rows) error {
+		var org, tok, exec pgtype.UUID
+		var nodeID, scope, fairness string
+		var edge, payload pgtype.Text
+		var lineage []byte
+		var epoch int64
+		var expires pgtype.Timestamptz
+		if err := rows.Scan(&org, &tok, &exec, &nodeID, &edge, &scope, &lineage, &payload, &fairness, &epoch, &expires); err != nil {
+			return err
+		}
+		*out = append(*out, store.Claimed{
+			OrgID: fromPGUUID[identity.OrgID](org), TokenID: fromPGUUID[store.TokenID](tok), ExecutionID: fromPGUUID[store.ExecutionID](exec),
+			NodeID: nodeID, EdgeID: edge.String, ScopePath: scope, ForkLineage: lineage, PayloadReference: payload.String,
+			FairnessKey: fairness, LeaseEpoch: epoch, LeaseExpiresAt: instant(expires),
+		})
+		return nil
+	}
 }
 
 // RenewLeases implements [store.WorkQueue].
@@ -205,12 +243,21 @@ func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThres
 	return out, err
 }
 
-// ReleaseWorkerLeases implements [store.WorkQueue].
+// ReleaseWorkerLeases implements [store.WorkQueue]: the owner gives its tokens back.
 func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]store.Reaped, error) {
+	return s.releaseWorker(ctx, worker, poisonThreshold, now, false)
+}
+
+// ReleaseLostLeases implements [store.WorkQueue]: nobody returned them, so each counts.
+func (s *Store) ReleaseLostLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]store.Reaped, error) {
+	return s.releaseWorker(ctx, worker, poisonThreshold, now, true)
+}
+
+func (s *Store) releaseWorker(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time, counted bool) ([]store.Reaped, error) {
 	var out []store.Reaped
 	err := s.engineRowsRouted(ctx, "release worker leases",
-		`SELECT org_id, id, execution_id, abandoned_count, is_poisoned FROM orcon_engine.release_worker_leases($1, $2, $3)`,
-		[]any{pgUUID(worker), poisonThreshold, timestamp(now)},
+		`SELECT org_id, id, execution_id, abandoned_count, is_poisoned FROM orcon_engine.release_worker_leases($1, $2, $3, $4)`,
+		[]any{pgUUID(worker), poisonThreshold, timestamp(now), counted},
 		now,
 		func(rows pgx.Rows) error {
 			var org, tok, exec pgtype.UUID

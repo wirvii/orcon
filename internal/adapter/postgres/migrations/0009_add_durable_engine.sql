@@ -53,6 +53,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON token_input TO orcon_engine;
 
 -- Supports ListLiveTokens (the tokens of one execution that are not terminal, which a worker reads to open the
 -- execution) and orcon_engine.refresh_execution (their counts per state).
+-- Supports orcon_engine.claim_last_chance_token and the oldest-last-chance read: tokens that were abandoned at
+-- least once are few, and the claim must not walk the whole queue to find them.
+CREATE INDEX ix_token_available_at_id ON token (available_at, id)
+  WHERE status = 'RUNNABLE' AND abandoned_count > 0;
+
 CREATE INDEX ix_token_org_id_execution_id_id ON token (org_id, execution_id, id)
   WHERE status IN ('RUNNABLE', 'LEASED', 'WAITING', 'DEFERRED', 'SUSPENDED');
 
@@ -203,7 +208,7 @@ $$;
 -- was abandoned p_poison_threshold times (ADR-0013 section 9). The started attempts of its node executions become
 -- ABANDONED, and the events, the attention request and the counters follow in the same transaction. The callers
 -- (expired leases, a worker that shuts down) choose the tokens.
-CREATE FUNCTION orcon_engine.abandon_tokens(p_ids uuid[], p_poison_threshold bigint, p_now timestamptz)
+CREATE FUNCTION orcon_engine.abandon_tokens(p_ids uuid[], p_poison_threshold bigint, p_now timestamptz, p_counts boolean)
 RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, is_poisoned boolean)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
 $$
@@ -214,12 +219,12 @@ BEGIN
   PERFORM orcon_engine.lock_executions_of_tokens(p_ids);
   FOR r IN
     UPDATE token AS t
-    SET status = CASE WHEN t.abandoned_count + 1 >= p_poison_threshold THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
-        suspend_reason = CASE WHEN t.abandoned_count + 1 >= p_poison_threshold THEN 'POISON' ELSE NULL END,
-        abandoned_count = t.abandoned_count + 1,
+    SET status = CASE WHEN p_counts AND t.abandoned_count + 1 >= p_poison_threshold THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+        suspend_reason = CASE WHEN p_counts AND t.abandoned_count + 1 >= p_poison_threshold THEN 'POISON' ELSE NULL END,
+        abandoned_count = t.abandoned_count + CASE WHEN p_counts THEN 1 ELSE 0 END,
         lease_owner = NULL,
         lease_expires_at = NULL,
-        available_at = CASE WHEN t.abandoned_count + 1 >= p_poison_threshold THEN t.available_at ELSE p_now END,
+        available_at = CASE WHEN p_counts AND t.abandoned_count + 1 >= p_poison_threshold THEN t.available_at ELSE p_now END,
         updated_at = p_now
     WHERE t.id = ANY (p_ids) AND t.status = 'LEASED'
     RETURNING t.org_id AS r_org, t.id AS r_token, t.execution_id AS r_execution, t.abandoned_count AS r_abandoned,
@@ -230,10 +235,13 @@ BEGIN
     FROM node_execution n
     WHERE n.org_id = r.r_org AND n.token_id = r.r_token
       AND a.org_id = n.org_id AND a.node_execution_id = n.id AND a.status = 'STARTED';
-    PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
-      orcon_engine.derive_uuid('event', 'lease.expired', r.r_token::text, r.r_epoch::text),
-      'lease.expired', '{"tokenId":"' || r.r_token::text || '","nodeId":' || to_json(r.r_node)::text || '}',
-      '{"abandonedCount":' || r.r_abandoned::text || '}', p_now);
+    -- A lease the owner gives back (p_counts false) is not an expiry: no event, no abandon count.
+    IF p_counts THEN
+      PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
+        orcon_engine.derive_uuid('event', 'lease.expired', r.r_token::text, r.r_epoch::text),
+        'lease.expired', '{"tokenId":"' || r.r_token::text || '","nodeId":' || to_json(r.r_node)::text || '}',
+        '{"abandonedCount":' || r.r_abandoned::text || '}', p_now);
+    END IF;
     IF r.r_poisoned THEN
       PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
         orcon_engine.derive_uuid('event', 'token.poisoned', r.r_token::text, r.r_epoch::text),
@@ -286,14 +294,14 @@ BEGIN
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE) a;
 END
 $$;
 
--- Gives up every lease of a worker at once (graceful shutdown, ADR-0013 section 9). It counts as an abandonment
--- like an expired lease does, so a token that keeps ending its worker reaches the poison threshold.
+-- Gives up every lease of a worker at once. The owner returning its tokens at shutdown (ADR-0013 section 9) does not
+-- count as an abandonment (p_counts false); the leases a previous incarnation of the worker left behind do.
 DROP FUNCTION orcon_engine.release_worker_leases(uuid, timestamptz);
-CREATE FUNCTION orcon_engine.release_worker_leases(p_worker_id uuid, p_poison_threshold bigint, p_now timestamptz)
+CREATE FUNCTION orcon_engine.release_worker_leases(p_worker_id uuid, p_poison_threshold bigint, p_now timestamptz, p_counts boolean)
 RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, is_poisoned boolean)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
 $$
@@ -312,7 +320,7 @@ BEGIN
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, p_counts) a;
 END
 $$;
 
@@ -339,7 +347,7 @@ BEGIN
     FOR UPDATE
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE) a;
 END
 $$;
 
@@ -406,10 +414,29 @@ BEGIN
 END
 $$;
 
--- Claims runnable tokens in fairness order with FOR UPDATE SKIP LOCKED (ADR-0013 section 3). The first claim of
--- a token of an execution starts it, with its event (ADR-0009 section 1: QUEUED to RUNNING when the first token is
--- claimed). The counters of the execution are refreshed by the next commit of a worker or by the reaper.
-CREATE OR REPLACE FUNCTION orcon_engine.claim_tokens(p_worker_id uuid, p_fairness_keys text[], p_limit integer, p_lease_milliseconds bigint, p_now timestamptz)
+-- The first claim of a token of an execution starts it, with its event (ADR-0009 section 1: QUEUED to RUNNING
+-- when the first token is claimed). The counters of the execution are refreshed by the next commit of a worker or
+-- by the reaper.
+CREATE FUNCTION orcon_engine.start_claimed_execution(p_org_id uuid, p_execution_id uuid, p_now timestamptz)
+RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+BEGIN
+  UPDATE execution e
+  SET status = 'RUNNING', started_at = COALESCE(e.started_at, p_now), updated_at = p_now
+  WHERE e.org_id = p_org_id AND e.id = p_execution_id AND e.status = 'QUEUED';
+  IF FOUND THEN
+    PERFORM orcon_engine.append_event(p_org_id, p_execution_id,
+      orcon_engine.derive_uuid('event', 'execution.started', p_execution_id::text), 'execution.started', '{}', NULL, p_now);
+  END IF;
+END
+$$;
+
+-- Claims runnable tokens in fairness order with FOR UPDATE SKIP LOCKED (ADR-0013 section 3). A token one
+-- abandonment short of the poison threshold is left to claim_last_chance_token (SPEC-001 Enmienda 12 section 12-1).
+DROP FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz);
+CREATE FUNCTION orcon_engine.claim_tokens(p_worker_id uuid, p_fairness_keys text[], p_limit integer, p_lease_milliseconds bigint,
+                                          p_now timestamptz, p_poison_threshold bigint)
 RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, node_id text, edge_id text, scope_path text,
                fork_lineage_document bytea, payload_reference text, fairness_key text, lease_epoch bigint, lease_expires_at timestamptz)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
@@ -425,6 +452,7 @@ BEGIN
       WHERE t.status = 'RUNNABLE'
         AND t.available_at <= clock_timestamp()
         AND (p_fairness_keys IS NULL OR t.fairness_key = ANY (p_fairness_keys))
+        AND t.abandoned_count < p_poison_threshold - 1
       ORDER BY t.effective_priority, t.available_at, t.id
       LIMIT p_limit
       FOR UPDATE SKIP LOCKED
@@ -442,13 +470,72 @@ BEGIN
               t.scope_path AS r_scope, t.fork_lineage_document AS r_lineage, t.payload_reference AS r_payload,
               t.fairness_key AS r_fairness, t.lease_epoch AS r_epoch, t.lease_expires_at AS r_expires
   LOOP
-    UPDATE execution e
-    SET status = 'RUNNING', started_at = COALESCE(e.started_at, p_now), updated_at = p_now
-    WHERE e.org_id = r.r_org AND e.id = r.r_execution AND e.status = 'QUEUED';
-    IF FOUND THEN
-      PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
-        orcon_engine.derive_uuid('event', 'execution.started', r.r_execution::text), 'execution.started', '{}', NULL, p_now);
-    END IF;
+    PERFORM orcon_engine.start_claimed_execution(r.r_org, r.r_execution, p_now);
+    org_id := r.r_org;
+    id := r.r_id;
+    execution_id := r.r_execution;
+    node_id := r.r_node;
+    edge_id := r.r_edge;
+    scope_path := r.r_scope;
+    fork_lineage_document := r.r_lineage;
+    payload_reference := r.r_payload;
+    fairness_key := r.r_fairness;
+    lease_epoch := r.r_epoch;
+    lease_expires_at := r.r_expires;
+    RETURN NEXT;
+  END LOOP;
+END
+$$;
+
+-- Since when a runnable token one abandonment short of the poison threshold has been claimable; null when none is.
+CREATE FUNCTION orcon_engine.oldest_last_chance(p_poison_threshold bigint)
+RETURNS timestamptz
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+  SELECT min(t.available_at)
+  FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= clock_timestamp()
+    AND t.abandoned_count > 0 AND t.abandoned_count = p_poison_threshold - 1;
+$$;
+
+-- Claims the one runnable token that is one abandonment short of the poison threshold. The caller holds no other
+-- token and claims nothing else while it holds this one, so the abandonment that reaches the threshold happens
+-- with the token alone in its process.
+CREATE FUNCTION orcon_engine.claim_last_chance_token(p_worker_id uuid, p_lease_milliseconds bigint, p_now timestamptz, p_poison_threshold bigint)
+RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, node_id text, edge_id text, scope_path text,
+               fork_lineage_document bytea, payload_reference text, fairness_key text, lease_epoch bigint, lease_expires_at timestamptz)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+#variable_conflict use_column
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    WITH candidate AS (
+      SELECT t.id
+      FROM token t
+      WHERE t.status = 'RUNNABLE'
+        AND t.available_at <= clock_timestamp()
+        AND t.abandoned_count > 0
+        AND t.abandoned_count = p_poison_threshold - 1
+      ORDER BY t.available_at, t.id
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE token AS t
+    SET status = 'LEASED',
+        lease_owner = p_worker_id,
+        lease_epoch = t.lease_epoch + 1,
+        lease_expires_at = clock_timestamp() + p_lease_milliseconds * interval '1 millisecond',
+        claim_count = t.claim_count + 1,
+        updated_at = p_now
+    FROM candidate
+    WHERE t.id = candidate.id
+    RETURNING t.org_id AS r_org, t.id AS r_id, t.execution_id AS r_execution, t.node_id AS r_node, t.edge_id AS r_edge,
+              t.scope_path AS r_scope, t.fork_lineage_document AS r_lineage, t.payload_reference AS r_payload,
+              t.fairness_key AS r_fairness, t.lease_epoch AS r_epoch, t.lease_expires_at AS r_expires
+  LOOP
+    PERFORM orcon_engine.start_claimed_execution(r.r_org, r.r_execution, p_now);
     org_id := r.r_org;
     id := r.r_id;
     execution_id := r.r_execution;
@@ -481,15 +568,25 @@ REVOKE ALL ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) F
 GRANT EXECUTE ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) TO orcon_application;
 ALTER FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) FROM PUBLIC;
-ALTER FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz) OWNER TO orcon_engine;
-REVOKE ALL ON FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz) FROM PUBLIC;
-ALTER FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz) OWNER TO orcon_engine;
+ALTER FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean) FROM PUBLIC;
+ALTER FUNCTION orcon_engine.start_claimed_execution(uuid, uuid, timestamptz) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.start_claimed_execution(uuid, uuid, timestamptz) FROM PUBLIC;
+ALTER FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz, bigint) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz, bigint) TO orcon_application;
+ALTER FUNCTION orcon_engine.oldest_last_chance(bigint) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.oldest_last_chance(bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.oldest_last_chance(bigint) TO orcon_application;
+ALTER FUNCTION orcon_engine.claim_last_chance_token(uuid, bigint, timestamptz, bigint) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.claim_last_chance_token(uuid, bigint, timestamptz, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.claim_last_chance_token(uuid, bigint, timestamptz, bigint) TO orcon_application;
 ALTER FUNCTION orcon_engine.release_expired_leases(integer, bigint, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.release_expired_leases(integer, bigint, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.release_expired_leases(integer, bigint, timestamptz) TO orcon_application;
-ALTER FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) OWNER TO orcon_engine;
-REVOKE ALL ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz) TO orcon_application;
+ALTER FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz, boolean) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.release_worker_leases(uuid, bigint, timestamptz, boolean) TO orcon_application;
 ALTER FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.release_token_lease(uuid, bigint, uuid, bigint, timestamptz) TO orcon_application;

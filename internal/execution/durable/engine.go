@@ -27,6 +27,7 @@ type Engine struct {
 	interp *execution.Interpreter
 
 	leases   *leaseTable
+	claims   *claimState
 	draining atomic.Bool
 	wake     chan struct{}
 
@@ -38,6 +39,9 @@ type Engine struct {
 // item routing, the node runner) are the ones in deps; deps.Payloads and
 // deps.Clock are set by the engine.
 func New(cfg *Config, st Store, revisions Revisions, reader DocumentReader, deps execution.Deps, limits PlanLimits) (*Engine, error) {
+	if cfg.PoisonThreshold != 0 && cfg.PoisonThreshold < store.MinPoisonThreshold {
+		return nil, fmt.Errorf("new durable engine: PoisonThreshold %d is below the minimum %d (with 1 every token would have to run alone)", cfg.PoisonThreshold, store.MinPoisonThreshold)
+	}
 	cfg.defaults()
 	if cfg.Worker.IsZero() {
 		return nil, errors.New("new durable engine: Worker is required")
@@ -46,7 +50,7 @@ func New(cfg *Config, st Store, revisions Revisions, reader DocumentReader, deps
 	deps.Clock = cfg.Clock
 	e := &Engine{
 		cfg: *cfg, store: st, plans: NewPlans(revisions, reader, limits), interp: execution.NewInterpreter(deps),
-		leases: newLeaseTable(cfg.LeaseTTL), wake: make(chan struct{}, cfg.Concurrency), meta: make(map[store.ExecutionID]*store.Execution),
+		leases: newLeaseTable(cfg.LeaseTTL), claims: &claimState{}, wake: make(chan struct{}, cfg.Concurrency), meta: make(map[store.ExecutionID]*store.Execution),
 	}
 	if router, ok := st.(store.EventRouter); ok {
 		router.RouteEvents(cfg.Outbox)

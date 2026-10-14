@@ -44,6 +44,11 @@ CREATE TABLE token_input (
 -- Supports fk_token_input_execution and the delete of its parent row.
 CREATE INDEX ix_token_input_org_id_execution_id ON token_input (org_id, execution_id);
 
+-- Supports ClaimLastChanceToken and GetOldestLastChance: tokens that were abandoned at least once are few, and the
+-- claim must not walk the whole queue to find them.
+CREATE INDEX ix_token_available_at_id ON token (available_at, id)
+  WHERE status = 'RUNNABLE' AND abandoned_count > 0;
+
 -- Supports ListLiveTokens (the tokens of one execution that are not terminal, which a worker reads to open the
 -- execution) and RefreshExecutionCounters (their counts per state).
 CREATE INDEX ix_token_org_id_execution_id_id ON token (org_id, execution_id, id)

@@ -19,12 +19,13 @@ import (
 )
 
 var (
-	_ store.Reader       = (*Store)(nil)
-	_ store.Inbox        = (*Store)(nil)
-	_ store.Transactor   = (*Store)(nil)
-	_ store.WorkQueue    = (*Store)(nil)
-	_ store.Deliveries   = (*Store)(nil)
-	_ store.WaitResolver = (*Store)(nil)
+	_ store.Reader        = (*Store)(nil)
+	_ store.Inbox         = (*Store)(nil)
+	_ store.Transactor    = (*Store)(nil)
+	_ store.WorkQueue     = (*Store)(nil)
+	_ store.LeaseRecovery = (*Store)(nil)
+	_ store.Deliveries    = (*Store)(nil)
+	_ store.WaitResolver  = (*Store)(nil)
 )
 
 // beforeCursor is the position of a newest-first list; the zero cursor is after everything.

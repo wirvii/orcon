@@ -76,7 +76,7 @@ func TestFencing(t *testing.T) {
 			}
 			stolen = true
 			// The lease of A is taken from it, as the reaper would after its expiry, and B finishes the execution.
-			released, err := env.Store.ReleaseWorkerLeases(ctx, workerA, 3, time.Now())
+			released, err := env.Store.ReleaseLostLeases(ctx, workerA, 3, time.Now())
 			if err != nil || len(released) != 1 || released[0].AbandonedCount != 1 {
 				t.Errorf("the lease of A was not taken: %+v, %v", released, err)
 			}
@@ -216,7 +216,7 @@ func TestReaper(t *testing.T) {
 		eng := env.Engine(durable.Config{Concurrency: 1, LeaseTTL: ttl}, runner())
 		poisoned := env.Start(eng, pub, input())
 		for round := 1; round <= 3; round++ {
-			claimed, _, err := eng.Claim(ctx, 1)
+			claimed, _, err := claimRound(ctx, eng, round, 3)
 			if err != nil || len(claimed) != 1 {
 				t.Fatalf("round %d: claim = %d tokens, %v", round, len(claimed), err)
 			}
@@ -270,9 +270,9 @@ func TestReaper(t *testing.T) {
 	})
 }
 
-// TestGracefulReleaseCountsAbandonment (BL-051): the tokens a worker gives up at
-// shutdown count as abandoned and reach the poison threshold, like an expired lease.
-func TestGracefulReleaseCountsAbandonment(t *testing.T) {
+// TestLostLeasesCountAbandonment (BL-051): the leases a previous run of a worker
+// left count as abandoned and reach the poison threshold, like an expired lease.
+func TestLostLeasesCountAbandonment(t *testing.T) {
 	eachStore(t, storetest.EngineOptions{Weak: true, PoisonThreshold: 2}, func(t *testing.T, env *storetest.EngineEnv) {
 		t.Helper()
 		ctx := t.Context()
@@ -281,10 +281,10 @@ func TestGracefulReleaseCountsAbandonment(t *testing.T) {
 		eng := env.Engine(durable.Config{Worker: worker, Concurrency: 1, PoisonThreshold: 2}, runner())
 		execID := env.Start(eng, pub, input())
 		for round := 1; round <= 2; round++ {
-			if claimed, _, err := eng.Claim(ctx, 1); err != nil || len(claimed) != 1 {
+			if claimed, _, err := claimRound(ctx, eng, round, 2); err != nil || len(claimed) != 1 {
 				t.Fatalf("round %d: claim = %d, %v", round, len(claimed), err)
 			}
-			released, err := env.Store.ReleaseWorkerLeases(ctx, worker, 2, time.Now())
+			released, err := env.Store.ReleaseLostLeases(ctx, worker, 2, time.Now())
 			if err != nil || len(released) != 1 || released[0].AbandonedCount != int64(round) || released[0].Poisoned != (round == 2) {
 				t.Fatalf("round %d: released = %+v, %v", round, released, err)
 			}
@@ -294,4 +294,14 @@ func TestGracefulReleaseCountsAbandonment(t *testing.T) {
 			t.Errorf("tokens = %+v, want one SUSPENDED POISON token", tokens)
 		}
 	})
+}
+
+// claimRound claims the token in the round-th time it is claimed in a scenario
+// that abandons it every time: the round that finds it one abandonment short of
+// the threshold takes it as the last chance, the others normally.
+func claimRound(ctx context.Context, eng *durable.Engine, round int, threshold int) ([]store.Claimed, time.Time, error) {
+	if round == threshold {
+		return eng.ClaimLastChance(ctx)
+	}
+	return eng.Claim(ctx, 1)
 }

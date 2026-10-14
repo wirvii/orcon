@@ -184,7 +184,7 @@ func (t *pgTx) AdvanceToken(ctx context.Context, f store.Fence, u store.TokenUpd
 	}
 	n, err := t.q.UpdateAdvancedToken(ctx, sqlcgen.UpdateAdvancedTokenParams{
 		NodeID: u.NodeID, EdgeID: nullText(u.EdgeID), ScopePath: u.ScopePath, ForkLineageDocument: u.ForkLineage,
-		PayloadReference: nullText(u.PayloadReference), UpdatedAt: timestamp(now), OrgID: pgUUID(f.OrgID), ID: pgUUID(f.Token),
+		PayloadReference: nullText(u.PayloadReference), ResetAbandoned: u.ResetAbandoned, UpdatedAt: timestamp(now), OrgID: pgUUID(f.OrgID), ID: pgUUID(f.Token),
 		LeaseEpoch: f.Epoch, LeaseOwner: pgUUID(f.Owner),
 	})
 	if err != nil {
@@ -205,7 +205,7 @@ func (t *pgTx) MoveHeldToken(ctx context.Context, f store.Fence, u store.TokenUp
 	}
 	n, err := t.q.UpdateMovedToken(ctx, sqlcgen.UpdateMovedTokenParams{
 		Status: u.Status, NodeID: u.NodeID, EdgeID: nullText(u.EdgeID), ScopePath: u.ScopePath, ForkLineageDocument: u.ForkLineage,
-		PayloadReference: nullText(u.PayloadReference), AvailableAt: nullTimestamp(u.AvailableAt), QueueOrder: u.QueueOrder, UpdatedAt: timestamp(now),
+		PayloadReference: nullText(u.PayloadReference), AvailableAt: nullTimestamp(u.AvailableAt), QueueOrder: u.QueueOrder, ResetAbandoned: u.ResetAbandoned, UpdatedAt: timestamp(now),
 		OrgID: pgUUID(f.OrgID), ID: pgUUID(f.Token), LeaseEpoch: f.Epoch, LeaseOwner: pgUUID(f.Owner),
 	})
 	if err != nil {

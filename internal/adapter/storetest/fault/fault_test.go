@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -374,43 +375,73 @@ func TestStoppedWorkerIsFenced(t *testing.T) {
 	w.integrity()
 }
 
-// TestPoisonItem (FI-12): a node that kills the process every time it is activated
-// is suspended as poison after three abandonments, and the other executions finish.
+// TestPoisonItem (FI-12, SPEC-001 Enmienda 12 section 12-1): a node that kills the process
+// every time it is activated is suspended as poison after three abandonments, with the
+// default concurrency of the worker and healthy executions sharing its process, and
+// the healthy ones finish without any of their tokens being suspended. A node longer
+// than the shutdown grace that crosses three orderly shutdowns is never counted.
 func TestPoisonItem(t *testing.T) {
 	requireSQLite(t)
+	t.Run("a poison item next to healthy executions", poisonNextToHealthy)
+	t.Run("three orderly shutdowns across a long node", orderlyShutdowns)
+}
+
+func poisonNextToHealthy(t *testing.T) {
+	const threshold = 3
 	w := newWorld(t)
 	poison := w.start(w.publish(sequence("poison")))
 	var others []store.ExecutionID
-	healthy := w.publish(sequence("a", "b"))
-	for range 5 {
+	healthy := w.publish(sequence("h1", "h2", "h3", "h4", "h5", "h6"))
+	for range 3 {
 		others = append(others, w.start(healthy))
 	}
-	deaths := 0
-	for {
+	maxHealthy := int64(0)
+	var crashes []string
+	for deaths := 0; ; {
 		w.release()
-		// One token at a time: a token held by the process when it dies is abandoned too, so
-		// a healthy one held next to the poison item would be suspended with it.
-		c := w.startChild(envCrashNode+"=poison", envLease+"=400", envConcurrency+"=1")
-		c.waitLine("READY")
-		r := c.wait(60 * time.Second)
+		c := w.startChild(envCrashNode+"=poison", envNodeMS+"=800", envCrashDelayMS+"=1000")
+		ready := c.waitLine("READY")
+		if want := fmt.Sprintf("READY concurrency=%d", durable.DefaultConcurrency); ready != want {
+			t.Fatalf("worker says %q, want the default concurrency: %q", ready, want)
+		}
+		r := c.wait(120 * time.Second)
+		crash := drainLines(c, "CRASH")
 		w.open()
+		for _, id := range others {
+			live := w.env.LiveTokens(id)
+			for i := range live {
+				if live[i].Status == "SUSPENDED" {
+					t.Fatalf("a healthy token was suspended: %+v", live[i])
+				}
+				maxHealthy = max(maxHealthy, live[i].AbandonedCount)
+			}
+		}
 		if !r.Killed {
 			if r.Code != 0 {
 				t.Fatalf("worker process ended with %+v", r)
 			}
 			break
 		}
-		deaths++
-		if deaths > 6 {
+		crashes = append(crashes, crash)
+		if deaths++; deaths > 6 {
 			t.Fatal("the poison item kept killing the process after six restarts")
 		}
 	}
-	if deaths != 3 {
-		t.Errorf("the process died %d times, want 3: the third abandonment suspends the token", deaths)
+	if len(crashes) != threshold {
+		t.Errorf("the process died %d times (%v), want %d: the third abandonment suspends the token", len(crashes), crashes, threshold)
+	}
+	if len(crashes) > 0 && crashes[len(crashes)-1] != "CRASH alone" {
+		t.Errorf("the crash that reached the threshold was %q: it must happen with the token alone in its process", crashes[len(crashes)-1])
+	}
+	if shared := slices.Index(crashes, "CRASH shared"); shared < 0 {
+		t.Errorf("no crash happened with healthy tokens in the process (%v): the test did not exercise the neighbors", crashes)
+	}
+	if maxHealthy >= threshold {
+		t.Errorf("a healthy token was abandoned %d times, want fewer than %d", maxHealthy, threshold)
 	}
 	tokens := w.env.LiveTokens(poison)
-	if len(tokens) != 1 || tokens[0].Status != "SUSPENDED" || tokens[0].SuspendReason != "POISON" || tokens[0].AbandonedCount != 3 {
-		t.Fatalf("tokens of the poison execution = %+v, want one SUSPENDED POISON token abandoned 3 times", tokens)
+	if len(tokens) != 1 || tokens[0].Status != "SUSPENDED" || tokens[0].SuspendReason != "POISON" || tokens[0].AbandonedCount != threshold {
+		t.Fatalf("tokens of the poison execution = %+v, want one SUSPENDED POISON token abandoned %d times", tokens, threshold)
 	}
 	if got := countType(w, poison, "token.poisoned"); got != 1 {
 		t.Errorf("%d token.poisoned events, want 1", got)
@@ -423,7 +454,46 @@ func TestPoisonItem(t *testing.T) {
 		t.Errorf("poison execution = %+v, %v; want SUSPENDED", ex, err)
 	}
 	for _, id := range others {
-		w.verifyExecution(id, 4)
+		w.verifyExecution(id, 8)
+	}
+}
+
+// drainLines returns the last line of the process that starts with prefix.
+func drainLines(c *child, prefix string) string {
+	last := ""
+	for line := range c.lines {
+		if strings.HasPrefix(line, prefix) {
+			last = line
+		}
+	}
+	return last
+}
+
+func orderlyShutdowns(t *testing.T) {
+	w := newWorld(t)
+	long := w.start(w.publish(sequence("long")))
+	for shutdown := 1; shutdown <= 3; shutdown++ {
+		w.release()
+		// The node outlasts the grace period of the process, so the shutdown cancels it.
+		c := w.startChild(envNodeMS+"=60000", envGraceMS+"=300")
+		c.waitLine("READY")
+		time.Sleep(700 * time.Millisecond) // the token is claimed and the node is running
+		c.signal(syscall.SIGTERM)
+		if r := c.wait(30 * time.Second); r.Killed || r.Code != 0 {
+			t.Fatalf("shutdown %d: the worker ended with %+v, want an orderly exit", shutdown, r)
+		}
+		w.open()
+		tokens := w.env.LiveTokens(long)
+		if len(tokens) != 1 || tokens[0].Status != "RUNNABLE" || tokens[0].AbandonedCount != 0 {
+			t.Fatalf("shutdown %d: tokens = %+v, want one RUNNABLE token with no abandonment", shutdown, tokens)
+		}
+	}
+	w.release()
+	w.finish()
+	w.open()
+	w.verifyExecution(long, 3)
+	if got := countType(w, long, "lease.expired"); got != 0 {
+		t.Errorf("%d lease.expired events for leases the worker gave back", got)
 	}
 }
 

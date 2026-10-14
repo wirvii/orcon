@@ -118,8 +118,11 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	if opts.Synchronous == 0 {
 		opts.Synchronous = SynchronousFull
 	}
-	if opts.PoisonThreshold <= 0 {
+	if opts.PoisonThreshold == 0 {
 		opts.PoisonThreshold = DefaultPoisonThreshold
+	}
+	if opts.PoisonThreshold < store.MinPoisonThreshold {
+		return nil, fmt.Errorf("open sqlite store: PoisonThreshold %d is below the minimum %d (with 1 every token would have to run alone)", opts.PoisonThreshold, store.MinPoisonThreshold)
 	}
 	if opts.Readers <= 0 {
 		opts.Readers = runtime.GOMAXPROCS(0)

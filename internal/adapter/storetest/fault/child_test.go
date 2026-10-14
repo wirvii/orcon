@@ -45,16 +45,22 @@ const (
 	envFileLimit = "ORCON_FAULT_FILE_LIMIT"
 	// The lease TTL of the child, in milliseconds.
 	envLease = "ORCON_FAULT_LEASE_MS"
-	// The number of tokens the child works at once (4 when absent).
-	envConcurrency = "ORCON_FAULT_CONCURRENCY"
+	// How long every node takes, in milliseconds, and how long the poison node waits before it kills the process.
+	envNodeMS       = "ORCON_FAULT_NODE_MS"
+	envCrashDelayMS = "ORCON_FAULT_CRASH_DELAY_MS"
+	// The shutdown grace of the child, in milliseconds.
+	envGraceMS = "ORCON_FAULT_GRACE_MS"
 )
 
 // logger is the activation log of the child: a line is appended in one write, which
 // survives the death of the process.
 type activationRunner struct {
-	file      *os.File
-	crashNode string
-	inner     executiontest.TraceRunner
+	file       *os.File
+	crashNode  string
+	nodeTime   time.Duration
+	crashAfter time.Duration
+	inflight   atomic.Int64
+	inner      executiontest.TraceRunner
 }
 
 func (r *activationRunner) Execute(ctx context.Context, call execution.NodeCall) (execution.NodeOutput, error) {
@@ -63,8 +69,23 @@ func (r *activationRunner) Execute(ctx context.Context, call execution.NodeCall)
 			return execution.NodeOutput{}, err
 		}
 	}
+	r.inflight.Add(1)
+	defer r.inflight.Add(-1)
 	if r.crashNode != "" && string(call.Node.ID) == r.crashNode {
+		time.Sleep(r.crashAfter) // the other tokens of the process are in the middle of their nodes
+		if r.inflight.Load() > 1 {
+			sayf("CRASH shared")
+		} else {
+			sayf("CRASH alone")
+		}
 		killSelf()
+	}
+	if r.nodeTime > 0 {
+		select {
+		case <-ctx.Done():
+			return execution.NodeOutput{}, fmt.Errorf("node %s canceled: %w", call.Node.ID, ctx.Err())
+		case <-time.After(r.nodeTime):
+		}
 	}
 	return r.inner.Execute(ctx, call)
 }
@@ -136,13 +157,23 @@ func runChild() int {
 		ms, _ := strconv.Atoi(v)
 		lease = time.Duration(ms) * time.Millisecond
 	}
-	concurrency := 4
-	if v := os.Getenv(envConcurrency); v != "" {
-		concurrency, _ = strconv.Atoi(v)
+	grace := 5 * time.Second
+	if v := os.Getenv(envGraceMS); v != "" {
+		ms, _ := strconv.Atoi(v)
+		grace = time.Duration(ms) * time.Millisecond
 	}
+	if v := os.Getenv(envNodeMS); v != "" {
+		ms, _ := strconv.Atoi(v)
+		runner.nodeTime = time.Duration(ms) * time.Millisecond
+	}
+	if v := os.Getenv(envCrashDelayMS); v != "" {
+		ms, _ := strconv.Atoi(v)
+		runner.crashAfter = time.Duration(ms) * time.Millisecond
+	}
+	// The concurrency is the default of the configuration: the poison item is tested with the neighbors it has there.
 	cfg := durable.Config{
-		Worker: execution.WorkerID(id.NewV7Generator(time.Now).New()), Role: execution.WorkerStandalone, Concurrency: concurrency,
-		LeaseTTL: lease, RenewEvery: lease / 3, PollEvery: 10 * time.Millisecond, ReapEvery: 50 * time.Millisecond, ShutdownGrace: 5 * time.Second,
+		Worker: execution.WorkerID(id.NewV7Generator(time.Now).New()), Role: execution.WorkerStandalone,
+		LeaseTTL: lease, RenewEvery: lease / 3, PollEvery: 10 * time.Millisecond, ReapEvery: 50 * time.Millisecond, ShutdownGrace: grace,
 	}
 	if point := os.Getenv(envPoint); point != "" {
 		count, _ := strconv.ParseInt(os.Getenv(envCount), 10, 64)
@@ -156,7 +187,7 @@ func runChild() int {
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- eng.Run(runCtx) }()
-	sayf("READY")
+	sayf("READY concurrency=%d", cfg.Concurrency)
 	go watchIdle(runCtx, st, cancel)
 	if err := <-done; err != nil {
 		sayf("ERROR run: %v", err)

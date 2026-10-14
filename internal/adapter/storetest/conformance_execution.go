@@ -501,7 +501,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	}
 	// The next claim raises the epoch; at the threshold the token is poisoned instead of retried.
 	for round := 2; round <= 3; round++ {
-		c, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now})
+		request := store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now}
+		claim := e.s.ClaimTokens
+		if round == 3 { // one abandonment short of the threshold: only the last chance claim takes it
+			claim = e.s.ClaimLastChanceToken
+		}
+		c, err := claim(e.ctx(), request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -533,12 +538,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	if got.Status != "SUSPENDED" || got.SuspendReason != "POISON" || got.AbandonedCount != 3 {
 		t.Fatalf("poisoned token = %+v", got)
 	}
-	// Graceful shutdown gives every lease of a worker back at once.
+	// Graceful shutdown gives every lease of a worker back at once, and gives it back: no abandonment is counted.
 	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, 3, now)
-	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID || released[0].AbandonedCount != 1 || released[0].Poisoned {
+	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID || released[0].AbandonedCount != 0 || released[0].Poisoned {
 		t.Fatalf("released = %+v, %v", released, err)
 	}
-	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() {
+	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() || got.AbandonedCount != 0 {
 		t.Fatalf("released token = %+v", got)
 	}
 }

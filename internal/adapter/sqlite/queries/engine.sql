@@ -15,10 +15,34 @@ WHERE id IN (
   SELECT t.id FROM token t
   WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
     AND (sqlc.arg(any_fairness_key) = 1 OR t.fairness_key IN (sqlc.slice(fairness_keys)))
+    AND t.abandoned_count < sqlc.arg(poison_threshold) - 1
   ORDER BY t.effective_priority, t.available_at, t.id
   LIMIT sqlc.arg(page_size))
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
           lease_epoch, lease_expires_at;
+
+-- The token one abandonment short of the poison threshold runs alone in its process (SPEC-001 Enmienda 12 section 12-1).
+-- name: ClaimLastChanceToken :many
+-- orcon:scope engine
+-- orcon:hot
+UPDATE token
+SET status = 'LEASED', lease_owner = sqlc.arg(worker_id), lease_epoch = lease_epoch + 1, lease_expires_at = sqlc.arg(lease_expires_at),
+    claim_count = claim_count + 1, updated_at = sqlc.arg(now)
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
+    AND t.abandoned_count > 0 AND t.abandoned_count = sqlc.arg(poison_threshold) - 1
+  ORDER BY t.effective_priority, t.available_at, t.id
+  LIMIT 1)
+RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+          lease_epoch, lease_expires_at;
+
+-- name: GetOldestLastChance :one
+-- orcon:scope engine
+SELECT min(t.available_at) AS since
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
+  AND t.abandoned_count > 0 AND t.abandoned_count = sqlc.arg(poison_threshold) - 1;
 
 -- name: RenewLeases :many
 -- orcon:scope engine
@@ -57,10 +81,10 @@ WHERE task_attempt.org_id = sqlc.arg(org_id) AND task_attempt.status = 'STARTED'
 -- orcon:scope engine
 -- orcon:hot
 UPDATE token
-SET status = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
-    suspend_reason = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
-    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
-    available_at = CASE WHEN token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
+SET status = CASE WHEN sqlc.arg(counts) = 1 AND token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN sqlc.arg(counts) = 1 AND token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + sqlc.arg(counts), lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN sqlc.arg(counts) = 1 AND token.abandoned_count + 1 >= sqlc.arg(poison_threshold) THEN token.available_at ELSE sqlc.arg(now) END,
     updated_at = sqlc.arg(now)
 WHERE id IN (
   SELECT t.id FROM token t

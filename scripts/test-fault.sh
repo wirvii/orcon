@@ -50,7 +50,7 @@ for row in $(echo "$rows" | tr ',' ' '); do
     FI-11) run ./test/engine/durable/ 'TestClaimIsExclusive|TestOutbox' ;;
     FI-12)
       [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestPoisonItem'
-      run ./test/engine/durable/ 'TestReaper|TestGracefulReleaseCountsAbandonment'
+      run ./test/engine/durable/ 'TestReaper|TestLostLeasesCountAbandonment'
       ;;
     FI-15) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestKillDuringWrites|TestDiskFull' ;;
     FI-16) run ./test/engine/durable/ 'TestRecomputeDeterminism' ;;

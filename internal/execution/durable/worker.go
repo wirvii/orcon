@@ -16,13 +16,13 @@ import (
 )
 
 // Claim leases up to limit runnable tokens for this worker, whatever their
-// organization (ADR-0013 section 3). The caller must call [Engine.Work] for each,
-// or the leases expire and the reaper returns the tokens.
+// organization (ADR-0013 section 3), except the one a token one abandonment short
+// of the poison threshold, which only the worker loop claims (it must run alone).
+// The caller must call [Engine.Work] for each, or the leases expire and the reaper
+// returns the tokens.
 func (e *Engine) Claim(ctx context.Context, limit int) ([]store.Claimed, time.Time, error) {
 	start := time.Now()
-	claimed, err := e.store.ClaimTokens(ctx, store.ClaimRequest{
-		Worker: e.cfg.Worker, Limit: limit, LeaseTTL: e.cfg.LeaseTTL, Now: e.cfg.Clock.Now(),
-	})
+	claimed, err := e.store.ClaimTokens(ctx, e.claimRequest(limit))
 	return claimed, start, err
 }
 
@@ -97,6 +97,16 @@ func (e *Engine) releaseLease(ctx context.Context, f store.Fence) bool {
 	return true
 }
 
+// ClaimLastChance leases the one token that is one abandonment short of the
+// poison threshold, if there is one. The worker loop takes it only with nothing
+// else in hand and claims nothing else while it holds it; a caller that uses
+// this directly takes on that duty.
+func (e *Engine) ClaimLastChance(ctx context.Context) ([]store.Claimed, time.Time, error) {
+	start := time.Now()
+	claimed, err := e.store.ClaimLastChanceToken(ctx, e.claimRequest(1))
+	return claimed, start, err
+}
+
 // segment runs the held token from where it is to the next confirmation point
 // and commits. It reports whether the worker still holds a token to go on with.
 func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.ExecutionID) (bool, error) {
@@ -139,7 +149,10 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 	}
 	work := execution.WorkOptions{
 		Budget: e.cfg.CheckpointActivations, StopAtFork: true, Release: e.draining.Load(),
-		Pause: func() bool { return time.Since(started) >= e.cfg.CheckpointInterval || !l.valid(e.leases) },
+		// A worker that shuts down pauses at the next activation boundary, commits, and gives the token back.
+		Pause: func() bool {
+			return time.Since(started) >= e.cfg.CheckpointInterval || !l.valid(e.leases) || e.draining.Load()
+		},
 	}
 	result, err := sess.Work(ctx, execution.TokenID(l.fence.Token.String()), work)
 	if err != nil {

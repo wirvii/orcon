@@ -19,3 +19,5 @@ sqlite:UpdateWokenToken  # SPEC-001 C4a: PostgreSQL wakes the token inside orcon
 sqlite:UpdateExecutionStatus  # SPEC-001 C4a: PostgreSQL moves the status inside orcon_engine.refresh_execution
 sqlite:UpdateStartedExecution  # SPEC-001 C4a: PostgreSQL starts the execution inside orcon_engine.claim_tokens
 sqlite:ReleaseTokenLease  # SPEC-001 C4a: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ClaimLastChanceToken  # SPEC-001 C4a: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:GetOldestLastChance  # SPEC-001 C4a: PostgreSQL reads it from a hand-written method with the engine functions (DA-8)

@@ -19,13 +19,14 @@ import (
 )
 
 var (
-	_ store.Reader       = (*Store)(nil)
-	_ store.EngineReader = (*Store)(nil)
-	_ store.Inbox        = (*Store)(nil)
-	_ store.Transactor   = (*Store)(nil)
-	_ store.WorkQueue    = (*Store)(nil)
-	_ store.Deliveries   = (*Store)(nil)
-	_ store.WaitResolver = (*Store)(nil)
+	_ store.Reader        = (*Store)(nil)
+	_ store.EngineReader  = (*Store)(nil)
+	_ store.Inbox         = (*Store)(nil)
+	_ store.Transactor    = (*Store)(nil)
+	_ store.WorkQueue     = (*Store)(nil)
+	_ store.LeaseRecovery = (*Store)(nil)
+	_ store.Deliveries    = (*Store)(nil)
+	_ store.WaitResolver  = (*Store)(nil)
 )
 
 // decode collects the first error of a sequence of identity conversions.
@@ -591,7 +592,6 @@ func boolToInt(b bool) int64 {
 
 // ClaimTokens implements [store.WorkQueue].
 func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
-	var out []store.Claimed
 	// One process owns the file, so its clock is the database clock: the instant of the
 	// caller is not used, and a worker whose clock is off cannot make a lease
 	// expire early or late (ADR-0013 section 4).
@@ -600,33 +600,91 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 	if len(keys) == 0 {
 		keys = []string{""} // the slice is never empty; AnyFairnessKey decides
 	}
+	var out []store.Claimed
 	err := s.write(ctx, "claim tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
 			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
-			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PageSize: clampPage(r.Limit),
+			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r), PageSize: clampPage(r.Limit),
 		})
 		if err != nil {
 			return err
 		}
+		out, err = s.afterClaim(ctx, q, rows, now)
+		return err
+	})
+	return out, err
+}
+
+// ClaimLastChanceToken implements [store.WorkQueue].
+func (s *Store) ClaimLastChanceToken(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
+	now := s.clock.Now()
+	var out []store.Claimed
+	err := s.write(ctx, "claim last chance token", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ClaimLastChanceToken(ctx, sqlcgen.ClaimLastChanceTokenParams{
+			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+			PoisonThreshold: thresholdOf(r),
+		})
+		if err != nil {
+			return err
+		}
+		claimed := make([]claimedRow, len(rows))
 		for i := range rows {
-			var d decode
-			row := &rows[i]
-			out = append(out, store.Claimed{
-				OrgID: uuidField[identity.OrgID](&d, row.OrgID), TokenID: uuidField[store.TokenID](&d, row.ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, row.ExecutionID), NodeID: row.NodeID, EdgeID: nullString(row.EdgeID),
-				ScopePath: row.ScopePath, ForkLineage: row.ForkLineageDocument, PayloadReference: nullString(row.PayloadReference),
-				FairnessKey: row.FairnessKey, LeaseEpoch: row.LeaseEpoch, LeaseExpiresAt: nullInstant(row.LeaseExpiresAt),
-			})
-			if d.err != nil {
-				return d.err
-			}
-			if err := startExecution(ctx, q, s.outboxRule(), row.OrgID, row.ExecutionID, now); err != nil {
-				return err
-			}
+			claimed[i] = claimedRow(rows[i])
+		}
+		out, err = s.afterClaim(ctx, q, claimed, now)
+		return err
+	})
+	return out, err
+}
+
+// LastChanceWaiting implements [store.WorkQueue].
+func (s *Store) LastChanceWaiting(ctx context.Context, poisonThreshold int64) (time.Time, bool, error) {
+	var since time.Time
+	var found bool
+	err := s.read(ctx, "read the oldest last chance token", func(ctx context.Context, q *sqlcgen.Queries) error {
+		v, err := q.GetOldestLastChance(ctx, s.clock.Now().UnixMicro(), poisonThreshold)
+		if err != nil {
+			return err
+		}
+		if m, ok := v.(int64); ok {
+			since, found = time.UnixMicro(m).UTC(), true
 		}
 		return nil
 	})
-	return out, err
+	return since, found, err
+}
+
+// thresholdOf returns the poison threshold of a claim.
+func thresholdOf(r store.ClaimRequest) int64 {
+	if r.PoisonThreshold <= 0 {
+		return store.DefaultPoisonThreshold
+	}
+	return r.PoisonThreshold
+}
+
+// claimedRow is the row both claim statements return.
+type claimedRow = sqlcgen.ClaimTokensRow
+
+// afterClaim turns the rows of a claim into claims and starts the executions they belong to.
+func (s *Store) afterClaim(ctx context.Context, q *sqlcgen.Queries, rows []claimedRow, now time.Time) ([]store.Claimed, error) {
+	out := make([]store.Claimed, 0, len(rows))
+	for i := range rows {
+		var d decode
+		row := &rows[i]
+		out = append(out, store.Claimed{
+			OrgID: uuidField[identity.OrgID](&d, row.OrgID), TokenID: uuidField[store.TokenID](&d, row.ID),
+			ExecutionID: uuidField[store.ExecutionID](&d, row.ExecutionID), NodeID: row.NodeID, EdgeID: nullString(row.EdgeID),
+			ScopePath: row.ScopePath, ForkLineage: row.ForkLineageDocument, PayloadReference: nullString(row.PayloadReference),
+			FairnessKey: row.FairnessKey, LeaseEpoch: row.LeaseEpoch, LeaseExpiresAt: nullInstant(row.LeaseExpiresAt),
+		})
+		if d.err != nil {
+			return nil, d.err
+		}
+		if err := startExecution(ctx, q, s.outboxRule(), row.OrgID, row.ExecutionID, now); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // RenewLeases implements [store.WorkQueue].

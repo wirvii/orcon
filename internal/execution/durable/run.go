@@ -29,6 +29,13 @@ func (e *Engine) Run(ctx context.Context) error {
 	if err := e.store.RegisterWorker(ctx, register); err != nil {
 		return fmt.Errorf("register worker %s: %w", e.cfg.Worker, err)
 	}
+	// Whatever a previous incarnation of this worker left leased was lost without
+	// being returned, so it counts as an abandonment (Enmienda 12 section 12-1).
+	if lost, err := e.store.ReleaseLostLeases(ctx, e.cfg.Worker, e.cfg.PoisonThreshold, e.cfg.Clock.Now()); err != nil {
+		return fmt.Errorf("release the leases a previous run of worker %s left: %w", e.cfg.Worker, err)
+	} else if len(lost) > 0 {
+		e.cfg.Logger.WarnContext(ctx, "leases of a previous run released", slog.Int("tokens", len(lost)))
+	}
 	// Three lifetimes: claiming ends with ctx; the tokens in flight get the grace
 	// period after that; the background loops end last, after the leases are given back.
 	workCtx, abandon := context.WithCancel(context.WithoutCancel(ctx))
@@ -124,7 +131,7 @@ func (e *Engine) pause(ctx context.Context, d time.Duration) {
 // claimCtx and the work in flight with workCtx.
 func (e *Engine) workerLoop(claimCtx, workCtx context.Context) {
 	for claimCtx.Err() == nil {
-		claimed, start, err := e.Claim(claimCtx, 1)
+		claimed, start, kind, err := e.claimNext(claimCtx)
 		if err != nil {
 			if claimCtx.Err() == nil {
 				e.cfg.Logger.WarnContext(claimCtx, "claim failed", slog.Any("error", err))
@@ -140,6 +147,7 @@ func (e *Engine) workerLoop(claimCtx, workCtx context.Context) {
 			if err := e.Work(workCtx, claimed[i], start); err != nil && workCtx.Err() == nil {
 				e.cfg.Logger.ErrorContext(workCtx, "token abandoned after an error", slog.String("token", claimed[i].TokenID.String()), slog.Any("error", err))
 			}
+			e.claimDone(kind)
 		}
 	}
 }

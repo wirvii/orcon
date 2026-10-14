@@ -1829,9 +1829,10 @@ const updateAdvancedToken = `-- name: UpdateAdvancedToken :execrows
 UPDATE token
 SET node_id = ?1, edge_id = ?2, scope_path = ?3,
     fork_lineage_document = ?4, payload_reference = ?5,
-    updated_at = ?6
-WHERE org_id = ?7 AND id = ?8 AND lease_epoch = ?9
-  AND lease_owner = ?10 AND status = 'LEASED'
+    abandoned_count = CASE WHEN ?6 = 1 THEN 0 ELSE abandoned_count END,
+    updated_at = ?7
+WHERE org_id = ?8 AND id = ?9 AND lease_epoch = ?10
+  AND lease_owner = ?11 AND status = 'LEASED'
 `
 
 type UpdateAdvancedTokenParams struct {
@@ -1840,6 +1841,7 @@ type UpdateAdvancedTokenParams struct {
 	ScopePath           string
 	ForkLineageDocument []byte
 	PayloadReference    sql.NullString
+	ResetAbandoned      interface{}
 	UpdatedAt           int64
 	OrgID               []byte
 	ID                  []byte
@@ -1857,6 +1859,7 @@ func (q *Queries) UpdateAdvancedToken(ctx context.Context, arg UpdateAdvancedTok
 		arg.ScopePath,
 		arg.ForkLineageDocument,
 		arg.PayloadReference,
+		arg.ResetAbandoned,
 		arg.UpdatedAt,
 		arg.OrgID,
 		arg.ID,
@@ -1954,9 +1957,10 @@ UPDATE token
 SET status = ?1, node_id = ?2, edge_id = ?3, scope_path = ?4,
     fork_lineage_document = ?5, payload_reference = ?6,
     available_at = COALESCE(?7, available_at), lease_owner = NULL, lease_expires_at = NULL,
-    updated_at = ?8
-WHERE org_id = ?9 AND id = ?10 AND lease_epoch = ?11
-  AND lease_owner = ?12 AND status = 'LEASED'
+    abandoned_count = CASE WHEN ?8 = 1 THEN 0 ELSE abandoned_count END,
+    updated_at = ?9
+WHERE org_id = ?10 AND id = ?11 AND lease_epoch = ?12
+  AND lease_owner = ?13 AND status = 'LEASED'
 `
 
 type UpdateMovedTokenParams struct {
@@ -1967,6 +1971,7 @@ type UpdateMovedTokenParams struct {
 	ForkLineageDocument []byte
 	PayloadReference    sql.NullString
 	AvailableAt         sql.NullInt64
+	ResetAbandoned      interface{}
 	UpdatedAt           int64
 	OrgID               []byte
 	ID                  []byte
@@ -1986,6 +1991,7 @@ func (q *Queries) UpdateMovedToken(ctx context.Context, arg UpdateMovedTokenPara
 		arg.ForkLineageDocument,
 		arg.PayloadReference,
 		arg.AvailableAt,
+		arg.ResetAbandoned,
 		arg.UpdatedAt,
 		arg.OrgID,
 		arg.ID,

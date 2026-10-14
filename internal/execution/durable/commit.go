@@ -255,6 +255,7 @@ func (e *Engine) change(ctx context.Context, tx store.Tx, a *applyInput, c *exec
 	if err != nil {
 		return false, err
 	}
+	upd.ResetAbandoned = tid == a.fence.Token && progressed(a.delta)
 	switch {
 	case a.fence.Epoch != 0 && tid == a.fence.Token:
 		if c.Row.State == execution.TokenLeased {
@@ -423,4 +424,18 @@ func (e *Engine) appendEvent(ctx context.Context, tx store.Tx, ex *store.Executi
 		}
 	}
 	return nil
+}
+
+// progressed reports whether the step stored a new result of the token: a node
+// execution that reached a terminal state. Such a step puts the abandon count of
+// the token back to zero, in the same fenced statement that moves it (SPEC-001
+// Enmienda 12 section 12-1): a token that always falls at the same point never
+// progresses, and still reaches the threshold.
+func progressed(d *execution.Delta) bool {
+	for i := range d.NodeExecutions {
+		if d.NodeExecutions[i].State != execution.NodeRunning {
+			return true
+		}
+	}
+	return false
 }
