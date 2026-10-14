@@ -548,3 +548,64 @@ func TestConfigReloadExitsFiveWhenAnyServerRefuses(t *testing.T) {
 		t.Errorf("both results must be shown:\n%s", r.out.String())
 	}
 }
+
+func TestConcurrentReloadCommandsBothSucceed(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	watch(t, dir, cli.ReloadResult{AppliedKeys: []string{"log.level"}})
+	waitRegistered(t, dir, 1)
+	const commands = 4
+	errs := make(chan error, commands)
+	reports := make(chan *cli.ReloadReport, commands)
+	for range commands {
+		go func() {
+			rep, err := cli.RequestReload(t.Context(), dir, 10*time.Second, 10*time.Millisecond)
+			errs <- err
+			reports <- rep
+		}()
+	}
+	ids := map[string]bool{}
+	for range commands {
+		if err := <-errs; err != nil {
+			t.Errorf("a concurrent command failed: %v", err)
+		}
+		if rep := <-reports; rep != nil {
+			if len(rep.Servers) != 1 || len(rep.Unanswered) != 0 {
+				t.Errorf("report = %+v", rep)
+			}
+			ids[rep.RequestID] = true
+		}
+	}
+	if len(ids) != commands {
+		t.Errorf("%d different requests answered, want %d", len(ids), commands)
+	}
+	if _, err := os.Stat(filepath.Join(cli.RunDir(dir), "reload.lock")); !os.IsNotExist(err) {
+		t.Errorf("the lock was not released: %v", err)
+	}
+}
+
+func TestStaleReloadLockIsTakenOver(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := cli.EnsureRunDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(cli.RunDir(dir), "reload.lock")
+	if err := os.WriteFile(lock, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(lock, old, old); err != nil {
+		t.Fatal(err)
+	}
+	watch(t, dir, cli.ReloadResult{})
+	waitRegistered(t, dir, 1)
+	if _, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond); err != nil {
+		t.Fatalf("a dead command's lock must not block: %v", err)
+	}
+}

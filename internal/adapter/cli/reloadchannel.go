@@ -29,12 +29,14 @@ import (
 //
 // Files in <dataDir>/run:
 //
+//	reload.lock               held by the command while it runs, so only one request is in flight
 //	reload-request            the request, written by the command, removed by it when done
 //	reload-result.<server>    the answer of one server to the latest request
 //	server.<server>           the registration of a live server, rewritten on every poll
 const (
 	runDirName      = "run"
 	requestFileName = "reload-request"
+	lockFileName    = "reload.lock"
 	resultPrefix    = "reload-result."
 	serverPrefix    = "server."
 	// The most that either side reads from a file of the channel.
@@ -43,6 +45,8 @@ const (
 	staleRequest = time.Minute
 	// A server that has not refreshed its registration for this many polls is gone.
 	staleServerPolls = 3
+	// A lock file older than this was left by a command that died.
+	staleLock = time.Minute
 	// How many request ids a server remembers, so it handles each one once.
 	rememberedRequests = 16
 )
@@ -180,6 +184,21 @@ func liveServers(dir string, fresh time.Duration) []string {
 // Unanswered. The request and the results are removed before it returns.
 func RequestReload(ctx context.Context, dataDir string, wait, poll time.Duration) (*ReloadReport, error) {
 	dir := RunDir(dataDir)
+	deadline := time.NewTimer(wait)
+	defer deadline.Stop()
+	tick := time.NewTicker(poll)
+	defer tick.Stop()
+
+	// One command at a time: two requests in the one request file would hide one of them from the servers.
+	unlock, err := lockReload(ctx, dir, deadline.C, tick.C)
+	if errors.Is(err, ErrNoServer) {
+		return nil, noServerError(dataDir)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	expected := liveServers(dir, staleServerPolls*ReloadPollInterval)
 	if len(expected) == 0 {
 		return nil, noServerError(dataDir)
@@ -198,10 +217,6 @@ func RequestReload(ctx context.Context, dataDir string, wait, poll time.Duration
 	}
 	defer cleanup(dir, request, id)
 
-	deadline := time.NewTimer(wait)
-	defer deadline.Stop()
-	tick := time.NewTicker(poll)
-	defer tick.Stop()
 	for {
 		results := collectResults(dir, id)
 		if len(answered(results, expected)) == len(expected) {
@@ -221,13 +236,49 @@ func RequestReload(ctx context.Context, dataDir string, wait, poll time.Duration
 	}
 }
 
+// lockReload takes the lock file of the run directory, waiting for another command that holds it.
+// A lock older than staleLock belongs to a command that died and is taken over. The returned
+// function releases the lock.
+func lockReload(ctx context.Context, dir string, timeout, tick <-chan time.Time) (unlock func(), err error) {
+	path := filepath.Join(dir, lockFileName)
+	for {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) //nolint:gosec // G304: a fixed name inside the run directory
+		if err == nil {
+			_ = f.Close() // the file's existence is the lock
+			return func() { _ = os.Remove(path) }, nil
+		}
+		if !errors.Is(err, fs.ErrExist) {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, ErrNoServer // there is no run directory, so no server has ever run here
+			}
+			return nil, fmt.Errorf("lock the reload channel: %w", err)
+		}
+		if info, serr := os.Stat(path); serr == nil && time.Since(info.ModTime()) > staleLock {
+			_ = os.Remove(path) // left by a command that died
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("wait for another orcon config reload: %w", ctx.Err())
+		case <-timeout:
+			return nil, errors.New("another orcon config reload is still running; try again")
+		case <-tick:
+		}
+	}
+}
+
 func noServerError(dataDir string) error {
 	return fmt.Errorf("%w in %s; is it running with this data directory?", ErrNoServer, dataDir)
 }
 
 // cleanup removes the request and the results of request id; best effort, the command is finishing.
 func cleanup(dir, request, id string) {
-	_ = os.Remove(request)
+	if data, err := readBounded(request); err == nil {
+		var req ReloadRequest
+		if json.Unmarshal(data, &req) == nil && req.RequestID == id {
+			_ = os.Remove(request) // only if it is still ours
+		}
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
