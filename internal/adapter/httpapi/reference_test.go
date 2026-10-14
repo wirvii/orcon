@@ -69,8 +69,8 @@ func TestAPIReferenceServedInApiAndStandalone(t *testing.T) {
 		if rec := get(t, rt, http.MethodGet, "/api/reference/missing.js"); rec.Code != http.StatusNotFound {
 			t.Errorf("%s a missing file = %d, want 404", role, rec.Code)
 		}
-		if rec := get(t, rt, http.MethodPost, "/api/reference/"); rec.Code != http.StatusNotFound {
-			t.Errorf("%s POST to the site = %d, want 404", role, rec.Code)
+		if rec := get(t, rt, http.MethodPost, "/api/reference/"); rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s POST to the site = %d, want 405", role, rec.Code)
 		}
 	}
 	for _, role := range []config.Role{config.RoleScheduler, config.RoleWorker} {

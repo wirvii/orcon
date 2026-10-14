@@ -34,8 +34,12 @@ const syntheticSpec = `{
       "put": {"operationId": "updateThing", "x-orcon-permission": {"allOf": ["flow:read", "flow:update"]}, "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
         "parameters": [{"$ref": "#/components/parameters/IfMatch"}]}
     },
+    "/drafts": {
+      "put": {"operationId": "replaceDraft", "description": "Replaces a draft. It needs a revision. Request body limit: 8 MiB.", "x-orcon-permission": "flow:update", "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
+        "parameters": [{"$ref": "#/components/parameters/IfMatch"}], "requestBody": {"content": {"application/json": {}}}}
+    },
     "/things": {
-      "post": {"operationId": "createThing", "x-orcon-permission": {"anyOf": ["flow:create", "flow:update"]}, "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
+      "post": {"operationId": "createThing", "description": "Creates a thing. It may be repeated. Request body limit: 1 MiB.", "requestBody": {"content": {"application/json": {}}}, "x-orcon-permission": {"anyOf": ["flow:create", "flow:update"]}, "x-orcon-rate-class": "write", "x-orcon-stability": "stable",
         "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}]}
     },
     "/things/stream": {
@@ -128,6 +132,7 @@ func fakeHandlers(mux apigen.ServeMux, base string, onStream func()) {
 	})
 	mux.HandleFunc("PUT "+base+"/things/{thingId}", json200(map[string]string{"updated": "yes"}))
 	mux.HandleFunc("POST "+base+"/things", json200(map[string]string{"created": "yes"}))
+	mux.HandleFunc("PUT "+base+"/drafts", json200(map[string]string{"saved": "yes"}))
 	mux.HandleFunc("GET "+base+"/things/stream", func(w http.ResponseWriter, r *http.Request) {
 		if onStream != nil {
 			onStream()

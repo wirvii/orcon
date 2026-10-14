@@ -36,8 +36,8 @@ func TestCatalogIsWellFormed(t *testing.T) {
 			t.Errorf("Lookup(%s) = %+v, %v", s.Code, got, ok)
 		}
 	}
-	if len(seen) != 21 {
-		t.Errorf("the catalog has %d codes, ERR-6 confirms 21", len(seen))
+	if len(seen) != 24 {
+		t.Errorf("the catalog has %d codes, ERR-6 and Amendment 8 confirm 24", len(seen))
 	}
 	if _, ok := problem.Lookup("no-such-code"); ok {
 		t.Error("Lookup found a code that is not in the catalog")
@@ -140,6 +140,26 @@ func TestHeaderOption(t *testing.T) {
 	rec := write(t, http.MethodGet, problem.Unauthenticated, problem.Header("WWW-Authenticate", "Bearer"))
 	if rec.Header().Get("WWW-Authenticate") != "Bearer" {
 		t.Error("the header option was dropped")
+	}
+}
+
+func TestConfirmationMembers(t *testing.T) {
+	rec := write(t, http.MethodPost, problem.ConfirmationRequired,
+		problem.Confirmation("0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a99", time.Date(2026, 10, 14, 9, 30, 0, 0, time.UTC)))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+	var doc problem.Problem
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("body: %v", err)
+	}
+	if doc.ConfirmationID == nil || *doc.ConfirmationID != "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a99" || doc.ExpiresAt == nil || *doc.ExpiresAt != "2026-10-14T09:30:00Z" {
+		t.Errorf("document = %+v", doc)
+	}
+	for code, status := range map[problem.Code]int{problem.MethodNotAllowed: 405, problem.FederatedTokenRejected: 400} {
+		if s, ok := problem.Lookup(code); !ok || s.Status != status || s.Retryable {
+			t.Errorf("%s = %+v, %v; want status %d, not retryable", code, s, ok, status)
+		}
 	}
 }
 

@@ -52,6 +52,10 @@ type Operation struct {
 	IssuesSecret bool
 	// PathParams are the names of the path parameters in order of appearance.
 	PathParams []string
+	// HasBody is true when the operation declares a request body.
+	HasBody bool
+	// Description is the description of the operation.
+	Description string
 }
 
 // Spec is the parsed contract.
@@ -171,6 +175,8 @@ func (s *Spec) operation(path, method string, item, doc map[string]any) (Operati
 		}
 	}
 	op.IssuesSecret = s.issuesSecret(doc)
+	_, op.HasBody = doc["requestBody"]
+	op.Description, _ = doc["description"].(string)
 	return op, nil
 }
 

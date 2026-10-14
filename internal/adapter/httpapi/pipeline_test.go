@@ -36,7 +36,7 @@ func TestProblemJSONShape(t *testing.T) {
 		{"forbidden", http.MethodGet, "/api/v1/things/1", "token-a", forbidden, nil, 403, "forbidden"},
 		{"hidden", http.MethodGet, "/api/v1/things/1", "token-a", hidden, nil, 404, "not-found"},
 		{"unknown path", http.MethodGet, "/api/v1/nowhere", "token-a", nil, nil, 404, "not-found"},
-		{"wrong method on a known path", http.MethodDelete, "/api/v1/things/1", "token-a", nil, nil, 404, "not-found"},
+		{"wrong method on a known path", http.MethodDelete, "/api/v1/things/1", "token-a", nil, nil, 405, "method-not-allowed"},
 		{"announced body too large", http.MethodPost, "/api/v1/things", "token-a", nil, func(r *http.Request) {
 			r.ContentLength = DefaultBodyLimit + 1
 		}, 413, "payload-too-large"},

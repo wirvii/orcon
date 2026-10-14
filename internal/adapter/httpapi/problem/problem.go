@@ -40,6 +40,7 @@ const (
 	StepUpRequired           Code = "step-up-required"
 	PersonalKeysDisabled     Code = "personal-keys-disabled"
 	NotFound                 Code = "not-found"
+	MethodNotAllowed         Code = "method-not-allowed"
 	Conflict                 Code = "conflict"
 	IdempotencyInProgress    Code = "idempotency-in-progress"
 	SecretAlreadyIssued      Code = "secret-already-issued"
@@ -53,6 +54,8 @@ const (
 	RateLimited              Code = "rate-limited"
 	InternalError            Code = "internal-error"
 	ServiceUnavailable       Code = "service-unavailable"
+	ConfirmationRequired     Code = "confirmation-required"
+	FederatedTokenRejected   Code = "federated-token-rejected"
 )
 
 // Spec describes one entry of the catalog.
@@ -78,6 +81,7 @@ var catalog = []Spec{
 	{StepUpRequired, http.StatusForbidden, "Step-up required", "The operation needs a recent second factor.", false},
 	{PersonalKeysDisabled, http.StatusForbidden, "Personal keys disabled", "The organization does not allow personal API keys.", false},
 	{NotFound, http.StatusNotFound, "Not found", "The resource does not exist or is not visible to the caller.", false},
+	{MethodNotAllowed, http.StatusMethodNotAllowed, "Method not allowed", "The path exists but the method is not one of its operations; the Allow header lists the methods that are.", false},
 	{Conflict, http.StatusConflict, "Conflict", "The resource state does not allow the operation.", false},
 	{IdempotencyInProgress, http.StatusConflict, "Idempotent request in progress", "A request with the same key is still running.", true},
 	{SecretAlreadyIssued, http.StatusConflict, "Secret already issued", "A replay asked again for a secret that is shown only once.", false},
@@ -91,6 +95,8 @@ var catalog = []Spec{
 	{RateLimited, http.StatusTooManyRequests, "Rate limited", "The rate class quota is exhausted.", true},
 	{InternalError, http.StatusInternalServerError, "Internal error", "An unexpected server error happened.", true},
 	{ServiceUnavailable, http.StatusServiceUnavailable, "Service unavailable", "The server is starting, stopping or overloaded.", true},
+	{ConfirmationRequired, http.StatusForbidden, "Confirmation required", "The request was stored as a confirmation that a person must approve before it runs.", false},
+	{FederatedTokenRejected, http.StatusBadRequest, "Federated token rejected", "The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant.", false},
 }
 
 // Catalog returns a copy of the catalog in contract order.
@@ -126,15 +132,21 @@ type Problem struct {
 	Code      Code         `json:"code"`
 	RequestID string       `json:"requestId"`
 	Errors    []FieldError `json:"errors,omitempty"`
+	// ConfirmationID and ExpiresAt are the extension members of confirmation-required:
+	// the stored confirmation and when it lapses.
+	ConfirmationID *string `json:"confirmationId,omitempty"`
+	ExpiresAt      *string `json:"expiresAt,omitempty"`
 }
 
 // Option adjusts one problem response.
 type Option func(*response)
 
 type response struct {
-	detail string
-	fields []FieldError
-	header http.Header
+	detail       string
+	fields       []FieldError
+	header       http.Header
+	confirmation *string
+	expiresAt    *string
 }
 
 // Detail sets the explanation of this occurrence. It must never contain secret
@@ -144,6 +156,15 @@ func Detail(text string) Option { return func(r *response) { r.detail = text } }
 // Fields sets the per-field errors; every invalid field goes in one response (API-4.2).
 func Fields(errs ...FieldError) Option {
 	return func(r *response) { r.fields = append(r.fields, errs...) }
+}
+
+// Confirmation adds the extension members of confirmation-required: the id of the
+// stored confirmation and the instant it lapses.
+func Confirmation(id string, expiresAt time.Time) Option {
+	return func(r *response) {
+		stamp := expiresAt.UTC().Format(time.RFC3339)
+		r.confirmation, r.expiresAt = &id, &stamp
+	}
 }
 
 // RetryAfter adds the Retry-After header, rounded up to whole seconds.
@@ -179,6 +200,9 @@ func New(w http.ResponseWriter, r *http.Request, code Code, opts ...Option) (Pro
 		Code:      spec.Code,
 		RequestID: w.Header().Get(RequestIDHeader),
 		Errors:    resp.fields,
+
+		ConfirmationID: resp.confirmation,
+		ExpiresAt:      resp.expiresAt,
 	}
 	if r != nil && r.URL != nil {
 		p.Instance = r.URL.Path

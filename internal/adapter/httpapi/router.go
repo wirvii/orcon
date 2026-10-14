@@ -23,10 +23,6 @@ import (
 	"github.com/wirvii/orcon/internal/platform/id"
 )
 
-// DefaultBodyLimit bounds request bodies when Deps does not say otherwise. The
-// limit is documented per operation once operations carry larger bodies (API-5.2).
-const DefaultBodyLimit = 1 << 20
-
 // ErrRole means the role does not serve the API.
 var ErrRole = errors.New("this role does not serve the API")
 
@@ -54,8 +50,6 @@ type Deps struct {
 	Limits middleware.Limits
 	// LimiterOptions adjust the rate limiter, for example the divisor.
 	LimiterOptions []middleware.LimiterOption
-	// BodyLimit bounds request bodies in bytes; zero means DefaultBodyLimit.
-	BodyLimit int64
 	// Auth names where requests carry credentials; the zero value means
 	// middleware.DefaultAuthConfig.
 	Auth middleware.AuthConfig
@@ -162,14 +156,13 @@ func build(supplied *Deps, rawSpec []byte, register func(mux apigen.ServeMux, ba
 	routes := rec.routes
 	mux := rec.mux
 	routes = append(routes, mountReference(mux, reference.Handler(site))...)
-	mux.Handle("/api/", http.HandlerFunc(notFound))
+	mux.Handle("/api/", fallback(mux))
 	routes = append(routes, Route{Pattern: "/api/", Kind: KindFallback})
 
 	handler := middleware.Chain(mux,
 		middleware.RequestID(deps.IDs),
 		middleware.Recover(deps.Logger),
 		middleware.LimitAddress(limiter),
-		middleware.BodyLimit(deps.BodyLimit),
 	)
 	return &Router{handler: handler, routes: routes, spec: spec}, nil
 }
@@ -195,9 +188,6 @@ func (d *Deps) withDefaults() *Deps {
 	}
 	if d.Limits == (middleware.Limits{}) {
 		d.Limits = middleware.DefaultLimits()
-	}
-	if d.BodyLimit <= 0 {
-		d.BodyLimit = DefaultBodyLimit
 	}
 	if d.Auth == (middleware.AuthConfig{}) {
 		d.Auth = middleware.DefaultAuthConfig()
@@ -257,7 +247,8 @@ func checkPermissions(spec *Spec, cat *authz.Catalog) error {
 // authorization. Operations that need no authentication skip all of them but
 // the stability gate; the per-address limit of the global chain protects them.
 func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation) []middleware.Middleware {
-	chain := []middleware.Middleware{withOperation(op)}
+	// Step 1 of the pipeline: the body limit of the operation, before anything reads the request.
+	chain := []middleware.Middleware{withOperation(op), middleware.BodyLimit(BodyLimitFor(op.ID))}
 	if !op.Public {
 		chain = append(chain,
 			middleware.Authenticate(deps.Authenticator, deps.Logger, deps.Auth),
@@ -309,10 +300,28 @@ func (rec *recorder) HandleFunc(pattern string, handler func(http.ResponseWriter
 // ServeHTTP implements [apigen.ServeMux].
 func (rec *recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) { rec.mux.ServeHTTP(w, r) }
 
-// notFound answers every path under /api/ that no route claims. A known path
-// with another method gets the same answer: the catalog has no 405 code.
-func notFound(w http.ResponseWriter, r *http.Request) {
-	problem.Write(w, r, problem.NotFound)
+// probeMethods are the methods the fallback tries to find which a path allows.
+var probeMethods = []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+
+// fallback answers every request under /api/ that no route claims: 405
+// method-not-allowed with an Allow header when the path exists for other
+// methods, 404 not-found when it does not (ERR-6).
+func fallback(mux *http.ServeMux) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var allowed []string
+		for _, m := range probeMethods {
+			probe := r.Clone(r.Context())
+			probe.Method = m
+			if _, pattern := mux.Handler(probe); pattern != "" && pattern != "/api/" {
+				allowed = append(allowed, m)
+			}
+		}
+		if len(allowed) > 0 {
+			problem.Write(w, r, problem.MethodNotAllowed, problem.Header("Allow", strings.Join(allowed, ", ")))
+			return
+		}
+		problem.Write(w, r, problem.NotFound)
+	}
 }
 
 // mountReference registers the reference site and the redirect from
