@@ -21,7 +21,7 @@ import (
 // The durable engine's use of the store (SPEC-001 C4a): opening an execution
 // from its rows and committing a step. The recovery work that moves tokens when
 // a lease is lost runs in the orcon_engine functions of migrations 0008 and
-// 0009 (engine.go).
+// 0011 (engine.go).
 
 // livePageSize is the page of live tokens a snapshot reads at a time.
 const livePageSize = 500
