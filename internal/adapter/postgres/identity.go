@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -109,11 +111,11 @@ func (s *Store) clearPrincipalReferences(ctx context.Context, principal identity
 	return changed, mapError(op, err)
 }
 
-func userFrom(row *sqlcgen.ApplicationUser) identity.UserRecord {
+func userFrom(id, principal pgtype.UUID, email, displayName, status string, created, updated pgtype.Timestamptz) identity.UserRecord {
 	return identity.UserRecord{
-		ID: fromPGUUID[identity.UserID](row.ID), PrincipalID: fromPGUUID[identity.PrincipalID](row.PrincipalID),
-		EmailNormalized: row.EmailNormalized, DisplayName: row.DisplayName, Status: row.Status,
-		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		ID: fromPGUUID[identity.UserID](id), PrincipalID: fromPGUUID[identity.PrincipalID](principal),
+		EmailNormalized: email, DisplayName: displayName, Status: status,
+		CreatedAt: instant(created), UpdatedAt: instant(updated),
 	}
 }
 
@@ -140,7 +142,7 @@ func (s *Store) GetUser(ctx context.Context, user identity.UserID) (identity.Use
 		if err != nil {
 			return err
 		}
-		out = userFrom(&row)
+		out = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return nil
 	})
 	return out, err
@@ -154,7 +156,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, emailNormalized string) (ide
 		if err != nil {
 			return err
 		}
-		out = userFrom(&row)
+		out = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return nil
 	})
 	return out, err

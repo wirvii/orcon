@@ -19,6 +19,7 @@ type ApplicationUser struct {
 	Status          string
 	CreatedAt       int64
 	UpdatedAt       int64
+	PasswordHash    sql.NullString
 }
 
 type AttentionRequest struct {
@@ -384,6 +385,14 @@ type LimitBucket struct {
 	UpdatedAt       int64
 }
 
+type LoginThrottle struct {
+	ID          []byte
+	Failures    int64
+	LockedUntil int64
+	CreatedAt   int64
+	UpdatedAt   int64
+}
+
 type Membership struct {
 	ID                   []byte
 	OrgID                []byte
@@ -567,6 +576,19 @@ type SchemaMigration struct {
 	BinaryVersion      string
 	CompatibilityFloor string
 	CreatedAt          int64
+}
+
+type Session struct {
+	ID                []byte
+	ApplicationUserID []byte
+	TokenHash         []byte
+	AssuranceLevel    string
+	CreatedAt         int64
+	ExpiresAt         int64
+	IdleExpiresAt     int64
+	LastSeenAt        int64
+	RevokedAt         sql.NullInt64
+	UpdatedAt         int64
 }
 
 type TaskAttempt struct {

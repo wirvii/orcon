@@ -71,6 +71,60 @@ type UserStore interface {
 	//
 	//orcon:scope instance application_user is an instance table
 	GetUserByEmail(ctx context.Context, emailNormalized string) (UserRecord, error)
+	// GetUserCredentialsByEmail returns the user with that normalized address and
+	// its stored password hash, or [ErrNotFound]. Only the sign-in path reads the hash.
+	//
+	//orcon:scope instance application_user is an instance table
+	GetUserCredentialsByEmail(ctx context.Context, emailNormalized string) (UserCredentials, error)
+	// SetPasswordHash stores the password hash of the user and the instant of the
+	// change, or fails with [ErrNotFound].
+	//
+	//orcon:scope instance application_user is an instance table
+	SetPasswordHash(ctx context.Context, user UserID, hash string, now time.Time) error
+}
+
+// SessionStore persists login sessions.
+type SessionStore interface {
+	// CreateSession inserts a session. A repeated token hash fails with [ErrConflict];
+	// an unknown user with [ErrReference].
+	//
+	//orcon:scope instance session is an instance table
+	CreateSession(ctx context.Context, s SessionRecord) error
+	// GetSessionByTokenHash returns the session with that token hash and its user,
+	// revoked or not, or [ErrNotFound].
+	//
+	//orcon:scope instance session is an instance table
+	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (SessionView, error)
+	// GetSession returns one session of the user, or [ErrNotFound].
+	//
+	//orcon:scope instance session is an instance table
+	GetSession(ctx context.Context, user UserID, session SessionID) (SessionRecord, error)
+	// UpdateSessionActivity moves the last-seen instant and the idle deadline of a
+	// live session, or fails with [ErrNotFound] when it is revoked or unknown.
+	//
+	//orcon:scope instance session is an instance table
+	UpdateSessionActivity(ctx context.Context, session SessionID, lastSeen, idleExpiresAt time.Time) error
+	// MarkSessionRevoked sets the revocation instant of a live session of the user,
+	// or fails with [ErrNotFound].
+	//
+	//orcon:scope instance session is an instance table
+	MarkSessionRevoked(ctx context.Context, user UserID, session SessionID, at time.Time) error
+}
+
+// LoginThrottleStore persists the failed sign-in attempts per keyed identifier.
+type LoginThrottleStore interface {
+	// GetLoginThrottle returns the state of the identifier, or [ErrNotFound].
+	//
+	//orcon:scope instance login_throttle is an instance table
+	GetLoginThrottle(ctx context.Context, identifier []byte) (LoginThrottle, error)
+	// PutLoginThrottle stores the state of the identifier, replacing any previous one.
+	//
+	//orcon:scope instance login_throttle is an instance table
+	PutLoginThrottle(ctx context.Context, identifier []byte, t LoginThrottle) error
+	// ClearLoginThrottle removes the state of the identifier; an unknown one is not an error.
+	//
+	//orcon:scope instance login_throttle is an instance table
+	ClearLoginThrottle(ctx context.Context, identifier []byte) error
 }
 
 // MembershipStore persists the memberships of an organization.
