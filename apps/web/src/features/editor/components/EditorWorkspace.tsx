@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { AlertDialog, Banner, Button, CommandPalette, type PaletteCommand } from '@orcon/ui';
-import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
+import { AlertDialog, Banner, Button, CommandPalette, type DetailsTab, type PaletteCommand } from '@orcon/ui';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { useIntl } from 'react-intl';
 
 import { clipboardEventText, setClipboardEventText } from '../../../app/boundary/clipboard';
@@ -21,6 +21,13 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import { useAutosave, type SaveFunction } from './use-autosave';
 import { useEditorCommands } from './use-editor-commands';
 import { EDITING_QUERY, useMediaQuery } from './use-media-query';
+
+// The details view and its forms load when the first node is opened: they are not part of opening the editor.
+const NodeDetails = lazy(() => import('./NodeDetails').then((module) => ({ default: module.NodeDetails })));
+const DockedDataPanel = lazy(() => import('./NodeDetails').then((module) => ({ default: module.DockedDataPanel })));
+
+/** From this width the node details view is a dialog over the canvas (lg); below it, from md, it docks beside the canvas. */
+const DIALOG_QUERY = '(min-width: 64rem)';
 
 export interface EditorWorkspaceProps {
   /** Writes the draft. */
@@ -56,6 +63,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const editable = useMediaQuery(EDITING_QUERY);
+  const dialogLayout = useMediaQuery(DIALOG_QUERY);
   const platform = useMemo(detectPlatform, []);
   const canvas = useRef<EditorCanvasHandle>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -65,6 +73,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
   const [findOpen, setFindOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [confirmReload, setConfirmReload] = useState(false);
+  const [details, setDetails] = useState<{ id: string; tab: DetailsTab } | undefined>();
   const [previewShown, setPreviewShown] = useState(true);
   const { status, saveNow } = useAutosave(save, session);
 
@@ -124,6 +133,21 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
     focusOutline.current = true;
     setOutlineOpen(true);
   };
+
+  // The details view needs the md breakpoint: on a phone the canvas is view-only and shows its own status panel.
+  const openDetails = useCallback((id: string) => {
+    setDetails((current) => ({ id, tab: current?.id === id ? current.tab : 'parameters' }));
+  }, []);
+  const closeDetails = useCallback(() => {
+    setDetails(undefined);
+  }, []);
+  useEffect(() => {
+    if (!editable) setDetails(undefined);
+  }, [editable]);
+  const detailsId = details?.id;
+  const returnFocus = useCallback(() => {
+    if (detailsId) canvas.current?.focusSoon(detailsId);
+  }, [detailsId]);
 
   const commands = useEditorCommands({
     canvas,
@@ -197,12 +221,25 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
     setSession((value) => value + 1);
   };
 
+  /** Escape closes the docked details view, like "Back to canvas", unless a menu or dialog inside it took the key. */
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || !details || dialogLayout) return;
+    if (event.target instanceof HTMLElement && event.target.closest('[data-node-details="docked"]')) {
+      event.preventDefault();
+      closeDetails();
+      returnFocus();
+    }
+  };
+
+  const showDocked = details !== undefined && editable && !dialogLayout;
+
   return (
     <div
       ref={root}
       data-editor-workspace
       className="bg-surface border-border flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-lg border"
       onKeyDownCapture={onKeyDownCapture}
+      onKeyDown={onKeyDown}
       onFocus={(event) => {
         // Portals of the dialogs bubble their focus events here too; only the editor's own elements count.
         if (event.target instanceof HTMLElement && root.current?.contains(event.target)) lastFocus.current = event.target;
@@ -282,30 +319,67 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
           </Banner>
         ) : null}
       </div>
-      <div className="relative flex min-h-0 flex-1 flex-col lg:flex-row">
-        <EditorCanvas ref={canvas} />
-        <NoticeBar />
-        {outlineOpen ? (
-          <aside
-            ref={outlineRef}
-            tabIndex={-1}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.stopPropagation();
-                closeOutline();
-              }
-            }}
-            aria-label={intl.formatMessage(editorMessages.outlineTitle)}
-            className="border-border bg-surface min-h-0 overflow-y-auto border-t p-3 lg:w-canvas-palette-w lg:shrink-0 lg:border-s lg:border-t-0">
-            <EditorOutline
-              editable={editable}
-              onFocusNode={(id) => canvas.current?.focusSoon(id)}
-              onDisconnect={(edgeId) => api.getState().disconnect(edgeId)}
-              onDeleteNode={(id) => api.getState().removeNodes([id])}
-            />
-          </aside>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <EditorCanvas ref={canvas} onOpenDetails={openDetails} syncNodes={details !== undefined} />
+            {showDocked ? (
+              <Suspense fallback={null}>
+                <NodeDetails
+                  nodeId={details.id}
+                  layout="docked"
+                  tab={details.tab}
+                  onTabChange={(tab) => {
+                    setDetails({ id: details.id, tab });
+                  }}
+                  onClose={closeDetails}
+                  onReturnFocus={returnFocus}
+                />
+              </Suspense>
+            ) : null}
+          </div>
+          <NoticeBar />
+          {outlineOpen ? (
+            <aside
+              ref={outlineRef}
+              tabIndex={-1}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation();
+                  closeOutline();
+                }
+              }}
+              aria-label={intl.formatMessage(editorMessages.outlineTitle)}
+              className="border-border bg-surface min-h-0 overflow-y-auto border-t p-3 lg:w-canvas-palette-w lg:shrink-0 lg:border-s lg:border-t-0">
+              <EditorOutline
+                editable={editable}
+                onFocusNode={(id) => canvas.current?.focusSoon(id)}
+                onDisconnect={(edgeId) => api.getState().disconnect(edgeId)}
+                onDeleteNode={(id) => api.getState().removeNodes([id])}
+              />
+            </aside>
+          ) : null}
+        </div>
+        {showDocked ? (
+          <Suspense fallback={null}>
+            <DockedDataPanel nodeId={details.id} />
+          </Suspense>
         ) : null}
       </div>
+      {details !== undefined && editable && dialogLayout ? (
+        <Suspense fallback={null}>
+          <NodeDetails
+            nodeId={details.id}
+            layout="dialog"
+            tab={details.tab}
+            onTabChange={(tab) => {
+              setDetails({ id: details.id, tab });
+            }}
+            onClose={closeDetails}
+            onReturnFocus={returnFocus}
+          />
+        </Suspense>
+      ) : null}
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} platform={platform} />
       <FindNodeDialog open={findOpen} onOpenChange={setFindOpen} nodes={found} onPick={(id) => {
           picked.current = id;

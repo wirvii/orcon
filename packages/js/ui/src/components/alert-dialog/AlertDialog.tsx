@@ -6,7 +6,8 @@ import type { ReactElement, ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 import { cn } from '../../lib/cn';
-import { modalPanel, scrim } from '../../lib/control';
+import { modalPanel } from '../../lib/control';
+import { useScrim } from '../../lib/modal-nesting';
 import { commonMessages } from '../../lib/messages';
 import { Button } from '../button/Button';
 
@@ -48,11 +49,12 @@ export function AlertDialog({
   destructive = true,
 }: AlertDialogProps) {
   const intl = useIntl();
+  const backdrop = useScrim();
   return (
     <AlertPrimitive.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {trigger ? <AlertPrimitive.Trigger asChild>{trigger}</AlertPrimitive.Trigger> : null}
       <AlertPrimitive.Portal>
-        <AlertPrimitive.Overlay className={scrim} />
+        <AlertPrimitive.Overlay className={backdrop} />
         <div className="pointer-events-none fixed inset-0 z-modal flex items-center justify-center p-4">
           <AlertPrimitive.Content
             className={cn(modalPanel, 'pointer-events-auto flex max-h-full w-full max-w-screen-sm flex-col gap-3 overflow-y-auto rounded-xl p-4')}

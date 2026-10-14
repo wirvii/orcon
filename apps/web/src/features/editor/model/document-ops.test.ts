@@ -12,10 +12,15 @@ import {
   edgeKindFor,
   edgeProblem,
   moveNodes,
+  pinConnector,
   positionOf,
   removeNodes,
   renameNode,
+  setCredentialBinding,
   setDisabled,
+  setNodeBlock,
+  setNodeNote,
+  setParameter,
   setPosition,
   updateStickyNote,
 } from './document-ops';
@@ -157,6 +162,14 @@ describe('adding', () => {
     expect(addNodeOfType(document, def('if'), { x: 0, y: 0 }, 'Another')).toBe('add-if-2');
   });
 
+  it('adds a Call sub-flow node without a call block: it is written when a flow is chosen', () => {
+    const document = exampleFlowDocument();
+    const id = addNodeOfType(document, def('call'), { x: 0, y: 0 }, 'Call sub-flow');
+    const added = findNode(document, id);
+    expect(added).toMatchObject({ element: 'callActivity', type: 'orcon.callFlow@1', parameters: {} });
+    expect(added).not.toHaveProperty('call');
+  });
+
   it('adds and changes sticky notes', () => {
     const document = exampleFlowDocument();
     const id = addStickyNote(document, { x: 101, y: 99 });
@@ -167,5 +180,89 @@ describe('adding', () => {
     expect(updateStickyNote(document, id, { title: undefined })).toBe(true);
     expect(document.editor.stickyNotes?.[1]).not.toHaveProperty('title');
     expect(updateStickyNote(document, 'ghost', { body: 'x' })).toBe(false);
+  });
+});
+
+describe('configuring a node', () => {
+  it('sets a parameter and removes it with undefined', () => {
+    const document = exampleFlowDocument();
+    expect(setParameter(document, 'slack', 'method', 'PUT')).toBe(true);
+    expect(findNode(document, 'slack')?.parameters['method']).toBe('PUT');
+    expect(setParameter(document, 'slack', 'body', undefined)).toBe(true);
+    expect(findNode(document, 'slack')?.parameters).not.toHaveProperty('body');
+    expect(setParameter(document, 'ghost', 'a', 1)).toBe(false);
+  });
+
+  it('replaces and removes a behaviour block and leaves the others alone', () => {
+    const document = exampleFlowDocument();
+    expect(setNodeBlock(document, 'slack', 'retry', { maxAttempts: 3 })).toBe(true);
+    expect(setNodeBlock(document, 'slack', 'onError', 'ERROR_OUTPUT')).toBe(true);
+    expect(findNode(document, 'slack')).toMatchObject({ retry: { maxAttempts: 3 }, onError: 'ERROR_OUTPUT', connector: { version: '1.0.0' } });
+    expect(setNodeBlock(document, 'slack', 'retry', undefined)).toBe(true);
+    expect(findNode(document, 'slack')).not.toHaveProperty('retry');
+    expect(setNodeBlock(document, 'ghost', 'retry', {})).toBe(false);
+  });
+
+  it('binds a credential slot by name and unbinds it, dropping the block when it is empty', () => {
+    const document = exampleFlowDocument();
+    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Slack incoming webhook' } });
+    expect(setCredentialBinding(document, 'slack', 'auth', 'Other')).toBe(true);
+    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Other' } });
+    expect(setCredentialBinding(document, 'slack', 'second', 'Two')).toBe(true);
+    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Other' }, second: { name: 'Two' } });
+    expect(setCredentialBinding(document, 'slack', 'auth', undefined)).toBe(true);
+    expect(setCredentialBinding(document, 'slack', 'second', undefined)).toBe(true);
+    expect(findNode(document, 'slack')).not.toHaveProperty('credentials');
+    expect(setCredentialBinding(document, 'ghost', 'auth', 'x')).toBe(false);
+  });
+
+  it('pins a node to another connector version', () => {
+    const document = exampleFlowDocument();
+    expect(pinConnector(document, 'slack', '1.2.0', 'sha256:abc')).toBe(true);
+    expect(findNode(document, 'slack')?.['connector']).toEqual({ version: '1.2.0', digest: 'sha256:abc' });
+  });
+});
+
+describe('notes on nodes', () => {
+  it('keeps a note beside the position, and removes it when the text is empty', () => {
+    const document = exampleFlowDocument();
+    expect(setNodeNote(document, 'slack', 'Ask Ana before changing the channel')).toBe(true);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 640, y: 60, note: 'Ask Ana before changing the channel' });
+    expect(setNodeNote(document, 'slack', '')).toBe(true);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 640, y: 60 });
+    setNodeNote(document, 'slack', 'again');
+    expect(setNodeNote(document, 'slack', undefined)).toBe(true);
+    expect(document.editor.nodes?.['slack']).not.toHaveProperty('note');
+  });
+
+  it('refuses a note of more than 5000 characters, counted as code points, and a node that does not exist', () => {
+    const document = exampleFlowDocument();
+    expect(setNodeNote(document, 'slack', 'a'.repeat(5000))).toBe(true);
+    expect(setNodeNote(document, 'slack', 'a'.repeat(5001))).toBe(false);
+    // 5000 emoji are 5000 characters even though they take two UTF-16 units each.
+    expect(setNodeNote(document, 'slack', '\u{1F600}'.repeat(5000))).toBe(true);
+    expect(setNodeNote(document, 'ghost', 'x')).toBe(false);
+  });
+
+  it('keeps the position the canvas draws for a node that has none recorded', () => {
+    const document = exampleFlowDocument();
+    document.editor.nodes = {};
+    setNodeNote(document, 'validate', 'note');
+    expect(document.editor.nodes['validate']).toMatchObject({ note: 'note' });
+    expect(Object.keys(document.editor.nodes)).toEqual(['validate']);
+  });
+
+  it('survives moving the node', () => {
+    const document = exampleFlowDocument();
+    setNodeNote(document, 'slack', 'stay');
+    moveNodes(document, ['slack'], 40, 20);
+    expect(document.editor.nodes?.['slack']).toEqual({ x: 680, y: 80, note: 'stay' });
+  });
+
+  it('goes with the node when it is deleted', () => {
+    const document = exampleFlowDocument();
+    setNodeNote(document, 'slack', 'gone');
+    removeNodes(document, ['slack']);
+    expect(document.editor.nodes).not.toHaveProperty('slack');
   });
 });

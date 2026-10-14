@@ -122,6 +122,8 @@ function elementTypeRules() {
     { from: 'feature-screens', allow: [['feature-screens', sameArea], ['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
     { from: 'feature-forms', allow: [['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
     { from: 'feature-components', allow: [['feature-components', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
+    // Only the editor's components may import its forms: the node details view hosts the node configuration form (orcon-web AR-5, SPEC-014 FE9).
+    { from: [['feature-components', { area: 'editor' }]], allow: [['feature-forms', { area: 'editor' }]] },
     { from: 'feature-api', allow: [['feature-api', sameArea], ['feature-model', sameArea], ...app] },
     { from: 'feature-model', allow: [['feature-model', sameArea]] },
     { from: 'feature-store', allow: ['feature-store', ['feature-model', { area: 'editor' }]] },

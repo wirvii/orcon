@@ -27,10 +27,16 @@ function renderEditor(path = `/flows/${EXAMPLE_FLOW_ID}`) {
 }
 
 /** A tablet or a computer: from the md breakpoint the canvas edits. */
-function editing(on = true) {
+function editing(on = true, wide = false) {
   vi.stubGlobal(
     'matchMedia',
-    vi.fn((query: string) => ({ matches: on && query === '(min-width: 48rem)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    vi.fn((query: string) => ({
+      // `wide` is the lg breakpoint: from it the node details view is a dialog, below it it docks beside the canvas.
+      matches: on && (query === '(min-width: 48rem)' || (wide && query === '(min-width: 64rem)')),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   );
 }
 
@@ -515,5 +521,264 @@ describe('the editor screen', () => {
     canvasNode(/^Slack,/).focus();
     await userEvent.keyboard('d');
     expect(leave()).toBe(true);
+  });
+});
+
+describe('the node details view', () => {
+  beforeEach(() => {
+    const fresh = createLocalDraftSource();
+    vi.spyOn(draftSource, 'load').mockImplementation(fresh.load);
+    vi.spyOn(draftSource, 'save').mockImplementation(fresh.save);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  describe('from lg, as a dialog over the canvas', () => {
+    beforeEach(() => {
+      editing(true, true);
+    });
+
+    it('opens with Enter on a node and has three panes and the three tabs', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
+      for (const pane of ['input', 'parameters', 'output']) expect(dialog.querySelector(`[data-pane="${pane}"]`)).not.toBeNull();
+      expect(within(dialog).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Parameters', 'Settings', 'Docs']);
+      expect(within(dialog).getByRole('textbox', { name: /URL/ })).toHaveValue('https://hooks.slack.example.test/services/orders');
+      // Nothing has run in this editor: both panes say so and offer the run.
+      expect(within(dialog).getByText('No input data yet')).toBeVisible();
+      expect(within(dialog).getByText('Execute this step to see output')).toBeVisible();
+    });
+
+    it('has no input pane for a trigger', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Webhook,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Webhook details' });
+      expect(dialog.querySelector('[data-pane="input"]')).toBeNull();
+      expect(dialog.querySelector('[data-pane="output"]')).not.toBeNull();
+      expect(within(dialog).getByRole('textbox', { name: /Path/ })).toHaveValue('/orders');
+    });
+
+    it('closes with Escape and gives focus back to the node', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      await screen.findByRole('dialog', { name: 'Slack details' });
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Slack details' })).toBeNull();
+      });
+      await waitFor(() => {
+        expect(canvasNode(/^Slack,/)).toHaveFocus();
+      });
+    });
+
+    it('closes with "Back to canvas" and gives focus back to the node', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^HTTP Request,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'HTTP Request details' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Back to canvas' }));
+      await waitFor(() => {
+        expect(canvasNode(/^HTTP Request,/)).toHaveFocus();
+      });
+    });
+
+    it('shows the edits on the canvas as they are made: the line under the node and the error output', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
+      const url = within(dialog).getByRole('textbox', { name: /URL/ });
+      await userEvent.clear(url);
+      await userEvent.type(url, 'https://other.example.test/x');
+      await userEvent.click(within(dialog).getByRole('tab', { name: 'Settings' }));
+      await userEvent.click(within(dialog).getByRole('combobox', { name: /After the last attempt fails/ }));
+      await userEvent.click(await screen.findByRole('option', { name: /error output/ }));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Slack details' })).toBeNull();
+      });
+      await waitFor(() => {
+        expect(canvasNode(/^Slack,/).getAttribute('aria-label') ?? '').toContain('other.example.test');
+        // The tile draws a port for the failure output.
+        expect(canvasNode(/^Slack,/).textContent).toContain('error');
+      });
+      // The canvas was told about the new line and port; that is not an edit of its own, so nothing was renamed.
+      expect(status()).not.toMatch(/Renamed/);
+    });
+
+    it('takes the canvas back with the draft when the edits are undone', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
+      await userEvent.click(within(dialog).getByRole('tab', { name: 'Settings' }));
+      await userEvent.click(within(dialog).getByRole('combobox', { name: /After the last attempt fails/ }));
+      await userEvent.click(await screen.findByRole('option', { name: /error output/ }));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Slack details' })).toBeNull();
+      });
+      await waitFor(() => {
+        expect(canvasNode(/^Slack,/).textContent).toContain('error');
+      });
+      await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      await waitFor(() => {
+        expect(canvasNode(/^Slack,/).textContent).not.toContain('error');
+      });
+    });
+
+    it('renames the node from its header, with the references rewritten, and says so', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Webhook,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Webhook details' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Webhook' }));
+      const field = within(dialog).getByRole('textbox', { name: 'Node name' });
+      await userEvent.clear(field);
+      await userEvent.type(field, 'Order received{Enter}');
+      expect(await screen.findByRole('dialog', { name: 'Order received details' })).toBeVisible();
+      expect(status()).toMatch(/Renamed to Order received\. 1 reference updated/);
+    });
+
+    it('refuses a name another node has, and says so', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Webhook,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Webhook details' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Webhook' }));
+      const field = within(dialog).getByRole('textbox', { name: 'Node name' });
+      await userEvent.clear(field);
+      await userEvent.type(field, 'Slack{Enter}');
+      expect(status()).toMatch(/Another node already has that name/);
+      expect(screen.getByRole('dialog', { name: 'Webhook details' })).toBeVisible();
+    });
+
+    it('says test runs come later when the person runs the step', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
+      await userEvent.click(within(dialog).getAllByRole('button', { name: 'Execute step' })[0] as HTMLElement);
+      expect(status()).toMatch(/Test runs arrive in a later editor release/);
+    });
+
+    it('keeps the editor shortcuts out of the dialog: typing "d" in a field does not disable the node', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
+      const url = within(dialog).getByRole('textbox', { name: /URL/ });
+      await userEvent.type(url, 'd');
+      expect(url).toHaveValue('https://hooks.slack.example.test/services/ordersd');
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Slack details' })).toBeNull();
+      });
+      expect(canvasNode(/^Slack,/).getAttribute('aria-label') ?? '').not.toMatch(/disabled/i);
+    });
+  });
+
+  describe('between md and lg, docked beside the canvas', () => {
+    beforeEach(() => {
+      editing(true, false);
+    });
+
+    it('docks the parameters and shows the data in a panel at the bottom, one side at a time', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const docked = await screen.findByRole('complementary', { name: 'Slack details' });
+      expect(within(docked).getByRole('textbox', { name: /URL/ })).toBeVisible();
+      // The canvas stays on screen beside it.
+      expect(canvasNode(/^Slack,/)).toBeInTheDocument();
+      const data = await screen.findByRole('region', { name: 'Data of Slack' });
+      expect(within(data).getByText('Execute this step to see output')).toBeVisible();
+      await userEvent.click(within(data).getByRole('button', { name: 'Input' }));
+      expect(within(data).getByText('No input data yet')).toBeVisible();
+      expect(within(data).getByRole('button', { name: 'Input' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('shows only the output of a trigger', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Webhook,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const data = await screen.findByRole('region', { name: 'Data of Webhook' });
+      expect(within(data).queryByRole('button', { name: 'Input' })).toBeNull();
+      expect(within(data).getByText('Execute this step to see output')).toBeVisible();
+    });
+
+    it('closes with Escape from inside the panel and gives focus back to the node', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const docked = await screen.findByRole('complementary', { name: 'Slack details' });
+      await userEvent.click(within(docked).getByRole('textbox', { name: /URL/ }));
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByRole('complementary', { name: 'Slack details' })).toBeNull();
+      });
+      expect(screen.queryByRole('region', { name: 'Data of Slack' })).toBeNull();
+      await waitFor(() => {
+        expect(canvasNode(/^Slack,/)).toHaveFocus();
+      });
+    });
+
+    it('moves to another node when another is opened, and closes with its back button', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      await screen.findByRole('complementary', { name: 'Slack details' });
+      canvasNode(/^Webhook,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const docked = await screen.findByRole('complementary', { name: 'Webhook details' });
+      expect(screen.queryByRole('complementary', { name: 'Slack details' })).toBeNull();
+      await userEvent.click(within(docked).getByRole('button', { name: 'Back to canvas' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('complementary', { name: 'Webhook details' })).toBeNull();
+      });
+    });
+
+    it('keeps Ctrl+S working from a field of the panel', async () => {
+      renderEditor();
+      await opened();
+      canvasNode(/^Slack,/).focus();
+      await userEvent.keyboard('{Enter}');
+      const docked = await screen.findByRole('complementary', { name: 'Slack details' });
+      await userEvent.type(within(docked).getByRole('textbox', { name: /URL/ }), 'z');
+      await userEvent.keyboard('{Control>}s{/Control}');
+      await waitFor(() => {
+        expect(draftSource.save).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('on a phone', () => {
+    it('does not open: the canvas shows its own panel with the state of the node', async () => {
+      editing(false);
+      renderEditor();
+      await screen.findByRole('heading', { level: 1, name: 'Order notifications' });
+      expect(screen.queryByRole('dialog', { name: /details/ })).toBeNull();
+      expect(screen.queryByRole('complementary', { name: /details/ })).toBeNull();
+    });
   });
 });
