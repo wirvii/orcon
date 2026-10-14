@@ -21,6 +21,7 @@
   },
   "$defs": {
     "text": { "type": "string", "minLength": 1 },
+    "sensitivePath": { "type": "string", "maxLength": 512, "pattern": "^/([^~]|~[01])*$" },
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "uuid": {
       "type": "string",
@@ -332,6 +333,13 @@
             },
             "compensation": { "type": "object", "additionalProperties": false }
           }
+        },
+        "sensitivePaths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sensitivePath" }
         },
         "attention": {
           "type": "object",

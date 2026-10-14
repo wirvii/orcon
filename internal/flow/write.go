@@ -220,6 +220,7 @@ func (n *Node) writeBlocks(b *builder) {
 		a.str("notify", string(n.Attention.Notify))
 		b.val("attention", a.build())
 	}
+	b.strs("sensitivePaths", n.SensitivePaths)
 }
 
 func (k IntOrKeyword) value() jsonvalue.Value {
