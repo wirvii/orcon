@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orcon brand review</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="review.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>Orcon brand review</h1>
+      <p>
+        Each asset is shown next to its region of the approved primary board
+        (<code>brand/reference/orcon-board-primary.png</code>, never re-encoded). The percentage is the
+        shape match (intersection over union, IoU) measured in this page; the floor beside it is the
+        automatic minimum, not the approval. The owner decides.
+      </p>
+      <div class="toolbar">
+        <label>Zoom
+          <select id="zoom">
+            <option value="1">1x</option>
+            <option value="2" selected>2x</option>
+            <option value="4">4x</option>
+          </select>
+        </label>
+        <nav id="nav"></nav>
+      </div>
+    </header>
+    <main id="main">
+      <section data-section="shape-match" id="shape-match"><h2>Shape match against the board</h2><div id="cards" class="cards"></div></section>
+      <section data-section="icons" id="icons"><h2>Icons and favicon</h2><div id="icon-cards" class="cards"></div></section>
+      <section data-section="mascot" id="mascot"><h2>Mascot cut-outs</h2><div id="mascot-cards" class="cards"></div></section>
+      <section data-section="contrast" id="contrast"><h2>Contrast of the brand colors</h2><div id="contrast-table"></div></section>
+    </main>
+    <script type="module" src="review.js"></script>
+  </body>
+</html>
