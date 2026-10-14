@@ -3,7 +3,7 @@
 <img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0017 — Execution history, retention and redaction
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13 (editor test runs, ADR-0082)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12; 2026-10-13; 2026-10-14 (editor test runs, ADR-0082)
 
 Accepted by the owner on 2026-10-12 via SPEC-001.
 
@@ -33,3 +33,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-005.** Retention of `public_event` 7 days, `webhook_delivery` 30 days, `idempotency_record` 24 hours and `api_operation` 30 days; the audit log keeps its own retention (ADR-0048 §6).
 - **SPEC-006.** Adds retention classes for conversations (their own; default 90 days of inactivity) and for evaluation results (as data of `EVALUATION` executions); the redaction vault is kept under the execution or conversation data key (ADR-0068 §3).
 - **SPEC-014 (ADR-0082, 2026-10-13, owner decision OQ3).** §1, §2 and §5: executions of mode `TEST` form their own retention class: execution data is kept 7 days and the execution log 30 days, whatever the flow's policy (an `ALWAYS` policy does not protect them), and under the size cap their data is deleted before any other class. §4: `orcon_engine.prune_batch('editor_test_data', n)` deletes, 24 hours after creation, editor test data that no pin and no test run references; effect previews are deleted with their execution's data, and test runs and their seeds with their execution; expired editing sessions are deleted without audit. §8: pins and their editor test data are deleted with the flow at purge.
+- **SPEC-014 (2026-10-14, owner decision P-ED6-2).** §3: the user-declared paths per node are the node's `sensitivePaths` (ADR-0007 §3) in the flow revision the execution pins (a published version or a test snapshot). They apply to the `json` object of every output item the node produces, on every port including `error`, with the same treatment as connector-declared fields: masked as `"[REDACTED]"` in history, encrypted in working state, masked in debug and replay. A path that does not exist in an item masks nothing and is not an error. They do not apply to binary data or to `parameters`. A mark covers the field of the marked node only: a later node that copies the value into its own output masks the copy only if that node marks it too or its connector declares it. The redaction of ADR-0068 uses the same marks.
