@@ -4,6 +4,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -71,9 +73,10 @@ func TestSVGRejectsBase64(t *testing.T) {
 func TestSVGRejectsExternalHref(t *testing.T) {
 	t.Parallel()
 	runSVGCases(t, []svgCase{
-		{name: "xlink:href to a URL", fixture: "href-external", reject: "not a local #fragment"},
+		{name: "xlink:href to a URL", fixture: "href-external", reject: "namespaced attribute"},
 		{name: "href to a relative file", fixture: "href-relative", reject: "not a local #fragment"},
-		{name: "src to a URL", fixture: "src-external", reject: "not a local #fragment"},
+		{name: "href on use to a URL", fixture: "use-href-external", reject: "not a local #fragment"},
+		{name: "src to a URL", fixture: "src-external", reject: "attribute is not allowed"},
 		{name: "local #fragment href is accepted", fixture: "clean"},
 	})
 }
@@ -81,8 +84,8 @@ func TestSVGRejectsExternalHref(t *testing.T) {
 func TestSVGRejectsCSSURL(t *testing.T) {
 	t.Parallel()
 	runSVGCases(t, []svgCase{
-		{name: "fill url() to a remote file", fixture: "css-url-external", reject: "not a local url(#id)"},
-		{name: "style attribute url() to a file", fixture: "css-url-style-attr", reject: "not a local url(#id)"},
+		{name: "fill url() to a remote file", fixture: "css-url-external", reject: "a local url(#id)"},
+		{name: "style attribute url() to a file", fixture: "css-url-style-attr", reject: "style attributes are not allowed"},
 		{name: "url(#id) in fill and style is accepted", fixture: "clean"},
 	})
 }
@@ -103,7 +106,8 @@ func TestSVGRejectsStyleAndEventHandlers(t *testing.T) {
 		{name: "style element", fixture: "style-element", reject: "<style>"},
 		{name: "onclick attribute", fixture: "onclick-attr", reject: "event handler"},
 		{name: "onload on the root", fixture: "onload-root", reject: "event handler"},
-		{name: "inline style attribute without url is accepted", fixture: "clean"},
+		{name: "style attribute", fixture: "style-attribute", reject: "style attributes are not allowed"},
+		{name: "plain presentation attributes are accepted", fixture: "clean"},
 	})
 }
 
@@ -144,6 +148,65 @@ func TestSVGRejectsOversizedFile(t *testing.T) {
 				t.Errorf("checkSVG(%d bytes) = %v, want one size finding", len(tc.doc), got)
 			case !tc.reject && len(got) != 0:
 				t.Errorf("checkSVG(%d bytes) = %v, want none", len(tc.doc), got)
+			}
+		})
+	}
+}
+
+// TestSVGRejectsAllowlistBypasses runs every bypass found in review against the
+// checker: animation of href or style, metadata, switch, CSS escapes, entities,
+// namespace tricks and the rest. Each must fail.
+func TestSVGRejectsAllowlistBypasses(t *testing.T) {
+	t.Parallel()
+	entries, err := os.ReadDir(filepath.Join("testdata", "svg", "bypass"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const wantFiles = 21
+	if len(entries) != wantFiles {
+		t.Fatalf("testdata/svg/bypass holds %d fixtures, want %d: a fixture was lost", len(entries), wantFiles)
+	}
+	for _, e := range entries {
+		t.Run(e.Name(), func(t *testing.T) {
+			t.Parallel()
+			got := checkSVG(e.Name(), readFixture(t, "svg/bypass/"+e.Name()))
+			if len(got) == 0 {
+				t.Fatalf("checkSVG(%s) accepted a bypass", e.Name())
+			}
+		})
+	}
+}
+
+func TestSVGAllowlistCoversRealAssets(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		doc    string
+		reject string
+	}{
+		{"gradient, clip path, use and transform", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><defs><radialGradient id="r" cx="2" cy="2" r="2"><stop offset=".5" stop-color="#fff" stop-opacity=".5"/></radialGradient><mask id="m"><rect width="4" height="4" fill="#fff"/></mask></defs><g transform="matrix(1 0 0 1 0 0) rotate(5)"><polygon points="0,0 4,0 4,4" fill="url(#r)" mask="url(#m)"/></g></svg>`, ""},
+		{"xmlns:xlink declaration is allowed", `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 4 4"><path d="M0 0h4v4z"/></svg>`, ""},
+		{"foreign namespace declaration", `<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://example.com/x" viewBox="0 0 4 4"><path d="M0 0h4v4z"/></svg>`, "namespace"},
+		{"element outside the SVG namespace", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z"/><path xmlns="http://www.w3.org/1999/xlink" d="M0 0"/></svg>`, "not in the SVG namespace"},
+		{"text outside title", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z"/><g>hello</g></svg>`, "only allowed inside <title>"},
+		{"fill with a function", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" fill="rgb(1,2,3)"/></svg>`, "plain paint"},
+		{"backslash in a value", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" id="a\b"/></svg>`, "backslash"},
+		{"parenthesis in an arbitrary attribute", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" stroke-width="calc(1px)"/></svg>`, "parenthesis"},
+		{"url with a fallback is not exact url(#id)", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" fill="url(#a) url(https://x/y)"/></svg>`, "plain paint"},
+		{"upper case attribute name", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><use HREF="#a"/><path d="M0 0h4v4z"/></svg>`, "not allowed"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := checkSVG("x.svg", []byte(tc.doc))
+			if tc.reject == "" {
+				if len(got) != 0 {
+					t.Fatalf("checkSVG found:\n%swant it accepted", render(got))
+				}
+				return
+			}
+			if !strings.Contains(render(got), tc.reject) {
+				t.Fatalf("checkSVG found:\n%swant a finding containing %q", render(got), tc.reject)
 			}
 		})
 	}

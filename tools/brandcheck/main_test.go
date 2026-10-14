@@ -20,7 +20,7 @@ func TestRunSVGNamesTheFileAndExitsOne(t *testing.T) {
 		{"clean", 0, "brandcheck: ok"},
 		{"image-lower", 1, "<image>"},
 		{"data-fill", 1, "data: URI"},
-		{"href-external", 1, "not a local #fragment"},
+		{"href-external", 1, "namespaced attribute"},
 		{"text-element", 1, "<text>"},
 	}
 	for _, tc := range tests {

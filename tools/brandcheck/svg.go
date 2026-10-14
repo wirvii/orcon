@@ -16,14 +16,45 @@ import (
 // maxSVGBytes is the size ceiling of a brand SVG (SPEC-018 BC-1).
 const maxSVGBytes = 16 * 1024
 
-// bannedElements are the elements that can carry raster data, run code, load
-// something from outside or stand for text that was not converted to outlines.
-// Names are compared in lower case and without namespace prefix.
-var bannedElements = map[string]bool{
-	"image": true, "feimage": true, "foreignobject": true, "script": true,
-	"iframe": true, "object": true, "embed": true, "video": true, "audio": true,
-	"canvas": true, "text": true, "tspan": true, "textpath": true, "font": true,
-	"font-face": true, "style": true,
+// Namespaces a brand SVG may declare.
+const (
+	svgNamespace   = "http://www.w3.org/2000/svg"
+	xlinkNamespace = "http://www.w3.org/1999/xlink"
+)
+
+// The vector check is an allowlist: a brand SVG may contain only the elements
+// and attributes below, and every value is validated. Anything not listed is a
+// finding, so a feature nobody thought of (animation, metadata, switch, CSS
+// escapes, entity tricks) fails closed instead of slipping through.
+
+// paintAttrs are the presentation attributes every drawn element accepts.
+var paintAttrs = []string{
+	"id", "transform", "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width",
+	"stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-opacity",
+	"stroke-dasharray", "stroke-dashoffset", "opacity", "clip-path", "clip-rule", "mask",
+}
+
+// elementAttrs maps each allowed element to the attributes it accepts, besides
+// namespace declarations. Names are case sensitive, as in SVG.
+var elementAttrs = map[string]map[string]bool{
+	"svg":            attrSet(paintAttrs, "viewBox", "width", "height", "preserveAspectRatio", "version"),
+	"g":              attrSet(paintAttrs),
+	"defs":           attrSet(paintAttrs),
+	"path":           attrSet(paintAttrs, "d"),
+	"rect":           attrSet(paintAttrs, "x", "y", "width", "height", "rx", "ry"),
+	"circle":         attrSet(paintAttrs, "cx", "cy", "r"),
+	"ellipse":        attrSet(paintAttrs, "cx", "cy", "rx", "ry"),
+	"line":           attrSet(paintAttrs, "x1", "y1", "x2", "y2"),
+	"polyline":       attrSet(paintAttrs, "points"),
+	"polygon":        attrSet(paintAttrs, "points"),
+	"use":            attrSet(paintAttrs, "href", "x", "y", "width", "height"),
+	"linearGradient": attrSet(nil, "id", "gradientUnits", "gradientTransform", "spreadMethod", "x1", "y1", "x2", "y2", "href"),
+	"radialGradient": attrSet(nil, "id", "gradientUnits", "gradientTransform", "spreadMethod", "cx", "cy", "r", "fx", "fy", "href"),
+	"stop":           attrSet(nil, "id", "offset", "stop-color", "stop-opacity"),
+	"clipPath":       attrSet(paintAttrs, "clipPathUnits"),
+	"mask":           attrSet(paintAttrs, "maskUnits", "maskContentUnits", "x", "y", "width", "height"),
+	"title":          attrSet(nil, "id"),
+	"desc":           attrSet(nil, "id"),
 }
 
 // shapeElements are the elements that draw geometry; a vector asset has at
@@ -33,8 +64,64 @@ var shapeElements = map[string]bool{
 	"circle": true, "ellipse": true, "line": true,
 }
 
-// urlReference finds the url() references inside attribute values.
-var urlReference = regexp.MustCompile(`(?i)url\(\s*([^)]*)\)`)
+// textElements may hold character data; everywhere else only whitespace is
+// allowed.
+var textElements = map[string]bool{"title": true, "desc": true}
+
+func attrSet(base []string, extra ...string) map[string]bool {
+	set := make(map[string]bool, len(base)+len(extra))
+	for _, n := range base {
+		set[n] = true
+	}
+	for _, n := range extra {
+		set[n] = true
+	}
+	return set
+}
+
+var (
+	idValue        = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	localRef       = regexp.MustCompile(`^#[A-Za-z_][A-Za-z0-9_.:-]*$`)
+	urlRef         = regexp.MustCompile(`^url\(#[A-Za-z_][A-Za-z0-9_.:-]*\)$`)
+	paintValue     = regexp.MustCompile(`^(none|currentColor|inherit|#[0-9A-Fa-f]{3,8}|[A-Za-z]+)$`)
+	transformValue = regexp.MustCompile(`^\s*((matrix|translate|scale|rotate|skewX|skewY)\s*\(\s*[-+0-9.eE,\s]*\)\s*,?\s*)+$`)
+)
+
+// checkValue validates one attribute value and returns the problem, or "".
+// A value never holds a backslash (CSS escapes) and holds a parenthesis only as
+// a transform function or as exactly url(#id).
+func checkValue(name, value string) string {
+	if strings.Contains(value, `\`) {
+		return "contains a backslash"
+	}
+	switch name {
+	case "id":
+		if !idValue.MatchString(value) {
+			return fmt.Sprintf("id %q is not a plain identifier", shorten(value))
+		}
+	case "href":
+		if !localRef.MatchString(strings.TrimSpace(value)) {
+			return fmt.Sprintf("reference %q is not a local #fragment (no external resources)", shorten(value))
+		}
+	case "fill", "stroke", "stop-color":
+		if v := strings.TrimSpace(value); !paintValue.MatchString(v) && !urlRef.MatchString(v) {
+			return fmt.Sprintf("value %q is not a plain paint or a local url(#id)", shorten(value))
+		}
+	case "clip-path", "mask":
+		if v := strings.TrimSpace(value); v != "none" && !urlRef.MatchString(v) {
+			return fmt.Sprintf("value %q is not none or a local url(#id)", shorten(value))
+		}
+	case "transform", "gradientTransform":
+		if !transformValue.MatchString(value) {
+			return fmt.Sprintf("value %q is not a plain transform list", shorten(value))
+		}
+	default:
+		if strings.ContainsAny(value, "()") {
+			return fmt.Sprintf("value %q contains a parenthesis; only url(#id) and transforms may", shorten(value))
+		}
+	}
+	return ""
+}
 
 // checkSVG applies BC-1 to one SVG document; file only labels the findings.
 func checkSVG(file string, data []byte) []Finding {
@@ -52,7 +139,7 @@ type svgChecker struct {
 	findings []Finding
 
 	roots    int
-	depth    int
+	stack    []string
 	hasShape bool
 }
 
@@ -78,9 +165,11 @@ func (c *svgChecker) run() {
 		case xml.StartElement:
 			c.start(start, t)
 		case xml.EndElement:
-			c.depth--
+			if len(c.stack) > 0 {
+				c.stack = c.stack[:len(c.stack)-1]
+			}
 		case xml.CharData:
-			c.payload(start, "text node", string(t))
+			c.chars(start, string(t))
 		case xml.Directive:
 			c.add(start, "directive <!%s> is not allowed (no DOCTYPE or entity declarations)", shorten(string(t)))
 		case xml.ProcInst:
@@ -98,27 +187,33 @@ func (c *svgChecker) run() {
 }
 
 func (c *svgChecker) start(offset int64, el xml.StartElement) {
-	name := strings.ToLower(el.Name.Local)
-	if c.depth == 0 {
+	name := el.Name.Local
+	if len(c.stack) == 0 {
 		c.roots++
 		switch {
 		case c.roots > 1:
 			c.add(offset, "more than one root element")
 		case name != "svg":
-			c.add(offset, "root element is <%s>, want <svg>", el.Name.Local)
+			c.add(offset, "root element is <%s>, want <svg>", name)
 		case !hasViewBox(el):
 			c.add(offset, "root <svg> has no viewBox")
 		}
 	}
-	c.depth++
-	if bannedElements[name] {
-		c.add(offset, "element <%s> is not allowed in a vector asset", el.Name.Local)
+	c.stack = append(c.stack, name)
+
+	allowed, known := elementAttrs[name]
+	switch {
+	case el.Name.Space != svgNamespace:
+		c.add(offset, "element <%s> is not in the SVG namespace", name)
+		known = false
+	case !known:
+		c.add(offset, "element <%s> is not in the allowed vector element set", name)
 	}
-	if shapeElements[name] {
+	if shapeElements[name] && known {
 		c.hasShape = true
 	}
 	for _, a := range el.Attr {
-		c.attr(offset, el.Name.Local, a)
+		c.attr(offset, name, a, allowed, known)
 	}
 }
 
@@ -131,24 +226,54 @@ func hasViewBox(el xml.StartElement) bool {
 	return false
 }
 
-func (c *svgChecker) attr(offset int64, element string, a xml.Attr) {
-	if a.Name.Space == "xmlns" || (a.Name.Space == "" && a.Name.Local == "xmlns") {
+func (c *svgChecker) attr(offset int64, element string, a xml.Attr, allowed map[string]bool, known bool) {
+	name := a.Name.Local
+	where := fmt.Sprintf("<%s %s>", element, name)
+	c.payload(offset, where, a.Value)
+
+	// Namespace declarations are the only namespaced attributes, and they may
+	// only bind the SVG and XLink namespaces.
+	if a.Name.Space == "xmlns" || (a.Name.Space == "" && name == "xmlns") {
+		if a.Value != svgNamespace && a.Value != xlinkNamespace {
+			c.add(offset, "%s: namespace %q is not allowed", where, shorten(a.Value))
+		}
 		return
 	}
-	name := strings.ToLower(a.Name.Local)
-	where := fmt.Sprintf("<%s %s>", element, a.Name.Local)
-	if len(name) > 2 && strings.HasPrefix(name, "on") {
+	if !known {
+		return // the element is already a finding; do not pile on its attributes
+	}
+	switch {
+	case a.Name.Space != "":
+		c.add(offset, "%s: namespaced attribute %s:%s is not allowed", where, a.Name.Space, name)
+	case strings.HasPrefix(strings.ToLower(name), "on"):
 		c.add(offset, "%s: event handler attributes are not allowed", where)
-	}
-	c.payload(offset, where, a.Value)
-	if (name == "href" || name == "src") && !strings.HasPrefix(strings.TrimSpace(a.Value), "#") {
-		c.add(offset, "%s: reference %q is not a local #fragment (no external resources)", where, shorten(a.Value))
-	}
-	for _, m := range urlReference.FindAllStringSubmatch(a.Value, -1) {
-		target := strings.Trim(strings.TrimSpace(m[1]), `"'`)
-		if len(target) < 2 || target[0] != '#' {
-			c.add(offset, "%s: url(%s) is not a local url(#id)", where, shorten(target))
+	case name == "style":
+		c.add(offset, "%s: style attributes are not allowed (use presentation attributes)", where)
+	case !allowed[name]:
+		c.add(offset, "%s: attribute is not allowed on <%s>", where, element)
+	default:
+		if problem := checkValue(name, a.Value); problem != "" {
+			c.add(offset, "%s: %s", where, problem)
 		}
+	}
+}
+
+// chars checks character data: only <title> and <desc> may carry text, and it
+// may not be markup or a payload.
+func (c *svgChecker) chars(offset int64, text string) {
+	c.payload(offset, "text node", text)
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	parent := ""
+	if len(c.stack) > 0 {
+		parent = c.stack[len(c.stack)-1]
+	}
+	switch {
+	case !textElements[parent]:
+		c.add(offset, "text %q is only allowed inside <title> and <desc>", shorten(text))
+	case strings.Contains(text, "<"):
+		c.add(offset, "<%s> text contains markup", parent)
 	}
 }
 

@@ -427,10 +427,7 @@ func TestMissingManifestChecksOnlySVGsAndBoards(t *testing.T) {
 		{
 			name:   "bad SVG is still rejected",
 			mutate: func(tr *tree) { tr.putFixture("brand/logo/with-image.svg", "svg/image-lower.svg") },
-			want: []want{
-				{ruleVector, "brand/logo/with-image.svg", "<image>"},
-				{ruleVector, "brand/logo/with-image.svg", "not a local #fragment"},
-			},
+			want:   []want{{ruleVector, "brand/logo/with-image.svg", "<image>"}},
 		},
 		{
 			name:   "stale README board hash is still rejected",
