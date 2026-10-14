@@ -5850,7 +5850,7 @@
       },
       "UpdateProjectRequest": {
         "type": "object",
-        "description": "Fields of a project to change (JSON Merge Patch).",
+        "description": "Fields of a project to change (JSON Merge Patch). Send null as the environment to remove the label.",
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -5862,8 +5862,11 @@
             "maxLength": 200
           },
           "environment": {
-            "type": "string",
-            "description": "New environment label.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "New environment label, or null to remove it.",
             "examples": [
               "staging"
             ],
