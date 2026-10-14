@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { productApi } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, globex, problem, sessionId, signedIn } from '../../../../test/session-fixtures';
 
@@ -34,11 +35,11 @@ describe('the session area routes', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
-  it('lands a person with one organization inside it', async () => {
-    server.use(signedIn.currentUser, signedIn.organizations([acme]));
+  it('lands a person with one organization on its projects', async () => {
+    server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
     const { router } = renderRoute('/');
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/orgs/acme');
+      expect(router.state.location.pathname).toBe('/orgs/acme/projects');
     });
   });
 
@@ -77,7 +78,7 @@ describe('the session area routes', () => {
   });
 
   it('offers switching organization only to a person with more than one', async () => {
-    server.use(signedIn.currentUser, signedIn.organizations([acme]));
+    server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
     renderRoute('/orgs/acme');
     await screen.findByRole('button', { name: 'Account menu' });
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
