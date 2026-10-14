@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import type { FlowDocument, FlowNode, Point } from './flow-document';
+import type { FlowDocument, FlowEdge, FlowNode, Point } from './flow-document';
 import { LOOP_TYPE, START_TYPE, UNSUPPORTED_TYPE, subtitleOf, typeDefOf, type CanvasIconName, type CanvasKind, type CanvasLogic } from './node-types';
 
 /**
@@ -173,6 +173,26 @@ export function toCanvasGraph(document: FlowDocument, describe?: (node: FlowNode
   return { nodes, edges, notes };
 }
 
+/**
+ * How the canvas draws one node: its name, the line under it, its ports (the ports its connections
+ * use included) and whether it is disabled. The node details view shows the node the same way.
+ */
+export function canvasNodeView(node: FlowNode, edges: readonly FlowEdge[], describe?: (node: FlowNode) => string | undefined): CanvasNode {
+  const shell: FlowDocument = {
+    format: 'orcon/flow@1',
+    id: 'view',
+    name: 'view',
+    settings: {},
+    variables: [],
+    nodes: [node],
+    edges: edges.filter((edge) => edge.from.node === node.id),
+    editor: { nodes: { [node.id]: { x: 0, y: 0 } } },
+  };
+  const [view] = toCanvasGraph(shell, describe).nodes;
+  if (!view) throw new Error('unreachable: one node in, one node out');
+  return view;
+}
+
 /** True when the node is the start of the flow (nothing can be connected into it). */
 export const isStartNode = (node: Pick<FlowNode, 'type'>): boolean => node.type === START_TYPE;
 export const isLoopNode = (node: Pick<FlowNode, 'type'>): boolean => node.type === LOOP_TYPE;
@@ -182,7 +202,7 @@ export const isLoopNode = (node: Pick<FlowNode, 'type'>): boolean => node.type =
  * state and positions, the same connections and the same sticky notes. The screen checks it when
  * the canvas went back or forward by itself (undo, redo) and rebuilds the canvas when it fails.
  */
-export function graphAgrees(document: FlowDocument, graph: CanvasGraph): boolean {
+export function graphAgrees(document: FlowDocument, graph: CanvasGraph, describe?: (node: FlowNode) => string | undefined): boolean {
   const notes = document.editor.stickyNotes ?? [];
   const shownNotes = graph.notes ?? [];
   if (document.nodes.length !== graph.nodes.length || document.edges.length !== graph.edges.length || notes.length !== shownNotes.length) return false;
@@ -194,6 +214,15 @@ export function graphAgrees(document: FlowDocument, graph: CanvasGraph): boolean
     if ((seen.disabled === true) !== (node.disabled === true || node.type === UNSUPPORTED_TYPE)) return false;
     const at = recorded[node.id];
     if (at && (at.x !== seen.position.x || at.y !== seen.position.y)) return false;
+  }
+  if (describe) {
+    // The line under a node and its ports follow its parameters and settings, which the details view edits.
+    const expected = new Map(toCanvasGraph(document, describe).nodes.map((node) => [node.id, node]));
+    const ports = (node: CanvasNode) => node.outputs.map((port) => port.id).join('|');
+    for (const shownNode of graph.nodes) {
+      const want = expected.get(shownNode.id);
+      if (!want || want.subtitle !== shownNode.subtitle || ports(want) !== ports(shownNode)) return false;
+    }
   }
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
   for (const edge of document.edges) {

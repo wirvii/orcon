@@ -19,6 +19,7 @@ const names: Record<string, MessageDescriptor> = {
   if: nodeTypeMessages.if,
   merge: nodeTypeMessages.merge,
   loop: nodeTypeMessages.loop,
+  call: nodeTypeMessages.call,
   end: nodeTypeMessages.end,
 };
 
@@ -31,6 +32,7 @@ const descriptions: Record<string, MessageDescriptor> = {
   if: nodeTypeMessages.ifText,
   merge: nodeTypeMessages.mergeText,
   loop: nodeTypeMessages.loopText,
+  call: nodeTypeMessages.callText,
   end: nodeTypeMessages.endText,
 };
 

@@ -3,9 +3,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { clientToFlow, fallbackPositions, graphAgrees, parseViewportTransform, snap, toCanvasGraph } from './canvas-graph';
+import { canvasNodeView, clientToFlow, fallbackPositions, graphAgrees, parseViewportTransform, snap, toCanvasGraph } from './canvas-graph';
 import { exampleFlowDocument } from './example-flow';
-import { cloneDocument } from './flow-document';
+import { cloneDocument, findNode } from './flow-document';
 
 describe('the canvas view of a document', () => {
   it('draws the sample flow: a trigger, an If with two outputs, tiles and an end', () => {
@@ -130,5 +130,55 @@ describe('geometry', () => {
     expect(parseViewportTransform('none')).toBeUndefined();
     expect(parseViewportTransform('translate(1px, 2px) scale(0)')).toBeUndefined();
     expect(clientToFlow({ x: 220, y: 160 }, { left: 100, top: 50 }, { x: 20, y: 10, zoom: 0.5 })).toEqual({ x: 200, y: 200 });
+  });
+});
+
+describe('a node as the details view draws it', () => {
+  it('is the node as its tile on the canvas draws it', () => {
+    const document = exampleFlowDocument();
+    const whole = toCanvasGraph(document);
+    for (const node of document.nodes) {
+      const view = canvasNodeView(node, document.edges);
+      const tile = whole.nodes.find((candidate) => candidate.id === node.id);
+      expect({ ...view, position: undefined }).toEqual({ ...tile, position: undefined });
+    }
+  });
+
+  it('shows the error output a setting adds and the line the parameters give', () => {
+    const document = exampleFlowDocument();
+    const slack = findNode(document, 'slack');
+    if (!slack) throw new Error('no node');
+    slack['onError'] = 'ERROR_OUTPUT';
+    slack.parameters['url'] = 'https://other.example.test/x';
+    const view = canvasNodeView(slack, document.edges);
+    expect(view.outputs.map((port) => port.id)).toEqual(['main', 'error']);
+    expect(view.subtitle).toBe('POST other.example.test');
+  });
+});
+
+describe('when the canvas agrees with the document about what the details view edits', () => {
+  const describeNode = () => 'described';
+
+  it('does not look at the line under a node or its ports unless it is given the describing function', () => {
+    const document = exampleFlowDocument();
+    const graph = toCanvasGraph(document, describeNode);
+    expect(graphAgrees(document, graph)).toBe(true);
+    expect(graphAgrees(document, graph, describeNode)).toBe(true);
+  });
+
+  it('disagrees after the document changes a line or an output behind the canvas', () => {
+    const document = exampleFlowDocument();
+    const graph = toCanvasGraph(document, describeNode);
+    const changed = cloneDocument(document);
+    const slack = findNode(changed, 'slack');
+    if (!slack) throw new Error('no node');
+    slack.parameters['url'] = 'https://other.example.test/x';
+    expect(graphAgrees(changed, graph, describeNode)).toBe(false);
+    expect(graphAgrees(changed, graph)).toBe(true);
+    const failing = cloneDocument(document);
+    const target = findNode(failing, 'slack');
+    if (!target) throw new Error('no node');
+    target['onError'] = 'ERROR_OUTPUT';
+    expect(graphAgrees(failing, graph, describeNode)).toBe(false);
   });
 });

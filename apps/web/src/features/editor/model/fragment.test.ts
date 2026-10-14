@@ -191,3 +191,19 @@ describe('pasting', () => {
     expect(flowFragmentSchema.safeParse({ format: FLOW_FRAGMENT_FORMAT, nodes: [{ id: 'bad id' }], edges: [], editor: {} }).success).toBe(false);
   });
 });
+
+describe('a Call sub-flow node', () => {
+  it('pastes as itself, with its call block, and not as the placeholder of an unknown type', () => {
+    const document = exampleFlowDocument();
+    const call = { target: '01930000-0000-7000-8000-00000000ed61', version: 3, mode: 'WAIT', perItem: true };
+    const fragment = flowFragmentSchema.parse({
+      format: FLOW_FRAGMENT_FORMAT,
+      nodes: [{ id: 'ship', name: 'Ship order', element: 'callActivity', type: 'orcon.callFlow@1', parameters: {}, call }],
+      edges: [],
+      editor: { nodes: { ship: { x: 0, y: 0 } } },
+    });
+    const result = pasteFragment(document, fragment, { offset: { x: 0, y: 0 } });
+    expect(result.placeholders).toBe(0);
+    expect(document.nodes.find((node) => node.id === result.nodeIds[0])).toMatchObject({ type: 'orcon.callFlow@1', element: 'callActivity', call });
+  });
+});

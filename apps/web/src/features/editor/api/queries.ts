@@ -3,10 +3,14 @@
 
 import { queryOptions } from '@tanstack/react-query';
 
-import { EXAMPLE_FLOW_ID, exampleFlowDocument, PERF_FLOW_ID } from '../model/example-flow';
+import { EXAMPLE_FLOW_ID, exampleFlowDocument, PERF_FLOW_ID, SAMPLE_SUBFLOWS, subflowDocument } from '../model/example-flow';
 
+import type { CredentialSource } from './credential-source';
 import type { DraftSource } from './draft-source';
+import type { FlowTargetSource } from './flow-target-source';
+import { createLocalCredentialSource } from './local-credential-source';
 import { createLocalDraftSource, type DraftSeed } from './local-draft-source';
+import { createLocalFlowTargetSource } from './local-flow-target-source';
 
 /**
  * The organization of the keys until sign-in provides one (orcon-web DT-4: every key starts with
@@ -17,9 +21,14 @@ export const LOCAL_ORGANIZATION = 'local';
 export const editorKeys = {
   all: (organizationId: string) => [organizationId, 'editor'] as const,
   draft: (organizationId: string, flowId: string) => [organizationId, 'editor', 'draft', flowId] as const,
+  credentials: (organizationId: string) => [organizationId, 'editor', 'credentials'] as const,
+  flowTargets: (organizationId: string) => [organizationId, 'editor', 'flow-targets'] as const,
 };
 
-const seeds = new Map<string, DraftSeed>([[EXAMPLE_FLOW_ID, exampleFlowDocument]]);
+const seeds = new Map<string, DraftSeed>([
+  [EXAMPLE_FLOW_ID, exampleFlowDocument],
+  ...SAMPLE_SUBFLOWS.map((flow): [string, DraftSeed] => [flow.id, () => subflowDocument(flow.id, flow.name)]),
+]);
 // The performance build (`vite build --mode perf`) also opens the 500-node reference flow; in the
 // production build this condition is false and the module is not part of the bundle.
 if (import.meta.env.MODE === 'perf') {
@@ -32,6 +41,30 @@ if (import.meta.env.MODE === 'perf') {
  * source here (ED5a part 2). Nothing else in the editor names a source.
  */
 export const draftSource: DraftSource = createLocalDraftSource(seeds);
+
+/** Where the credential widget reads and creates credentials: the same seam as `draftSource` (ED5a part 2 swaps it). */
+export const credentialSource: CredentialSource = createLocalCredentialSource();
+
+/** Where the sub-flow widget reads the flows a node may call. */
+export const flowTargetSource: FlowTargetSource = createLocalFlowTargetSource();
+
+/** The credentials the person can use in this project (`credential:use`), names and types only. */
+export function credentialsQueryOptions() {
+  return queryOptions({
+    queryKey: editorKeys.credentials(LOCAL_ORGANIZATION),
+    queryFn: () => credentialSource.list(),
+    staleTime: 60_000,
+  });
+}
+
+/** The flows a Call sub-flow node may target. */
+export function flowTargetsQueryOptions() {
+  return queryOptions({
+    queryKey: editorKeys.flowTargets(LOCAL_ORGANIZATION),
+    queryFn: () => flowTargetSource.list(),
+    staleTime: 60_000,
+  });
+}
 
 /**
  * The draft of a flow, read once. The editor copies it into its store, and from then on the store

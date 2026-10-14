@@ -15,7 +15,8 @@ export const FLOW_FORMAT = 'orcon/flow@1';
 
 /** Node and edge ids (orcon-flow-1.md "Patterns and limits"). */
 export const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-const TYPE_PATTERN = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+@[1-9][0-9]*$/;
+// The same pattern as `NodeTypePattern` in internal/flow/validate.go: later parts may use capitals (`orcon.callFlow@1`).
+const TYPE_PATTERN = /^[a-z][a-z0-9-]*(\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$/;
 
 export const MAX_NOTE_LENGTH = 10_000;
 export const STICKY_COLORS = [1, 2, 3, 4, 5, 6] as const;

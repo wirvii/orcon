@@ -152,6 +152,18 @@ export const NODE_TYPES: readonly NodeTypeDef[] = [
     initial: () => ({ parameters: {}, loop: { maxIterations: 10 } }),
   },
   {
+    slug: 'call',
+    type: 'orcon.callFlow@1',
+    element: 'callActivity',
+    kind: 'action',
+    icon: 'play',
+    outputs: MAIN,
+    group: 'flow',
+    aliases: ['Sub-flow', 'Call flow', 'Execute Workflow', 'Run flow'],
+    // The `call` block is written when a flow is chosen; until then the node has none (publishing asks for it, orcon-flow-1.md V11).
+    initial: () => ({ parameters: {} }),
+  },
+  {
     slug: 'end',
     type: 'orcon.end@1',
     element: 'endEvent',

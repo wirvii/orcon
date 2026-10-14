@@ -38,6 +38,10 @@ describe('the editor store: every action can be undone and redone', () => {
   it('renameNode, with the references it rewrites', () => expectUndoable((state) => state.renameNode('webhook', 'Order received')));
   it('setDisabled', () => expectUndoable((state) => state.setDisabled('slack', true)));
   it('addNote', () => expectUndoable((state) => state.addNote({ x: 100, y: 500 })));
+  it('setParameter', () => expectUndoable((state) => state.setParameter('slack', 'method', 'PUT')));
+  it('setNodeBlock', () => expectUndoable((state) => state.setNodeBlock('slack', 'retry', { maxAttempts: 4, initialInterval: 'PT2S' })));
+  it('setCredential', () => expectUndoable((state) => state.setCredential('slack', 'auth', 'Inventory API key')));
+  it('updateConnector', () => expectUndoable((state) => state.updateConnector('slack', '1.2.0', 'sha256:c3')));
   it('updateNote', () => expectUndoable((state) => state.updateNote('note-1', { body: 'changed', color: 4 })));
   it('applyLayout', () => expectUndoable((state) => state.applyLayout(new Map([['slack', { x: 700, y: 120 }]]))));
   it('duplicate', () => expectUndoable((state) => state.duplicate(['inventory', 'slack'])));
@@ -203,5 +207,88 @@ describe('the editor store: saving', () => {
     const [first, second] = [open(), open()];
     first.getState().setDisabled('slack', true);
     expect(second.getState().document.nodes.find((node) => node.id === 'slack')).not.toHaveProperty('disabled');
+  });
+});
+
+describe('the editor store: configuring a node', () => {
+  const urlOf = (store: EditorStore) => store.getState().document.nodes.find((node) => node.id === 'slack')?.parameters['url'];
+
+  it('makes one history entry of the edits made in one field while it kept its group', () => {
+    const store = open();
+    const original = urlOf(store);
+    for (const text of ['h', 'ht', 'htt', 'http']) store.getState().setParameter('slack', 'url', text, 'url#1');
+    expect(urlOf(store)).toBe('http');
+    expect(store.getState().history.past).toHaveLength(1);
+    expect(store.getState().history.past[0]?.name).toBe('configureNode');
+    store.getState().undo();
+    expect(urlOf(store)).toBe(original);
+    store.getState().redo();
+    expect(urlOf(store)).toBe('http');
+  });
+
+  it('starts a new entry when the group changes, as it does when the field is focused again', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'url', 'a', 'url#1');
+    store.getState().setParameter('slack', 'url', 'ab', 'url#1');
+    store.getState().setParameter('slack', 'url', 'abc', 'url#2');
+    expect(store.getState().history.past).toHaveLength(2);
+    store.getState().undo();
+    expect(urlOf(store)).toBe('ab');
+  });
+
+  it('does not join an edit to the entry of another field, even with the same group', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'url', 'a', 'g');
+    store.getState().setNodeBlock('slack', 'retry', { maxAttempts: 2 });
+    store.getState().setParameter('slack', 'url', 'ab', 'g');
+    expect(store.getState().history.past).toHaveLength(3);
+  });
+
+  it('does not join an edit to an entry that undo or redo has passed through', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'url', 'a', 'g');
+    store.getState().undo();
+    store.getState().redo();
+    store.getState().setParameter('slack', 'url', 'ab', 'g');
+    expect(store.getState().history.past).toHaveLength(2);
+  });
+
+  it('keeps edits without a group as separate entries', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'method', 'PUT');
+    store.getState().setParameter('slack', 'method', 'PATCH');
+    expect(store.getState().history.past).toHaveLength(2);
+  });
+
+  it('records nothing when the value does not change', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'method', 'POST');
+    store.getState().setCredential('slack', 'auth', 'Slack incoming webhook');
+    expect(store.getState().history.past).toHaveLength(0);
+    expect(store.getState().version).toBe(0);
+  });
+
+  it('does not rebuild the canvas for an edit of the form, and rebuilds it when the edit is taken back', () => {
+    const store = open();
+    store.getState().setParameter('slack', 'method', 'PUT');
+    expect(store.getState().canvasEpoch).toBe(0);
+    store.getState().undo();
+    expect(store.getState().canvasEpoch).toBe(1);
+  });
+
+  it('is one history entry to update the connector, and undo gives the old pin back', () => {
+    const store = open();
+    store.getState().updateConnector('slack', '1.2.0', 'sha256:c3');
+    expect(store.getState().history.past).toHaveLength(1);
+    expect(store.getState().history.past[0]?.name).toBe('updateConnector');
+    store.getState().undo();
+    expect(store.getState().document.nodes.find((node) => node.id === 'slack')?.['connector']).toMatchObject({ version: '1.0.0' });
+  });
+
+  it('shows the canvas the ports a failure output adds', () => {
+    const store = open();
+    store.getState().setNodeBlock('slack', 'onError', 'ERROR_OUTPUT');
+    const graph: CanvasGraph = toCanvasGraph(store.getState().document);
+    expect(graph.nodes.find((node) => node.id === 'slack')?.outputs.map((port) => port.id)).toEqual(['main', 'error']);
   });
 });

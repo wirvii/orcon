@@ -15,9 +15,14 @@ import {
   moveNodes,
   removeNodes,
   renameNode,
+  pinConnector,
+  setCredentialBinding,
   setDisabled,
+  setNodeBlock,
+  setParameter,
   updateStickyNote,
   type EdgeProblem,
+  type NodeBlock,
   type NotePatch,
   type RenameProblem,
 } from '../model/document-ops';
@@ -30,7 +35,7 @@ enablePatches();
 /** History keeps this many entries (SPEC-014 R-ED-UNDO-01, orcon-web ST-5). */
 export const HISTORY_LIMIT = 100;
 
-export type ActionName = 'addNode' | 'removeNodes' | 'connect' | 'disconnect' | 'moveNodes' | 'renameNode' | 'setDisabled' | 'addNote' | 'updateNote' | 'paste' | 'tidyUp' | 'canvasEdit';
+export type ActionName = 'addNode' | 'removeNodes' | 'connect' | 'disconnect' | 'moveNodes' | 'renameNode' | 'setDisabled' | 'addNote' | 'updateNote' | 'paste' | 'tidyUp' | 'canvasEdit' | 'configureNode' | 'updateConnector';
 
 /** One undoable user action: the patches that make it and the patches that take it back. */
 export interface HistoryEntry {
@@ -42,6 +47,8 @@ export interface HistoryEntry {
   readonly selectionAfter: readonly string[];
   /** The canvas already shows the result of this action, so undoing it from the canvas needs no rebuild. */
   readonly fromCanvas: boolean;
+  /** Edits made in one field while it kept focus share a group and make one entry (SPEC-014 R-ED-UNDO-01). */
+  readonly group?: string | undefined;
 }
 
 export interface EditorState {
@@ -67,6 +74,14 @@ export interface EditorState {
   moveNodes: (ids: readonly string[], dx: number, dy: number) => void;
   renameNode: (id: string, name: string) => { references: number } | { problem: RenameProblem };
   setDisabled: (id: string, disabled: boolean) => void;
+  /** Sets a parameter of a node (`undefined` removes it). Edits with the same `group` in a row are one history entry. */
+  setParameter: (id: string, name: string, value: unknown, group?: string) => void;
+  /** Replaces a behaviour or binding block of a node (retry, timeouts, onError, concurrency, attention, call). */
+  setNodeBlock: (id: string, block: NodeBlock, value: unknown, group?: string) => void;
+  /** Binds a credential slot of a node to a credential by name; `undefined` unbinds it. */
+  setCredential: (id: string, slot: string, name: string | undefined) => void;
+  /** Pins a node to another version of its connector; one history entry. */
+  updateConnector: (id: string, version: string, digest: string) => void;
   addNote: (at: Point) => string;
   updateNote: (id: string, patch: NotePatch) => void;
   /** Adds a fragment to the flow; one history entry. */
@@ -102,6 +117,8 @@ interface CommitOptions<T> {
   selection?: readonly string[] | ((value: T | undefined) => readonly string[]);
   /** False when the canvas already shows the change. */
   rebuild?: boolean;
+  /** Joins the entry to the one before it when that one has the same group and nothing came between. */
+  group?: string;
 }
 
 /**
@@ -110,6 +127,9 @@ interface CommitOptions<T> {
  */
 export function createEditorStore(initial: EditorInit): EditorStore {
   return createStore<EditorState>()((set, get) => {
+    // The group of the last entry while no undo, redo or other action came after it: the only entry a new edit may join.
+    let openGroup: string | undefined;
+
     /** Runs `recipe` on a draft of the document and records the result as one history entry. */
     function commit<T>(name: ActionName, recipe: (draft: FlowDocument) => T, options: CommitOptions<T> = {}): { done: boolean; value: T | undefined } {
       const state = get();
@@ -120,11 +140,17 @@ export function createEditorStore(initial: EditorInit): EditorStore {
       if (patches.length === 0) return { done: false, value: held.value };
       const chosen = typeof options.selection === 'function' ? options.selection(held.value) : options.selection;
       const selectionAfter = chosen ?? state.selection;
-      const entry: HistoryEntry = { name, patches, inverse, selectionBefore: state.selection, selectionAfter, fromCanvas: options.fromCanvas === true };
+      const last = state.history.past[state.history.past.length - 1];
+      const joined = options.group !== undefined && openGroup === options.group && last?.group === options.group ? last : undefined;
+      const entry: HistoryEntry =
+        joined
+          ? { ...joined, patches: [...joined.patches, ...patches], inverse: [...inverse, ...joined.inverse], selectionAfter }
+          : { name, patches, inverse, selectionBefore: state.selection, selectionAfter, fromCanvas: options.fromCanvas === true, group: options.group };
+      openGroup = options.group;
       set({
         document,
         selection: selectionAfter,
-        history: { past: [...state.history.past, entry].slice(-HISTORY_LIMIT), future: [] },
+        history: { past: [...(joined ? state.history.past.slice(0, -1) : state.history.past), entry].slice(-HISTORY_LIMIT), future: [] },
         version: state.version + 1,
         canvasEpoch: state.canvasEpoch + (options.rebuild === false ? 0 : 1),
       });
@@ -136,6 +162,7 @@ export function createEditorStore(initial: EditorInit): EditorStore {
       const { past, future } = state.history;
       const entry = direction === 'undo' ? past[past.length - 1] : future[0];
       if (!entry) return false;
+      openGroup = undefined;
       set({
         document: applyPatches(state.document, direction === 'undo' ? entry.inverse : entry.patches),
         selection: direction === 'undo' ? entry.selectionBefore : entry.selectionAfter,
@@ -195,6 +222,22 @@ export function createEditorStore(initial: EditorInit): EditorStore {
         commit('setDisabled', (draft) => {
           setDisabled(draft, id, disabled);
         });
+      },
+
+      setParameter: (id, name, value, group) => {
+        commit('configureNode', (draft) => setParameter(draft, id, name, value), { rebuild: false, ...(group === undefined ? {} : { group }) });
+      },
+
+      setNodeBlock: (id, block, value, group) => {
+        commit('configureNode', (draft) => setNodeBlock(draft, id, block, value), { rebuild: false, ...(group === undefined ? {} : { group }) });
+      },
+
+      setCredential: (id, slot, name) => {
+        commit('configureNode', (draft) => setCredentialBinding(draft, id, slot, name), { rebuild: false });
+      },
+
+      updateConnector: (id, version, digest) => {
+        commit('updateConnector', (draft) => pinConnector(draft, id, version, digest), { rebuild: false });
       },
 
       addNote: (at) => {
