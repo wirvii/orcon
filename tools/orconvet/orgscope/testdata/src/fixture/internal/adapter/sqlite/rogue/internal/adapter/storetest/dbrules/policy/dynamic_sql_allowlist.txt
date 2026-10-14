@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A planted copy that lists its own package; it must authorize nothing.
+rogue.go  self-authorized  2026-10-13  approved-by:nobody

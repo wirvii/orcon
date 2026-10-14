@@ -129,10 +129,12 @@ func apply(ctx context.Context, conn *pgx.Conn, m migration.Migration, opts Migr
 		// One CREATE INDEX CONCURRENTLY cannot run inside a transaction (MG-9); the
 		// row is written after it, and a crash in between is repaired by the
 		// idempotent IF NOT EXISTS on the next start.
+		//orcon:dynamic-sql the migration runner executes the embedded migration files and the bookkeeping statement it is handed
 		if _, err := conn.Exec(ctx, m.SQL, pgx.QueryExecModeSimpleProtocol); err != nil {
 			return err
 		}
 		return record(func(ctx context.Context, sql string, args ...any) error {
+			//orcon:dynamic-sql the migration runner executes the embedded migration files and the bookkeeping statement it is handed
 			_, err := conn.Exec(ctx, sql, args...)
 			return err
 		})
@@ -151,10 +153,12 @@ func apply(ctx context.Context, conn *pgx.Conn, m migration.Migration, opts Migr
 		}
 	}()
 	// A migration file holds several statements: the simple protocol runs them in one round trip.
+	//orcon:dynamic-sql the migration runner executes the embedded migration files and the bookkeeping statement it is handed
 	if _, err := tx.Exec(ctx, m.SQL, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return err
 	}
 	if err := record(func(ctx context.Context, sql string, args ...any) error {
+		//orcon:dynamic-sql the migration runner executes the embedded migration files and the bookkeeping statement it is handed
 		_, err := tx.Exec(ctx, sql, args...)
 		return err
 	}); err != nil {

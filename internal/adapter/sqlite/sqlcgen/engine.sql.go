@@ -139,6 +139,7 @@ func (q *Queries) ClaimTokens(ctx context.Context, arg ClaimTokensParams) ([]Cla
 		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
 	}
 	queryParams = append(queryParams, arg.PageSize)
+	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
