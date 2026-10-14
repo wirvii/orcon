@@ -123,6 +123,24 @@ func TestConfigCheckRedactsSecretsAndShowsSource(t *testing.T) {
 	}
 }
 
+func TestConfigCheckNeverPrintsCredentialsOfAnAddress(t *testing.T) {
+	t.Parallel()
+
+	for _, format := range []string{"table", "json", "yaml"} {
+		env := cli.Env{MarshalYAML: json.Marshal, Environ: []string{"HOME=/h", "ORCON_BACKUP_TARGET=s3://AKIA:" + sentinel + "@bucket/p", "ORCON_OBSERVABILITY_OTLP_ENDPOINT=https://u:" + sentinel + "@c:4318"}}
+		r := exec(t, env, "config", "check", "-o", format)
+		if r.code != cli.ExitValidation {
+			t.Errorf("-o %s: exit = %d, want %d", format, r.code, cli.ExitValidation)
+		}
+		if strings.Contains(r.out.String()+r.err.String(), sentinel) {
+			t.Errorf("-o %s prints the credentials of an address:\n%s", format, r.out.String())
+		}
+		if !strings.Contains(r.out.String(), "credentials") {
+			t.Errorf("-o %s does not explain the error:\n%s", format, r.out.String())
+		}
+	}
+}
+
 func TestConfigCheckJSONShape(t *testing.T) {
 	t.Parallel()
 

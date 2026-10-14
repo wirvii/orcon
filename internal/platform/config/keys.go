@@ -98,6 +98,27 @@ func validateHTTPURL(v string) error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return errors.New("must be an http:// or https:// URL")
 	}
+	if u.User != nil {
+		return errNoUserinfo
+	}
+	return nil
+}
+
+// validateEndpoint accepts host:port or a URL, and refuses credentials in either form.
+func validateEndpoint(v string) error {
+	if strings.Contains(v, "://") {
+		u, err := url.Parse(v)
+		if err != nil || u.Host == "" {
+			return errors.New("must be host:port or a URL with a host")
+		}
+		if u.User != nil {
+			return errNoUserinfo
+		}
+		return nil
+	}
+	if strings.Contains(v, "@") {
+		return errNoUserinfo
+	}
 	return nil
 }
 
@@ -116,6 +137,9 @@ func validateBackupTarget(v string) error {
 	u, err := url.Parse(v)
 	if err != nil {
 		return errors.New("must be file:///<absolute path> or s3://<bucket>/<prefix>")
+	}
+	if u.User != nil {
+		return errNoUserinfo
 	}
 	switch u.Scheme {
 	case "file":

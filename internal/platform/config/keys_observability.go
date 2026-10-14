@@ -14,7 +14,7 @@ func keysObservability() []Key {
 				"Servir las métricas en formato Prometheus en /metrics, en el escuchador de operaciones (ops.address)."),
 		},
 		{
-			Path: "observability.otlp.endpoint", Kind: KindString,
+			Path: "observability.otlp.endpoint", Kind: KindString, Validate: validateEndpoint,
 			Description: text(
 				"Address of the OpenTelemetry collector that receives metrics, traces and logs.",
 				"Dirección del colector de OpenTelemetry que recibe métricas, trazas y registros."),

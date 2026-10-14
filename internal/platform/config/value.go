@@ -125,6 +125,10 @@ func (v Value) equal(o Value) bool {
 	return v.scalar == o.scalar && slices.Equal(v.list, o.list) && maps.Equal(v.pairs, o.pairs)
 }
 
+// errNoUserinfo rejects credentials written in the address of a non-secret key: config check
+// would print them, and logs and process listings would carry them.
+var errNoUserinfo = errors.New("must not contain credentials (user:password@); give them in the key made for the credential, which can be read from a file")
+
 // errEmpty is returned for an empty text where the kind needs a value.
 var errEmpty = errors.New("must not be empty")
 
@@ -341,6 +345,9 @@ func canonURL(text string) (string, error) {
 	u, err := url.Parse(text)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return "", errors.New("must be an absolute URL with a scheme and a host")
+	}
+	if u.User != nil {
+		return "", errNoUserinfo
 	}
 	return text, nil
 }

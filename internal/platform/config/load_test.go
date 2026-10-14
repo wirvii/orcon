@@ -499,6 +499,43 @@ func TestInvalidValuesNameTheKeyAndNeverTheSecret(t *testing.T) {
 	}
 }
 
+func TestAddressesRefuseCredentialsAndNeverPrintThem(t *testing.T) {
+	t.Parallel()
+
+	const leaked = "S3CRET-PASSWORD"
+	tests := []struct{ key, flag, value string }{
+		{"backup.target", "--backup-target", "s3://AKIA:" + leaked + "@bucket/prefix"},
+		{"backup.keys.target", "--backup-keys-target", "file://user:" + leaked + "@/keys"},
+		{"observability.otlp.endpoint", "--observability-otlp-endpoint", "https://user:" + leaked + "@collector:4318"},
+		{"observability.otlp.endpoint", "--observability-otlp-endpoint", "user:" + leaked + "@collector:4318"},
+		{"updateCheck.url", "--update-check-url", "https://user:" + leaked + "@api.github.com/x"},
+		{"publicUrl", "--public-url", "https://user:" + leaked + "@orcon.example.com"},
+		{"blobs.s3.endpoint", "--blobs-s3-endpoint", "https://user:" + leaked + "@s3.example.com"},
+		{"keys.master.vaultTransit.address", "--keys-master-vault-transit-address", "https://user:" + leaked + "@vault:8200"},
+	}
+	for _, tt := range tests {
+		res := load(t, input{args: []string{tt.flag + "=" + tt.value}})
+		if !hasIssue(res, config.SeverityError, tt.key, "credentials") {
+			t.Errorf("%s=%q: issues = %v, want a credentials error", tt.key, tt.value, issuesFor(res, tt.key))
+		}
+		if got := res.Config.Value(tt.key).Text(); strings.Contains(got, leaked) {
+			t.Errorf("%s keeps the rejected value %q", tt.key, got)
+		}
+		for _, i := range res.Issues {
+			if strings.Contains(i.Message, leaked) {
+				t.Errorf("an issue repeats the credentials: %v", i)
+			}
+		}
+	}
+	// Addresses without credentials stay valid, host:port included.
+	for _, v := range []string{"collector:4317", "https://collector:4318", "localhost"} {
+		res := load(t, input{args: []string{"--observability-otlp-endpoint=" + v}})
+		if hasIssue(res, config.SeverityError, "observability.otlp.endpoint", "") {
+			t.Errorf("endpoint %q refused: %v", v, res.Issues)
+		}
+	}
+}
+
 func TestListAndMapValues(t *testing.T) {
 	t.Parallel()
 
