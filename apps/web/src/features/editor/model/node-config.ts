@@ -47,12 +47,28 @@ export function switchMode(def: ParamDef, parameters: Parameters, to: ParamMode)
   return source === '' ? undefined : source;
 }
 
-/** True when the parameter shows for the values the node has now (`displayWhen`, all conditions). */
-export function isVisible(def: ParamDef, parameters: Parameters): boolean {
+/**
+ * True when the parameter shows for the values the node has now (`displayWhen`, all conditions). A
+ * controlling parameter the node holds nothing for counts with its default (ADR-0030 section 3:
+ * defaults are explicit values). When the controlling parameter is an expression its value is not known
+ * until the flow runs, so the dependent parameter shows: hiding it would make it unreachable.
+ */
+export function isVisible(def: ParamDef, parameters: Parameters, all: readonly ParamDef[] = []): boolean {
   return (def.displayWhen ?? []).every((condition) => {
-    const value = parameters[condition.param];
+    const controlling = all.find((candidate) => candidate.name === condition.param);
+    const value = parameters[condition.param] ?? controlling?.default;
+    if (isExpression(value)) return true;
     return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? condition.oneOf.includes(value) : false;
   });
+}
+
+/**
+ * The parameters the node holds a value for that the form does not show, because their condition does
+ * not hold. Their values stay in the document untouched (changing a choice back brings them back, and
+ * nothing is lost by a click); the form says they are kept and hidden.
+ */
+export function hiddenWithValue(defs: readonly ParamDef[], parameters: Parameters): ParamDef[] {
+  return defs.filter((def) => def.widget === undefined && !isVisible(def, parameters, defs) && parameters[def.name] !== undefined);
 }
 
 export type ProblemCode = 'required' | 'number' | 'json' | 'option' | 'incomplete';
@@ -82,7 +98,7 @@ export function problemOf(def: ParamDef, parameters: Parameters, isJson: (text: 
 export function problemsOf(defs: readonly ParamDef[], parameters: Parameters, isJson?: (text: string) => boolean): Record<string, ProblemCode> {
   const found: Record<string, ProblemCode> = {};
   for (const def of defs) {
-    if (def.widget !== undefined || !isVisible(def, parameters)) continue;
+    if (def.widget !== undefined || !isVisible(def, parameters, defs)) continue;
     const problem = problemOf(def, parameters, isJson);
     if (problem) found[def.name] = problem;
   }

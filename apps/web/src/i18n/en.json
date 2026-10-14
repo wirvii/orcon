@@ -81,6 +81,7 @@
   "editor.config.entry": "{field}, entry {index}",
   "editor.config.expression": "Expression",
   "editor.config.fixed": "Fixed",
+  "editor.config.hiddenValues": "{count, plural, one {A saved value is hidden because it does not apply to the current choices: {names}. It is kept.} other {# saved values are hidden because they do not apply to the current choices: {names}. They are kept.}}",
   "editor.config.locator.id": "By identifier",
   "editor.config.locator.mode": "How {field} is given",
   "editor.config.locator.url": "By address",

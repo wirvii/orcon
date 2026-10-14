@@ -16,6 +16,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const nodeOf = (document: FlowDocument, id: string) => {
+  const node = findNode(document, id);
+  if (!node) throw new Error(`no node ${id}`);
+  return node;
+};
+
 const parametersOf = (document: FlowDocument, id: string) => findNode(document, id)?.parameters ?? {};
 
 /** A schema with one parameter of every type, to prove the renderer has a widget for each. */
@@ -80,6 +86,38 @@ describe('the node configuration form', () => {
       // The node is pinned to 1.0.0: the options of later versions are not there.
       expect(screen.queryByText('Response format')).not.toBeInTheDocument();
       expect(screen.queryByText('Follow redirects to other hosts')).not.toBeInTheDocument();
+    });
+
+    it('keeps a value that no longer applies, hides it and says so, and brings it back with the choice', async () => {
+      const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />);
+      expect(await screen.findByRole('textbox', { name: /Body/ })).toBeInTheDocument();
+      expect(screen.queryByText(/saved value is hidden/)).not.toBeInTheDocument();
+      act(() => {
+        store.getState().setParameter('slack', 'method', 'GET');
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole('textbox', { name: /Body/ })).not.toBeInTheDocument();
+      });
+      expect(screen.getByText('A saved value is hidden because it does not apply to the current choices: Body. It is kept.')).toBeInTheDocument();
+      expect(parametersOf(store.getState().document, 'slack')['body']).toEqual(expect.stringContaining('Order'));
+      act(() => {
+        store.getState().setParameter('slack', 'method', 'POST');
+      });
+      expect(await screen.findByRole('textbox', { name: /Body/ })).toBeInTheDocument();
+    });
+
+    it('shows a dependent field when the method is an expression, and when the node holds no method', async () => {
+      const flow = exampleFlowDocument();
+      Object.assign(nodeOf(flow, 'slack').parameters, { method: '={{ $json.method }}' });
+      const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />, flow);
+      expect(await screen.findByRole('textbox', { name: /Body/ })).toBeInTheDocument();
+      act(() => {
+        store.getState().setParameter('slack', 'method', undefined);
+      });
+      // No method held: the default is GET, which sends no body.
+      await waitFor(() => {
+        expect(screen.queryByRole('textbox', { name: /Body/ })).not.toBeInTheDocument();
+      });
     });
 
     it('shows the options a newer pinned version has', async () => {

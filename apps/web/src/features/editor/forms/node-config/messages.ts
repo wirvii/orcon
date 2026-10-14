@@ -8,6 +8,7 @@ export const configMessages = defineMessages({
   fixed: { id: 'editor.config.fixed', defaultMessage: 'Fixed', description: 'Button that makes a field hold a value typed by hand.' },
   expression: { id: 'editor.config.expression', defaultMessage: 'Expression', description: 'Button that makes a field hold a formula that is worked out for each item.' },
   valueKind: { id: 'editor.config.valueKind', defaultMessage: 'Kind of value of {field}', description: 'Accessible name of the pair of buttons that switch a field between a fixed value and an expression. {field} is the field name.' },
+  hiddenValues: { id: 'editor.config.hiddenValues', defaultMessage: '{count, plural, one {A saved value is hidden because it does not apply to the current choices: {names}. It is kept.} other {# saved values are hidden because they do not apply to the current choices: {names}. They are kept.}}', description: 'Tells that values the step holds for fields that do not apply now are hidden but not deleted. {count} is how many and {names} their field names.' },
   noParameters: { id: 'editor.config.none', defaultMessage: 'This step has nothing to set here.', description: 'Shown in the parameters of a step that has no parameters.' },
   required: { id: 'editor.config.problem.required', defaultMessage: 'Fill in this field.', description: 'Error under a required field that is empty.' },
   notNumber: { id: 'editor.config.problem.number', defaultMessage: 'Enter a number.', description: 'Error under a number field that holds something else.' },

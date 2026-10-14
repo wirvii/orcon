@@ -291,5 +291,6 @@
   "editor.node.call.text": "Ejecuta otro flujo y continúa con su resultado",
   "editor.settings.notes": "Notas",
   "editor.settings.note.label": "Nota sobre este paso",
-  "editor.settings.note.hint": "Texto sin formato para las personas que trabajan en el flujo, de hasta {max} caracteres. Se guarda con el borrador y no cambia lo que hace el flujo."
+  "editor.settings.note.hint": "Texto sin formato para las personas que trabajan en el flujo, de hasta {max} caracteres. Se guarda con el borrador y no cambia lo que hace el flujo.",
+  "editor.config.hiddenValues": "{count, plural, one {Hay un valor guardado oculto porque no se aplica a las opciones actuales: {names}. Se conserva.} other {Hay # valores guardados ocultos porque no se aplican a las opciones actuales: {names}. Se conservan.}}"
 }

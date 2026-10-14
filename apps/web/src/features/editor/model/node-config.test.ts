@@ -7,6 +7,7 @@ import {
   expressionCapable,
   expressionSource,
   isExpression,
+  hiddenWithValue,
   isVisible,
   modeOf,
   normalize,
@@ -79,8 +80,14 @@ describe('what a node holds and what shows', () => {
     expect(isVisible(body, { method: 'POST' })).toBe(true);
     expect(isVisible(body, { method: 'GET' })).toBe(false);
     expect(isVisible(body, {})).toBe(false);
-    expect(isVisible(body, { method: '=$json.m' })).toBe(false);
+    expect(isVisible(body, { method: '=$json.m' })).toBe(true);
     expect(isVisible(text, {})).toBe(true);
+    // A controlling parameter the node holds nothing for counts with its default.
+    const method: ParamDef = { name: 'method', type: 'OPTIONS', default: 'POST', options: ['GET', 'POST'] };
+    expect(isVisible(body, {}, [method])).toBe(true);
+    expect(isVisible(body, { method: 'GET' }, [method])).toBe(false);
+    // An expression is not known until the flow runs: the dependent parameter shows.
+    expect(isVisible(body, { method: '={{ $json.method }}' }, [method])).toBe(true);
     const both: ParamDef = { name: 'x', type: 'STRING', displayWhen: [{ param: 'a', oneOf: [true] }, { param: 'b', oneOf: [1] }] };
     expect(isVisible(both, { a: true, b: 1 })).toBe(true);
     expect(isVisible(both, { a: true, b: 2 })).toBe(false);
@@ -139,5 +146,23 @@ describe('what is stored for what was typed', () => {
 
   it('writes a block without the members set to undefined', () => {
     expect(withoutUndefined({ a: 1, b: undefined, c: null, d: false })).toEqual({ a: 1, c: null, d: false });
+  });
+});
+
+describe('values that are hidden', () => {
+  const method: ParamDef = { name: 'method', type: 'OPTIONS', default: 'GET', options: ['GET', 'POST'] };
+  const body: ParamDef = { name: 'body', type: 'STRING', displayWhen: [{ param: 'method', oneOf: ['POST'] }] };
+
+  it('are the ones the node holds and the choices no longer apply to', () => {
+    expect(hiddenWithValue([method, body], { method: 'GET', body: 'x' }).map((def) => def.name)).toEqual(['body']);
+    expect(hiddenWithValue([method, body], { method: 'POST', body: 'x' })).toEqual([]);
+    expect(hiddenWithValue([method, body], { method: 'GET' })).toEqual([]);
+    expect(hiddenWithValue([method, body], { method: '={{ $json.m }}', body: 'x' })).toEqual([]);
+  });
+
+  it('are not checked while hidden', () => {
+    const required: ParamDef = { ...body, required: true };
+    expect(problemsOf([method, required], { method: 'GET' })).toEqual({});
+    expect(problemsOf([method, required], { method: 'POST' })).toEqual({ body: 'required' });
   });
 });

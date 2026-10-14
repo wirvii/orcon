@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl';
 import { parseJsonText } from '../../../../app/boundary/parse';
 import { pinOf } from '../../model/connector-versions';
 import type { FlowNode } from '../../model/flow-document';
-import { isVisible } from '../../model/node-config';
+import { hiddenWithValue, isVisible } from '../../model/node-config';
 import { isUnsupported, manifestOf, parametersFor, type NodeManifest } from '../../model/node-manifests';
 
 import { CredentialSelect } from './CredentialSelect';
@@ -92,7 +92,9 @@ export function NodeConfigForm({ nodeId, manifest: override }: NodeConfigFormPro
   }
   if (!manifest) return <RawParameters node={node} />;
 
-  const defs = parametersFor(manifest, pinOf(node)?.version).filter((def) => isVisible(def, node.parameters));
+  const known = parametersFor(manifest, pinOf(node)?.version);
+  const defs = known.filter((def) => isVisible(def, node.parameters, known));
+  const kept = hiddenWithValue(known, node.parameters);
   if (defs.length === 0 && manifest.credentials.length === 0) {
     return <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.noParameters)}</p>;
   }
@@ -108,6 +110,11 @@ export function NodeConfigForm({ nodeId, manifest: override }: NodeConfigFormPro
           <ParameterField key={def.name} def={def} parameters={node.parameters} t={t} onChange={actions.setParameter} />
         ),
       )}
+      {kept.length > 0 ? (
+        <p className="text-fg-muted text-sm" data-hidden-values>
+          {intl.formatMessage(configMessages.hiddenValues, { count: kept.length, names: kept.map((def) => t(`param.${def.name}.label`)).join(', ') })}
+        </p>
+      ) : null}
     </div>
   );
 }
