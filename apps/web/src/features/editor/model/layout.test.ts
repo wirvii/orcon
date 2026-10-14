@@ -69,6 +69,21 @@ describe('tidying up', () => {
     expect(placed.get('note-1')).toEqual({ x: webhook?.x, y: (webhook?.y ?? 0) + 180 });
   });
 
+  it('never leaves a note under a node: a node with no connections does not land on the note', () => {
+    const input = inputOf();
+    // A node with no connection, as one added from the palette: it lands in the first column, where the note sits.
+    input.nodes.push({ id: 'lonely', w: 100, h: 100, position: { x: 460, y: 460 } });
+    const placed = positions(layoutGraph(input));
+    const boxes = [...input.nodes.map((node) => ({ id: node.id, at: placed.get(node.id) ?? node.position, w: node.w, h: node.h + 56 })), ...input.notes.map((note) => ({ id: note.id, at: placed.get(note.id) ?? note.position, w: note.w, h: note.h }))];
+    for (const [index, a] of boxes.entries()) {
+      for (const b of boxes.slice(index + 1)) {
+        const apart = a.at.x >= b.at.x + b.w || b.at.x >= a.at.x + a.w || a.at.y >= b.at.y + b.h || b.at.y >= a.at.y + a.h;
+        expect(apart, `${a.id} and ${b.id} do not overlap`).toBe(true);
+      }
+    }
+    expect((placed.get('note-1')?.y ?? 0) % 20).toBe(0);
+  });
+
   it('lays out only the selection and leaves the others alone', () => {
     const selection = new Set(['inventory', 'slack', 'done']);
     const output = layoutGraph(inputOf(selection));

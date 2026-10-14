@@ -40,6 +40,7 @@ export type LayoutOutput = [string, Point][];
 /** Room under a tile for its name and subtitle (canvas.md#labels). */
 const LABEL_ROOM = 56;
 const ROW_GAP = 40;
+const GRID_GAP = 20;
 const RANK_GAP = COLUMN_PITCH - 100;
 
 const centerOf = (box: { position: Point; w: number; h: number }): Point => ({ x: box.position.x + box.w / 2, y: box.position.y + box.h / 2 });
@@ -107,5 +108,39 @@ export function layoutGraph(input: LayoutInput): LayoutOutput {
       y: snap(target.y + (note.position.y - nearest.node.position.y)),
     });
   }
+  separateNotes(input, moved);
   return [...moved];
+}
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const overlap = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/**
+ * A sticky note is an obstacle, not just a thing that follows a node: a note that ended up under a
+ * node (a node with no connections lands in the first column, where a note often is) moves down to
+ * the first free place below what it overlaps, on the grid. Notes are placed in the order they have.
+ */
+function separateNotes(input: LayoutInput, moved: Map<string, Point>): void {
+  const boxes: Box[] = input.nodes.map((node) => {
+    const at = moved.get(node.id) ?? node.position;
+    return { x: at.x, y: at.y, w: node.w, h: node.h + LABEL_ROOM };
+  });
+  for (const note of input.notes) {
+    const at = moved.get(note.id) ?? note.position;
+    let box: Box = { x: at.x, y: at.y, w: note.w, h: note.h };
+    // Every pass moves the note below one more obstacle, so the loop ends after at most one pass per box.
+    for (let pass = 0; pass <= boxes.length; pass += 1) {
+      const blocker = boxes.find((other) => overlap(box, other));
+      if (!blocker) break;
+      box = { ...box, y: snap(blocker.y + blocker.h + GRID_GAP) };
+    }
+    moved.set(note.id, { x: box.x, y: box.y });
+    boxes.push(box);
+  }
 }
