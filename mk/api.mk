@@ -56,7 +56,7 @@ api-compat-selftest: $(OASDIFF)
 # nothing to run and the target says so.
 api-examples:
 	@if [ -d internal/adapter/httpapi/examplestest ]; then \
-		$(MAKE) build-go && ORCON_BIN=$(CURDIR)/bin/orcon ORCON_EXAMPLES_DB=$(DB) go test -count=1 -run 'TestExamples|TestRunnerAgainstFake' ./internal/adapter/httpapi/examplestest/...; \
+		$(MAKE) build-go && ORCON_BIN=$(CURDIR)/bin/orcon ORCON_EXAMPLES_DB=$(DB) go test -count=1 -v -run 'TestExamples|TestRunnerAgainstFake' ./internal/adapter/httpapi/examplestest/...; \
 	else \
 		echo "api-examples: the examples runner (internal/adapter/httpapi/examplestest) arrives with cut A5; nothing to run (DB=$(DB))"; \
 	fi

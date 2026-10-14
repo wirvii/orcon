@@ -1,0 +1,432 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fake contract for the examples runner self-test",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/things/{thingId}": {
+      "get": {
+        "operationId": "getThing",
+        "parameters": [
+          {
+            "name": "thingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A thing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                },
+                "examples": {
+                  "good": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                      "name": "Alpha",
+                      "createdAt": "2026-10-12T15:04:05Z"
+                    }
+                  },
+                  "wrongValue": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                      "name": "Zeta",
+                      "createdAt": "2026-10-12T15:04:05Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "good",
+            "request": {
+              "pathParams": {
+                "thingId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "good"
+            },
+            "scenario": "seed-thing"
+          },
+          {
+            "name": "wrongStatus",
+            "request": {
+              "pathParams": {
+                "thingId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              }
+            },
+            "response": {
+              "status": 201,
+              "body": "good"
+            },
+            "scenario": "seed-thing"
+          },
+          {
+            "name": "wrongValue",
+            "request": {
+              "pathParams": {
+                "thingId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "wrongValue"
+            },
+            "scenario": "seed-thing"
+          },
+          {
+            "name": "unboundId",
+            "request": {
+              "pathParams": {
+                "thingId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "good"
+            },
+            "scenario": "seed-thing"
+          },
+          {
+            "name": "missingScenario",
+            "request": {
+              "pathParams": {
+                "thingId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "good"
+            },
+            "scenario": "no-such-scenario"
+          }
+        ]
+      }
+    },
+    "/things": {
+      "post": {
+        "operationId": "createThing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewThing"
+              },
+              "examples": {
+                "createThing": {
+                  "value": {
+                    "name": "Beta"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                },
+                "examples": {
+                  "createThing": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a62",
+                      "name": "Beta",
+                      "createdAt": "2026-10-12T15:04:05Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "createThing",
+            "request": {
+              "body": "createThing"
+            },
+            "response": {
+              "status": 201,
+              "body": "createThing"
+            }
+          }
+        ]
+      }
+    },
+    "/things/stream": {
+      "get": {
+        "operationId": "streamThings",
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "followThings",
+            "request": {},
+            "response": {
+              "status": 200
+            },
+            "stream": {
+              "trigger": "createThing",
+              "expectTypes": [
+                "thing.created"
+              ],
+              "within": "5s"
+            }
+          }
+        ]
+      }
+    },
+    "/broken": {
+      "get": {
+        "operationId": "getBroken",
+        "responses": {
+          "200": {
+            "description": "Missing a required field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                },
+                "examples": {
+                  "badBody": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                      "name": "Alpha",
+                      "createdAt": "2026-10-12T15:04:05Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "badBody",
+            "request": {},
+            "response": {
+              "status": 200,
+              "body": "badBody"
+            }
+          }
+        ]
+      }
+    },
+    "/wrapped": {
+      "get": {
+        "operationId": "getWrapped",
+        "responses": {
+          "200": {
+            "description": "Wrapped in an envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                },
+                "examples": {
+                  "envelope": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                      "name": "Alpha",
+                      "createdAt": "2026-10-12T15:04:05Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "envelope",
+            "request": {},
+            "response": {
+              "status": 200,
+              "body": "envelope"
+            }
+          }
+        ]
+      }
+    },
+    "/imports": {
+      "post": {
+        "operationId": "startImport",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                },
+                "examples": {
+                  "importThings": {
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63",
+                      "status": "PENDING"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "importThings",
+            "request": {},
+            "response": {
+              "status": 202,
+              "body": "importThings"
+            },
+            "operation": {
+              "terminalStatus": "SUCCEEDED"
+            }
+          }
+        ]
+      }
+    },
+    "/operations/{operationId}": {
+      "get": {
+        "operationId": "getOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "responses": {
+          "200": {
+            "description": "Protocol endpoint, never executed"
+          }
+        },
+        "x-orcon-examples": [
+          {
+            "name": "exempt",
+            "request": {},
+            "response": {
+              "status": 200
+            },
+            "scenario": "no-such-scenario"
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Thing": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NewThing": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELED"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
