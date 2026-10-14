@@ -55,11 +55,13 @@ export interface EditorCanvasProps {
   ref?: Ref<EditorCanvasHandle> | undefined;
   /** Enter, double-click or "Open details" on a node (from the md breakpoint; below it the canvas shows its own status panel). */
   onOpenDetails?: ((nodeId: string) => void) | undefined;
+  /** A tap on a node below the md breakpoint, where the canvas is read-only: the host opens its own read-only details. */
+  onOpenPhoneDetails?: ((nodeId: string) => void) | undefined;
   /** True while the node details view is open: what it edits is shown on the canvas as it changes. */
   syncNodes?: boolean | undefined;
 }
 
-export function EditorCanvas({ ref, onOpenDetails, syncNodes = false }: EditorCanvasProps) {
+export function EditorCanvas({ ref, onOpenDetails, onOpenPhoneDetails, syncNodes = false }: EditorCanvasProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const channel = useNoticeChannel();
@@ -303,6 +305,7 @@ export function EditorCanvas({ ref, onOpenDetails, syncNodes = false }: EditorCa
         catalog={catalog}
         onGraphChange={onGraphChange}
         onOpenDetails={onOpenDetails}
+        onOpenPhoneDetails={onOpenPhoneDetails}
         onRunStep={later}
         onExecuteWorkflow={later}
         className="min-w-0 flex-1"

@@ -19,8 +19,11 @@ import { useDescribeNode } from './use-node-catalog';
 
 export interface NodeDetailsProps {
   nodeId: string;
-  /** `dialog`: three panes over the canvas (lg and wider). `docked`: the Parameters pane beside the canvas (md to lg). */
-  layout: 'dialog' | 'docked';
+  /**
+   * `dialog`: three panes over the canvas (lg and wider). `docked`: the Parameters pane beside the canvas (md to lg).
+   * `fullscreen`: a phone (below md), read-only: the same tabs, every value shown and no control that writes.
+   */
+  layout: 'dialog' | 'docked' | 'fullscreen';
   tab: DetailsTab;
   onTabChange: (tab: DetailsTab) => void;
   onClose: () => void;
@@ -65,6 +68,8 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
   const view = useViewNode(nodeId);
   const node = useEditorStore((state) => state.document.nodes.find((candidate) => candidate.id === nodeId));
   const panes = usePanes(view, 'flex-1');
+  // On a phone the view only shows: no data panes, no rename, no run.
+  const readOnly = layout === 'fullscreen';
 
   useEffect(() => {
     if (!node) onClose();
@@ -89,8 +94,9 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
         if (!open) onClose();
       }}
       layout={layout}
-      input={panes.input}
-      output={panes.output}
+      readOnly={readOnly}
+      input={readOnly ? undefined : panes.input}
+      output={readOnly ? undefined : panes.output}
       tab={tab}
       onTabChange={onTabChange}
       tabs={{
@@ -103,8 +109,8 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
         settings: <NodeSettingsForm node={node} manifest={manifest} />,
         docs: <NodeDocs node={node} manifest={manifest} />,
       }}
-      onExecute={panes.run}
-      onRename={rename}
+      onExecute={readOnly ? undefined : panes.run}
+      onRename={readOnly ? undefined : rename}
       onReturnFocus={onReturnFocus}
     />
   );

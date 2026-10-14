@@ -321,12 +321,59 @@ test.describe('on a tablet', () => {
   });
 });
 
-test.describe('on a phone', () => {
+// On a phone the details view opens full screen and only shows: every value is there, and no control can change it.
+test.describe('on a phone the node details are read-only', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('opens no details view: the canvas stays read-only', async ({ page }) => {
+  /** The controls of the open view that a person can still press or type into, except the tabs and the close button. */
+  async function enabledControls(page: Page): Promise<string[]> {
+    return page.locator('[data-node-details="fullscreen"]').evaluate((root) => {
+      const labelOf = (element: HTMLElement) => element.getAttribute('aria-label') ?? element.textContent.trim();
+      return Array.from(root.querySelectorAll<HTMLElement>('input, textarea, select, button, [role="combobox"], [role="switch"], [role="checkbox"], [contenteditable="true"]'))
+        .filter((element) => !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true')
+        .filter((element) => element.getAttribute('role') !== 'tab' && labelOf(element) !== 'Back to canvas')
+        .map((element) => `${element.tagName.toLowerCase()} ${labelOf(element)}`.trim());
+    });
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`the read-only details have no accessibility violations in the ${theme} theme, in every tab`, async ({ page }) => {
+      await openEditor(page, { theme });
+      await node(page, 'slack').click();
+      await page.waitForSelector('[data-node-details="fullscreen"]');
+      await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Docs' }).click();
+      await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
+      await expectNoViolations(page);
+    });
+  }
+
+  test('a tap on a node opens the details with every value shown and no control that writes, and the close button gives focus back to the node', async ({ page }) => {
     await openEditor(page);
     await node(page, 'slack').click();
-    await expect(page.locator('[data-node-details="dialog"], [data-node-details="docked"]')).toHaveCount(0);
+    const view = page.locator('[data-node-details="fullscreen"]');
+    await expect(view).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Read-only on this screen')).toBeVisible();
+    // The short summary a phone used to show is not opened: the full view is.
+    await expect(page.locator('[data-node-details="slack"]')).toHaveCount(0);
+    await expect(view.getByRole('textbox').first()).toBeDisabled();
+    expect(await enabledControls(page)).toEqual([]);
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
+    expect(await enabledControls(page)).toEqual([]);
+    await page.getByRole('tab', { name: 'Docs' }).click();
+    await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
+    expect(await enabledControls(page)).toEqual([]);
+    // The view fits the screen: nothing scrolls sideways.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Back to canvas' }).click();
+    await expect(view).toBeHidden();
+    await expect(node(page, 'slack')).toBeFocused();
   });
 });
+

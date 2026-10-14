@@ -35,6 +35,11 @@ export interface NavEntry {
   icon: LucideIcon;
   /** Count of things waiting in that section. */
   badge?: number | undefined;
+  /**
+   * The link leaves the single-page app: the server answers it with its own page, so a plain click
+   * follows the link and never goes through `onNavigate`.
+   */
+  fullPage?: boolean | undefined;
 }
 
 export interface AppShellProps {
@@ -72,7 +77,7 @@ export function AppShell({ navigation, currentId, brand, actions, children, defa
   const [drawerOpen, setDrawerOpen] = useState(defaultDrawerOpen);
   const follow = (entry: NavEntry, afterwards?: () => void) => (event: MouseEvent<HTMLAnchorElement>) => {
     afterwards?.();
-    if (!onNavigate || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!onNavigate || entry.fullPage || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     onNavigate(entry);
   };
