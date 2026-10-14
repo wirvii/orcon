@@ -320,8 +320,9 @@ func TestEveryAssetIsListed(t *testing.T) {
 			want:   []want{{ruleManifest, "brand/mascot/old/pose.png", "not listed"}},
 		},
 		{
-			name:   "editor litter is ignored",
+			name:   "hidden files are assets too",
 			mutate: func(tr *tree) { tr.put("brand/icon/.DS_Store", []byte{0}) },
+			want:   []want{{ruleManifest, "brand/icon/.DS_Store", "not listed"}},
 		},
 		{
 			name:   "files outside the asset directories are not assets",
