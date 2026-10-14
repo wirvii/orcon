@@ -14,59 +14,109 @@ const (
 	AISupported = "SUPPORTED"
 	// AIAdapted is row A: mapped with a difference the import reports.
 	AIAdapted = "ADAPTED"
+	// AIUnsupported is row U: the annex says the type has no counterpart.
+	AIUnsupported = "UNSUPPORTED"
 )
 
-// aiPlan is the AI mapping that SPEC-006 Annex B commits to, for the n8n AI
-// types that appear in the measurement corpus. It is planning data: the
-// coverage of a catalog that maps AI is "planned" until the AI importer of
-// SPEC-006 (AI16) replaces this table with the real mapping. A type the annex
-// does not name, and LangChain Code (row U), are not in it, so they count as
-// unmapped and are listed in the report.
+// aiPlan classifies the AI types of the pinned n8n release by the rows of
+// SPEC-006 Annex B (docs/reference/n8n-ai-coverage.md), family rows included:
+// the chat model, language model, embedding, memory, vector store, loader,
+// splitter, retriever, parser and tool families map as their row says (S unless
+// the row says A). It is planning data: the AI importer of SPEC-006 (AI16)
+// replaces it with the real mapping. A type here that the annex marks U is
+// unsupported; a type of the inventory that is neither here nor in aiUnnamed
+// fails TestAIPlanCoversInventory, so a new release cannot change the figures
+// unnoticed.
 //
-// Keys are the type names without the package prefix.
-var aiPlan = map[string]string{
+// Keys are full n8n types; the LangChain package prefix is added by lc.
+var aiPlan = buildAIPlan()
+
+func buildAIPlan() map[string]string {
+	plan := map[string]string{}
+	lc := func(status string, names ...string) {
+		for _, n := range names {
+			plan[aiPrefix+n] = status
+		}
+	}
 	// Root nodes: agents and chains.
-	"agent": AIAdapted, "chainLlm": AISupported, "chainRetrievalQa": AISupported,
-	"chainSummarization": AISupported, "informationExtractor": AISupported,
-	"textClassifier": AISupported, "sentimentAnalysis": AISupported, "mcpClientTool": AISupported,
-	"chat": AISupported, "openAi": AIAdapted, "googleGemini": AIAdapted,
+	lc(AISupported, "chainLlm", "chainRetrievalQa", "chainSummarization", "informationExtractor",
+		"textClassifier", "sentimentAnalysis", "modelSelector", "mcpClient", "chat")
+	lc(AIAdapted, "agent", "openAi", "googleGemini")
+	lc(AIUnsupported, "code") // LangChain Code: row U
 	// Triggers.
-	"chatTrigger": AISupported, "mcpTrigger": AISupported,
-	// Chat models, language models and embeddings.
-	"lmChatAnthropic": AISupported, "lmChatOpenAi": AISupported, "lmChatGoogleGemini": AISupported,
-	"lmChatAzureOpenAi": AISupported, "lmChatMistralCloud": AISupported, "lmChatGroq": AISupported,
-	"lmChatDeepSeek": AISupported, "lmChatOllama": AISupported, "lmChatOpenRouter": AISupported,
-	"lmChatXAiGrok": AISupported, "lmOllama": AIAdapted, "lmOpenHuggingFaceInference": AIAdapted,
-	"embeddingsOpenAi": AISupported, "embeddingsGoogleGemini": AISupported,
-	"embeddingsMistralCloud": AISupported, "embeddingsOllama": AISupported,
-	"rerankerCohere": AISupported,
+	lc(AISupported, "chatTrigger", "mcpTrigger")
+	// Chat models, language models and embeddings (family rows).
+	lc(AISupported, "lmChatAnthropic", "lmChatOpenAi", "lmChatGoogleGemini", "lmChatGoogleVertex",
+		"lmChatAzureOpenAi", "lmChatAwsBedrock", "lmChatMistralCloud", "lmChatGroq", "lmChatDeepSeek",
+		"lmChatOllama", "lmChatOpenRouter", "lmChatVercelAiGateway", "lmChatXAiGrok")
+	lc(AIAdapted, "lmOllama", "lmOpenHuggingFaceInference", "lmCohere")
+	lc(AISupported, "embeddingsOpenAi", "embeddingsGoogleGemini", "embeddingsGoogleVertex",
+		"embeddingsAzureOpenAi", "embeddingsAwsBedrock", "embeddingsMistralCloud", "embeddingsOllama",
+		"embeddingsCohere", "embeddingsHuggingFaceInference", "rerankerCohere")
 	// Memory.
-	"memoryBufferWindow": AIAdapted, "memoryManager": AISupported, "memoryPostgresChat": AISupported,
-	"memoryRedisChat": AISupported, "memoryMongoDbChat": AISupported,
+	lc(AISupported, "memoryManager", "memoryPostgresChat", "memoryRedisChat", "memoryMongoDbChat",
+		"memoryXata", "memoryZep", "memoryMotorhead")
+	lc(AIAdapted, "memoryBufferWindow")
 	// Vector stores, loaders, splitters, retrievers and parsers.
-	"vectorStoreInMemory": AIAdapted, "vectorStorePGVector": AISupported, "vectorStorePinecone": AISupported,
-	"vectorStoreQdrant": AISupported, "vectorStoreSupabase": AISupported, "vectorStoreWeaviate": AISupported,
-	"vectorStoreMongoDBAtlas": AISupported, "documentDefaultDataLoader": AISupported,
-	"textSplitterCharacterTextSplitter": AISupported, "textSplitterRecursiveCharacterTextSplitter": AISupported,
-	"textSplitterTokenSplitter": AISupported, "retrieverVectorStore": AISupported, "retrieverWorkflow": AISupported,
-	"outputParserStructured": AISupported, "outputParserAutofixing": AISupported, "outputParserItemList": AISupported,
+	lc(AISupported, "vectorStorePGVector", "vectorStorePinecone", "vectorStoreQdrant", "vectorStoreSupabase",
+		"vectorStoreWeaviate", "vectorStoreMongoDBAtlas", "vectorStoreRedis", "vectorStoreMilvus", "vectorStoreZep",
+		"documentDefaultDataLoader", "textSplitterCharacterTextSplitter", "textSplitterRecursiveCharacterTextSplitter",
+		"textSplitterTokenSplitter", "retrieverVectorStore", "retrieverWorkflow", "retrieverMultiQuery",
+		"retrieverContextualCompression", "outputParserStructured", "outputParserAutofixing", "outputParserItemList")
+	lc(AIAdapted, "vectorStoreInMemory", "documentGithubLoader")
 	// Tools.
-	"toolWorkflow": AISupported, "toolHttpRequest": AISupported, "toolCode": AISupported,
-	"toolCalculator": AISupported, "toolThink": AISupported, "toolVectorStore": AISupported,
-	"toolWikipedia": AISupported, "toolSerpApi": AISupported,
+	lc(AISupported, "agentTool", "toolWorkflow", "toolHttpRequest", "toolCode", "toolCalculator", "toolThink",
+		"toolVectorStore", "toolWikipedia", "toolSerpApi", "toolSearXng", "toolWolframAlpha", "mcpClientTool")
+	// Nodes of the base package that the annex names as AI nodes.
+	plan[basePrefix+"aiTransform"] = AIAdapted // AI Transform -> orcon.code@1, the generated code is kept
+	plan[basePrefix+"openAi"] = AIAdapted      // the legacy OpenAI application node
+	return plan
+}
+
+// aiUnnamed lists the AI types of the pinned release that SPEC-006 Annex B does
+// not name. They count as unmapped and are reported; naming them is an
+// amendment of that annex, not a change here.
+var aiUnnamed = []string{
+	aiPrefix + "manualChatTrigger",
+	aiPrefix + "lmOpenAi",
+	aiPrefix + "documentBinaryInputLoader",
+	aiPrefix + "documentJsonInputLoader",
+	aiPrefix + "memoryChatRetriever",
+}
+
+// AIPlanTypes returns every type the plan classifies, sorted: the mapped ones,
+// the explicitly unsupported ones and the unnamed ones.
+func AIPlanTypes() []string {
+	out := make([]string, 0, len(aiPlan)+len(aiUnnamed))
+	for t := range aiPlan {
+		out = append(out, t)
+	}
+	out = append(out, aiUnnamed...)
+	slices.Sort(out)
+	return out
+}
+
+// AIClassified reports whether the plan says something about the AI type.
+func AIClassified(nodeType string) bool {
+	if _, ok := aiPlan[nodeType]; ok {
+		return true
+	}
+	return slices.Contains(aiUnnamed, nodeType)
 }
 
 // PlannedAI returns the AI entries of the planned catalog: the types of
-// SPEC-006 Annex B (rows S and A), the Tool variants of built-in nodes and the
-// $fromAI() function.
+// SPEC-006 Annex B marked S or A, the Tool variants of built-in nodes and the
+// $fromAI() function. Unsupported and unnamed types are not in it, so they
+// count as unmapped.
 func PlannedAI() []AIEntry {
 	out := []AIEntry{
 		{Type: AIToolVariants, Status: AISupported},
 		{Type: AIFromAI, Status: AISupported},
-		{Type: basePrefix + "openAi", Status: AIAdapted},
 	}
-	for name, status := range aiPlan {
-		out = append(out, AIEntry{Type: aiPrefix + name, Status: status})
+	for t, status := range aiPlan {
+		if status != AIUnsupported {
+			out = append(out, AIEntry{Type: t, Status: status})
+		}
 	}
 	slices.SortFunc(out, func(a, b AIEntry) int { return cmp.Compare(a.Type, b.Type) })
 	return out

@@ -66,10 +66,9 @@ var coreNodes = []CoreNode{
 	{[]string{"ssh", "git"}, "orcon.host.*@1", "SPEC-003 CN13", DispHost, "local SSH and Git are host-access nodes"},
 	{[]string{"executeCommand", "readBinaryFile", "readBinaryFiles", "writeBinaryFile", "readWriteFile"},
 		"orcon.host.*@1", "SPEC-003 CN13", DispHost, "disabled by default; allowlists of the admin"},
-	{[]string{"aiTransform"}, "orcon.code@1", "SPEC-006", DispNode, "the generated code is kept (docs/reference/n8n-ai-coverage.md); added from the pinned inventory"},
-	{[]string{"htmlExtract"}, "orcon.html@1", "SPEC-003 CN13", DispNode, "legacy name of the HTML node; added from the pinned inventory"},
-	{[]string{"readPDF"}, "orcon.file.*@1", "SPEC-003 CN13", DispNode, "legacy PDF reader; added from the pinned inventory"},
-	{[]string{"iCal", "timeSaved", "simulate", "simulateTrigger"}, "orcon.<name>@1", "SPEC-003 CN13", DispNode, "added from the pinned inventory; CN13 confirms the design"},
+	{[]string{"htmlExtract"}, "orcon.html@1", "SPEC-003 CN13", DispNode, "legacy name of the HTML node, whose extraction operation replaces it (Amendment 10)"},
+	{[]string{"readPDF"}, "orcon.file.*@1", "SPEC-003 CN13", DispNode, "legacy; n8n replaced it with Extract from File, PDF format (Amendment 10)"},
+	{[]string{"iCal"}, "orcon.file.*@1", "SPEC-003 CN13", DispNode, "legacy; today's documentation covers it with Convert to File, ICS (Amendment 10)"},
 	{[]string{"n8n"}, "official declarative connector over the public n8n REST API", "SPEC-003 CN13", DispConnector,
 		"acts on the n8n instance the flow managed, never on the Orcon API; no n8n name or logo (Amendment 9)"},
 	{[]string{"start"}, "orcon.manual@1", "SPEC-002", DispTrigger, "legacy entry point of old n8n flows, a manual trigger (Amendment 9)"},
@@ -88,7 +87,10 @@ var coreNodes = []CoreNode{
 	{[]string{"localFileTrigger"}, "orcon.localFile@1", "SPEC-002", DispTrigger, "family LISTEN; disabled by default"},
 	{[]string{"stickyNote"}, "editor.stickyNotes[]", "SPEC-014 (editor); importer CN2", DispEditor, "editor data (ADR-0007 section 2), not a node: left out of node and type counts (Amendment 9)"},
 	{[]string{"dataTable"}, "", "own backlog item", DispUnsupported, "tabular storage has no design yet (SPEC-003 Q14); the importer reports it"},
-	{[]string{"e2eTest", "e2eTestPollingTrigger"}, "", "none", DispUnsupported, "n8n's own end-to-end test nodes; no user flow imports them"},
+	{[]string{"e2eTest", "e2eTestPollingTrigger", "simulate", "simulateTrigger"}, "", "out of scope", DispUnsupported,
+		"n8n's internal nodes without public documentation; reimplementing them would mean reading n8n code (Q9, Amendment 10)"},
+	{[]string{"timeSaved"}, "", "pending owner decision P-TS1", DispUnsupported,
+		"Track Time Saved has no destination until the owner answers P-TS1; the importer reports it and does not invent one"},
 }
 
 // CoreNodes returns the core table. The caller owns the result.

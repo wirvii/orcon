@@ -32,7 +32,7 @@ var annexB = []string{
 	"emailReadImap", "sseTrigger", "rssFeedReadTrigger", "localFileTrigger",
 	"dataTable",
 	// Added by Amendment 9 and by the pinned inventory.
-	"start", "n8n", "aiTransform", "htmlExtract", "readPDF", "iCal", "timeSaved", "simulate", "simulateTrigger",
+	"start", "n8n", "htmlExtract", "readPDF", "iCal", "timeSaved", "simulate", "simulateTrigger",
 	"e2eTest", "e2eTestPollingTrigger",
 }
 
@@ -82,7 +82,7 @@ func TestCoreNodeListComplete(t *testing.T) {
 		if row.Mapped() {
 			continue
 		}
-		if !slices.Equal(row.N8nTypes, []string{"dataTable"}) && !slices.Equal(row.N8nTypes, []string{"e2eTest", "e2eTestPollingTrigger"}) {
+		if !slices.Contains([]string{"dataTable", "e2eTest", "timeSaved"}, row.N8nTypes[0]) {
 			t.Errorf("unexpected unsupported row %v", row.N8nTypes)
 		}
 	}
@@ -150,6 +150,70 @@ func TestCoreNodeListAgainstPinnedRelease(t *testing.T) {
 	}
 	if gaps := n8nimport.CheckInventory(inv); len(gaps) > 0 {
 		t.Fatalf("core types of n8n %s without a counterpart: %v", inv.N8nVersion, gaps)
+	}
+	for typ, question := range n8nimport.PendingOwner(inv) {
+		t.Logf("%s waits for the owner decision %s: the release gate cannot close while it is listed", typ, question)
+	}
+}
+
+// TestAIPlanCoversInventory checks the AI plan against the inventory of the
+// pinned release: every AI type of the inventory is classified (planned,
+// explicitly unsupported or explicitly unnamed), and the plan names no type the
+// inventory lacks. It runs only with ORCON_N8N_CORPUS and needs an inventory
+// that has the AI group.
+func TestAIPlanCoversInventory(t *testing.T) {
+	dir := os.Getenv("ORCON_N8N_CORPUS")
+	if dir == "" {
+		t.Skip("ORCON_N8N_CORPUS is not set")
+	}
+	inv, err := n8nimport.ReadInventory(os.DirFS(dir), n8nimport.InventoryFile)
+	if err != nil {
+		t.Fatalf("the corpus has no inventory of the pinned release: %v", err)
+	}
+	inInventory := map[string]bool{}
+	ai := 0
+	for _, n := range inv.Nodes {
+		inInventory[n.Type] = true
+		if n.Group != n8nimport.GroupAI {
+			continue
+		}
+		ai++
+		if !n8nimport.AIClassified(n.Type) {
+			t.Errorf("the AI type %s is not in the AI plan or in the list of unnamed types: classify it", n.Type)
+		}
+	}
+	if ai == 0 {
+		t.Fatal("the inventory has no AI group: write it again with the current tool")
+	}
+	for _, typ := range n8nimport.AIPlanTypes() {
+		if !inInventory[typ] {
+			t.Errorf("the AI plan names %s, which the inventory of n8n %s lacks", typ, inv.N8nVersion)
+		}
+	}
+}
+
+func TestAITransformCountsOnlyWhenMapped(t *testing.T) {
+	tp, err := n8nimport.ParseTemplate([]byte(`{"nodes":[{"name":"T","type":"n8n-nodes-base.aiTransform","typeVersion":1,"parameters":{}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := n8nimport.Classify(&tp, nil); res.Importable() || !res.HasAI {
+		t.Errorf("an AI node is unmapped unless the catalog maps it: %+v", res)
+	}
+	if res := n8nimport.Classify(&tp, n8nimport.PlannedBase()); !res.Importable() || !res.HasAI {
+		t.Errorf("the planned catalog maps AI Transform: %+v", res)
+	}
+	if _, ok := n8nimport.LookupCore("n8n-nodes-base.aiTransform"); ok {
+		t.Error("AI Transform is an AI node and has no row in the core table")
+	}
+	code := n8nimport.AIPlanTypes()
+	if !slices.Contains(code, "@n8n/n8n-nodes-langchain.code") {
+		t.Fatal("LangChain Code must be classified")
+	}
+	for _, e := range n8nimport.PlannedAI() {
+		if e.Type == "@n8n/n8n-nodes-langchain.code" || e.Type == "@n8n/n8n-nodes-langchain.manualChatTrigger" {
+			t.Errorf("%s must stay unmapped", e.Type)
+		}
 	}
 }
 

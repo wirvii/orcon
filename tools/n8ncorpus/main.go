@@ -46,8 +46,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	base := flags.String("base", defaultBase, "base URL of the template library")
 	delay := flags.Duration("delay", 150*time.Millisecond, "pause between requests of one worker")
 	workers := flags.Int("workers", 4, "parallel downloads")
-	registry := flags.String("registry", defaultRegistry, "package registry the node inventory of the pinned release is read from")
-	noInventory := flags.Bool("no-inventory", false, "do not write inventory.json (the coverage command then refuses the corpus)")
+	n8nURL := flags.String("n8n-url", "", "address of a locally running instance of the pinned n8n release; its node type list becomes inventory.json (without it no inventory is written and the coverage command refuses the corpus)")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -88,10 +87,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "n8ncorpus: %d templates, %d expressions, corpus %s\n", m.Templates, m.Expressions, m.CorpusSHA256)
-	if *noInventory {
+	if *n8nURL == "" {
+		fmt.Fprintln(stdout, "n8ncorpus: no inventory written: start the pinned n8n release locally and pass -n8n-url")
 		return 0
 	}
-	inv, err := f.fetchInventory(ctx, *registry, *version)
+	inv, err := f.fetchInventory(ctx, *n8nURL, *version)
 	if err != nil {
 		fmt.Fprintln(stderr, "n8ncorpus:", err)
 		return 1
@@ -101,17 +101,20 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "n8ncorpus:", err)
 		return 1
 	}
-	m.NodesBaseVersion, m.InventorySHA256 = inv.NodesBaseVersion, digest
+	m.InventorySHA256 = digest
 	if err := updateManifest(*dir, m); err != nil {
 		fmt.Fprintln(stderr, "n8ncorpus:", err)
 		return 1
 	}
-	core := 0
+	core, ai := 0, 0
 	for _, n := range inv.Nodes {
-		if n.Group == "CORE" {
+		switch n.Group {
+		case "CORE":
 			core++
+		case "AI":
+			ai++
 		}
 	}
-	fmt.Fprintf(stdout, "n8ncorpus: inventory of %s %s: %d node types, %d core, digest %s\n", basePackage, inv.NodesBaseVersion, len(inv.Nodes), core, digest)
+	fmt.Fprintf(stdout, "n8ncorpus: inventory of n8n %s: %d node types, %d core, %d AI, digest %s\n", inv.N8nVersion, len(inv.Nodes), core, ai, digest)
 	return 0
 }

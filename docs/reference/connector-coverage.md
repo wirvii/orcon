@@ -17,7 +17,7 @@ A template is fully importable when every node maps, every operation it selects 
 | Templates without AI nodes | 207, of which 28.99 % importable |
 | Templates with AI nodes | 392, of which 0.00 % importable |
 | Built-in integration node types used, with a connector | 0 of 95 (0.00 %) |
-| Core node types used, with a counterpart | 61 of 62 (98.39 %) |
+| Core node types used, with a counterpart | 60 of 61 (98.36 %) |
 | Operations used (type, version, resource, operation), mapped | 0 of 364 (0.00 %) |
 | Sticky notes (editor data) | 3115 |
 
@@ -86,7 +86,7 @@ A template is fully importable when every node maps, every operation it selects 
 | `n8n-nodes-base.baserow` | INTEGRATION | 15 | 4 | no |
 | `n8n-nodes-base.cron` | CORE | 15 | 15 | yes |
 
-The AI nodes (63 types, 2274 nodes, 0 types mapped by this catalog) are not listed: their mapping is in `n8n-ai-coverage.md`.
+The AI nodes (64 types, 2275 nodes, 0 types mapped by this catalog) are not listed: their mapping is in `n8n-ai-coverage.md`.
 
 ## What blocks templates most
 

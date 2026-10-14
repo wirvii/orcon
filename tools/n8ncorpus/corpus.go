@@ -52,10 +52,9 @@ type Manifest struct {
 	// CorpusSHA256 identifies the corpus without containing it: the digest of
 	// the sorted (template, path, SHA-256 of the expression) triples.
 	CorpusSHA256 string `json:"corpusSha256"`
-	// NodesBaseVersion and InventorySHA256 describe inventory.json, the node
-	// types of the pinned release that travel with the corpus.
-	NodesBaseVersion string `json:"nodesBaseVersion,omitempty"`
-	InventorySHA256  string `json:"inventorySha256,omitempty"`
+	// InventorySHA256 identifies inventory.json, the node types of the pinned
+	// release that travel with the corpus.
+	InventorySHA256 string `json:"inventorySha256,omitempty"`
 }
 
 type fetcher struct {

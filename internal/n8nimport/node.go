@@ -153,9 +153,12 @@ func intMember(v jsonvalue.Value, key string) int {
 func (n *Node) IsAI() bool { return IsAIType(n.Type) }
 
 // IsAIType reports whether an n8n node type belongs to the AI design: the
-// LangChain package, and the legacy OpenAI application node, which SPEC-006
-// maps to the provider connectors (docs/reference/n8n-ai-coverage.md).
-func IsAIType(t string) bool { return strings.HasPrefix(t, aiPrefix) || t == basePrefix+"openAi" }
+// LangChain package, and the two base-package nodes that SPEC-006 Annex B
+// names as AI nodes, AI Transform and the legacy OpenAI application node
+// (docs/reference/n8n-ai-coverage.md).
+func IsAIType(t string) bool {
+	return strings.HasPrefix(t, aiPrefix) || t == basePrefix+"openAi" || t == basePrefix+"aiTransform"
+}
 
 const (
 	aiPrefix   = "@n8n/n8n-nodes-langchain."
