@@ -56,15 +56,15 @@ func decode(data []byte, _ func(string) bool) ([]config.FileEntry, error) {
 	return out, nil
 }
 
-type run struct {
+type outcome struct {
 	out, err bytes.Buffer
 	code     int
 	handled  bool
 }
 
-func exec(t *testing.T, env cli.Env, args ...string) *run {
+func exec(t *testing.T, env cli.Env, args ...string) *outcome {
 	t.Helper()
-	r := &run{}
+	r := &outcome{}
 	env.Stdout, env.Stderr = &r.out, &r.err
 	if env.Environ == nil {
 		env.Environ = []string{"HOME=/home/orcon"}
