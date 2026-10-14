@@ -5,6 +5,7 @@ package storetest
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ func AbandonCount(t *testing.T, newStore Factory) {
 		run  func(*testing.T, Factory)
 	}{
 		{"ReaperAddsOne", abandonReaperCase},
+		{"StepErrorReleaseAddsOne", abandonStepErrorCase},
 		{"LostLeasesOfAPreviousRunAddOne", abandonLostCase},
 		{"ReturnByTheOwnerAddsNothing", abandonReturnCase},
 		{"ProgressResetsTheCount", abandonProgressCase},
@@ -56,6 +58,46 @@ func (e *execFixture) leased(ex *store.Execution, ttl time.Duration) (store.Toke
 	return tok, store.Fence{}
 }
 
+// expiredData reads the data of the lease.expired events of an execution: the cause and
+// the abandon count after the increment.
+func (e *execFixture) expiredData(ex store.ExecutionID) []struct {
+	Cause          string `json:"cause"`
+	AbandonedCount int64  `json:"abandonedCount"`
+} {
+	e.t.Helper()
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex, 0, 100)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	var out []struct {
+		Cause          string `json:"cause"`
+		AbandonedCount int64  `json:"abandonedCount"`
+	}
+	for i := range events {
+		if events[i].Type != "lease.expired" {
+			continue
+		}
+		var d struct {
+			Cause          string `json:"cause"`
+			AbandonedCount int64  `json:"abandonedCount"`
+		}
+		if err := json.Unmarshal(events[i].Data, &d); err != nil {
+			e.t.Fatalf("data of lease.expired %q: %v", events[i].Data, err)
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// wantExpired asserts that the execution has one lease.expired event with the cause and count.
+func (e *execFixture) wantExpired(ex store.ExecutionID, cause string) {
+	e.t.Helper()
+	got := e.expiredData(ex)
+	if len(got) != 1 || got[0].Cause != cause || got[0].AbandonedCount != 1 {
+		e.t.Errorf("lease.expired events = %+v, want one with cause %s and abandonedCount 1", got, cause)
+	}
+}
+
 func (e *execFixture) eventCount(ex store.ExecutionID, typ string) int {
 	e.t.Helper()
 	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex, 0, 100)
@@ -83,9 +125,27 @@ func abandonReaperCase(t *testing.T, newStore Factory) {
 	if got := e.mustToken(e.orgA, tok.ID); got.AbandonedCount != 1 || got.Status != "RUNNABLE" {
 		t.Fatalf("token = %+v", got)
 	}
-	if n := e.eventCount(ex.ID, "lease.expired"); n != 1 {
-		t.Errorf("%d lease.expired events, want 1", n)
+	e.wantExpired(ex.ID, "LEASE_TIMEOUT")
+}
+
+func abandonStepErrorCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	ex := e.execution()
+	tok, f := e.leased(ex, time.Hour)
+	reaped, ok, err := e.s.ReleaseTokenLease(e.ctx(), f, 3, realNow())
+	if err != nil || !ok || reaped.AbandonedCount != 1 || reaped.TokenID != tok.ID {
+		t.Fatalf("release = %+v, %v, %v; want one abandonment", reaped, ok, err)
 	}
+	if got := e.mustToken(e.orgA, tok.ID); got.AbandonedCount != 1 || got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() {
+		t.Fatalf("token = %+v", got)
+	}
+	e.wantExpired(ex.ID, "STEP_ERROR")
+	// The fence holds: a second release of the same lease, or one with another epoch, does nothing.
+	if _, ok, err := e.s.ReleaseTokenLease(e.ctx(), f, 3, realNow()); err != nil || ok {
+		t.Fatalf("second release = %v, %v; want nothing released", ok, err)
+	}
+	e.wantExpired(ex.ID, "STEP_ERROR")
 }
 
 func abandonLostCase(t *testing.T, newStore Factory) {
@@ -100,6 +160,7 @@ func abandonLostCase(t *testing.T, newStore Factory) {
 	if got := e.mustToken(e.orgA, tok.ID); got.AbandonedCount != 1 || got.Status != "RUNNABLE" {
 		t.Fatalf("token = %+v", got)
 	}
+	e.wantExpired(ex.ID, "STALE_INCARNATION")
 }
 
 func abandonReturnCase(t *testing.T, newStore Factory) {
@@ -239,8 +300,9 @@ func abandonLastChanceCase(t *testing.T, newStore Factory) {
 
 // LeftLeased names a token a store was closed with while it was leased.
 type LeftLeased struct {
-	Org   identity.OrgID
-	Token store.TokenID
+	Org       identity.OrgID
+	Token     store.TokenID
+	Execution store.ExecutionID
 }
 
 // SeedLeftLeased inserts a token leased to a worker with a lease that has not
@@ -248,8 +310,9 @@ type LeftLeased struct {
 func SeedLeftLeased(t *testing.T, s Store) LeftLeased {
 	t.Helper()
 	e := newExecFixture(t, func(*testing.T) Store { return s })
-	tok, _ := e.leased(e.execution(), time.Hour)
-	return LeftLeased{Org: e.orgA, Token: tok.ID}
+	ex := e.execution()
+	tok, _ := e.leased(ex, time.Hour)
+	return LeftLeased{Org: e.orgA, Token: tok.ID, Execution: ex.ID}
 }
 
 // CheckStartupRelease verifies, on the store reopened after SeedLeftLeased, that
@@ -262,5 +325,26 @@ func CheckStartupRelease(t *testing.T, s Store, l LeftLeased) {
 	}
 	if got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() || got.AbandonedCount != 1 {
 		t.Fatalf("token after the reopen = %+v; want RUNNABLE, released, abandoned once", got)
+	}
+	events, err := s.ListExecutionEvents(t.Context(), l.Org, l.Execution, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for i := range events {
+		if events[i].Type != "lease.expired" {
+			continue
+		}
+		n++
+		var d struct {
+			Cause          string `json:"cause"`
+			AbandonedCount int64  `json:"abandonedCount"`
+		}
+		if err := json.Unmarshal(events[i].Data, &d); err != nil || d.Cause != "PROCESS_RESTART" || d.AbandonedCount != 1 {
+			t.Errorf("lease.expired data %q (%v), want cause PROCESS_RESTART and abandonedCount 1", events[i].Data, err)
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d lease.expired events after the reopen, want 1", n)
 	}
 }

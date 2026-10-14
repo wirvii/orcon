@@ -436,7 +436,8 @@ func startExecution(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRu
 // attempts of their node executions, the events, the attention request of a
 // poisoned token and the counters of the executions, all in the writer job of
 // the update (ADR-0013 sections 4 and 9).
-func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, rows []abandoned, counted bool, now time.Time) ([]store.Reaped, error) {
+// The cause says why the lease was lost and goes into the data of lease.expired.
+func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, rows []abandoned, counted bool, cause string, now time.Time) ([]store.Reaped, error) {
 	out := make([]store.Reaped, 0, len(rows))
 	for i := range rows {
 		a := &rows[i]
@@ -459,7 +460,7 @@ func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule
 			tokenText := id.UUID(reaped.TokenID).String()
 			epoch := strconv.FormatInt(a.epoch, 10)
 			ref := eventDocument("tokenId", tokenText, "nodeId", a.node)
-			data := eventDocument("abandonedCount", a.count)
+			data := eventDocument("abandonedCount", a.count, "cause", cause)
 			tokenEvent := execution.Event{Token: execution.TokenID(tokenText), Node: flow.NodeID(a.node)}
 			expired := tokenEvent
 			expired.Type = execution.EventType("lease.expired")
@@ -504,7 +505,7 @@ func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThres
 		for i, r := range rows {
 			moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 		}
-		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, true, now)
+		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, true, "LEASE_TIMEOUT", now)
 		return err
 	})
 	return out, err
@@ -536,7 +537,7 @@ func (s *Store) releaseWorker(ctx context.Context, worker execution.WorkerID, po
 			for i, r := range rows {
 				moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 			}
-			page, err := afterAbandon(ctx, q, s.outboxRule(), moved, counted, now)
+			page, err := afterAbandon(ctx, q, s.outboxRule(), moved, counted, "STALE_INCARNATION", now)
 			if err != nil {
 				return err
 			}
@@ -565,7 +566,7 @@ func (s *Store) ReleaseTokenLease(ctx context.Context, f store.Fence, poisonThre
 		for i, r := range rows {
 			moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 		}
-		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, true, now)
+		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, true, "STEP_ERROR", now)
 		return err
 	})
 	if err != nil || len(out) == 0 {
@@ -594,7 +595,7 @@ func (s *Store) releaseAllLeases(ctx context.Context) (int, error) {
 			for i, r := range rows {
 				moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 			}
-			if _, err := afterAbandon(ctx, q, s.outboxRule(), moved, true, now); err != nil {
+			if _, err := afterAbandon(ctx, q, s.outboxRule(), moved, true, "PROCESS_RESTART", now); err != nil {
 				return err
 			}
 			n += len(rows)

@@ -208,7 +208,7 @@ $$;
 -- was abandoned p_poison_threshold times (ADR-0013 section 9). The started attempts of its node executions become
 -- ABANDONED, and the events, the attention request and the counters follow in the same transaction. The callers
 -- (expired leases, a worker that shuts down) choose the tokens.
-CREATE FUNCTION orcon_engine.abandon_tokens(p_ids uuid[], p_poison_threshold bigint, p_now timestamptz, p_counts boolean)
+CREATE FUNCTION orcon_engine.abandon_tokens(p_ids uuid[], p_poison_threshold bigint, p_now timestamptz, p_counts boolean, p_cause text)
 RETURNS TABLE (org_id uuid, id uuid, execution_id uuid, abandoned_count bigint, is_poisoned boolean)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
 $$
@@ -235,12 +235,13 @@ BEGIN
     FROM node_execution n
     WHERE n.org_id = r.r_org AND n.token_id = r.r_token
       AND a.org_id = n.org_id AND a.node_execution_id = n.id AND a.status = 'STARTED';
-    -- A lease the owner gives back (p_counts false) is not an expiry: no event, no abandon count.
+    -- A lease the owner gives back (p_counts false) is not an expiry: no event, no abandon count. p_cause says why the
+    -- lease was lost: LEASE_TIMEOUT, STALE_INCARNATION or STEP_ERROR (PROCESS_RESTART is the SQLite start).
     IF p_counts THEN
       PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
         orcon_engine.derive_uuid('event', 'lease.expired', r.r_token::text, r.r_epoch::text),
         'lease.expired', '{"tokenId":"' || r.r_token::text || '","nodeId":' || to_json(r.r_node)::text || '}',
-        '{"abandonedCount":' || r.r_abandoned::text || '}', p_now);
+        '{"abandonedCount":' || r.r_abandoned::text || ',"cause":' || to_json(p_cause)::text || '}', p_now);
     END IF;
     IF r.r_poisoned THEN
       PERFORM orcon_engine.append_event(r.r_org, r.r_execution,
@@ -294,7 +295,7 @@ BEGIN
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE, 'LEASE_TIMEOUT') a;
 END
 $$;
 
@@ -320,7 +321,7 @@ BEGIN
     FOR UPDATE SKIP LOCKED
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, p_counts) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, p_counts, 'STALE_INCARNATION') a;
 END
 $$;
 
@@ -347,7 +348,7 @@ BEGIN
     FOR UPDATE
   ) x;
   RETURN QUERY SELECT a.org_id, a.id, a.execution_id, a.abandoned_count, a.is_poisoned
-               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE) a;
+               FROM orcon_engine.abandon_tokens(v_ids, p_poison_threshold, p_now, TRUE, 'STEP_ERROR') a;
 END
 $$;
 
@@ -568,8 +569,8 @@ REVOKE ALL ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) F
 GRANT EXECUTE ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) TO orcon_application;
 ALTER FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.lock_executions_of_tokens(uuid[]) FROM PUBLIC;
-ALTER FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean) OWNER TO orcon_engine;
-REVOKE ALL ON FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean) FROM PUBLIC;
+ALTER FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean, text) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.abandon_tokens(uuid[], bigint, timestamptz, boolean, text) FROM PUBLIC;
 ALTER FUNCTION orcon_engine.start_claimed_execution(uuid, uuid, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.start_claimed_execution(uuid, uuid, timestamptz) FROM PUBLIC;
 ALTER FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz, bigint) OWNER TO orcon_engine;

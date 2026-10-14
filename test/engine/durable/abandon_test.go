@@ -5,7 +5,10 @@ package durable_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -133,6 +136,10 @@ func TestAbandonCount(t *testing.T) {
 	}{
 		{"shutdown within the grace adds nothing", returnedWithinGrace},
 		{"shutdown past the grace adds nothing", returnedPastGrace},
+		{"an engine error in a step gives the lease back and counts once", failedStepCountsOnce},
+		{"a node error or a panic neither returns the lease nor counts", nodeErrorDoesNotCount},
+		{"a return that is not confirmed is counted once, by the reaper", unconfirmedReturnCountsOnce},
+		{"a deterministic engine error ends in poison, the last run alone", repeatedStepErrorPoisons},
 		{"progress puts the count back to zero", progressResets},
 		{"a last chance token runs only on an empty worker, which then claims nothing", lastChanceRunsAlone},
 		{"a last chance token that waits too long empties the busy workers", lastChanceStarvation},
@@ -330,4 +337,220 @@ func lastChanceStarvation(t *testing.T, env *storetest.EngineEnv) {
 		}
 		return true
 	})
+}
+
+// leaseExpired returns the data of the lease.expired events of an execution.
+func leaseExpired(t *testing.T, env *storetest.EngineEnv, execID store.ExecutionID) []struct {
+	Cause          string `json:"cause"`
+	AbandonedCount int64  `json:"abandonedCount"`
+} {
+	t.Helper()
+	var out []struct {
+		Cause          string `json:"cause"`
+		AbandonedCount int64  `json:"abandonedCount"`
+	}
+	events := env.Events(execID)
+	for i := range events {
+		if events[i].Type != "lease.expired" {
+			continue
+		}
+		var d struct {
+			Cause          string `json:"cause"`
+			AbandonedCount int64  `json:"abandonedCount"`
+		}
+		if err := json.Unmarshal(events[i].Data, &d); err != nil {
+			t.Fatalf("data of lease.expired %q: %v", events[i].Data, err)
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// failedStepCountsOnce (BL-065, Enmienda 12b section 12b-1): a step that fails with
+// an engine error must not leave its token LEASED. Renewals go by worker, so while
+// the worker holds any other lease (here, execution A is blocked in a node) a
+// lease only dropped locally would be renewed for ever. The lease goes back at once,
+// counts one abandonment and says why in one lease.expired event.
+func failedStepCountsOnce(t *testing.T, env *storetest.EngineEnv) {
+	t.Helper()
+	pub := env.Publish(docOf(sequence(2)))
+	hold := newHoldRunner()
+	// The first step to reach its commit fails once: A is blocked before that, so it is B's.
+	faults := &faultPlan{only: []durable.Point{durable.PointWorked}, failAt: 1, err: errInjected}
+	cfg := durable.Config{Concurrency: 2, RenewEvery: 30 * time.Millisecond, PollEvery: 10 * time.Millisecond, ReapEvery: 50 * time.Millisecond, LeaseTTL: time.Minute, Faults: faults}
+	eng := env.Engine(cfg, execution.Deps{Runner: hold})
+	a := env.Start(eng, pub, input())
+	release, began := hold.hold(a)
+	b := env.Start(eng, pub, input())
+	stop := run(eng)
+	defer func() {
+		release()
+		if err := stop(); err != nil {
+			t.Errorf("Run() = %v", err)
+		}
+	}()
+	select {
+	case <-began:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the activation of A never started")
+	}
+	// B finishes while A still holds its lease: the lease of B came back after the failure.
+	waitFor(t, "B to finish after its failed step", 20*time.Second, func() bool { return statusOf(env, b) == execution.ExecSucceeded })
+	got := leaseExpired(t, env, b)
+	if len(got) != 1 || got[0].Cause != "STEP_ERROR" || got[0].AbandonedCount != 1 {
+		t.Errorf("lease.expired events of B = %+v, want one with cause STEP_ERROR and abandonedCount 1", got)
+	}
+	if got := leaseExpired(t, env, a); len(got) != 0 {
+		t.Errorf("lease.expired events of A = %+v, want none: its step did not fail", got)
+	}
+}
+
+// panicRunner fails the node t1 the way a connector does, or panics in it.
+type panicRunner struct{ panics bool }
+
+func (p panicRunner) Execute(_ context.Context, call execution.NodeCall) (execution.NodeOutput, error) {
+	if call.Node.ID == "t1" {
+		if p.panics {
+			panic("a node panics")
+		}
+		return execution.NodeOutput{}, errors.New("the connector failed")
+	}
+	return execution.NodeOutput{Ports: []execution.PortBatch{{Port: flow.PortMain, Batch: call.Input}}}, nil
+}
+
+// nodeErrorDoesNotCount: an error of a node, and a panic recovered in it, fail the
+// node execution and follow the flow's policy; they never take the path of an engine
+// error (ADR-0013 section 9: node panics become node errors, not poison).
+func nodeErrorDoesNotCount(t *testing.T, env *storetest.EngineEnv) {
+	t.Helper()
+	pub := env.Publish(docOf(sequence(2)))
+	for name, r := range map[string]panicRunner{"error": {}, "panic": {panics: true}} {
+		eng := env.Engine(durable.Config{Concurrency: 1}, execution.Deps{Runner: r})
+		execID := env.Start(eng, pub, input())
+		env.Drain(eng)
+		if got := statusOf(env, execID); got != execution.ExecFailed {
+			t.Errorf("%s: execution is %s, want FAILED by the node", name, got)
+		}
+		if n := countEvents(env, execID, "node.failed"); n != 1 {
+			t.Errorf("%s: %d node.failed events, want 1", name, n)
+		}
+		if got := leaseExpired(t, env, execID); len(got) != 0 {
+			t.Errorf("%s: lease.expired events = %+v, want none", name, got)
+		}
+	}
+}
+
+// failingRelease is a store whose release of one token can be made to fail, as when
+// the database is gone at the moment the worker gives the lease back.
+type failingRelease struct {
+	durable.Store
+	fail atomic.Bool
+}
+
+func (f *failingRelease) ReleaseTokenLease(ctx context.Context, fence store.Fence, threshold int64, now time.Time) (store.Reaped, bool, error) {
+	if f.fail.Load() {
+		return store.Reaped{}, false, errors.New("database unreachable")
+	}
+	return f.Store.ReleaseTokenLease(ctx, fence, threshold, now) //nolint:wrapcheck // a test double passes the answer through
+}
+
+// unconfirmedReturnCountsOnce: when the return after a step error does not reach the
+// database, the lease expires and the reaper counts it: one abandonment in all, never two.
+func unconfirmedReturnCountsOnce(t *testing.T, env *storetest.EngineEnv) {
+	t.Helper()
+	ctx := t.Context()
+	pub := env.Publish(docOf(sequence(2)))
+	flaky := &failingRelease{Store: env.Store}
+	flaky.fail.Store(true)
+	faults := &faultPlan{only: []durable.Point{durable.PointWorked}, failAt: 1, err: errInjected}
+	eng := env.EngineOn(flaky, durable.Config{Concurrency: 1, LeaseTTL: 100 * time.Millisecond, Faults: faults}, runner())
+	execID := env.Start(eng, pub, input())
+	claimed, start, err := eng.Claim(ctx, 1)
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim = %d, %v", len(claimed), err)
+	}
+	if err := eng.Work(ctx, claimed[0], start); !errors.Is(err, errInjected) {
+		t.Fatalf("Work() = %v, want the injected error", err)
+	}
+	if tok := tokenOf(t, env, execID); tok.Status != "LEASED" || tok.AbandonedCount != 0 {
+		t.Fatalf("token %s with %d abandonments after a release that did not reach the database", tok.Status, tok.AbandonedCount)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if n, err := eng.Reap(ctx); err != nil || n != 1 {
+		t.Fatalf("reap = %d, %v", n, err)
+	}
+	// The late release of the same lease finds the fence gone: still one abandonment.
+	f := store.Fence{OrgID: env.Org, Token: claimed[0].TokenID, Epoch: claimed[0].LeaseEpoch, Owner: eng.Worker()}
+	if _, ok, err := env.Store.ReleaseTokenLease(ctx, f, 3, time.Now()); err != nil || ok {
+		t.Fatalf("late release = %v, %v; want nothing to release", ok, err)
+	}
+	if tok := tokenOf(t, env, execID); tok.AbandonedCount != 1 {
+		t.Errorf("token abandoned %d times, want exactly 1", tok.AbandonedCount)
+	}
+	got := leaseExpired(t, env, execID)
+	if len(got) != 1 || got[0].Cause != "LEASE_TIMEOUT" || got[0].AbandonedCount != 1 {
+		t.Errorf("lease.expired events = %+v, want one with cause LEASE_TIMEOUT", got)
+	}
+}
+
+// repeatedStepErrorPoisons: an engine error that happens every time ends in poison,
+// and the run that reaches the threshold is the one where the token was alone: the
+// token waits at the last chance count while another execution keeps the worker busy.
+func repeatedStepErrorPoisons(t *testing.T, env *storetest.EngineEnv) {
+	t.Helper()
+	pub := env.Publish(docOf(sequence(1)))
+	hold := newHoldRunner()
+	var bad atomic.Value // store.TokenID of the token that always fails
+	faults := &faultPlan{on: func(_ context.Context, p durable.Point, token store.TokenID) error {
+		if want, _ := bad.Load().(store.TokenID); p == durable.PointWorked && token == want {
+			return errInjected
+		}
+		return nil
+	}}
+	cfg := durable.Config{Concurrency: 4, PollEvery: 5 * time.Millisecond, IsolationWait: time.Hour, Faults: faults}
+	eng := env.Engine(cfg, execution.Deps{Runner: hold})
+	busy := env.Start(eng, pub, input())
+	releaseBusy, busyBegan := hold.hold(busy)
+	poison := env.Start(eng, pub, input())
+	bad.Store(tokenOf(t, env, poison).ID)
+	stop := run(eng)
+	defer func() {
+		releaseBusy()
+		_ = stop()
+	}()
+	select {
+	case <-busyBegan:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the busy node never started")
+	}
+	// Two failures bring the token to the count one short of the threshold; then it waits for an empty worker.
+	waitFor(t, "the token to reach the last chance count", 20*time.Second, func() bool {
+		tokens := env.LiveTokens(poison)
+		return len(tokens) == 1 && tokens[0].AbandonedCount == 2 && tokens[0].Status == "RUNNABLE"
+	})
+	time.Sleep(300 * time.Millisecond)
+	if tok := tokenOf(t, env, poison); tok.Status != "RUNNABLE" || tok.AbandonedCount != 2 {
+		t.Fatalf("the token ran again with the worker busy: %s with %d abandonments", tok.Status, tok.AbandonedCount)
+	}
+	releaseBusy()
+	waitFor(t, "the token to be suspended as poison", 20*time.Second, func() bool {
+		tokens := env.LiveTokens(poison)
+		return len(tokens) == 1 && tokens[0].Status == "SUSPENDED"
+	})
+	if tok := tokenOf(t, env, poison); tok.SuspendReason != "POISON" || tok.AbandonedCount != 3 {
+		t.Errorf("token = %+v, want SUSPENDED POISON after 3 abandonments", tok)
+	}
+	if n := countEvents(env, poison, "token.poisoned"); n != 1 {
+		t.Errorf("%d token.poisoned events, want 1", n)
+	}
+	got := leaseExpired(t, env, poison)
+	if len(got) != 3 {
+		t.Fatalf("lease.expired events = %+v, want three", got)
+	}
+	for i, d := range got {
+		if d.Cause != "STEP_ERROR" || d.AbandonedCount != int64(i+1) {
+			t.Errorf("lease.expired #%d = %+v, want cause STEP_ERROR and abandonedCount %d", i+1, d, i+1)
+		}
+	}
+	waitFor(t, "the busy execution to end", 20*time.Second, func() bool { return statusOf(env, busy) == execution.ExecSucceeded })
 }
