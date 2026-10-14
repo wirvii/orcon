@@ -172,6 +172,25 @@ test.describe('on a computer', () => {
     await expect(page.getByRole('group', { name: /^Webhook,/ })).toBeVisible();
   });
 
+  test('shows the undo notice after deleting nodes, and its Undo brings them back in step with the store', async ({ page }) => {
+    await openEditor(page);
+    await node(page, 'slack').focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Delete');
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete nodes' }).click();
+    await expect(tiles(page)).toHaveCount(0);
+    const toast = page.locator('[data-sonner-toast]');
+    await expect(toast).toContainText(/Deleted \d+ nodes/);
+    await toast.getByRole('button', { name: 'Undo' }).click();
+    await expect(tiles(page)).toHaveCount(6);
+    // The store followed: the flow is saved with its nodes, and history still goes back through the delete.
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible({ timeout: 6_000 });
+    await page.getByRole('link', { name: 'Settings' }).first().click();
+    await page.getByRole('link', { name: 'Flow editor' }).first().click();
+    await page.waitForSelector('[data-fitted="true"]');
+    await expect(tiles(page)).toHaveCount(6);
+  });
+
   test('tidies up the flow with the keyboard: the connections of the If do not cross, and it is one undo', async ({ page }) => {
     await openEditor(page);
     await node(page, 'rejected').focus();

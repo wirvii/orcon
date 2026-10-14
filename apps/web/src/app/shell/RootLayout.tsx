@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { AppShell, Banner, BrandMark, type NavEntry } from '@orcon/ui';
+import { AppShell, Banner, BrandMark, Toaster, type NavEntry } from '@orcon/ui';
 import { onlineManager } from '@tanstack/react-query';
 import { createRootRouteWithContext, linkOptions, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import { House, Settings, Workflow } from 'lucide-react';
@@ -102,6 +102,8 @@ function RootLayout() {
         ) : null}
         <Outlet />
       </div>
+      {/* The one place short confirmations appear, such as the undo notice after deleting nodes on the canvas. */}
+      <Toaster />
     </AppShell>
   );
 }
