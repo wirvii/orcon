@@ -96,3 +96,51 @@ type ProjectRecord struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// Assurance levels of a session (SPEC-004 R-AUTH-03): AAL1 is a password, AAL2 adds a second factor.
+const (
+	AssuranceAAL1 = "AAL1"
+	AssuranceAAL2 = "AAL2"
+)
+
+// SessionRecord is a row of session: one login of a browser. Only the SHA-256 of
+// the opaque token is kept (SPEC-004 R-ID-06); the token itself never is.
+type SessionRecord struct {
+	ID             SessionID
+	UserID         UserID
+	TokenHash      []byte
+	AssuranceLevel string
+	CreatedAt      time.Time
+	// ExpiresAt is the maximum age of the session, whatever its activity.
+	ExpiresAt time.Time
+	// IdleExpiresAt is the end of the idle timeout; activity moves it forward, never past ExpiresAt.
+	IdleExpiresAt time.Time
+	LastSeenAt    time.Time
+	// RevokedAt is the zero value while the session is not revoked.
+	RevokedAt time.Time
+}
+
+// SessionView is a session with the user it belongs to, as its token resolves it.
+type SessionView struct {
+	Session     SessionRecord
+	PrincipalID PrincipalID
+	UserStatus  string
+	Email       string
+	DisplayName string
+}
+
+// UserCredentials is a user with the stored hash of its password. The hash is
+// returned only to the sign-in path, never through [UserRecord].
+type UserCredentials struct {
+	User UserRecord
+	// PasswordHash is empty for an account that has no password yet.
+	PasswordHash string
+}
+
+// LoginThrottle is the failed-attempt state of one keyed identifier (SPEC-004 R-AUTH-02).
+type LoginThrottle struct {
+	Failures int
+	// LockedUntil is the instant before which the identifier is refused.
+	LockedUntil time.Time
+	UpdatedAt   time.Time
+}

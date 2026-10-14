@@ -170,18 +170,18 @@ func (s *Store) DeletePrincipal(ctx context.Context, principal identity.Principa
 	})
 }
 
-func userFrom(row *sqlcgen.ApplicationUser) (identity.UserRecord, error) {
-	uid, err := uuidOf[identity.UserID](row.ID)
+func userFrom(id, principal []byte, email, displayName, status string, created, updated int64) (identity.UserRecord, error) {
+	uid, err := uuidOf[identity.UserID](id)
 	if err != nil {
 		return identity.UserRecord{}, fmt.Errorf("user id: %w", err)
 	}
-	pid, err := uuidOf[identity.PrincipalID](row.PrincipalID)
+	pid, err := uuidOf[identity.PrincipalID](principal)
 	if err != nil {
 		return identity.UserRecord{}, fmt.Errorf("user principal id: %w", err)
 	}
 	return identity.UserRecord{
-		ID: uid, PrincipalID: pid, EmailNormalized: row.EmailNormalized, DisplayName: row.DisplayName, Status: row.Status,
-		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		ID: uid, PrincipalID: pid, EmailNormalized: email, DisplayName: displayName, Status: status,
+		CreatedAt: instant(created), UpdatedAt: instant(updated),
 	}, nil
 }
 
@@ -208,7 +208,7 @@ func (s *Store) GetUser(ctx context.Context, user identity.UserID) (identity.Use
 		if err != nil {
 			return err
 		}
-		out, err = userFrom(&row)
+		out, err = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return err
 	})
 	return out, err
@@ -222,7 +222,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, emailNormalized string) (ide
 		if err != nil {
 			return err
 		}
-		out, err = userFrom(&row)
+		out, err = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return err
 	})
 	return out, err

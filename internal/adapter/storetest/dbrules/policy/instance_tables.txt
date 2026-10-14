@@ -19,6 +19,7 @@ connector_revocation  # SPEC-003 revocations apply to the whole instance
 connector_revocation_override  # SPEC-003 instance-level override of a revocation
 code_library  # SPEC-003 code libraries shared by the instance
 session  # SPEC-004 login sessions are resolved before the organization is known
+login_throttle  # SPEC-004 R-AUTH-02 failed sign-in attempts per keyed identifier, before the organization is known
 ai_price_table  # SPEC-006 model price table of the instance
 knowledge_chunk_fts5  # SPEC-006 SQLite FTS5 virtual table; its synchronisation triggers need a TI-10 exception
 backup_run  # SPEC-015 backup runs of the instance

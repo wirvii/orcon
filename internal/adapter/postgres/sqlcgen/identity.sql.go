@@ -14,6 +14,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteLoginThrottle = `-- name: DeleteLoginThrottle :execrows
+DELETE FROM login_throttle
+WHERE id = $1
+`
+
+// orcon:scope instance
+// orcon:delete bookkeeping:the throttle record of an identifier ends when that identifier signs in
+func (q *Queries) DeleteLoginThrottle(ctx context.Context, id []byte) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteLoginThrottle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePrincipal = `-- name: DeletePrincipal :execrows
 DELETE FROM principal
 WHERE id = $1
@@ -35,10 +50,20 @@ FROM application_user
 WHERE id = $1
 `
 
+type GetApplicationUserRow struct {
+	ID              pgtype.UUID
+	PrincipalID     pgtype.UUID
+	EmailNormalized string
+	DisplayName     string
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 // orcon:scope instance
-func (q *Queries) GetApplicationUser(ctx context.Context, id pgtype.UUID) (ApplicationUser, error) {
+func (q *Queries) GetApplicationUser(ctx context.Context, id pgtype.UUID) (GetApplicationUserRow, error) {
 	row := q.db.QueryRow(ctx, getApplicationUser, id)
-	var i ApplicationUser
+	var i GetApplicationUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.PrincipalID,
@@ -57,16 +82,80 @@ FROM application_user
 WHERE email_normalized = $1
 `
 
+type GetApplicationUserByEmailRow struct {
+	ID              pgtype.UUID
+	PrincipalID     pgtype.UUID
+	EmailNormalized string
+	DisplayName     string
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 // orcon:scope instance
-func (q *Queries) GetApplicationUserByEmail(ctx context.Context, emailNormalized string) (ApplicationUser, error) {
+func (q *Queries) GetApplicationUserByEmail(ctx context.Context, emailNormalized string) (GetApplicationUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getApplicationUserByEmail, emailNormalized)
-	var i ApplicationUser
+	var i GetApplicationUserByEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.PrincipalID,
 		&i.EmailNormalized,
 		&i.DisplayName,
 		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getApplicationUserCredentialsByEmail = `-- name: GetApplicationUserCredentialsByEmail :one
+SELECT id, principal_id, email_normalized, display_name, status, password_hash, created_at, updated_at
+FROM application_user
+WHERE email_normalized = $1
+`
+
+type GetApplicationUserCredentialsByEmailRow struct {
+	ID              pgtype.UUID
+	PrincipalID     pgtype.UUID
+	EmailNormalized string
+	DisplayName     string
+	Status          string
+	PasswordHash    pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+// orcon:scope instance
+func (q *Queries) GetApplicationUserCredentialsByEmail(ctx context.Context, emailNormalized string) (GetApplicationUserCredentialsByEmailRow, error) {
+	row := q.db.QueryRow(ctx, getApplicationUserCredentialsByEmail, emailNormalized)
+	var i GetApplicationUserCredentialsByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.PrincipalID,
+		&i.EmailNormalized,
+		&i.DisplayName,
+		&i.Status,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getLoginThrottle = `-- name: GetLoginThrottle :one
+SELECT id, failures, locked_until, created_at, updated_at
+FROM login_throttle
+WHERE id = $1
+`
+
+// orcon:scope instance
+func (q *Queries) GetLoginThrottle(ctx context.Context, id []byte) (LoginThrottle, error) {
+	row := q.db.QueryRow(ctx, getLoginThrottle, id)
+	var i LoginThrottle
+	err := row.Scan(
+		&i.ID,
+		&i.Failures,
+		&i.LockedUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -171,6 +260,84 @@ func (q *Queries) GetProject(ctx context.Context, orgID pgtype.UUID, iD pgtype.U
 		&i.IsProtected,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getSession = `-- name: GetSession :one
+SELECT id, application_user_id, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at
+FROM session
+WHERE application_user_id = $1 AND id = $2
+`
+
+type GetSessionRow struct {
+	ID                pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	AssuranceLevel    string
+	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+}
+
+// orcon:scope instance
+func (q *Queries) GetSession(ctx context.Context, applicationUserID pgtype.UUID, iD pgtype.UUID) (GetSessionRow, error) {
+	row := q.db.QueryRow(ctx, getSession, applicationUserID, iD)
+	var i GetSessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationUserID,
+		&i.AssuranceLevel,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.IdleExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
+const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
+SELECT s.id, s.application_user_id, s.assurance_level, s.created_at, s.expires_at, s.idle_expires_at, s.last_seen_at, s.revoked_at,
+       u.principal_id, u.status AS user_status, u.email_normalized, u.display_name
+FROM session AS s
+JOIN application_user AS u ON u.id = s.application_user_id
+WHERE s.token_hash = $1
+`
+
+type GetSessionByTokenHashRow struct {
+	ID                pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	AssuranceLevel    string
+	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	PrincipalID       pgtype.UUID
+	UserStatus        string
+	EmailNormalized   string
+	DisplayName       string
+}
+
+// orcon:scope instance
+func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error) {
+	row := q.db.QueryRow(ctx, getSessionByTokenHash, tokenHash)
+	var i GetSessionByTokenHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationUserID,
+		&i.AssuranceLevel,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.IdleExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.PrincipalID,
+		&i.UserStatus,
+		&i.EmailNormalized,
+		&i.DisplayName,
 	)
 	return i, err
 }
@@ -343,6 +510,37 @@ func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) er
 	return err
 }
 
+const insertSession = `-- name: InsertSession :exec
+INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, $5)
+`
+
+type InsertSessionParams struct {
+	ID                pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	TokenHash         []byte
+	AssuranceLevel    string
+	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+}
+
+// orcon:scope instance
+func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) error {
+	_, err := q.db.Exec(ctx, insertSession,
+		arg.ID,
+		arg.ApplicationUserID,
+		arg.TokenHash,
+		arg.AssuranceLevel,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+		arg.IdleExpiresAt,
+		arg.LastSeenAt,
+	)
+	return err
+}
+
 const listMemberships = `-- name: ListMemberships :many
 SELECT id, org_id, application_user_id, status, invited_by_principal_id, created_at, updated_at
 FROM membership
@@ -433,6 +631,36 @@ func (q *Queries) ListProjects(ctx context.Context, orgID pgtype.UUID, afterID p
 	return items, nil
 }
 
+const markSessionRevoked = `-- name: MarkSessionRevoked :execrows
+UPDATE session
+SET revoked_at = $1, updated_at = $1
+WHERE id = $2 AND application_user_id = $3 AND revoked_at IS NULL
+`
+
+// orcon:scope instance
+func (q *Queries) MarkSessionRevoked(ctx context.Context, revokedAt pgtype.Timestamptz, iD pgtype.UUID, applicationUserID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markSessionRevoked, revokedAt, iD, applicationUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateApplicationUserPasswordHash = `-- name: UpdateApplicationUserPasswordHash :execrows
+UPDATE application_user
+SET password_hash = $1, updated_at = $2
+WHERE id = $3
+`
+
+// orcon:scope instance
+func (q *Queries) UpdateApplicationUserPasswordHash(ctx context.Context, passwordHash pgtype.Text, updatedAt pgtype.Timestamptz, iD pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, updateApplicationUserPasswordHash, passwordHash, updatedAt, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateMembershipStatus = `-- name: UpdateMembershipStatus :execrows
 UPDATE membership
 SET status = $1, updated_at = $2
@@ -458,4 +686,45 @@ func (q *Queries) UpdateMembershipStatus(ctx context.Context, arg UpdateMembersh
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const updateSessionActivity = `-- name: UpdateSessionActivity :execrows
+UPDATE session
+SET last_seen_at = $1, idle_expires_at = $2, updated_at = $1
+WHERE id = $3 AND revoked_at IS NULL
+`
+
+// orcon:scope instance
+func (q *Queries) UpdateSessionActivity(ctx context.Context, lastSeenAt pgtype.Timestamptz, idleExpiresAt pgtype.Timestamptz, iD pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, updateSessionActivity, lastSeenAt, idleExpiresAt, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertLoginThrottle = `-- name: UpsertLoginThrottle :exec
+INSERT INTO login_throttle (id, failures, locked_until, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until = excluded.locked_until, updated_at = excluded.updated_at
+`
+
+type UpsertLoginThrottleParams struct {
+	ID          []byte
+	Failures    int64
+	LockedUntil pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+// orcon:scope instance
+func (q *Queries) UpsertLoginThrottle(ctx context.Context, arg UpsertLoginThrottleParams) error {
+	_, err := q.db.Exec(ctx, upsertLoginThrottle,
+		arg.ID,
+		arg.Failures,
+		arg.LockedUntil,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }

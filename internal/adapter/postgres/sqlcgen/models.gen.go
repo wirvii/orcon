@@ -19,6 +19,7 @@ type ApplicationUser struct {
 	Status          string
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	PasswordHash    pgtype.Text
 }
 
 type AttentionRequest struct {
@@ -384,6 +385,14 @@ type LimitBucket struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type LoginThrottle struct {
+	ID          []byte
+	Failures    int64
+	LockedUntil pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type Membership struct {
 	ID                   pgtype.UUID
 	OrgID                pgtype.UUID
@@ -567,6 +576,19 @@ type SchemaMigration struct {
 	BinaryVersion      string
 	CompatibilityFloor string
 	CreatedAt          pgtype.Timestamptz
+}
+
+type Session struct {
+	ID                pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	TokenHash         []byte
+	AssuranceLevel    string
+	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type TaskAttempt struct {
