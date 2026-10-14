@@ -72,7 +72,7 @@ func TestValueAndEntryNeverPrintASecret(t *testing.T) {
 			"Value %v":   fmt.Sprintf("%v", v),
 			"Value %+v":  fmt.Sprintf("%+v", v),
 			"Value %#v":  fmt.Sprintf("%#v", v),
-			"Value %s":   fmt.Sprintf("%s", v), //nolint:perfsprint,gocritic // the verb is what is under test
+			"Value %s":   fmt.Sprintf("%s", v),
 			"Value %x":   fmt.Sprintf("%x", v),
 			"Value %d":   fmt.Sprintf("%d", v),
 			"Entry %v":   fmt.Sprintf("%v", entry),

@@ -27,7 +27,7 @@ func TestReloadReportsAnUnreadableRunDirectoryAndItsOwner(t *testing.T) {
 	if err := os.Chmod(run, 0); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(run, 0o700) }) // so the temporary directory can be removed
+	t.Cleanup(func() { _ = os.Chmod(run, 0o700) }) //nolint:gosec // G302: so the temporary directory can be removed
 	me, err := user.Current()
 	if err != nil {
 		t.Fatal(err)
