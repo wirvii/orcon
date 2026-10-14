@@ -42,6 +42,8 @@ Aggregated per journal batch, with counts and id ranges: `op.prepared`, `op.disp
 ### Recovery and limits
 `lease.expired`, `token.poisoned`, `memory.limit_exceeded`, `limit.throttled` (live-only, not persisted; the latest value is sampled to the execution row).
 
+A token's abandon count grows by one when its lease is lost without its holder returning it: the reaper expires the lease, a SQLite process starts after a crash, or a worker clears leases left by its previous run. A worker that returns its tokens during an orderly shutdown, within or past the shutdown grace, does not add to the count. The count goes back to zero at every confirmation point that stores new results for the token. A token one abandon away from the poison threshold runs only on a worker that holds no other token, so the abandon that reaches the threshold is always one where the token ran alone; `token.poisoned` therefore names a token that crashed its process by itself.
+
 ### Human attention (ADR-0073)
 | Type | Meaning |
 |---|---|
