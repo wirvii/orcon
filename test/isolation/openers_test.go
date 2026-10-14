@@ -13,10 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/wirvii/orcon/internal/adapter/postgres"
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
+	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/test/isolation"
 )
 
@@ -59,29 +58,17 @@ func freshPostgresDatabase(tb testing.TB) string {
 	if admin == "" {
 		tb.Fatal("isolation: -store=postgres needs ORCON_TEST_POSTGRES_DSN (the administrative connection string of a PostgreSQL server)")
 	}
+	name := fmt.Sprintf("orcon_iso_%d", time.Now().UnixNano())
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	name := fmt.Sprintf("orcon_iso_%d", time.Now().UnixNano())
-	conn, err := pgx.Connect(ctx, admin)
-	if err != nil {
-		tb.Fatalf("connect to the administrative database: %v", err)
+	if err := storetest.CreateDatabase(ctx, admin, name); err != nil {
+		tb.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, "CREATE DATABASE "+name); err != nil {
-		_ = conn.Close(ctx)
-		tb.Fatalf("create database %s: %v", name, err)
-	}
-	_ = conn.Close(ctx)
 	tb.Cleanup(func() {
 		cctx, ccancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer ccancel()
-		c, err := pgx.Connect(cctx, admin)
-		if err != nil {
-			tb.Errorf("drop database %s: connect: %v", name, err)
-			return
-		}
-		defer func() { _ = c.Close(cctx) }()
-		if _, err := c.Exec(cctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
-			tb.Errorf("drop database %s: %v", name, err)
+		if err := storetest.DropDatabase(cctx, admin, name); err != nil {
+			tb.Errorf("%v", err)
 		}
 	})
 	u, err := url.Parse(admin)
