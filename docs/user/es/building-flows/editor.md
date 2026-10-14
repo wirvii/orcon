@@ -4,10 +4,11 @@ description: Abre un flujo, cámbialo en el lienzo, copia y pega nodos, ordénal
 sources:
   - ADR-0007
   - ADR-0082
-sourceHash: 7bf1dcd37fa725f2e2a05c9f5910bfee70e0fad6805fd2ffbeb0fea0cb6f4961
+sourceHash: 32e4cdb461a62557ac380da5715e625f49cfcc3b89d201bca5456a8352283134
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # El editor de flujos
 
 > Esta página describe la primera versión del editor, que trabaja con un flujo de ejemplo guardado en la pestaña de tu navegador. Todavía no lee ni guarda flujos en el servidor, no edita lo que hace un nodo (sus parámetros) y no ejecuta pruebas. Las partes que entreguen esas funciones actualizarán esta página.

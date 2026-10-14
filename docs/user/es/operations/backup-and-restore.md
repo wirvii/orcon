@@ -6,10 +6,11 @@ sources:
   - ADR-0042
   - ADR-0048
   - ADR-0073
-sourceHash: f86e138257f62c1971656e13cb884de6cc6897912fafda73c505db6ba2eec8bd
+sourceHash: b2046767b19b88307c482ba49bff592616f91b6a1bf38359979fda995e324e48
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Respaldo y restauración
 
 > Esta página describe un comportamiento especificado por el ADR 0083 que aún no está implementado. El corte que entregue `orcon backup` quitará esta nota.

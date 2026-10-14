@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0055 — Public events: real-time streaming (SSE) and signed outbound webhooks
 
 Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q18, human-attention surface, cross-spec consistency; ADR-0080 enum and `webhooks` rules; ADR-0077 schema rules) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)

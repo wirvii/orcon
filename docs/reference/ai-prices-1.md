@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # AI price table `orcon/ai-prices@1`
 
 Status: **Accepted** | Source: ADR-0062 §1 and §3 (accepted 2026-10-12 via SPEC-006)

@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Execution event catalog
 
 Status: **Accepted** | Source: ADR-0009 §7–§9 (accepted 2026-10-12 via SPEC-001), with the `ai.*` events added by SPEC-006

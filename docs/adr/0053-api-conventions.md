@@ -1,8 +1,9 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0053 — API conventions: pagination, filtering, errors, idempotency, concurrency, rate limits, long-running operations and response shapes
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 error catalog and response shapes; ADR-0077 schema rules) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: owner answers Q1–Q14, human-attention surface; ADR-0080 error catalog and response shapes; ADR-0077 schema rules) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2) (amended 2026-10-14: the idempotent response body is stored in a column with its format)
 
 Accepted by the owner on 2026-10-12 via SPEC-005.
 
@@ -26,7 +27,7 @@ The code catalog is part of the contract (`components/schemas/ProblemCode` with 
 
 ### 4. Idempotency
 - `Idempotency-Key` (1–255 visible ASCII) accepted on every `POST`; required on: running a flow, creating/rotating API keys, creating OAuth clients, creating event subscriptions, redelivering webhooks, starting imports and Git syncs, the continue/repeat/cancel human-attention actions (ADR-0052 §6), and every long-running operation.
-- `idempotency_record(org_id, id, requested_by_principal_id?, requester_identity, idempotency_key, fingerprint, status: IN_PROGRESS|COMPLETED, response_status, response_body_reference, resource_reference, created_at, expires_at)`, unique `(org_id, requester_identity, idempotency_key)`, TTL 24 h. `requester_identity` is the exact requesting principal (a user, a service account, or the API key or OAuth token for key-authenticated calls), so two keys of the same user do not share records; `requested_by_principal_id` is the actor column of ADR-0077 §8. Fingerprint = SHA-256 of method, route template, path parameters and canonical body.
+- `idempotency_record(org_id, id, requested_by_principal_id?, requester_identity, idempotency_key, fingerprint, status: IN_PROGRESS|COMPLETED, response_status, response_body_document, response_body_document_format, resource_reference, created_at, expires_at)`, unique `(org_id, requester_identity, idempotency_key)`, TTL 24 h. `requester_identity` is the exact requesting principal (a user, a service account, or the API key or OAuth token for key-authenticated calls), so two keys of the same user do not share records; `requested_by_principal_id` is the actor column of ADR-0077 §8. The stored response body lives in the row (`response_body_document`, with its format in `response_body_document_format`), up to 1 MiB; a larger body is not stored and a replay is rebuilt from `resource_reference`. Fingerprint = SHA-256 of method, route template, path parameters and canonical body.
 - Same key and fingerprint after completion → stored response replayed with `Idempotent-Replayed: true`. Different fingerprint → `422 idempotency-key-reused`. In progress → `409 idempotency-in-progress` with `Retry-After`.
 - The record is written in the same transaction as the state change; handlers that start durable work store the created resource id so a replay returns it even if the first response was lost.
 - Responses disclosing a newly issued secret are stored without it; a replay returns `409 secret-already-issued` with the resource id.
@@ -76,3 +77,4 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-009 K19 (2026-10-13, owner decision).** §4 (`idempotency_record.status`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
 - **SPEC-012 (Amendment 2, 2026-10-13, owner decision).** §4: a secret Orcon generates is returned once, in `<Resource>WithSecret.secret`, by the operation that creates or rotates it, which requires idempotency. §7: a failed `Operation` reports `failure`, never `error`. §9: protocol-tagged operations are the only exception to problem+json errors.
 - **SPEC-005 (Amendment 8, 2026-10-13).** §3: new code `method-not-allowed` 405 for a new condition; `confirmation-required` confirmed as 403 and `federated-token-rejected` as 400, as this section allowed the implementing slices to do.
+- **SPEC-005 (Amendment 8, Q-API-C, 2026-10-14, owner decision).** §4: the stored idempotent response body is kept in a column of `idempotency_record` together with its format (`response_body_document` and `response_body_document_format`, as SPEC-005 §11.2 states), not as a reference to a blob (ADR-0016); this replaces the column `response_body_reference`.

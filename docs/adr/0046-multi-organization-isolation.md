@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # ADR-0046 — Multi-organization isolation: data-access layer, static check, PostgreSQL RLS and SQLite behaviour
 
-Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (return type of current_org_ids)
+Status: **Accepted** | Date: 2026-10-11 | Amended: 2026-10-12 (owner answers; ADR-0077 §6); 2026-10-13 (return type of current_org_ids); 2026-10-13 (SPEC-004 Amendment 7)
 
 Accepted by the owner on 2026-10-12 via SPEC-004.
 
@@ -16,7 +16,7 @@ Every customer-data table has `org_id NOT NULL`, a unique constraint `(org_id, i
 
 ### 2. Wall 1: data-access layer
 - All SQL lives in `internal/adapter/sqlite` and `internal/adapter/postgres` (per-dialect sqlc query files). Each query declares its scope on its own line after `-- name:`: `-- orcon:scope org|instance|engine` (sqlc accepts no extra tokens on the `-- name:` line).
-- Organization-scoped methods take `orgscope.Org`, a type with an unexported constructor obtainable only from `authz.AuthContext.Org()` or from rows returned by engine functions (ADR-0047 §2). The scope value is bound to the `org_id` parameter by generated code.
+- Organization-scoped methods take `orgscope.Org` (package `internal/platform/orgscope`), a type with unexported fields obtainable only from `authz.AuthContext.Org()` or from rows returned by engine functions (ADR-0047 §2). Go cannot keep a constructor private across packages, so the only constructor lives in `internal/platform/orgscope/issue`, which only `internal/authz`, the storage-adapter files that wrap engine functions and tests may import (depguard rule `orgscope-issue-confined` and a contract test). The scope value is bound to the `org_id` parameter by generated code.
 - Handlers load resources within the scope and check parent/child consistency; mismatches return 404.
 
 ### 3. Wall 2: static checks in CI
@@ -50,3 +50,4 @@ Schema per organization (rejected: migrations × N, connection/catalog bloat, cr
 Changes applied after acceptance; each entry names its source.
 
 - **SPEC-009 D4 (2026-10-13).** §4: `orcon_context.current_org_ids()` returns `SETOF uuid` (no rows unless the ADR-0047 list variant sets `orcon.org_ids`), because the row-level security policy compares `org_id` with the rows of `(SELECT orcon_context.current_org_ids())`; an array return type makes that comparison fail. The policy text does not change.
+- **SPEC-004 Amendment 7 (2026-10-13).** §2: clarifies the mechanism behind `orgscope.Org`: the type has unexported fields and a single constructor in `internal/platform/orgscope/issue`, importable only by `internal/authz`, the storage-adapter files that wrap engine functions and tests; the decision does not change.

@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR 0077: Database schema standards and storage contract corrections
 
 Status: Accepted | Amended: 2026-10-13 (decision 11 clarified, owner decision K19); 2026-10-13 (required timestamp columns clarified)
