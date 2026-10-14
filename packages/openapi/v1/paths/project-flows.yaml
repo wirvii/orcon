@@ -131,7 +131,7 @@ post:
   summary: Create a flow in a project
   description: >-
     Creates an empty flow in the project and returns it with its id. Use it to start a new automation;
-    the flow has no published version until you publish its draft.
+    the flow has no published version until you publish its draft. Request body limit: 1 MiB.
   tags:
     - flows
   x-orcon-permission: flow:create

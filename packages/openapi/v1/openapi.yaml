@@ -68,6 +68,8 @@ paths:
     $ref: ./paths/flow-test-sessions.yaml
   /flows/{flowId}/test-sessions/{testSessionId}:
     $ref: ./paths/flow-test-session.yaml
+  /flows/{flowId}/test-sessions/{testSessionId}/cancel:
+    $ref: ./paths/flow-test-session-cancel.yaml
   /executions/{executionId}:
     $ref: ./paths/execution.yaml
   /executions/{executionId}/data:

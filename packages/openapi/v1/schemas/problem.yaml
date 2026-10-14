@@ -68,6 +68,19 @@ Problem:
       description: 'On a 412 of a draft: the principal that saved the revision now stored.'
       examples:
         - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61
+    confirmationId:
+      type: string
+      format: uuid
+      description: >-
+        On a confirmation-required problem: the id of the stored confirmation a person must approve.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a99
+    expiresAt:
+      type: string
+      format: date-time
+      description: 'On a confirmation-required problem: when the stored confirmation lapses, in UTC.'
+      examples:
+        - '2026-10-14T09:30:00Z'
 ProblemFieldError:
   type: object
   description: One error of one request field.
@@ -107,6 +120,7 @@ ProblemCode:
     - step-up-required
     - personal-keys-disabled
     - not-found
+    - method-not-allowed
     - conflict
     - idempotency-in-progress
     - secret-already-issued
@@ -120,6 +134,8 @@ ProblemCode:
     - rate-limited
     - internal-error
     - service-unavailable
+    - confirmation-required
+    - federated-token-rejected
   x-orcon-problem-catalog:
     validation-failed:
       status: 400
@@ -160,6 +176,13 @@ ProblemCode:
       status: 404
       title: Not found
       when: The resource does not exist or is not visible to the caller.
+      retryable: false
+    method-not-allowed:
+      status: 405
+      title: Method not allowed
+      when: >-
+        The path exists but the method is not one of its operations; the Allow header lists the methods
+        that are.
       retryable: false
     conflict:
       status: 409
@@ -226,3 +249,15 @@ ProblemCode:
       title: Service unavailable
       when: The server is starting, stopping or overloaded.
       retryable: true
+    confirmation-required:
+      status: 403
+      title: Confirmation required
+      when: The request was stored as a confirmation that a person must approve before it runs.
+      retryable: false
+    federated-token-rejected:
+      status: 400
+      title: Federated token rejected
+      when: >-
+        The workload identity token was rejected by the trust relationship; protocol endpoints send it
+        as invalid_grant.
+      retryable: false

@@ -121,7 +121,8 @@ put:
   summary: Replace the draft of a flow
   description: >-
     Replaces the whole document of the draft. Send the revision you read in If-Match; if somebody saved
-    in between, the request is refused with the current revision so nothing is overwritten.
+    in between, the request is refused with the current revision so nothing is overwritten. Request body
+    limit: 8 MiB.
   tags:
     - flows
   x-orcon-permission: flow:update
@@ -307,7 +308,7 @@ patch:
   summary: Change the draft of a flow with a patch
   description: >-
     Applies a JSON Patch (RFC 6902) to the draft document. Start the patch with a test operation to make
-    it depend on a value you read; if any operation fails, nothing is applied.
+    it depend on a value you read; if any operation fails, nothing is applied. Request body limit: 8 MiB.
   tags:
     - flows
   x-orcon-permission: flow:update

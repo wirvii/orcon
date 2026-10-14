@@ -110,8 +110,12 @@ func (s *seeder) publish(flowID string, revision int) {
 	}, http.StatusOK, nil)
 }
 
-func (s *seeder) activate(flowID string) {
-	s.call(examplestest.Request{Method: http.MethodPost, Path: "/flows/" + flowID + "/activate", Header: key("seed-activate")}, http.StatusOK, nil)
+// activate switches the flow on; revision is the revision of the flow row, which
+// publishing raised to 1 (Amendment 8, 8-9).
+func (s *seeder) activate(flowID string, revision int) {
+	h := key("seed-activate")
+	h.Set("If-Match", `"`+strconv.Itoa(revision)+`"`)
+	s.call(examplestest.Request{Method: http.MethodPost, Path: "/flows/" + flowID + "/activate", Header: h}, http.StatusOK, nil)
 }
 
 // run starts an execution and binds its fixed id; it accepts 200 and 202 so a

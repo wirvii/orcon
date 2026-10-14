@@ -9,11 +9,11 @@ post:
   description: >-
     Opens a short window in which the test addresses of the draft are live, so you can send a real event
     and watch the execution it starts. The session ends when its time or event limit is reached, or when
-    you close it.
+    you cancel it; a second session on the same address conflicts. Request body limit: 1 MiB.
   tags:
     - testing
   x-orcon-permission: flow:execute
-  x-orcon-rate-class: write
+  x-orcon-rate-class: run
   x-orcon-stability: stable
   x-orcon-idempotency: optional
   x-orcon-audit: test_session.opened
@@ -22,6 +22,7 @@ post:
     - unauthenticated
     - forbidden
     - not-found
+    - conflict
     - idempotency-in-progress
     - payload-too-large
     - idempotency-key-reused
@@ -66,8 +67,6 @@ post:
           $ref: ../openapi.yaml#/components/headers/RateLimit
         RateLimit-Policy:
           $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
-        ETag:
-          $ref: ../openapi.yaml#/components/headers/ETag
         Location:
           $ref: ../openapi.yaml#/components/headers/Location
       content:

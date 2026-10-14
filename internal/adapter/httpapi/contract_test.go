@@ -191,9 +191,9 @@ var coreOperations = []struct {
 	{"activateFlow", "POST", "/flows/{flowId}/activate", "flow:activate", "write", "optional", "activate_flow"},
 	{"deactivateFlow", "POST", "/flows/{flowId}/deactivate", "flow:activate", "write", "optional", "deactivate_flow"},
 	{"rollbackFlow", "POST", "/flows/{flowId}/rollback", "flow:rollback", "write", "optional", ""},
-	{"createTestSession", "POST", "/flows/{flowId}/test-sessions", "flow:execute", "write", "optional", ""},
+	{"createTestSession", "POST", "/flows/{flowId}/test-sessions", "flow:execute", "run", "optional", ""},
 	{"getTestSession", "GET", "/flows/{flowId}/test-sessions/{testSessionId}", "flow:execute", "read", "", ""},
-	{"deleteTestSession", "DELETE", "/flows/{flowId}/test-sessions/{testSessionId}", "flow:execute", "write", "", ""},
+	{"cancelTestSession", "POST", "/flows/{flowId}/test-sessions/{testSessionId}/cancel", "flow:execute", "write", "optional", ""},
 	{"listExecutions", "GET", "/projects/{projectId}/executions", "execution:read", "read", "", "list_executions"},
 	{"createExecution", "POST", "/flows/{flowId}/executions", "flow:execute", "run", "required", "run_flow"},
 	{"getExecution", "GET", "/executions/{executionId}", "execution:read", "read", "", "get_execution"},
@@ -339,4 +339,65 @@ func permissionCatalog(t *testing.T) *authz.Catalog {
 		t.Fatalf("catalog: %v", err)
 	}
 	return cat
+}
+
+// TestTestSessionsAreNotEditable: a test session is canceled with a POST and
+// has no ETag, no CLOSED status and no DELETE (Amendment 8, 8-7).
+func TestTestSessionsAreNotEditable(t *testing.T) {
+	spec := newReal(t).Spec()
+	for i := range spec.Operations {
+		op := &spec.Operations[i]
+		if !strings.Contains(op.Path, "test-sessions") {
+			continue
+		}
+		if op.Method == http.MethodDelete || op.Method == http.MethodPut || op.Method == http.MethodPatch {
+			t.Errorf("%s edits a test session", op.ID)
+		}
+		doc := opDoc(t, spec, op)
+		responses, _ := doc["responses"].(map[string]any)
+		for status := range responses {
+			resp, found := declaredResponseByKey(t, spec, doc, status)
+			if !found {
+				continue
+			}
+			headers, _ := resp["headers"].(map[string]any)
+			if _, has := headers["ETag"]; has {
+				t.Errorf("%s answers %s with an ETag", op.ID, status)
+			}
+		}
+	}
+	node, _ := spec.lookup("/components/schemas/TestSession")
+	session, _ := spec.resolveObject(node)
+	status := session["properties"].(map[string]any)["status"].(map[string]any) //nolint:forcetypeassert,errcheck // the schema is known
+	if values := fmt.Sprint(status["enum"]); strings.Contains(values, "CLOSED") {
+		t.Errorf("TestSession.status still has CLOSED: %s", values)
+	}
+}
+
+// TestStateGuardedActionsTakeIfMatch: publish takes the draft ETag and the
+// actions on the flow row take its revision (Amendment 8, 8-9).
+func TestStateGuardedActionsTakeIfMatch(t *testing.T) {
+	spec := newReal(t).Spec()
+	need := map[string]bool{"publishFlow": true, "activateFlow": true, "deactivateFlow": true, "rollbackFlow": true, "updateFlow": true, "deleteFlow": true, "updateProject": true, "deleteProject": true, "replaceDraft": true, "updateDraft": true}
+	for i := range spec.Operations {
+		op := &spec.Operations[i]
+		if need[op.ID] && !op.IfMatchRequired {
+			t.Errorf("%s does not require If-Match", op.ID)
+		}
+	}
+}
+
+// declaredResponseByKey resolves the response of op under the status key.
+func declaredResponseByKey(t *testing.T, spec *Spec, doc map[string]any, key string) (map[string]any, bool) {
+	t.Helper()
+	responses, _ := doc["responses"].(map[string]any)
+	raw, ok := responses[key]
+	if !ok {
+		return nil, false
+	}
+	resp, err := spec.resolveObject(raw)
+	if err != nil {
+		t.Fatalf("response %s: %v", key, err)
+	}
+	return resp, true
 }

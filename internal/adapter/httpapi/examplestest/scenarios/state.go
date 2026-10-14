@@ -82,7 +82,7 @@ func flowActive(ctx context.Context, api *examplestest.Client) (examplestest.Bin
 	s := newSeeder(ctx, api)
 	f := validFlow(s)
 	s.publish(f, 1)
-	s.activate(f)
+	s.activate(f, 1)
 	return s.result()
 }
 
@@ -107,7 +107,7 @@ func activeFlowOf(s *seeder, document map[string]any) string {
 	f := s.flow(p, flowName, fixedFlow)
 	s.saveDraft(f, 0, document)
 	s.publish(f, 1)
-	s.activate(f)
+	s.activate(f, 1)
 	return f
 }
 

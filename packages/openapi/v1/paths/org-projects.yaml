@@ -131,7 +131,7 @@ post:
   summary: Create a project in an organization
   description: >-
     Creates a project in the organization and returns it. New projects are protected unless you say otherwise;
-    use the environment label to mark a project as dev, staging or prod.
+    use the environment label to mark a project as dev, staging or prod. Request body limit: 1 MiB.
   tags:
     - projects
   x-orcon-permission: project:create

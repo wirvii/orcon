@@ -9,7 +9,7 @@ post:
   description: >-
     Starts an execution of the active version of the flow and, with wait, holds the answer until it finishes.
     If it finishes in time you get 200 with the finished execution; otherwise you get 202 and read it
-    later from the Location address.
+    later from the Location address. Request body limit: 1 MiB.
   tags:
     - executions
   x-orcon-permission: flow:execute

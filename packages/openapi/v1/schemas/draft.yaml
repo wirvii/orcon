@@ -3,9 +3,11 @@
 FlowDocument:
   type: object
   description: >-
-    A flow document in the orcon/flow@1 format, stored and returned as it is. The format, its node types
-    and its static rules are described in docs/reference/orcon-flow-1.md; the server checks them and reports
-    every problem as a validation issue.
+    A flow document in the orcon/flow@1 format, stored and returned as it is. The canonical JSON Schema
+    is internal/adapter/codec/flowjson/schema/orcon-flow-1.schema.json and the format, its node types
+    and its static rules are described in docs/reference/orcon-flow-1.md. This schema is deliberately
+    open: the server validates every document with that schema and the static rules and answers validation-failed
+    with a JSON Pointer for each problem. A document has at most 2000 nodes and 10000 edges.
   required:
     - format
     - nodes

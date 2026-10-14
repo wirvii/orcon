@@ -9,7 +9,7 @@ post:
   description: >-
     Closes an external operation whose outcome is not known, with one of four supervised resolutions and
     the evidence you checked. Accepting a risk is recorded in the audit log and is never proof that the
-    operation happened.
+    operation happened. Request body limit: 1 MiB.
   tags:
     - executions
   x-orcon-permission: execution:resolve

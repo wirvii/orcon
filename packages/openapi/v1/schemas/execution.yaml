@@ -414,12 +414,11 @@ TestSession:
       type: string
       description: >-
         ACTIVE while the addresses are live; COMPLETED when the event limit was reached; EXPIRED when
-        the time ran out; CLOSED when it was closed early.
+        the time ran out or the session was canceled.
       enum:
         - ACTIVE
         - COMPLETED
         - EXPIRED
-        - CLOSED
       examples:
         - ACTIVE
     draftRevision:

@@ -23,7 +23,9 @@ post:
     - not-found
     - conflict
     - idempotency-in-progress
+    - precondition-failed
     - idempotency-key-reused
+    - precondition-required
     - rate-limited
     - internal-error
     - service-unavailable
@@ -39,10 +41,13 @@ post:
       request:
         pathParams:
           flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        headers:
+          If-Match: '"1"'
       response:
         status: 200
         body: activatePublishedFlow
   parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
     - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
   responses:
     '200':
@@ -83,8 +88,12 @@ post:
       $ref: ../openapi.yaml#/components/responses/NotFound
     '409':
       $ref: ../openapi.yaml#/components/responses/Conflict
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
     '422':
       $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
     '429':
       $ref: ../openapi.yaml#/components/responses/RateLimited
     '500':

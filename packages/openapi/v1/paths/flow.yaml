@@ -85,7 +85,8 @@ patch:
   summary: Update a flow
   description: >-
     Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you
-    read in If-Match; a stale ETag is refused so concurrent edits are never lost.
+    read in If-Match; a stale ETag is refused so concurrent edits are never lost. Request body limit:
+    1 MiB.
   tags:
     - flows
   x-orcon-permission: flow:update
@@ -116,7 +117,7 @@ patch:
         pathParams:
           flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
         headers:
-          If-Match: '"1"'
+          If-Match: '"0"'
         body: renameFlow
       response:
         status: 200
@@ -218,7 +219,7 @@ delete:
         pathParams:
           flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63
         headers:
-          If-Match: '"1"'
+          If-Match: '"0"'
       response:
         status: 204
   parameters:

@@ -9,7 +9,7 @@ post:
   description: >-
     Creates a new immutable version of the flow from its current draft and makes it the version that new
     executions use while the flow is active. Use it after the draft validates without errors; executions
-    already running keep the version they started with.
+    already running keep the version they started with. Request body limit: 1 MiB.
   tags:
     - flows
   x-orcon-permission: flow:publish

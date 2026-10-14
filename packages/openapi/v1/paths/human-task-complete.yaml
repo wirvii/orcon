@@ -8,7 +8,8 @@ post:
   summary: Complete a human task
   description: >-
     Submits the result of a task that waits for a person, such as an approval or a form, and lets the
-    execution continue. A task can be completed once; completing it again is refused.
+    execution continue. A task can be completed once; completing it again is refused. Request body limit:
+    1 MiB.
   tags:
     - executions
   x-orcon-permission: human-task:resolve

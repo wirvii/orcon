@@ -30,8 +30,8 @@ Generated from the API contract: 34 operations and 0 event types. The reference 
 | POST | `/api/v1/flows/{flowId}/publish` | `publishFlow` | Publish a flow draft | stable | `flow:publish` | `orcon flows publish` | `publish_flow` (destructive) |
 | POST | `/api/v1/flows/{flowId}/rollback` | `rollbackFlow` | Roll a flow back to an earlier version | stable | `flow:rollback` | `orcon flows rollback` | none |
 | POST | `/api/v1/flows/{flowId}/test-sessions` | `createTestSession` | Open a test session for a flow draft | stable | `flow:execute` | `orcon flows test-sessions create` | none |
-| DELETE | `/api/v1/flows/{flowId}/test-sessions/{testSessionId}` | `deleteTestSession` | Close a test session | stable | `flow:execute` | `orcon flows test-sessions close` | none |
 | GET | `/api/v1/flows/{flowId}/test-sessions/{testSessionId}` | `getTestSession` | Get a test session | stable | `flow:execute` | `orcon flows test-sessions get` | none |
+| POST | `/api/v1/flows/{flowId}/test-sessions/{testSessionId}/cancel` | `cancelTestSession` | Cancel a test session | stable | `flow:execute` | `orcon flows test-sessions cancel` | none |
 | GET | `/api/v1/flows/{flowId}/versions` | `listFlowVersions` | List the versions of a flow | stable | `flow:read` | `orcon flows versions` | none |
 | GET | `/api/v1/flows/{flowId}/versions/{version}` | `getFlowVersion` | Get one version of a flow | stable | `flow:read` | `orcon flows version` | none |
 | POST | `/api/v1/human-tasks/{humanTaskId}/complete` | `completeHumanTask` | Complete a human task | stable | `human-task:resolve` | `orcon human-tasks complete` | none |

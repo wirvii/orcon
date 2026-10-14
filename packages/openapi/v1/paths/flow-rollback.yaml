@@ -8,7 +8,7 @@ post:
   summary: Roll a flow back to an earlier version
   description: >-
     Publishes the content of an earlier version again as a new version, through the same checks as a publication.
-    Nothing is deleted: the later versions stay in the history.
+    Nothing is deleted: the later versions stay in the history. Request body limit: 1 MiB.
   tags:
     - flows
   x-orcon-permission: flow:rollback
@@ -24,8 +24,10 @@ post:
     - conflict
     - idempotency-in-progress
     - project-managed-by-git
+    - precondition-failed
     - payload-too-large
     - idempotency-key-reused
+    - precondition-required
     - rate-limited
     - internal-error
     - service-unavailable
@@ -39,11 +41,14 @@ post:
       request:
         pathParams:
           flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        headers:
+          If-Match: '"2"'
         body: rollbackToFirstVersion
       response:
         status: 200
         body: rollbackToFirstVersion
   parameters:
+    - $ref: ../openapi.yaml#/components/parameters/IfMatch
     - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
   requestBody:
     required: true
@@ -93,10 +98,14 @@ post:
       $ref: ../openapi.yaml#/components/responses/NotFound
     '409':
       $ref: ../openapi.yaml#/components/responses/Conflict
+    '412':
+      $ref: ../openapi.yaml#/components/responses/PreconditionFailed
     '413':
       $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
     '422':
       $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
+    '428':
+      $ref: ../openapi.yaml#/components/responses/PreconditionRequired
     '429':
       $ref: ../openapi.yaml#/components/responses/RateLimited
     '500':

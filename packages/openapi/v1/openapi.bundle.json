@@ -228,7 +228,7 @@
       "post": {
         "operationId": "createProject",
         "summary": "Create a project in an organization",
-        "description": "Creates a project in the organization and returns it. New projects are protected unless you say otherwise; use the environment label to mark a project as dev, staging or prod.",
+        "description": "Creates a project in the organization and returns it. New projects are protected unless you say otherwise; use the environment label to mark a project as dev, staging or prod. Request body limit: 1 MiB.",
         "tags": [
           "projects"
         ],
@@ -489,7 +489,7 @@
       "patch": {
         "operationId": "updateProject",
         "summary": "Update a project",
-        "description": "Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you read in If-Match; a stale ETag is refused so concurrent edits are never lost.",
+        "description": "Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you read in If-Match; a stale ETag is refused so concurrent edits are never lost. Request body limit: 1 MiB.",
         "tags": [
           "projects"
         ],
@@ -524,7 +524,7 @@
                 "projectId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70"
               },
               "headers": {
-                "If-Match": "\"1\""
+                "If-Match": "\"0\""
               },
               "body": "renameProject"
             },
@@ -667,7 +667,7 @@
                 "projectId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70"
               },
               "headers": {
-                "If-Match": "\"1\""
+                "If-Match": "\"0\""
               }
             },
             "response": {
@@ -908,7 +908,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Create a flow in a project",
-        "description": "Creates an empty flow in the project and returns it with its id. Use it to start a new automation; the flow has no published version until you publish its draft.",
+        "description": "Creates an empty flow in the project and returns it with its id. Use it to start a new automation; the flow has no published version until you publish its draft. Request body limit: 1 MiB.",
         "tags": [
           "flows"
         ],
@@ -1550,7 +1550,7 @@
       "patch": {
         "operationId": "updateFlow",
         "summary": "Update a flow",
-        "description": "Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you read in If-Match; a stale ETag is refused so concurrent edits are never lost.",
+        "description": "Changes the fields you send and leaves the others as they are (JSON Merge Patch). Send the ETag you read in If-Match; a stale ETag is refused so concurrent edits are never lost. Request body limit: 1 MiB.",
         "tags": [
           "flows"
         ],
@@ -1587,7 +1587,7 @@
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
               },
               "headers": {
-                "If-Match": "\"1\""
+                "If-Match": "\"0\""
               },
               "body": "renameFlow"
             },
@@ -1733,7 +1733,7 @@
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63"
               },
               "headers": {
-                "If-Match": "\"1\""
+                "If-Match": "\"0\""
               }
             },
             "response": {
@@ -1963,7 +1963,7 @@
       "put": {
         "operationId": "replaceDraft",
         "summary": "Replace the draft of a flow",
-        "description": "Replaces the whole document of the draft. Send the revision you read in If-Match; if somebody saved in between, the request is refused with the current revision so nothing is overwritten.",
+        "description": "Replaces the whole document of the draft. Send the revision you read in If-Match; if somebody saved in between, the request is refused with the current revision so nothing is overwritten. Request body limit: 8 MiB.",
         "tags": [
           "flows"
         ],
@@ -2235,7 +2235,7 @@
       "patch": {
         "operationId": "updateDraft",
         "summary": "Change the draft of a flow with a patch",
-        "description": "Applies a JSON Patch (RFC 6902) to the draft document. Start the patch with a test operation to make it depend on a value you read; if any operation fails, nothing is applied.",
+        "description": "Applies a JSON Patch (RFC 6902) to the draft document. Start the patch with a test operation to make it depend on a value you read; if any operation fails, nothing is applied. Request body limit: 8 MiB.",
         "tags": [
           "flows"
         ],
@@ -2879,7 +2879,7 @@
       "post": {
         "operationId": "publishFlow",
         "summary": "Publish a flow draft",
-        "description": "Creates a new immutable version of the flow from its current draft and makes it the version that new executions use while the flow is active. Use it after the draft validates without errors; executions already running keep the version they started with.",
+        "description": "Creates a new immutable version of the flow from its current draft and makes it the version that new executions use while the flow is active. Use it after the draft validates without errors; executions already running keep the version they started with. Request body limit: 1 MiB.",
         "tags": [
           "flows"
         ],
@@ -3075,7 +3075,9 @@
           "not-found",
           "conflict",
           "idempotency-in-progress",
+          "precondition-failed",
           "idempotency-key-reused",
+          "precondition-required",
           "rate-limited",
           "internal-error",
           "service-unavailable"
@@ -3095,6 +3097,9 @@
             "request": {
               "pathParams": {
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              },
+              "headers": {
+                "If-Match": "\"1\""
               }
             },
             "response": {
@@ -3104,6 +3109,9 @@
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
           }
@@ -3164,8 +3172,14 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -3204,7 +3218,9 @@
           "forbidden",
           "not-found",
           "idempotency-in-progress",
+          "precondition-failed",
           "idempotency-key-reused",
+          "precondition-required",
           "rate-limited",
           "internal-error",
           "service-unavailable"
@@ -3224,6 +3240,9 @@
             "request": {
               "pathParams": {
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
+              },
+              "headers": {
+                "If-Match": "\"2\""
               }
             },
             "response": {
@@ -3233,6 +3252,9 @@
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
           }
@@ -3293,8 +3315,14 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -3318,7 +3346,7 @@
       "post": {
         "operationId": "rollbackFlow",
         "summary": "Roll a flow back to an earlier version",
-        "description": "Publishes the content of an earlier version again as a new version, through the same checks as a publication. Nothing is deleted: the later versions stay in the history.",
+        "description": "Publishes the content of an earlier version again as a new version, through the same checks as a publication. Nothing is deleted: the later versions stay in the history. Request body limit: 1 MiB.",
         "tags": [
           "flows"
         ],
@@ -3335,8 +3363,10 @@
           "conflict",
           "idempotency-in-progress",
           "project-managed-by-git",
+          "precondition-failed",
           "payload-too-large",
           "idempotency-key-reused",
+          "precondition-required",
           "rate-limited",
           "internal-error",
           "service-unavailable"
@@ -3355,6 +3385,9 @@
               "pathParams": {
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60"
               },
+              "headers": {
+                "If-Match": "\"2\""
+              },
               "body": "rollbackToFirstVersion"
             },
             "response": {
@@ -3364,6 +3397,9 @@
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
           }
@@ -3439,11 +3475,17 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -3467,7 +3509,7 @@
       "post": {
         "operationId": "createExecution",
         "summary": "Run a flow by hand",
-        "description": "Starts an execution of the active version of the flow and, with wait, holds the answer until it finishes. If it finishes in time you get 200 with the finished execution; otherwise you get 202 and read it later from the Location address.",
+        "description": "Starts an execution of the active version of the flow and, with wait, holds the answer until it finishes. If it finishes in time you get 200 with the finished execution; otherwise you get 202 and read it later from the Location address. Request body limit: 1 MiB.",
         "tags": [
           "executions"
         ],
@@ -3683,12 +3725,12 @@
       "post": {
         "operationId": "createTestSession",
         "summary": "Open a test session for a flow draft",
-        "description": "Opens a short window in which the test addresses of the draft are live, so you can send a real event and watch the execution it starts. The session ends when its time or event limit is reached, or when you close it.",
+        "description": "Opens a short window in which the test addresses of the draft are live, so you can send a real event and watch the execution it starts. The session ends when its time or event limit is reached, or when you cancel it; a second session on the same address conflicts. Request body limit: 1 MiB.",
         "tags": [
           "testing"
         ],
         "x-orcon-permission": "flow:execute",
-        "x-orcon-rate-class": "write",
+        "x-orcon-rate-class": "run",
         "x-orcon-stability": "stable",
         "x-orcon-idempotency": "optional",
         "x-orcon-audit": "test_session.opened",
@@ -3697,6 +3739,7 @@
           "unauthenticated",
           "forbidden",
           "not-found",
+          "conflict",
           "idempotency-in-progress",
           "payload-too-large",
           "idempotency-key-reused",
@@ -3762,9 +3805,6 @@
               },
               "RateLimit-Policy": {
                 "$ref": "#/components/headers/RateLimitPolicy"
-              },
-              "ETag": {
-                "$ref": "#/components/headers/ETag"
               },
               "Location": {
                 "$ref": "#/components/headers/Location"
@@ -3891,9 +3931,6 @@
               },
               "RateLimit-Policy": {
                 "$ref": "#/components/headers/RateLimitPolicy"
-              },
-              "ETag": {
-                "$ref": "#/components/headers/ETag"
               }
             },
             "content": {
@@ -3942,17 +3979,29 @@
             "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
-      },
-      "delete": {
-        "operationId": "deleteTestSession",
-        "summary": "Close a test session",
-        "description": "Closes the session before it expires and takes its test addresses down. Closing a session that already ended is not an error.",
+      }
+    },
+    "/flows/{flowId}/test-sessions/{testSessionId}/cancel": {
+      "x-orcon-resource": "action",
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/FlowId"
+        },
+        {
+          "$ref": "#/components/parameters/TestSessionId"
+        }
+      ],
+      "post": {
+        "operationId": "cancelTestSession",
+        "summary": "Cancel a test session",
+        "description": "Ends the session now and takes its test addresses down. The session stays readable with the status EXPIRED, and canceling one that already ended returns it unchanged.",
         "tags": [
           "testing"
         ],
         "x-orcon-permission": "flow:execute",
         "x-orcon-rate-class": "write",
         "x-orcon-stability": "stable",
+        "x-orcon-idempotency": "optional",
         "x-orcon-audit": "none",
         "x-orcon-audit-reason": "A test session is a short-lived window; opening it is audited and its events are recorded as executions.",
         "x-orcon-problems": [
@@ -3960,44 +4009,42 @@
           "unauthenticated",
           "forbidden",
           "not-found",
-          "precondition-failed",
-          "precondition-required",
+          "idempotency-in-progress",
+          "idempotency-key-reused",
           "rate-limited",
           "internal-error",
           "service-unavailable"
         ],
         "x-orcon-cli": {
-          "command": "flows test-sessions close"
+          "command": "flows test-sessions cancel"
         },
         "x-orcon-mcp": {
           "level": "none"
         },
         "x-orcon-examples": [
           {
-            "name": "closeActiveSession",
+            "name": "cancelActiveSession",
             "scenario": "flow-with-test-session",
             "request": {
               "pathParams": {
                 "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
                 "testSessionId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69"
-              },
-              "headers": {
-                "If-Match": "\"1\""
               }
             },
             "response": {
-              "status": 204
+              "status": 200,
+              "body": "cancelActiveSession"
             }
           }
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/IfMatch"
+            "$ref": "#/components/parameters/IdempotencyKey"
           }
         ],
         "responses": {
-          "204": {
-            "description": "The session was closed.",
+          "200": {
+            "description": "The session after the cancel request.",
             "headers": {
               "Orcon-Request-Id": {
                 "$ref": "#/components/headers/OrconRequestId"
@@ -4007,6 +4054,29 @@
               },
               "RateLimit-Policy": {
                 "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSession"
+                },
+                "examples": {
+                  "cancelActiveSession": {
+                    "summary": "The session has ended",
+                    "value": {
+                      "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69",
+                      "flowId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                      "status": "EXPIRED",
+                      "draftRevision": 1,
+                      "eventCount": 0,
+                      "maximumEventCount": 1,
+                      "addresses": [],
+                      "createdAt": "2026-10-12T15:04:05Z",
+                      "expiresAt": "2026-10-12T15:06:05Z"
+                    }
+                  }
+                }
               }
             }
           },
@@ -4022,11 +4092,11 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
-          "428": {
-            "$ref": "#/components/responses/PreconditionRequired"
+          "422": {
+            "$ref": "#/components/responses/IdempotencyKeyReused"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -4783,7 +4853,7 @@
       "post": {
         "operationId": "resolveExternalOperation",
         "summary": "Resolve an uncertain external operation",
-        "description": "Closes an external operation whose outcome is not known, with one of four supervised resolutions and the evidence you checked. Accepting a risk is recorded in the audit log and is never proof that the operation happened.",
+        "description": "Closes an external operation whose outcome is not known, with one of four supervised resolutions and the evidence you checked. Accepting a risk is recorded in the audit log and is never proof that the operation happened. Request body limit: 1 MiB.",
         "tags": [
           "executions"
         ],
@@ -4930,7 +5000,7 @@
       "post": {
         "operationId": "completeHumanTask",
         "summary": "Complete a human task",
-        "description": "Submits the result of a task that waits for a person, such as an approval or a form, and lets the execution continue. A task can be completed once; completing it again is refused.",
+        "description": "Submits the result of a task that waits for a person, such as an approval or a form, and lets the execution continue. A task can be completed once; completing it again is refused. Request body limit: 1 MiB.",
         "tags": [
           "executions"
         ],
@@ -5398,6 +5468,22 @@
             "examples": [
               "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a61"
             ]
+          },
+          "confirmationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "On a confirmation-required problem: the id of the stored confirmation a person must approve.",
+            "examples": [
+              "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a99"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "On a confirmation-required problem: when the stored confirmation lapses, in UTC.",
+            "examples": [
+              "2026-10-14T09:30:00Z"
+            ]
           }
         }
       },
@@ -5449,6 +5535,7 @@
           "step-up-required",
           "personal-keys-disabled",
           "not-found",
+          "method-not-allowed",
           "conflict",
           "idempotency-in-progress",
           "secret-already-issued",
@@ -5461,7 +5548,9 @@
           "precondition-required",
           "rate-limited",
           "internal-error",
-          "service-unavailable"
+          "service-unavailable",
+          "confirmation-required",
+          "federated-token-rejected"
         ],
         "x-orcon-problem-catalog": {
           "validation-failed": {
@@ -5510,6 +5599,12 @@
             "status": 404,
             "title": "Not found",
             "when": "The resource does not exist or is not visible to the caller.",
+            "retryable": false
+          },
+          "method-not-allowed": {
+            "status": 405,
+            "title": "Method not allowed",
+            "when": "The path exists but the method is not one of its operations; the Allow header lists the methods that are.",
             "retryable": false
           },
           "conflict": {
@@ -5589,6 +5684,18 @@
             "title": "Service unavailable",
             "when": "The server is starting, stopping or overloaded.",
             "retryable": true
+          },
+          "confirmation-required": {
+            "status": 403,
+            "title": "Confirmation required",
+            "when": "The request was stored as a confirmation that a person must approve before it runs.",
+            "retryable": false
+          },
+          "federated-token-rejected": {
+            "status": 400,
+            "title": "Federated token rejected",
+            "when": "The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant.",
+            "retryable": false
           }
         }
       },
@@ -5915,7 +6022,7 @@
       },
       "FlowDocument": {
         "type": "object",
-        "description": "A flow document in the orcon/flow@1 format, stored and returned as it is. The format, its node types and its static rules are described in docs/reference/orcon-flow-1.md; the server checks them and reports every problem as a validation issue.",
+        "description": "A flow document in the orcon/flow@1 format, stored and returned as it is. The canonical JSON Schema is internal/adapter/codec/flowjson/schema/orcon-flow-1.schema.json and the format, its node types and its static rules are described in docs/reference/orcon-flow-1.md. This schema is deliberately open: the server validates every document with that schema and the static rules and answers validation-failed with a JSON Pointer for each problem. A document has at most 2000 nodes and 10000 edges.",
         "required": [
           "format",
           "nodes",
@@ -6850,12 +6957,11 @@
           },
           "status": {
             "type": "string",
-            "description": "ACTIVE while the addresses are live; COMPLETED when the event limit was reached; EXPIRED when the time ran out; CLOSED when it was closed early.",
+            "description": "ACTIVE while the addresses are live; COMPLETED when the event limit was reached; EXPIRED when the time ran out or the session was canceled.",
             "enum": [
               "ACTIVE",
               "COMPLETED",
-              "EXPIRED",
-              "CLOSED"
+              "EXPIRED"
             ],
             "examples": [
               "ACTIVE"

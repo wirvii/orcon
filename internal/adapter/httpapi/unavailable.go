@@ -124,13 +124,13 @@ func (Unavailable) CreateTestSession(context.Context, apigen.CreateTestSessionRe
 	return nil, errUnavailable
 }
 
-// DeleteTestSession refuses DELETE /flows/{flowId}/test-sessions/{testSessionId}.
-func (Unavailable) DeleteTestSession(context.Context, apigen.DeleteTestSessionRequestObject) (apigen.DeleteTestSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+// GetTestSession refuses GET /flows/{flowId}/test-sessions/{testSessionId}.
+func (Unavailable) GetTestSession(context.Context, apigen.GetTestSessionRequestObject) (apigen.GetTestSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable
 }
 
-// GetTestSession refuses GET /flows/{flowId}/test-sessions/{testSessionId}.
-func (Unavailable) GetTestSession(context.Context, apigen.GetTestSessionRequestObject) (apigen.GetTestSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+// CancelTestSession refuses POST /flows/{flowId}/test-sessions/{testSessionId}/cancel.
+func (Unavailable) CancelTestSession(context.Context, apigen.CancelTestSessionRequestObject) (apigen.CancelTestSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable
 }
 

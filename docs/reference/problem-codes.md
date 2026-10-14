@@ -11,11 +11,14 @@ Every error of the public API is an `application/problem+json` document (RFC 945
 | <a id="validation-failed"></a>`validation-failed` | 400 | Validation failed | A parameter or the body is invalid. | no |
 | <a id="invalid-page-token"></a>`invalid-page-token` | 400 | Invalid page token | The page token is unknown or was issued for other parameters. | no |
 | <a id="experimental-not-enabled"></a>`experimental-not-enabled` | 400 | Experimental feature not enabled | The operation is experimental and Orcon-Experimental does not name it. | no |
+| <a id="federated-token-rejected"></a>`federated-token-rejected` | 400 | Federated token rejected | The workload identity token was rejected by the trust relationship; protocol endpoints send it as invalid_grant. | no |
 | <a id="unauthenticated"></a>`unauthenticated` | 401 | Unauthenticated | No valid credential was sent. | no |
 | <a id="forbidden"></a>`forbidden` | 403 | Forbidden | The caller lacks the required permission. | no |
 | <a id="step-up-required"></a>`step-up-required` | 403 | Step-up required | The operation needs a recent second factor. | no |
 | <a id="personal-keys-disabled"></a>`personal-keys-disabled` | 403 | Personal keys disabled | The organization does not allow personal API keys. | no |
+| <a id="confirmation-required"></a>`confirmation-required` | 403 | Confirmation required | The request was stored as a confirmation that a person must approve before it runs. | no |
 | <a id="not-found"></a>`not-found` | 404 | Not found | The resource does not exist or is not visible to the caller. | no |
+| <a id="method-not-allowed"></a>`method-not-allowed` | 405 | Method not allowed | The path exists but the method is not one of its operations; the Allow header lists the methods that are. | no |
 | <a id="conflict"></a>`conflict` | 409 | Conflict | The resource state does not allow the operation. | no |
 | <a id="idempotency-in-progress"></a>`idempotency-in-progress` | 409 | Idempotent request in progress | A request with the same key is still running. | yes |
 | <a id="secret-already-issued"></a>`secret-already-issued` | 409 | Secret already issued | A replay asked again for a secret that is shown only once. | no |
