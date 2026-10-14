@@ -17,7 +17,7 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id)
-FOR UPDATE;
+FOR NO KEY UPDATE;
 
 -- name: GetNextFlowVersionNumber :one
 -- orcon:scope org

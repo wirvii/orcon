@@ -553,7 +553,7 @@ const lockFlowState = `-- name: LockFlowState :one
 SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
 FROM flow
 WHERE org_id = $1 AND id = $2
-FOR UPDATE
+FOR NO KEY UPDATE
 `
 
 type LockFlowStateRow struct {
