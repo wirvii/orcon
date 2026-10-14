@@ -13,7 +13,7 @@ import { NodeGlyph } from '../../canvas/NodeGlyph';
 import { NodeStatusChip } from '../../canvas/node-status-chip/NodeStatusChip';
 import type { GraphNode } from '../../canvas/model';
 import { cn } from '../../lib/cn';
-import { scrim } from '../../lib/control';
+import { InsideModal, useScrim } from '../../lib/modal-nesting';
 import { PaneSplitter } from '../pane-splitter/PaneSplitter';
 import { editorMessages } from '../messages';
 
@@ -163,6 +163,7 @@ function Header({ node, onBack, onExecute, onRename, compact = false }: { node: 
  */
 export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', input, output, tabs, alert, tab: tabProp, onTabChange, onExecute, onRename, onReturnFocus, className }: NodeDetailsViewProps) {
   const intl = useIntl();
+  const backdrop = useScrim();
   const [localTab, setLocalTab] = useState<DetailsTab>('parameters');
   const tab = tabProp ?? localTab;
   const frame = useRef<HTMLDivElement>(null);
@@ -232,7 +233,8 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={scrim} />
+        <DialogPrimitive.Overlay className={backdrop} />
+        <InsideModal.Provider value>
         <DialogPrimitive.Content
           aria-describedby={undefined}
           data-node-details="dialog"
@@ -271,6 +273,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
             </div>
           </div>
         </DialogPrimitive.Content>
+        </InsideModal.Provider>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
