@@ -3,6 +3,7 @@
 
 import { Banner, Checkbox, FormField, Input, Link as UiLink, Select, Skeleton, Switch } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 import { useIntl } from 'react-intl';
@@ -52,12 +53,21 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
   const formulaGroup = useFieldGroup('call-formula');
   const versionGroup = useFieldGroup('call-version');
   const call = readCall(value);
-  const formula = isExpression(call.target);
+  const [kind, setKind] = useState<'pick' | 'formula'>(isExpression(call.target) ? 'formula' : 'pick');
+  const formula = kind === 'formula';
+  // The call block is written only once a flow is chosen: a block with an empty target is not a valid call.
+  const hasTarget = call.target !== '' && call.target !== '=';
+  const held = typeof value === 'object' && value !== null;
   const flows = query.data ?? [];
   const chosen = flows.find((flow) => flow.id === call.target);
   /** Writes the block with the changes; a member set to `undefined` is removed, not stored. */
   const write = (next: { [Member in keyof CallBlock]?: CallBlock[Member] | undefined }, group?: string) => {
-    actions.setBlock('call', withoutUndefined({ ...call, ...next }), group);
+    const merged = withoutUndefined({ ...call, ...next });
+    if (merged['target'] === '' || merged['target'] === '=') {
+      if (held) actions.setBlock('call', undefined, group);
+      return;
+    }
+    actions.setBlock('call', merged, group);
   };
 
   const mode = (id: 'pick' | 'formula') => (
@@ -66,7 +76,10 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
       type="button"
       aria-pressed={(id === 'formula') === formula}
       onClick={() => {
-        if ((id === 'formula') !== formula) write({ target: id === 'formula' ? toExpression('') : '' });
+        if ((id === 'formula') !== formula) {
+          setKind(id);
+          write({ target: '' });
+        }
       }}
       className={choice}
     >
@@ -93,6 +106,7 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
                 }}
               />
             </FormField>
+            {hasTarget ? (
             <FormField group label={intl.formatMessage(configMessages.callAllowed)} description={intl.formatMessage(configMessages.callAllowedHint)} name="/call/allowedTargets">
               <div className="flex flex-col gap-1">
                 {flows.map((flow) => (
@@ -109,6 +123,7 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
                 ))}
               </div>
             </FormField>
+            ) : null}
           </>
         ) : query.isPending ? (
           <Skeleton className="h-control w-full" />
@@ -147,6 +162,8 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
         </div>
       ) : null}
 
+      {hasTarget ? (
+        <>
       <FormField label={intl.formatMessage(configMessages.callVersion)} name="/call/version">
         <Select
           value={call.version === 'CURRENT' ? 'CURRENT' : 'FIXED'}
@@ -193,6 +210,8 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
           write({ perItem: checked });
         }}
       />
+        </>
+      ) : null}
     </div>
   );
 }

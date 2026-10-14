@@ -181,20 +181,25 @@ describe('the sub-flow widget', () => {
     expect(await screen.findByText(/This flow is not in the list/)).toBeInTheDocument();
   });
 
-  it('chooses the flow by a formula among allowed flows', async () => {
+  it('chooses the flow by a formula among allowed flows, writing the block only once there is a formula', async () => {
     const user = userEvent.setup();
     const { store } = renderWithStore(<Call id="call" />, withCall({ target: notify.id, version: 'CURRENT', mode: 'WAIT', perItem: false }));
     await user.click(await screen.findByRole('button', { name: 'By a formula' }));
-    expect(nodeOf(store.getState().document, 'call')['call']).toMatchObject({ target: '=' });
+    // Nothing is chosen yet, so there is no call block and no option that needs one.
+    expect(nodeOf(store.getState().document, 'call')).not.toHaveProperty('call');
+    expect(screen.queryByRole('switch', { name: 'Call once for each item' })).not.toBeInTheDocument();
     const formula = await screen.findByRole('textbox', { name: /Flow identifier/ });
     await user.type(formula, '{{{{ $json.flow }}');
-    expect(nodeOf(store.getState().document, 'call')['call']).toMatchObject({ target: '={{ $json.flow }}' });
+    expect(nodeOf(store.getState().document, 'call')['call']).toMatchObject({ target: '={{ $json.flow }}', version: 'CURRENT', mode: 'WAIT', perItem: false });
     await user.click(await screen.findByRole('checkbox', { name: 'Notify the team' }));
     expect(nodeOf(store.getState().document, 'call')['call']).toMatchObject({ allowedTargets: [notify.id] });
     await user.click(screen.getByRole('checkbox', { name: 'Notify the team' }));
     expect(nodeOf(store.getState().document, 'call')['call']).not.toHaveProperty('allowedTargets');
     // No link to a flow chosen by a formula.
     expect(screen.queryByRole('link', { name: /Open sub-flow/ })).not.toBeInTheDocument();
+    // Emptying the formula takes the block away again.
+    await user.clear(formula);
+    expect(nodeOf(store.getState().document, 'call')).not.toHaveProperty('call');
   });
 
   it('turns per item on and off and keeps the members it does not know', async () => {
@@ -204,12 +209,14 @@ describe('the sub-flow widget', () => {
     expect(nodeOf(store.getState().document, 'call')['call']).toEqual({ target: notify.id, version: 'CURRENT', mode: 'FIRE_AND_FORGET', perItem: true, intentionalRecursion: { maxDepth: 3 } });
   });
 
-  it('reads a node whose call block is missing as the defaults of the format', async () => {
+  it('shows a node whose call block is missing as having no flow chosen, and offers no option until one is', async () => {
     const flow = exampleFlowDocument();
     flow.nodes.push({ id: 'call', name: 'Ship', element: 'callActivity', type: 'orcon.callFlow@1', parameters: {} });
-    renderWithStore(<Call id="call" />, flow);
+    const { store } = renderWithStore(<Call id="call" />, flow);
     expect(await screen.findByRole('combobox', { name: /Flow/ })).toHaveTextContent('Choose a flow');
-    expect(screen.getByRole('switch', { name: 'Call once for each item' })).not.toBeChecked();
+    expect(screen.queryByRole('switch', { name: 'Call once for each item' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
+    expect(nodeOf(store.getState().document, 'call')).not.toHaveProperty('call');
   });
 
   it('is part of the form of a Call sub-flow node, with the data it sends', async () => {
