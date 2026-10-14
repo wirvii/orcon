@@ -53,11 +53,32 @@ func Decode(data []byte, isLeaf func(path string) bool) ([]config.FileEntry, err
 	if root.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("line %d: the file must be a mapping of settings", root.Line)
 	}
+	if err := rejectAnchors(&doc, 0); err != nil {
+		return nil, err
+	}
 	w := &walker{isLeaf: isLeaf, seen: map[string]int{}}
 	if err := w.section("", root, 0); err != nil {
 		return nil, err
 	}
 	return w.entries, nil
+}
+
+// rejectAnchors refuses anchors and aliases anywhere in the document: on keys, values, sequence
+// items and mapping members. They are never needed in a settings file and an alias can multiply
+// the size of what a reader sees.
+func rejectAnchors(n *yaml.Node, depth int) error {
+	if depth > maxDepth*2 {
+		return fmt.Errorf("line %d: sections nest too deep", n.Line)
+	}
+	if n.Kind == yaml.AliasNode || n.Anchor != "" {
+		return fmt.Errorf("line %d: anchors and aliases are not supported", n.Line)
+	}
+	for _, c := range n.Content {
+		if err := rejectAnchors(c, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type walker struct {
