@@ -117,6 +117,20 @@ for (const locale of ['en', 'es'] as const) {
   });
 }
 
+test('a dialog opened from the details view dims it: the details are under the backdrop of the new dialog', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openEditor(page);
+  await openDetails(page, 'slack', 'dialog');
+  await page.getByRole('button', { name: 'Create new credential' }).click();
+  await expect(page.getByRole('dialog', { name: 'Create credential' })).toBeVisible();
+  // A point of the details view outside the small dialog lands on the backdrop of the new one, not on the details.
+  const covered = await page.evaluate(() => {
+    const top = document.elementFromPoint(100, 450);
+    return top?.closest('[data-node-details]') === null;
+  });
+  expect(covered).toBe(true);
+});
+
 test.describe('on a computer', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
