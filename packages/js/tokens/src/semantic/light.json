@@ -24,7 +24,7 @@
     "$type": "color",
     "panel": {
       "$value": "{color.green.100}",
-      "$description": "Soft rounded box behind the mascot. The dark theme uses a lighter tone so the dark question mark of the thinking pose stays legible."
+      "$description": "Soft green rounded box behind the mascot in the light theme."
     }
   },
   "fg": {

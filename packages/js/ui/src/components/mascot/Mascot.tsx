@@ -42,7 +42,7 @@ export interface MascotProps {
 export function Mascot({ pose = 'welcome', className }: MascotProps) {
   const { src, width, height } = poses[pose];
   return (
-    <div aria-hidden data-mascot-pose={pose} className={cn('bg-mascot-panel inline-flex shrink-0 items-end justify-center rounded-2xl p-3', className)}>
+    <div aria-hidden data-mascot-pose={pose} className={cn('bg-mascot-panel inline-flex max-w-full shrink-0 items-end justify-center rounded-2xl p-3', className)}>
       <img src={src} width={width} height={height} alt="" aria-hidden loading="lazy" decoding="async" className="orcon-mascot-image" />
     </div>
   );

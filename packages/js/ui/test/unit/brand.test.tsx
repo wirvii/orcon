@@ -100,7 +100,7 @@ describe('Mascot', () => {
     expect(image).toHaveAttribute('width');
     expect(image).toHaveAttribute('height');
     expect(panel?.textContent).toBe('');
-    const height = /\.orcon-mascot-image\s*\{[^}]*height:\s*(\d+)px/.exec(stylesheet);
+    const height = /\.orcon-mascot-image\s*\{[^}]*max-height:\s*(\d+)px/.exec(stylesheet);
     expect(Number(height?.[1])).toBeLessThanOrEqual(160);
   });
 
