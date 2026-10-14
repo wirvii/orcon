@@ -181,7 +181,10 @@ func checkCycle(r *collector, path, s string) {
 	}
 }
 
-func checkExt(r *collector, path string, ext jsonvalue.Value) {
+// checkExt checks the extension members of the document (node == nil) or of
+// a node. A key in the reserved orcon namespace is valid only where an
+// Accepted ADR defines it: orcon.import in a node (ADR-0034 section 8).
+func checkExt(r *collector, path string, ext jsonvalue.Value, node *Node) {
 	if ext.IsZero() {
 		return
 	}
@@ -191,6 +194,8 @@ func checkExt(r *collector, path string, ext jsonvalue.Value) {
 	}
 	for _, m := range ext.Members() {
 		switch {
+		case m.Key == ImportExtKey && node != nil:
+			checkImportMark(r, path+"/"+m.Key, m.Value, node)
 		case strings.HasPrefix(m.Key, "orcon."):
 			r.errorf(CodeExt, path, "extension key %q uses the reserved orcon. namespace", m.Key)
 		case !extKeyPattern.MatchString(m.Key):
@@ -217,7 +222,7 @@ func (v *validator) structure() {
 		r.errorf(CodeValue, "/name", "name must have 1 to %d characters", maxFlowNameRunes)
 	}
 	checkObject(r, "/editor", d.Editor)
-	checkExt(r, "/ext", d.Ext)
+	checkExt(r, "/ext", d.Ext, nil)
 	v.settings()
 	for i, vr := range d.Variables {
 		v.variable(i, vr)
@@ -286,7 +291,7 @@ func (v *validator) node(i int, n *Node) {
 	checkEnum(r, base+"/element", n.Element, Elements())
 	checkPattern(r, base+"/type", "node type", n.Type, typePattern)
 	checkObject(r, base+"/parameters", n.Parameters)
-	checkExt(r, base+"/ext", n.Ext)
+	checkExt(r, base+"/ext", n.Ext, n)
 	checkOptEnum(r, base+"/onError", n.OnError, OnErrors())
 	v.routingAndLoop(base, n)
 	v.variablesShape(i, n)
