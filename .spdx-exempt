@@ -61,3 +61,6 @@ internal/adapter/egress/testdata/ssrf-corpus.txt  # SSRF URL corpus (SPEC-003 E-
 
 # API contract toolchain (SPEC-012).
 packages/js/openapi-tools/oasdiff-levels.txt  # read by oasdiff --severity-levels, which rejects comment lines; explained in the package README
+
+# Generated coverage report (SPEC-003 CN2); JSON has no comment syntax.
+docs/reference/connector-coverage.json  # machine-readable output of orcon n8n coverage (ADR-0037 section 3)

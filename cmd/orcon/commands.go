@@ -28,6 +28,7 @@ func commands() []command {
 	return []command{
 		configCommand(),
 		docsCommand(),
+		n8nCommand(),
 		serveCommand(),
 		versionCommand(),
 	}

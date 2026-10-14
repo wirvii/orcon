@@ -49,6 +49,38 @@
         "allOf": [{ "pattern": "^[a-z0-9][a-z0-9-]*\\.[A-Za-z0-9_.-]+$" }, { "not": { "pattern": "^orcon\\." } }]
       }
     },
+    "nodeExt": {
+      "type": "object",
+      "propertyNames": {
+        "allOf": [
+          { "pattern": "^[a-z0-9][a-z0-9-]*\\.[A-Za-z0-9_.-]+$" },
+          { "oneOf": [{ "not": { "pattern": "^orcon\\." } }, { "const": "orcon.import" }] }
+        ]
+      },
+      "properties": { "orcon.import": { "$ref": "#/$defs/importMark" } }
+    },
+    "importMark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n8nType", "n8nTypeVersion"],
+      "properties": {
+        "n8nType": { "type": "string", "minLength": 1 },
+        "n8nTypeVersion": { "type": "number" },
+        "n8nNodeId": { "type": "string", "minLength": 1 },
+        "reviewStatus": { "enum": ["NEEDS_REVIEW", "REVIEWED"] },
+        "reviewReasons": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["HTTP_WRITE", "HTTP_METHOD_EXPRESSION", "UNSAFE_OPERATION"] }
+        },
+        "original": { "type": "object" }
+      },
+      "allOf": [
+        { "if": { "required": ["reviewStatus"] }, "then": { "required": ["reviewReasons"] } },
+        { "if": { "required": ["reviewReasons"] }, "then": { "required": ["reviewStatus"] } }
+      ]
+    },
     "branchMode": { "enum": ["PARALLEL", "SEQUENTIAL"] },
     "priority": { "enum": ["HIGH", "NORMAL", "LOW"] },
     "retention": { "enum": ["ALWAYS", "FAILED_ONLY", "NEVER", "DEFAULT"] },
@@ -131,6 +163,14 @@
       "required": ["id", "name", "element", "type", "parameters"],
       "allOf": [
         {
+          "if": { "required": ["type"], "properties": { "type": { "not": { "pattern": "^orcon\\.unsupported@" } } } },
+          "then": {
+            "properties": {
+              "ext": { "properties": { "orcon.import": { "not": { "required": ["original"] } } } }
+            }
+          }
+        },
+        {
           "if": { "required": ["type"], "properties": { "type": { "pattern": "^orcon\\.variables@" } } },
           "then": {
             "properties": {
@@ -147,7 +187,7 @@
         "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[A-Za-z][A-Za-z0-9_-]*)+@[1-9][0-9]*$" },
         "parameters": { "type": "object" },
         "disabled": { "type": "boolean" },
-        "ext": { "$ref": "#/$defs/ext" },
+        "ext": { "$ref": "#/$defs/nodeExt" },
         "routing": { "$ref": "#/$defs/routing" },
         "join": {
           "type": "object",

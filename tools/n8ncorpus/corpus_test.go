@@ -55,6 +55,7 @@ func library(t *testing.T, hits *atomic.Int64) *httptest.Server {
 		}
 		fmt.Fprint(w, workflow(id))
 	})
+	instance(mux, "9.9.9", nodeTypesFixture)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -65,7 +66,7 @@ func TestRunDownloadsExtractsAndResumes(t *testing.T) {
 	srv := library(t, &hits)
 	dir := t.TempDir()
 	var out, errOut bytes.Buffer
-	args := []string{"-n8n", "9.9.9", "-dir", dir, "-limit", "3", "-base", srv.URL, "-delay", "1ms", "-workers", "2"}
+	args := []string{"-n8n", "9.9.9", "-dir", dir, "-limit", "3", "-base", srv.URL, "-n8n-url", srv.URL, "-delay", "1ms", "-workers", "2"}
 	if code := run(context.Background(), args, &out, &errOut); code != 0 {
 		t.Fatalf("run = %d: %s", code, errOut.String())
 	}

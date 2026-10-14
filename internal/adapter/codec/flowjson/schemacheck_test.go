@@ -30,7 +30,7 @@ type schemaChecker struct {
 var supportedKeywords = map[string]bool{
 	"$schema": true, "$id": true, "$comment": true, "title": true, "description": true, "$defs": true,
 	"$ref": true, "type": true, "properties": true, "required": true, "additionalProperties": true,
-	"items": true, "minItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true, "if": true, "then": true,
+	"items": true, "minItems": true, "uniqueItems": true, "enum": true, "const": true, "pattern": true, "minLength": true, "maxLength": true, "if": true, "then": true,
 	"minimum": true, "maximum": true, "format": true, "oneOf": true, "allOf": true, "not": true, "propertyNames": true,
 }
 
@@ -264,6 +264,18 @@ func (c *schemaChecker) checkArray(schema, inst jsonvalue.Value, path string) []
 	var errs []string
 	if n, ok := intKeyword(schema, "minItems"); ok && inst.Len() < n {
 		errs = append(errs, fmt.Sprintf("%s: fewer than %d items", path, n))
+	}
+	if unique, ok := schema.Get("uniqueItems"); ok {
+		if want, _ := unique.Bool(); want {
+			items := inst.Items()
+			for i := range items {
+				for j := i + 1; j < len(items); j++ {
+					if jsonvalue.Equal(items[i], items[j]) {
+						errs = append(errs, fmt.Sprintf("%s: items %d and %d are equal", path, i, j))
+					}
+				}
+			}
+		}
 	}
 	items, ok := schema.Get("items")
 	if !ok {
