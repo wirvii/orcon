@@ -1,5 +1,6 @@
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Flow format `orcon/flow@1`
 
 Status: **Accepted** | Source: ADR-0007 (flow format), ADR-0008 §4 (data access), ADR-0010 §11 (static rules), ADR-0073 §1a (attention)

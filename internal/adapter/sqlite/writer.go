@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 
 	"github.com/wirvii/orcon/internal/flow"
@@ -140,7 +139,7 @@ func (w *writer) commit(ctx context.Context, batch []*writeJob) {
 			results[i] = fmt.Errorf("write canceled before it ran: %w", err)
 			continue
 		}
-		results[i] = w.runJob(ctx, tx, i, job)
+		results[i] = w.runJob(ctx, tx, job)
 	}
 	if err := tx.Commit(); err != nil {
 		// Nothing of the group is durable. The jobs that succeeded report the commit error.
@@ -156,11 +155,18 @@ func (w *writer) commit(ctx context.Context, batch []*writeJob) {
 	}
 }
 
-func (w *writer) runJob(ctx context.Context, tx *sql.Tx, n int, job *writeJob) (err error) {
-	savepoint := "job" + strconv.Itoa(n)
+// The statements of a job's savepoint are constants (orcon-db TI-8). The jobs of a group run one after the
+// other, each releasing its savepoint before the next begins, so one name serves them all.
+const (
+	savepointStmt  = "SAVEPOINT job"
+	rollbackToStmt = "ROLLBACK TO job"
+	releaseStmt    = "RELEASE job"
+)
+
+func (w *writer) runJob(ctx context.Context, tx *sql.Tx, job *writeJob) (err error) {
 	// Savepoint statements run under the goroutine's context, not the caller's: a half-rolled-back group would be worse.
 	bg := ctx
-	if _, err := tx.ExecContext(bg, "SAVEPOINT "+savepoint); err != nil {
+	if _, err := tx.ExecContext(bg, savepointStmt); err != nil {
 		return fmt.Errorf("savepoint: %w", err)
 	}
 	defer func() {
@@ -168,11 +174,11 @@ func (w *writer) runJob(ctx context.Context, tx *sql.Tx, n int, job *writeJob) (
 			err = fmt.Errorf("write panicked: %v", r)
 		}
 		if err != nil {
-			if _, rerr := tx.ExecContext(bg, "ROLLBACK TO "+savepoint); rerr != nil {
+			if _, rerr := tx.ExecContext(bg, rollbackToStmt); rerr != nil {
 				err = errors.Join(err, fmt.Errorf("rollback to savepoint: %w", rerr))
 			}
 		}
-		if _, rerr := tx.ExecContext(bg, "RELEASE "+savepoint); rerr != nil {
+		if _, rerr := tx.ExecContext(bg, releaseStmt); rerr != nil {
 			err = errors.Join(err, fmt.Errorf("release savepoint: %w", rerr))
 		}
 	}()

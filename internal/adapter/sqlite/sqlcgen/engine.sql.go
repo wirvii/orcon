@@ -220,6 +220,7 @@ func (q *Queries) ClaimTokens(ctx context.Context, arg ClaimTokensParams) ([]Cla
 	}
 	queryParams = append(queryParams, arg.PoisonThreshold)
 	queryParams = append(queryParams, arg.PageSize)
+	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err

@@ -88,6 +88,7 @@ func loginDSN(t *testing.T, dsn string, member bool) string {
 	role := "orcon_login_" + hex.EncodeToString(suffix[:])
 	const password = "login-password"
 	ctx := t.Context()
+	//orcon:dynamic-sql test helper: names a throwaway login role
 	if _, err := admin.Exec(ctx, "CREATE ROLE "+role+" LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD '"+password+"'"); err != nil {
 		t.Fatal(err)
 	}
@@ -99,11 +100,13 @@ func loginDSN(t *testing.T, dsn string, member bool) string {
 			return
 		}
 		defer c.Close(cleanup) //nolint:errcheck // closing the admin connection cannot fail a test
+		//orcon:dynamic-sql test helper: names a throwaway login role
 		if _, err := c.Exec(cleanup, "DROP ROLE IF EXISTS "+role); err != nil {
 			t.Errorf("drop role %s: %v", role, err)
 		}
 	})
 	if member {
+		//orcon:dynamic-sql test helper: names a throwaway login role
 		if _, err := admin.Exec(ctx, "GRANT orcon_application TO "+role); err != nil {
 			t.Fatal(err)
 		}

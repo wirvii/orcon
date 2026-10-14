@@ -10,7 +10,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 ## Stability
 
-- **VER-1** Every operation and event declares `x-orcon-stability: stable | beta | experimental`; experimental requires `Orcon-Experimental: <feature>` and is outside the guarantee. [`stability`]
+- **VER-1** Every operation and event declares `x-orcon-stability: stable | beta | experimental`; experimental requires `x-orcon-experimental-feature` (the feature name) and `Orcon-Experimental: <feature>` (a comma-separated list) and is outside the guarantee. [`stability`]
 
 ## Breaking and non-breaking changes
 

@@ -430,11 +430,13 @@ func (e *sqliteEngine) Fresh(tb testing.TB) error {
 }
 
 func (e *sqliteEngine) Exec(ctx context.Context, sqlText string) error {
+	//orcon:dynamic-sql test helper: runs the statements of the rule checks
 	_, err := e.db.ExecContext(ctx, sqlText)
 	return err
 }
 
 func (e *sqliteEngine) Query(ctx context.Context, statement string) ([][]string, error) {
+	//orcon:dynamic-sql test helper: runs the statements of the rule checks
 	rows, err := e.db.QueryContext(ctx, statement)
 	if err != nil {
 		return nil, err

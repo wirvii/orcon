@@ -37,5 +37,5 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 ## Permissions and audit
 
-- **CHAN-7** `x-orcon-permission`: a permission from `internal/authz/permissions.yaml`, `{ allOf: [...] }`, `{ anyOf: [...] }`, `authenticated`, or `anonymous` (protocol only); conditional extra permissions are explained in the description. [`permission`]
+- **CHAN-7** `x-orcon-permission`: a permission from `internal/authz/permissions.yaml`, `{ allOf: [...] }`, `{ anyOf: [...] }`, `authenticated`, or `anonymous` (protocol operations, and the closed list `createSession`, `getSetupState`, `createSetupSession` of ADR-0080 §4); conditional extra permissions are explained in the description. [`permission`]
 - **CHAN-8** `x-orcon-audit`: the audit action (`flow.published`) or `none` (reads); a mutation with `none` needs `x-orcon-audit-reason`. [`audit`]

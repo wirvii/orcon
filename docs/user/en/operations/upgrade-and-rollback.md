@@ -8,6 +8,7 @@ sources:
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # Upgrade and rollback
 
 > This page describes behavior specified by ADR 0083 that is not implemented yet. The slice that delivers `orcon store schema` removes this note.

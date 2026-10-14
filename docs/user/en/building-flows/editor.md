@@ -7,6 +7,7 @@ sources:
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
+<img src="../../../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # The flow editor
 
 > This page describes the first release of the editor, which works on a sample flow kept in your browser tab. It does not read or save flows on the server yet, it does not edit what a node does (its parameters) and it does not run tests. The slices that deliver those features update this page.
