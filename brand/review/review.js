@@ -258,7 +258,7 @@ async function main() {
 
   if (mascots.length > 0) {
     // how the cut-outs will sit in the app: on a soft rounded box, light and dark theme (owner decision Q3 = A)
-    const boxes = [['light theme', '#ecfdf5', '#0f172a'], ['dark theme', '#1e293b', '#e2e8f0']].map(([label, bg, fg]) =>
+    const boxes = [['light theme', '#ecfdf5', '#0f172a'], ['dark theme', '#475569', '#e2e8f0']].map(([label, bg, fg]) =>
       h('div', { class: 'cell' },
         h('div', { style: `display:flex;gap:16px;padding:16px;border-radius:16px;background:${bg}` },
           mascots.map((a) => h('div', { style: `border-radius:16px;background:${bg};display:flex;align-items:flex-end` }, h('img', { src: ROOT + a.path, alt: '', style: 'height:160px;display:block' })))),
