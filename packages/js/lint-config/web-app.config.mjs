@@ -121,8 +121,9 @@ function elementTypeRules() {
     // `store` exists only in the editor (no-unknown-files), and its screens, forms and components subscribe to it (orcon-web ST-6).
     { from: 'feature-screens', allow: [['feature-screens', sameArea], ['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
     { from: 'feature-forms', allow: [['feature-forms', sameArea], ['feature-components', sameArea], ['feature-api', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
-    // `forms` is allowed from components because the editor's node details view (a component) wires the node configuration form renderer (SPEC-014 FE9).
-    { from: 'feature-components', allow: [['feature-components', sameArea], ['feature-forms', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
+    { from: 'feature-components', allow: [['feature-components', sameArea], ['feature-model', sameArea], 'feature-store', ...app] },
+    // Only the editor's components may import its forms: the node details view hosts the node configuration form (orcon-web AR-5, SPEC-014 FE9).
+    { from: [['feature-components', { area: 'editor' }]], allow: [['feature-forms', { area: 'editor' }]] },
     { from: 'feature-api', allow: [['feature-api', sameArea], ['feature-model', sameArea], ...app] },
     { from: 'feature-model', allow: [['feature-model', sameArea]] },
     { from: 'feature-store', allow: ['feature-store', ['feature-model', { area: 'editor' }]] },
