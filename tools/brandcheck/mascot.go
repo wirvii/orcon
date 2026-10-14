@@ -60,10 +60,15 @@ func (b *boardImages) get(name string) (image.Image, error) {
 // cut-out carrying one would not look like the board even with equal pixels.
 var colorChunks = map[string]bool{"gAMA": true, "iCCP": true, "sRGB": true, "cHRM": true, "cICP": true}
 
+// textChunks carry free text; a cut-out has no use for it and it can hide data.
+var textChunks = map[string]bool{"tEXt": true, "zTXt": true, "iTXt": true}
+
 // pngHeader is what checkMascot needs from the PNG chunk structure.
 type pngHeader struct {
 	colorType  byte
 	colorChunk string // first color-management chunk found, if any
+	textChunk  string // first tEXt, zTXt or iTXt chunk found, if any
+	trailing   int    // bytes after the IEND chunk
 }
 
 // readPNGHeader walks the chunk list of a PNG and reports the color type and
@@ -75,7 +80,7 @@ func readPNGHeader(data []byte) (pngHeader, error) {
 		return h, errors.New("missing PNG signature")
 	}
 	rest := data[len(pngSignature):]
-	seenHeader := false
+	seenHeader, seenEnd := false, false
 	for len(rest) >= 12 {
 		length := int(binary.BigEndian.Uint32(rest))
 		kind := string(rest[4:8])
@@ -90,13 +95,21 @@ func readPNGHeader(data []byte) (pngHeader, error) {
 		if colorChunks[kind] && h.colorChunk == "" {
 			h.colorChunk = kind
 		}
-		if kind == "IEND" {
-			break
+		if textChunks[kind] && h.textChunk == "" {
+			h.textChunk = kind
 		}
 		rest = rest[12+length:]
+		if kind == "IEND" {
+			seenEnd = true
+			h.trailing = len(rest)
+			break
+		}
 	}
 	if !seenHeader {
 		return h, errors.New("no IHDR chunk")
+	}
+	if !seenEnd {
+		return h, errors.New("no IEND chunk")
 	}
 	return h, nil
 }
@@ -129,6 +142,12 @@ func checkMascot(a Asset, data []byte, boards *boardImages) []Finding {
 	if head.colorChunk != "" {
 		findings = append(findings, whole(a.Path, ruleMascot,
 			"PNG carries a %s chunk: color-management chunks change how the pixels display, so the cut-out would not match the board", head.colorChunk))
+	}
+	if head.textChunk != "" {
+		findings = append(findings, whole(a.Path, ruleMascot, "PNG carries a %s text chunk: cut-outs hold pixels only", head.textChunk))
+	}
+	if head.trailing > 0 {
+		findings = append(findings, whole(a.Path, ruleMascot, "PNG has %d bytes after the IEND chunk: nothing may follow the image", head.trailing))
 	}
 	cut, err := png.Decode(bytes.NewReader(data))
 	if err != nil {

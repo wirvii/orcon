@@ -234,7 +234,10 @@ func TestMascotCornersTransparent(t *testing.T) {
 				tr.asset(mascotPath).MaxBytes = 1 << 20
 				tr.saveManifest()
 			},
-			want: []want{{ruleMascot, mascotPath, "over the 204800 byte limit"}},
+			want: []want{
+				{ruleMascot, mascotPath, "over the 204800 byte limit"},
+				{ruleMascot, mascotPath, "205000 bytes after the IEND chunk"},
+			},
 		},
 	}
 	for _, tc := range tests {
@@ -609,6 +612,32 @@ func TestREADMEDigestMustBelongToTheBoardLine(t *testing.T) {
 			tr := goodTree(t)
 			tr.put(readmePath, []byte(tc.readme(tr, string(tr.read(readmePath)))))
 			requireExactly(t, tr.check(), tc.want...)
+		})
+	}
+}
+
+func TestMascotRejectsTextChunksAndTrailingBytes(t *testing.T) {
+	t.Parallel()
+	good := readFixture(t, "raster/mascot-good.png")
+	tests := []struct {
+		name string
+		png  []byte
+		sub  string
+	}{
+		{"tEXt", injectChunk(t, good, "tEXt", []byte("Comment\x00hidden")), "tEXt text chunk"},
+		{"zTXt", injectChunk(t, good, "zTXt", []byte("Comment\x00\x00x")), "zTXt text chunk"},
+		{"iTXt", injectChunk(t, good, "iTXt", []byte("Comment\x00\x00\x00\x00\x00hidden")), "iTXt text chunk"},
+		{"payload after IEND", append(append([]byte(nil), good...), []byte("PK-hidden-archive")...), "17 bytes after the IEND chunk"},
+		{"one byte after IEND", append(append([]byte(nil), good...), 0), "1 bytes after the IEND chunk"},
+		{"truncated before IEND", good[:len(good)-12], "no IEND chunk"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tr := goodTree(t)
+			tr.put(mascotPath, tc.png)
+			tr.put(mascotCopy, tc.png)
+			requireExactly(t, tr.check(), want{ruleMascot, mascotPath, tc.sub})
 		})
 	}
 }
