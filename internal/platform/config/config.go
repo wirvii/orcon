@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package config holds process-level configuration types shared by the
-// composition root. It is a platform package: it imports no area or adapter.
 package config
 
 // Role selects which part of Orcon a process runs.

@@ -109,7 +109,7 @@ func TestProductionStopMode(t *testing.T) {
 					t.Errorf("%s has the literal %s; configuration and flags must not expose a stop mode", rel, x.Value)
 				}
 			case *ast.SelectorExpr:
-				if id, ok := x.X.(*ast.Ident); ok && id.Name == "wazero" && x.Sel.Name == "New" && rel == filepath.Join("cmd", "orcon", "main.go") {
+				if id, ok := x.X.(*ast.Ident); ok && id.Name == "wazero" && x.Sel.Name == "New" && rel == filepath.Join("cmd", "orcon", "wire_serve.go") {
 					wired = true
 				}
 			}
@@ -117,7 +117,7 @@ func TestProductionStopMode(t *testing.T) {
 		})
 	}
 	if !wired {
-		t.Error("cmd/orcon/main.go does not build the sandbox with wazero.New; the production wiring moved")
+		t.Error("cmd/orcon/wire_serve.go does not build the sandbox with wazero.New; the production wiring moved")
 	}
 }
 

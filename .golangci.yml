@@ -440,6 +440,11 @@ linters:
         linters:
           - forbidigo
         text: os\.Exit
+      # The generated reference and the key descriptions carry Spanish text (decision P3);
+      # the spell checker only knows American English.
+      - path: ^internal/(platform/config/keys.*|adapter/cli/docs)\.go$
+        linters:
+          - misspell
       # table-driven test functions are long by design
       - path: _test\.go
         linters:

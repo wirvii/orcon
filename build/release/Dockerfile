@@ -6,4 +6,4 @@ COPY orcon /usr/local/bin/orcon
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/orcon"]
-CMD ["--role=standalone", "--addr=:8080"]
+CMD ["serve", "--role=standalone", "--http-address=:8080"]

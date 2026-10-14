@@ -19,7 +19,9 @@ RUN make web build-go
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /src/bin/orcon /usr/local/bin/orcon
 USER nonroot:nonroot
+# The server writes its run files in the data directory; /tmp is writable on Cloud Run.
+ENV ORCON_DATA_DIR=/tmp/orcon
 EXPOSE 8080
-# Cloud Run sends traffic to its default container port, 8080, which is the port the server listens on.
+# Cloud Run sends traffic to its default container port, 8080, on every interface, so the server listens on 0.0.0.0:8080.
 ENTRYPOINT ["/usr/local/bin/orcon"]
-CMD ["--role=standalone", "--addr=:8080"]
+CMD ["serve", "--role=standalone", "--http-address=0.0.0.0:8080"]

@@ -9,7 +9,7 @@ Every merge to `main` deploys a preview of Orcon to Cloud Run so maintainers can
 
 ## What it is
 
-- One Cloud Run service, `orcon-preview`, that runs the `standalone` role of the binary built from the commit on `main` (`build/preview/Dockerfile`). The image embeds the web editor.
+- One Cloud Run service, `orcon-preview`, that runs the `standalone` role of the binary built from the commit on `main` (`build/preview/Dockerfile`), started as `orcon serve --role=standalone --http-address=0.0.0.0:8080`. The image embeds the web editor.
 - It is reachable at `https://orcon-preview.wirvii.com`.
 - It scales to zero and runs at most one instance, so the first request after a quiet period is slow.
 

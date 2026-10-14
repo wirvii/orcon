@@ -1,0 +1,354 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	"github.com/wirvii/orcon/internal/adapter/cli"
+	"github.com/wirvii/orcon/internal/adapter/codec/configyaml"
+	"github.com/wirvii/orcon/internal/adapter/httpapi"
+	"github.com/wirvii/orcon/internal/adapter/wazero"
+	"github.com/wirvii/orcon/internal/adapter/webui"
+	"github.com/wirvii/orcon/internal/expr"
+	"github.com/wirvii/orcon/internal/platform/config"
+)
+
+// HTTP server limits. They bound slow or abusive clients (implementation
+// contract: bounded resources, explicit timeouts).
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 60 * time.Second
+	idleTimeout       = 120 * time.Second
+)
+
+// serveCommand is orcon serve. Its settings (role, http.address,
+// http.shutdownTimeout, expr.*) come from the configuration schema with the
+// precedence of R-CONF-01: it has no flags of its own.
+func serveCommand() command {
+	return command{
+		name:    "serve",
+		summary: "run the server (--role standalone|api|scheduler|worker)",
+		run: func(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+			return runServe(ctx, args, stdout, stderr, serveDeps{
+				newSandbox: productionSandbox,
+				environ:    os.Environ(),
+				reloadPoll: cli.ReloadPollInterval,
+			})
+		},
+	}
+}
+
+// serveDeps is what runServe takes from the outside, so tests can replace it.
+type serveDeps struct {
+	newSandbox sandboxFactory
+	environ    []string
+	// reloadPoll is how often the server looks for a reload request.
+	reloadPoll time.Duration
+}
+
+// exprSandbox is what the composition root keeps of the expression sandbox:
+// the signal that the process must restart, and its release.
+type exprSandbox interface {
+	expr.Health
+	Close(ctx context.Context) error
+}
+
+// sandboxFactory builds the expression sandbox of a process.
+type sandboxFactory func(maxAbandoned, slots int, logger *slog.Logger) exprSandbox
+
+// productionSandbox builds the sandbox with the stop mode of production, which
+// is the default of the adapter: the composition root has no way to pick
+// another (TestProductionStopMode).
+func productionSandbox(maxAbandoned, slots int, logger *slog.Logger) exprSandbox { //nolint:ireturn // a sandboxFactory returns the port the root keeps
+	return wazero.New(wazero.WithMaxAbandoned(maxAbandoned), wazero.WithSlots(slots), wazero.WithLogger(logger))
+}
+
+// runServe is the start-up sequence of the server, in one place (AL-8.1):
+// flags, configuration, logger, checks of the sandbox settings, then the role.
+func runServe(ctx context.Context, args []string, stdout, stderr io.Writer, deps serveDeps) int {
+	schema := config.Default()
+	flags := flag.NewFlagSet("orcon serve", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	fv := schema.BindFlags(flags)
+	if err := schema.ParseFlags(flags, args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printServeUsage(stdout, flags)
+			return exitOK
+		}
+		_, _ = fmt.Fprintln(stderr, "orcon:", err)
+		return exitUsage
+	}
+	load := func() *config.Result {
+		return schema.Load(config.Input{
+			Flags: fv, Environ: deps.environ, FS: config.OSFileSystem{}, Decode: configyaml.Decode, GOOS: runtime.GOOS,
+		})
+	}
+	res := load()
+	if err := res.Err(); err != nil {
+		_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
+		return exitValidation
+	}
+	cfg := res.Config
+
+	level := new(slog.LevelVar)
+	level.Set(logLevel(cfg.Value("log.level").Text()))
+	logger := newLogger(stderr, cfg.Value("log.format").Text(), level)
+	for _, issue := range res.Issues {
+		logger.WarnContext(ctx, "configuration warning", "key", issue.Key, "message", issue.Message)
+	}
+
+	selected := cfg.Role()
+	if selected == config.RoleScheduler || selected == config.RoleWorker {
+		logger.InfoContext(ctx, "role has no processing yet", "role", selected)
+		return exitOK
+	}
+
+	maxAbandoned := cfg.Value("expr.maxAbandoned").Int()
+	// The sandbox needs a scheduler slot for timers, callers and the API besides
+	// the slots that run guest code, so with one slot it cannot work: the
+	// operating system shares the core by time and does preempt the thread of
+	// the guest.
+	procs := runtime.GOMAXPROCS(0)
+	if procs < 2 {
+		runtime.GOMAXPROCS(2)
+		logger.InfoContext(ctx, "GOMAXPROCS raised to 2 so the expression sandbox keeps a scheduler slot free", "was", procs)
+		procs = 2
+	}
+	slots := cfg.Value("expr.sandboxSlots").Int()
+	if slots == 0 {
+		slots = procs - 1
+	}
+	if !config.ValidSandboxSlots(slots, procs) {
+		_, _ = fmt.Fprintf(stderr, "invalid --expr-sandbox-slots: %d (want 1 to %d)\n", slots, procs-1)
+		return exitUsage
+	}
+
+	reloader := config.NewReloader(cfg, load)
+	reloader.Subscribe(func(_, current *config.Config, _ []string) {
+		level.Set(logLevel(current.Value("log.level").Text()))
+	})
+
+	// The watchers stop when workCtx ends; the deferred calls run stopWork first, then wait.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	workCtx, stopWork := context.WithCancel(ctx)
+	defer stopWork()
+	startReloadWatchers(workCtx, &wg, cfg.Value("dataDir").Text(), deps.reloadPoll, reloader, logger)
+
+	return serveWithSandbox(ctx, logger, serveSettings{
+		role:            selected,
+		addr:            cfg.Value("http.address").Text(),
+		shutdownTimeout: cfg.Value("http.shutdownTimeout").Duration(),
+		maxAbandoned:    maxAbandoned,
+		slots:           slots,
+	}, deps.newSandbox)
+}
+
+func printServeUsage(w io.Writer, flags *flag.FlagSet) {
+	_, _ = fmt.Fprintln(w, "usage: orcon serve [flags]")
+	_, _ = fmt.Fprintln(w, "\nEvery setting is a flag; see the configuration reference (orcon config check).")
+	_, _ = fmt.Fprintln(w, "\nflags:")
+	flags.SetOutput(w)
+	flags.PrintDefaults()
+	flags.SetOutput(io.Discard)
+}
+
+func logLevel(name string) slog.Level {
+	switch name {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// newLogger builds the process logger: text on a terminal when the format is auto, JSON otherwise.
+func newLogger(w io.Writer, format string, level *slog.LevelVar) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: level}
+	if format == "text" || (format == "auto" && isTerminal(w)) {
+		return slog.New(slog.NewTextHandler(w, opts))
+	}
+	return slog.New(slog.NewJSONHandler(w, opts))
+}
+
+// startReloadWatchers starts the two ways a running server rereads its
+// configuration (R-CONF-09): the request file of orcon config reload and SIGHUP.
+// Both goroutines end with ctx and are waited for through wg. A data directory
+// that cannot hold the run directory turns the request file off with a warning.
+func startReloadWatchers(ctx context.Context, wg *sync.WaitGroup, dataDir string, poll time.Duration, r *config.Reloader, logger *slog.Logger) {
+	handle := func(string) cli.ReloadResult { return reloadOnce(ctx, r, logger) }
+	if err := cli.EnsureRunDir(dataDir); err != nil {
+		logger.WarnContext(ctx, "orcon config reload cannot reach this server", "error", err)
+	} else {
+		wg.Go(func() { cli.WatchReloadRequests(ctx, dataDir, poll, handle, logger) })
+	}
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGHUP)
+	wg.Go(func() {
+		defer signal.Stop(sigs)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sigs:
+				reloadOnce(ctx, r, logger)
+			}
+		}
+	})
+}
+
+// reloadOnce rereads the configuration and says what happened, in the log and in the result for the command.
+func reloadOnce(ctx context.Context, r *config.Reloader, logger *slog.Logger) cli.ReloadResult {
+	report, err := r.Reload()
+	res := cli.ReloadResult{AppliedKeys: report.Applied, RestartRequiredKeys: report.Pending, Errors: []string{}}
+	if err != nil {
+		for _, issue := range report.Issues {
+			if issue.Severity == config.SeverityError {
+				res.Errors = append(res.Errors, issue.Key+": "+issue.Message)
+			}
+		}
+		logger.ErrorContext(ctx, "configuration reload refused; the running configuration is kept", "errors", res.Errors)
+		return res
+	}
+	if len(report.Pending) > 0 {
+		logger.WarnContext(ctx, "configuration changed in keys that need a restart; they keep their running value", "keys", report.Pending)
+	}
+	logger.InfoContext(ctx, "configuration reloaded", "applied", report.Applied, "needs_restart", report.Pending)
+	return res
+}
+
+// serveSettings are the resolved settings serveWithSandbox needs.
+type serveSettings struct {
+	role            config.Role
+	addr            string
+	shutdownTimeout time.Duration
+	maxAbandoned    int
+	slots           int
+}
+
+// serveWithSandbox runs the HTTP server with the expression sandbox beside it.
+// When the sandbox reports that it is saturated or holds a stuck call, the
+// process shuts down through the ordinary graceful shutdown and exits with
+// [exitRestart], so the restart policy of the deployment starts it again.
+func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings, newSandbox sandboxFactory) int {
+	sb := newSandbox(s.maxAbandoned, s.slots, logger)
+	effective := min(s.maxAbandoned, s.slots)
+	defer func() { _ = sb.Close(context.WithoutCancel(ctx)) }()
+	// The abandoned evaluations of a process can hold this much memory at most.
+	logger.InfoContext(ctx, "expression sandbox limits",
+		"slots", s.slots, "max_abandoned", effective, "memory_bound_bytes", uint64(s.slots)*uint64(expr.DefaultMemoryLimit)) //nolint:gosec // slots is validated to 1..GOMAXPROCS-1 by runServe
+
+	serveCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var restart atomic.Bool
+	watched := make(chan struct{})
+	go func() {
+		defer close(watched)
+		select {
+		case <-sb.Degraded():
+			report := sb.HealthReport()
+			restart.Store(true)
+			logger.ErrorContext(ctx, "expression sandbox is saturated or stuck: shutting down so the process restarts",
+				"reason", expr.RestartReason,
+				"abandoned_running", report.AbandonedRunning, "stuck", report.Stuck, "max_abandoned", report.MaxAbandoned,
+				"abandoned_total", report.Abandoned, "saturated_total", report.Saturated)
+			cancel()
+		case <-serveCtx.Done():
+		}
+	}()
+
+	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout)
+	cancel()
+	<-watched
+	switch {
+	case err != nil:
+		logger.ErrorContext(ctx, "server stopped with error", "role", s.role, "error", err)
+		return exitError
+	case restart.Load():
+		return exitRestart
+	default:
+		return exitOK
+	}
+}
+
+// newHandler assembles the HTTP routes served by the standalone and api roles.
+func newHandler() (http.Handler, error) {
+	assets, err := webui.Assets()
+	if err != nil {
+		return nil, fmt.Errorf("build handler: %w", err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
+	mux.Handle("/", webui.Handler(assets))
+	return mux, nil
+}
+
+// serve listens on addr and serves HTTP until ctx is canceled, then drains
+// in-flight requests for at most shutdownTimeout.
+func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration) error {
+	handler, err := newHandler()
+	if err != nil {
+		return err
+	}
+
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}
+
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
+	}
+
+	// The goroutine below is owned by this function: serve always receives
+	// from serveErr before returning.
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- srv.Serve(ln) }()
+	logger.InfoContext(ctx, "listening", "role", role, "listen_addr", ln.Addr().String())
+
+	select {
+	case err := <-serveErr:
+		return fmt.Errorf("serve http: %w", err)
+	case <-ctx.Done():
+	}
+
+	logger.InfoContext(ctx, "shutting down", "role", role)
+	// Shutdown must outlive the canceled ctx, so detach cancellation and bound it explicitly.
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+	shutdownErr := srv.Shutdown(shutdownCtx)
+	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		shutdownErr = errors.Join(shutdownErr, fmt.Errorf("serve http: %w", err))
+	}
+	if shutdownErr != nil {
+		return fmt.Errorf("shut down http server: %w", shutdownErr)
+	}
+	return nil
+}
