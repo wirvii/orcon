@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-embed-names.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && stylelint --allow-empty-input \"**/*.css\"",
@@ -18,22 +18,25 @@
     "test:unit": "vitest run --project unit",
     "test:coverage": "vitest run --coverage",
     "test:screens": "vitest run --project screens",
-    "size": "vite build && size-limit && node scripts/check-initial-chunks.mjs",
-    "build:perf": "vite build --config vite.perf.config.ts",
+    "size": "vite build && size-limit && node scripts/check-initial-chunks.mjs && node scripts/check-embed-names.mjs",
+    "build:perf": "vite build --config vite.perf.config.ts --mode perf",
     "test:perf": "playwright test -c playwright.perf.config.ts",
     "perf:reference": "node perf/generate-reference-flow.mjs --check"
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
     "@hookform/resolvers": "^5",
     "@orcon/ui": "workspace:*",
     "@tanstack/react-query": "^5",
     "@tanstack/react-router": "^1",
+    "immer": "^10",
     "lucide-react": "^0.577.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7",
     "react-intl": "^7",
-    "zod": "^4"
+    "zod": "^4",
+    "zustand": "^5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
