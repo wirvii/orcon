@@ -82,7 +82,7 @@ func TestCoreNodeListComplete(t *testing.T) {
 		if row.Mapped() {
 			continue
 		}
-		if !slices.Contains([]string{"dataTable", "e2eTest", "timeSaved"}, row.N8nTypes[0]) {
+		if !slices.Contains([]string{"dataTable", "e2eTest"}, row.N8nTypes[0]) {
 			t.Errorf("unexpected unsupported row %v", row.N8nTypes)
 		}
 	}
@@ -150,9 +150,6 @@ func TestCoreNodeListAgainstPinnedRelease(t *testing.T) {
 	}
 	if gaps := n8nimport.CheckInventory(inv); len(gaps) > 0 {
 		t.Fatalf("core types of n8n %s without a counterpart: %v", inv.N8nVersion, gaps)
-	}
-	for typ, question := range n8nimport.PendingOwner(inv) {
-		t.Logf("%s waits for the owner decision %s: the release gate cannot close while it is listed", typ, question)
 	}
 }
 

@@ -75,25 +75,16 @@ func ParseInventory(data []byte) (*Inventory, error) {
 	return inv, nil
 }
 
-// pendingOwner lists the core types whose destination waits for an owner
-// decision. They are not exempt: the check reports them apart, and the release
-// gate cannot close while one is listed.
-var pendingOwner = map[string]string{basePrefix + "timeSaved": "P-TS1"}
-
 // CheckInventory returns the core types of the inventory that have no
 // counterpart, sorted. A new core type blocks the release gate until a row of
 // SPEC-003 Annex B names it. A core type whose row marks it unsupported is a
 // gap too, except the ones an Annex B row names as out of scope (see
 // documentedGap). A core type that SPEC-006 Annex B classifies as an AI node is
-// covered by the AI plan. Types waiting for an owner decision are left out
-// here and listed by [PendingOwner].
+// covered by the AI plan.
 func CheckInventory(inv *Inventory) []string {
 	var gaps []string
 	for _, n := range inv.Nodes {
 		if n.Group != GroupCore {
-			continue
-		}
-		if _, waiting := pendingOwner[n.Type]; waiting {
 			continue
 		}
 		if AIClassified(n.Type) {
@@ -106,18 +97,6 @@ func CheckInventory(inv *Inventory) []string {
 	}
 	slices.Sort(gaps)
 	return slices.Compact(gaps)
-}
-
-// PendingOwner returns the core types of the inventory whose destination waits
-// for an owner decision, with the question that holds them.
-func PendingOwner(inv *Inventory) map[string]string {
-	out := map[string]string{}
-	for _, n := range inv.Nodes {
-		if q, ok := pendingOwner[n.Type]; ok && n.Group == GroupCore {
-			out[n.Type] = q
-		}
-	}
-	return out
 }
 
 // documentedGap is the exact copy of the rows of SPEC-003 Annex B that leave a

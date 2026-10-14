@@ -155,6 +155,9 @@ func mapCore(n *Node, typ string, row CoreNode, m *Mapped, report func(FindingCo
 	if IsHTTPRequest(typ) {
 		mapHTTP(n, m, report)
 	}
+	if typ == basePrefix+"timeSaved" {
+		report(FindAdapted, "type", "Orcon does not record the minutes saved; the node passes the items through unchanged")
+	}
 }
 
 // mapHTTP states the safety of an HTTP Request node from its method

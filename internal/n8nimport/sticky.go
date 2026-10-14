@@ -20,8 +20,9 @@ const (
 	defaultStickyHeight = 160
 )
 
-// FindAdaptedSticky reports that a sticky note was changed to fit the editor.
-const FindAdaptedSticky FindingCode = "ADAPTED"
+// FindAdapted reports that a node was mapped with a difference the import
+// report must show, such as a sticky note cut to fit the editor.
+const FindAdapted FindingCode = "ADAPTED"
 
 // StickyNote is an editor sticky note, the Orcon counterpart of the n8n
 // Sticky Note node (ADR-0007 section 2: editor data, not a node).
@@ -52,7 +53,7 @@ func StickyNoteOf(n *Node) (StickyNote, []Finding) {
 	if utf8.RuneCountInString(note.Content) > MaxStickyContent {
 		note.Content = string([]rune(note.Content)[:MaxStickyContent])
 		findings = append(findings, Finding{
-			Code: FindAdaptedSticky, NodeID: n.ID, Node: n.Name, Field: "parameters.content",
+			Code: FindAdapted, NodeID: n.ID, Node: n.Name, Field: "parameters.content",
 			Message: "the note is longer than the editor allows and was cut",
 		})
 	}

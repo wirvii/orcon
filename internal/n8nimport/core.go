@@ -89,8 +89,8 @@ var coreNodes = []CoreNode{
 	{[]string{"dataTable"}, "", "own backlog item", DispUnsupported, "tabular storage has no design yet (SPEC-003 Q14); the importer reports it"},
 	{[]string{"e2eTest", "e2eTestPollingTrigger", "simulate", "simulateTrigger"}, "", "out of scope", DispUnsupported,
 		"n8n's internal nodes without public documentation; reimplementing them would mean reading n8n code (Q9, Amendment 10)"},
-	{[]string{"timeSaved"}, "", "pending owner decision P-TS1", DispUnsupported,
-		"Track Time Saved has no destination until the owner answers P-TS1; the importer reports it and does not invent one"},
+	{[]string{"timeSaved"}, "orcon.noop@1", "SPEC-003 CN13", DispNode,
+		"Track Time Saved passes the items through; Orcon does not record the minutes saved and the import report says so (owner decision P-TS1, Amendment 10)"},
 }
 
 // CoreNodes returns the core table. The caller owns the result.

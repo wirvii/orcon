@@ -30,30 +30,20 @@ func TestCoreExemptionsMatchAnnex(t *testing.T) {
 			unsupported = append(unsupported, basePrefix+short)
 		}
 	}
-	// Track Time Saved waits for the owner (P-TS1); it is not an exemption.
-	pending := basePrefix + "timeSaved"
-	var rest []string
-	for _, typ := range unsupported {
-		if typ != pending {
-			rest = append(rest, typ)
-		}
-	}
-	slices.Sort(rest)
+	slices.Sort(unsupported)
 	want := slices.Clone(annexExemptions)
 	slices.Sort(want)
-	if !slices.Equal(rest, want) {
-		t.Errorf("unsupported rows (timeSaved aside) = %v, want exactly the annex rows %v", rest, want)
+	if !slices.Equal(unsupported, want) {
+		t.Errorf("unsupported rows = %v, want exactly the annex rows %v", unsupported, want)
 	}
-	for _, typ := range append(slices.Clone(annexExemptions), pending) {
-		if got := documentedGap(typ); got != (typ != pending) {
-			t.Errorf("documentedGap(%s) = %v", typ, got)
+	for _, typ := range annexExemptions {
+		if !documentedGap(typ) {
+			t.Errorf("documentedGap(%s) = false", typ)
 		}
 	}
-	if len(pendingOwner) != 1 || pendingOwner[pending] != "P-TS1" {
-		t.Errorf("pending owner decisions = %v, want only timeSaved (P-TS1)", pendingOwner)
-	}
-	if !slices.Contains(unsupported, pending) {
-		t.Error("timeSaved must have a row without a destination")
+	// Track Time Saved is mapped (P-TS1 = A) and so is not an exemption.
+	if row, ok := LookupCore(basePrefix + "timeSaved"); !ok || !row.Mapped() || documentedGap(basePrefix+"timeSaved") {
+		t.Error("timeSaved must be a mapped row, not an exemption")
 	}
 	// A type without a row never passes as an exemption.
 	if documentedGap("n8n-nodes-base.somethingNew") {

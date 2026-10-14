@@ -49,7 +49,7 @@ func TestStickyNoteConversion(t *testing.T) {
 		if got := len([]rune(note.Content)); got != n8nimport.MaxStickyContent {
 			t.Errorf("content has %d characters", got)
 		}
-		if len(findings) != 1 || findings[0].Code != n8nimport.FindAdaptedSticky || findings[0].Field != "parameters.content" || findings[0].Node != "Note" {
+		if len(findings) != 1 || findings[0].Code != n8nimport.FindAdapted || findings[0].Field != "parameters.content" || findings[0].Node != "Note" {
 			t.Errorf("findings = %+v", findings)
 		}
 	})

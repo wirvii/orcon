@@ -373,3 +373,14 @@ func TestN8nOperationPairMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestTrackTimeSavedIsAdaptedWithANote(t *testing.T) {
+	n := importNode(t, `{"id":"t","name":"Saved","type":"n8n-nodes-base.timeSaved","typeVersion":1,"parameters":{"minutesSaved":5}}`)
+	m := n8nimport.MapNode(&n, nil)
+	if m.OrconType != "orcon.noop@1" || !m.Mapped() || m.ReviewRequired() {
+		t.Fatalf("mapping = %+v", m)
+	}
+	if len(m.Findings) != 1 || m.Findings[0].Code != n8nimport.FindAdapted || !strings.Contains(m.Findings[0].Message, "does not record the minutes saved") {
+		t.Errorf("the report must say Orcon does not record the minutes: %+v", m.Findings)
+	}
+}

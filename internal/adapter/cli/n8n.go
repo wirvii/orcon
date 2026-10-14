@@ -94,7 +94,7 @@ func runCoverage(f *coverageFlags, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := checkInventory(f, os.DirFS(f.corpus), stdout); err != nil {
+	if err := checkInventory(f, os.DirFS(f.corpus)); err != nil {
 		return err
 	}
 	var (
@@ -160,7 +160,7 @@ func runCoverage(f *coverageFlags, stdout io.Writer) error {
 
 // checkInventory verifies the core table against the inventory of the pinned
 // n8n release, which travels with the corpus. A missing inventory is an error.
-func checkInventory(f *coverageFlags, corpusFS fs.FS, w io.Writer) error {
+func checkInventory(f *coverageFlags, corpusFS fs.FS) error {
 	var (
 		inv *n8nimport.Inventory
 		err error
@@ -175,9 +175,6 @@ func checkInventory(f *coverageFlags, corpusFS fs.FS, w io.Writer) error {
 	}
 	if gaps := n8nimport.CheckInventory(inv); len(gaps) > 0 {
 		return fmt.Errorf("%d core node types of n8n %s have no counterpart: %v", len(gaps), inv.N8nVersion, gaps)
-	}
-	for typ, question := range n8nimport.PendingOwner(inv) {
-		_, _ = fmt.Fprintf(w, "pending owner decision %s: %s has no destination yet\n", question, typ)
 	}
 	return nil
 }
