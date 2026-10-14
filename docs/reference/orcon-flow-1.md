@@ -69,6 +69,7 @@ The fields of `effect` contracts (`READ_ONLY`, `IDEMPOTENCY_KEY`, `PROVIDER_KEY`
 | timer `date` | RFC 3339 date-time in UTC written with `Z` (`2026-10-12T10:00:00Z`), enforced by pattern in the schema and by the reader |
 | timer `cycle` | repeating interval, `R/PT10M` or `R5/PT10M` |
 | integers | whole numbers from 1 to 2147483647 where a count or limit is meant (`maxIterations`, `batchSize`, `maxAttempts`, `concurrency`, `callDepthLimit`, `edges[].order`); `2.0` and `1e3` are the same integer as `2` and `1000` and are read as such |
+| `nodes` and `edges` | at most 2000 nodes and 10000 edges per document (`maxItems`). A provisional product limit that no accepted document sets; Git synchronization applies the same limit; raising it later is additive |
 | `settings.memoryLimit` | whole number of bytes from 1 to 9007199254740991 (2^53-1); the instance maximum is checked at publication with the instance configuration (cut C12), not by the schema |
 | all numbers | every number in a document, including inside `parameters`, `ext`, `editor` and forms, must survive the canonical form exactly (RFC 7493, I-JSON): integers written without a fraction or exponent lie within ±(2^53-1), and decimals have no more digits than a double keeps. Larger values are written as strings. Otherwise two different numbers, for example 9007199254740992 and 9007199254740993, would share one `contentHash` |
 | strings | well-formed Unicode: a `\uD800`-`\uDFFF` escape must be half of a valid pair; a lone surrogate is refused rather than replaced by U+FFFD (RFC 8785) |

@@ -33,6 +33,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
   | `step-up-required` | 403 | confirmed |
   | `personal-keys-disabled` | 403 | confirmed |
   | `not-found` | 404 | confirmed |
+  | `method-not-allowed` | 405 | confirmed |
   | `conflict` | 409 | confirmed |
   | `idempotency-in-progress` | 409 | confirmed |
   | `secret-already-issued` | 409 | confirmed |
@@ -46,7 +47,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
   | `rate-limited` | 429 | confirmed |
   | `internal-error` | 500 | confirmed |
   | `service-unavailable` | 503 | confirmed |
-  | `confirmation-required` | to be confirmed | proposed; confirmed by SPEC-005 API1/API3 |
-  | `federated-token-rejected` | to be confirmed | proposed; confirmed by SPEC-005 API1/API3; belongs to a protocol endpoint and uses the OAuth error format |
+  | `confirmation-required` | 403 | confirmed (SPEC-005 API1) |
+  | `federated-token-rejected` | 400 | confirmed (ADR-0056 §9); protocol endpoint, sent in the OAuth error format |
 
 - **ERR-7** New codes are allowed only for new conditions, added to the catalog in the same pull request. [`problem-codes-declared`]
