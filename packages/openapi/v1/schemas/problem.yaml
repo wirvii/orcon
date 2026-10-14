@@ -129,6 +129,7 @@ ProblemCode:
     - deprecated-removed
     - precondition-failed
     - payload-too-large
+    - unsupported-media-type
     - idempotency-key-reused
     - precondition-required
     - rate-limited
@@ -223,6 +224,11 @@ ProblemCode:
       status: 413
       title: Payload too large
       when: The body exceeds the size limit.
+      retryable: false
+    unsupported-media-type:
+      status: 415
+      title: Unsupported media type
+      when: The body is not in a media type the operation accepts.
       retryable: false
     idempotency-key-reused:
       status: 422

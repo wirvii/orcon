@@ -173,6 +173,7 @@ paths:
         - conflict
         - idempotency-in-progress
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -249,6 +250,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -352,6 +355,7 @@ paths:
         - not-found
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - precondition-required
         - rate-limited
         - internal-error
@@ -426,6 +430,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '429':
@@ -642,6 +648,7 @@ paths:
         - idempotency-in-progress
         - project-managed-by-git
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -717,6 +724,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -1081,6 +1090,7 @@ paths:
         - project-managed-by-git
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - precondition-required
         - rate-limited
         - internal-error
@@ -1156,6 +1166,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '429':
@@ -1363,6 +1375,7 @@ paths:
         - project-managed-by-git
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - precondition-required
         - rate-limited
         - internal-error
@@ -1521,6 +1534,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '429':
@@ -1547,6 +1562,7 @@ paths:
         - project-managed-by-git
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - precondition-required
         - rate-limited
         - internal-error
@@ -1664,6 +1680,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '429':
@@ -1983,6 +2001,7 @@ paths:
         - project-managed-by-git
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - precondition-required
         - rate-limited
@@ -2070,6 +2089,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '428':
@@ -2302,6 +2323,7 @@ paths:
         - project-managed-by-git
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - precondition-required
         - rate-limited
@@ -2378,6 +2400,8 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '428':
@@ -2412,6 +2436,7 @@ paths:
         - conflict
         - idempotency-in-progress
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -2528,6 +2553,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -2559,6 +2586,7 @@ paths:
         - conflict
         - idempotency-in-progress
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -2632,6 +2660,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -3320,6 +3350,7 @@ paths:
         - conflict
         - idempotency-in-progress
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -3389,6 +3420,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -3420,6 +3453,7 @@ paths:
         - conflict
         - idempotency-in-progress
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - rate-limited
         - internal-error
@@ -3488,6 +3522,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
         '429':
@@ -3807,6 +3843,7 @@ components:
         - deprecated-removed
         - precondition-failed
         - payload-too-large
+        - unsupported-media-type
         - idempotency-key-reused
         - precondition-required
         - rate-limited
@@ -3899,6 +3936,11 @@ components:
           status: 413
           title: Payload too large
           when: The body exceeds the size limit.
+          retryable: false
+        unsupported-media-type:
+          status: 415
+          title: Unsupported media type
+          when: The body is not in a media type the operation accepts.
           retryable: false
         idempotency-key-reused:
           status: 422
@@ -5303,6 +5345,12 @@ components:
             $ref: '#/components/schemas/Problem'
     PayloadTooLarge:
       description: The body exceeds the size limit.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: The body is not in a media type the operation accepts.
       content:
         application/problem+json:
           schema:

@@ -99,6 +99,7 @@ patch:
     - not-found
     - precondition-failed
     - payload-too-large
+    - unsupported-media-type
     - precondition-required
     - rate-limited
     - internal-error
@@ -173,6 +174,8 @@ patch:
       $ref: ../openapi.yaml#/components/responses/PreconditionFailed
     '413':
       $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
     '428':
       $ref: ../openapi.yaml#/components/responses/PreconditionRequired
     '429':

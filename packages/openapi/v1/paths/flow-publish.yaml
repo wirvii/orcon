@@ -27,6 +27,7 @@ post:
     - project-managed-by-git
     - precondition-failed
     - payload-too-large
+    - unsupported-media-type
     - idempotency-key-reused
     - precondition-required
     - rate-limited
@@ -114,6 +115,8 @@ post:
       $ref: ../openapi.yaml#/components/responses/PreconditionFailed
     '413':
       $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
     '422':
       $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
     '428':

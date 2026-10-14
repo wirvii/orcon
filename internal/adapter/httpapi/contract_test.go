@@ -401,3 +401,31 @@ func declaredResponseByKey(t *testing.T, spec *Spec, doc map[string]any, key str
 	}
 	return resp, true
 }
+
+// TestOperationsWithBodiesDeclareTheMediaTypeProblem (BL-090): the 415 an
+// operation can answer is part of its contract.
+func TestOperationsWithBodiesDeclareTheMediaTypeProblem(t *testing.T) {
+	spec := newReal(t).Spec()
+	checked := 0
+	for i := range spec.Operations {
+		op := &spec.Operations[i]
+		if !op.HasBody {
+			continue
+		}
+		checked++
+		doc := opDoc(t, spec, op)
+		problems, _ := doc["x-orcon-problems"].([]any)
+		if !slices.Contains(problems, any("unsupported-media-type")) {
+			t.Errorf("%s does not declare unsupported-media-type", op.ID)
+		}
+		if _, ok := declaredResponseByKey(t, spec, doc, "415"); !ok {
+			t.Errorf("%s declares no 415 response", op.ID)
+		}
+		if len(op.BodyMedia) == 0 {
+			t.Errorf("%s declares no media type for its body", op.ID)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("the contract has no operation with a body")
+	}
+}

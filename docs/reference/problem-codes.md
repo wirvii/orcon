@@ -27,6 +27,7 @@ Every error of the public API is an `application/problem+json` document (RFC 945
 | <a id="deprecated-removed"></a>`deprecated-removed` | 410 | Removed | The operation was removed after its sunset date. | no |
 | <a id="precondition-failed"></a>`precondition-failed` | 412 | Precondition failed | If-Match does not match the current ETag. | no |
 | <a id="payload-too-large"></a>`payload-too-large` | 413 | Payload too large | The body exceeds the size limit. | no |
+| <a id="unsupported-media-type"></a>`unsupported-media-type` | 415 | Unsupported media type | The body is not in a media type the operation accepts. | no |
 | <a id="idempotency-key-reused"></a>`idempotency-key-reused` | 422 | Idempotency key reused | The key was used with a different request. | no |
 | <a id="precondition-required"></a>`precondition-required` | 428 | Precondition required | If-Match is missing. | no |
 | <a id="rate-limited"></a>`rate-limited` | 429 | Rate limited | The rate class quota is exhausted. | yes |

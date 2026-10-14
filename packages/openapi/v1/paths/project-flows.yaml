@@ -148,6 +148,7 @@ post:
     - idempotency-in-progress
     - project-managed-by-git
     - payload-too-large
+    - unsupported-media-type
     - idempotency-key-reused
     - rate-limited
     - internal-error
@@ -223,6 +224,8 @@ post:
       $ref: ../openapi.yaml#/components/responses/Conflict
     '413':
       $ref: ../openapi.yaml#/components/responses/PayloadTooLarge
+    '415':
+      $ref: ../openapi.yaml#/components/responses/UnsupportedMediaType
     '422':
       $ref: ../openapi.yaml#/components/responses/IdempotencyKeyReused
     '429':

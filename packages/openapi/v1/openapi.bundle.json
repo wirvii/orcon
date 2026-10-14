@@ -245,6 +245,7 @@
           "conflict",
           "idempotency-in-progress",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -358,6 +359,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
@@ -504,6 +508,7 @@
           "not-found",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "precondition-required",
           "rate-limited",
           "internal-error",
@@ -615,6 +620,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "428": {
             "$ref": "#/components/responses/PreconditionRequired"
@@ -926,6 +934,7 @@
           "idempotency-in-progress",
           "project-managed-by-git",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -1038,6 +1047,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
@@ -1567,6 +1579,7 @@
           "project-managed-by-git",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "precondition-required",
           "rate-limited",
           "internal-error",
@@ -1680,6 +1693,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "428": {
             "$ref": "#/components/responses/PreconditionRequired"
@@ -1979,6 +1995,7 @@
           "project-managed-by-git",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "precondition-required",
           "rate-limited",
           "internal-error",
@@ -2218,6 +2235,9 @@
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "428": {
             "$ref": "#/components/responses/PreconditionRequired"
           },
@@ -2251,6 +2271,7 @@
           "project-managed-by-git",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "precondition-required",
           "rate-limited",
           "internal-error",
@@ -2428,6 +2449,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "428": {
             "$ref": "#/components/responses/PreconditionRequired"
@@ -2898,6 +2922,7 @@
           "project-managed-by-git",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "precondition-required",
           "rate-limited",
@@ -3030,6 +3055,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
@@ -3365,6 +3393,7 @@
           "project-managed-by-git",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "precondition-required",
           "rate-limited",
@@ -3481,6 +3510,9 @@
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
@@ -3527,6 +3559,7 @@
           "conflict",
           "idempotency-in-progress",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -3700,6 +3733,9 @@
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
@@ -3742,6 +3778,7 @@
           "conflict",
           "idempotency-in-progress",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -3851,6 +3888,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
@@ -4870,6 +4910,7 @@
           "conflict",
           "idempotency-in-progress",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -4975,6 +5016,9 @@
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
           },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
           },
@@ -5017,6 +5061,7 @@
           "conflict",
           "idempotency-in-progress",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "rate-limited",
           "internal-error",
@@ -5120,6 +5165,9 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           },
           "422": {
             "$ref": "#/components/responses/IdempotencyKeyReused"
@@ -5544,6 +5592,7 @@
           "deprecated-removed",
           "precondition-failed",
           "payload-too-large",
+          "unsupported-media-type",
           "idempotency-key-reused",
           "precondition-required",
           "rate-limited",
@@ -5653,6 +5702,12 @@
             "status": 413,
             "title": "Payload too large",
             "when": "The body exceeds the size limit.",
+            "retryable": false
+          },
+          "unsupported-media-type": {
+            "status": 415,
+            "title": "Unsupported media type",
+            "when": "The body is not in a media type the operation accepts.",
             "retryable": false
           },
           "idempotency-key-reused": {
@@ -7527,6 +7582,16 @@
       },
       "PayloadTooLarge": {
         "description": "The body exceeds the size limit.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "The body is not in a media type the operation accepts.",
         "content": {
           "application/problem+json": {
             "schema": {

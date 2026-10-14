@@ -397,6 +397,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: The body is not in a media type the operation accepts.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     IdempotencyKeyReused:
       description: The idempotency key was used with a different request.
       content:
