@@ -627,3 +627,114 @@ func TestStaleReloadLockIsTakenOver(t *testing.T) {
 		t.Fatalf("a dead command's lock must not block: %v", err)
 	}
 }
+
+func TestRunDirectoryHygiene(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a symbolic link is refused and its target left alone", func(t *testing.T) {
+		t.Parallel()
+		dir, target := t.TempDir(), t.TempDir()
+		if err := os.Chmod(target, 0o755); err != nil { //nolint:gosec // G302: the test needs a mode to see that nothing changes it
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, cli.RunDir(dir)); err != nil {
+			t.Skipf("no symbolic links here: %v", err)
+		}
+		err := cli.EnsureRunDir(dir)
+		if err == nil || !strings.Contains(err.Error(), "symbolic link") {
+			t.Fatalf("EnsureRunDir = %v, want a symbolic link error", err)
+		}
+		if info, err := os.Stat(target); err != nil || info.Mode().Perm() != 0o755 {
+			t.Fatalf("the target of the link was changed: %v %v", info, err)
+		}
+		if _, err := cli.RequestReload(t.Context(), dir, time.Second, 10*time.Millisecond); err == nil || !strings.Contains(err.Error(), "symbolic link") {
+			t.Fatalf("RequestReload = %v, want a symbolic link error", err)
+		}
+	})
+
+	t.Run("stale files are expired when a server starts", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		if err := cli.EnsureRunDir(dir); err != nil {
+			t.Fatal(err)
+		}
+		run := cli.RunDir(dir)
+		old := time.Now().Add(-time.Hour)
+		for _, name := range []string{"server.dead", "reload-result.dead", "reload-request", "reload.lock", ".tmp-123"} {
+			path := filepath.Join(run, name)
+			if err := os.WriteFile(path, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chtimes(path, old, old); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(run, "server.alive"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		watch(t, dir, cli.ReloadResult{})
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			if _, err := os.Stat(filepath.Join(run, "server.dead")); os.IsNotExist(err) {
+				break
+			}
+			time.Sleep(5 * time.Millisecond) // polling for the watcher to start and expire the old files
+		}
+		for _, name := range []string{"server.dead", "reload-result.dead", "reload-request", "reload.lock", ".tmp-123"} {
+			if _, err := os.Stat(filepath.Join(run, name)); !os.IsNotExist(err) {
+				t.Errorf("%s was not expired: %v", name, err)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(run, "server.alive")); err != nil {
+			t.Errorf("a fresh registration of another server was removed: %v", err)
+		}
+	})
+
+	t.Run("a registration older than the expiry is not a live server", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		if err := cli.EnsureRunDir(dir); err != nil {
+			t.Fatal(err)
+		}
+		dead := filepath.Join(cli.RunDir(dir), "server.dead")
+		if err := os.WriteFile(dead, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		old := time.Now().Add(-time.Hour)
+		if err := os.Chtimes(dead, old, old); err != nil {
+			t.Fatal(err)
+		}
+		started := time.Now()
+		_, err := cli.RequestReload(t.Context(), dir, 5*time.Second, 10*time.Millisecond)
+		if !errors.Is(err, cli.ErrNoServer) || time.Since(started) > time.Second {
+			t.Fatalf("RequestReload = %v after %v; want ErrNoServer at once", err, time.Since(started))
+		}
+	})
+
+	t.Run("the heartbeat touches the registration instead of rewriting it", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		if err := cli.EnsureRunDir(dir); err != nil {
+			t.Fatal(err)
+		}
+		watch(t, dir, cli.ReloadResult{})
+		waitRegistered(t, dir, 1)
+		matches, _ := filepath.Glob(filepath.Join(cli.RunDir(dir), "server.*"))
+		first, err := os.Stat(matches[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			next, err := os.Stat(matches[0])
+			if err == nil && next.ModTime().After(first.ModTime()) {
+				if !os.SameFile(first, next) {
+					t.Fatal("the registration was replaced, not touched")
+				}
+				return
+			}
+			time.Sleep(5 * time.Millisecond) // polling the modification time the heartbeat moves
+		}
+		t.Fatal("the heartbeat never moved the modification time")
+	})
+}

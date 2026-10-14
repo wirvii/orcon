@@ -99,13 +99,40 @@ func RunDir(dataDir string) string { return filepath.Join(dataDir, runDirName) }
 
 // EnsureRunDir creates <dataDir>/run, readable by the owner only. The server
 // calls it at start.
+//
+// It refuses a run directory that is a symbolic link: restricting its mode would change
+// the directory the link points to, which may belong to someone else.
 func EnsureRunDir(dataDir string) error {
 	dir := RunDir(dataDir)
+	if err := refuseSymlink(dir); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
 	}
+	if err := refuseSymlink(dir); err != nil { // checked again: it could have appeared meanwhile
+		return err
+	}
 	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a directory needs the execute bit; 0700 is owner-only
 		return fmt.Errorf("restrict %s: %w", dir, err)
+	}
+	return nil
+}
+
+// refuseSymlink fails when path is a symbolic link or not a directory. A path that does not exist is fine.
+func refuseSymlink(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return runDirError(path, err)
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symbolic link; the run directory must be a real directory owned by the user that runs Orcon", path)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
 	}
 	return nil
 }
@@ -196,6 +223,9 @@ func runDirError(dir string, err error) error {
 // Unanswered. The request and the results are removed before it returns.
 func RequestReload(ctx context.Context, dataDir string, wait, poll time.Duration) (*ReloadReport, error) {
 	dir := RunDir(dataDir)
+	if err := refuseSymlink(dir); err != nil {
+		return nil, err
+	}
 	deadline := time.NewTimer(wait)
 	defer deadline.Stop()
 	tick := time.NewTicker(poll)
@@ -376,11 +406,18 @@ func WatchReloadRequests(ctx context.Context, dataDir string, poll time.Duration
 	registration := filepath.Join(dir, serverPrefix+serverID)
 	defer func() { _ = os.Remove(registration) }() // best effort: a stale registration expires by itself
 	var handled []string
+	// The registration is written once and kept alive by touching it: rewriting the file on
+	// every poll would be needless disk traffic.
 	register := func() {
+		now := time.Now()
+		if err := os.Chtimes(registration, now, now); err == nil {
+			return
+		}
 		if err := writeAtomic(registration, []byte(serverID+"\n")); err != nil {
 			logger.WarnContext(ctx, "cannot register for orcon config reload", "error", err)
 		}
 	}
+	expireStale(dir, logger)
 	register()
 	tick := time.NewTicker(poll)
 	defer tick.Stop()
@@ -391,6 +428,36 @@ func WatchReloadRequests(ctx context.Context, dataDir string, poll time.Duration
 		case <-tick.C:
 			register()
 			handled = serveRequest(ctx, dir, serverID, handled, handle, logger)
+		}
+	}
+}
+
+// expireStale removes what dead processes left in the run directory: registrations, results,
+// a request, a lock and temporary files that nobody refreshed. A live server refreshes its own
+// registration every poll, so anything this old is not in use.
+func expireStale(dir string, logger *slog.Logger) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	limits := map[string]time.Duration{
+		serverPrefix:    staleServerPolls * ReloadPollInterval,
+		resultPrefix:    staleServerPolls * ReloadPollInterval,
+		requestFileName: staleRequest,
+		lockFileName:    staleLock,
+		".tmp-":         staleRequest,
+	}
+	for _, e := range entries {
+		for prefix, limit := range limits {
+			if !strings.HasPrefix(e.Name(), prefix) {
+				continue
+			}
+			if info, err := e.Info(); err == nil && time.Since(info.ModTime()) > limit {
+				if err := os.Remove(filepath.Join(dir, e.Name())); err == nil {
+					logger.Debug("removed a stale file of the run directory", "file", e.Name())
+				}
+			}
+			break
 		}
 	}
 }
