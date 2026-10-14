@@ -6,6 +6,10 @@
 # internal/adapter and internal/platform) with statements must have at least
 # the given statement coverage (go-style.md GS-T, about 80 % in the domain).
 # Packages without statements (types and interfaces only) have nothing to cover.
+# The statements of a package that its own tests do not reach but the integration
+# tests under test/ do (the engine over the real stores, which an area test may
+# not import, AL-2.1) count for it: those tests are run with -short and
+# -coverpkg=<package>, and the higher of the two figures is the one checked.
 #
 # Usage: check-coverage.sh [minimum-percent]   (default 80)
 set -eu
@@ -41,6 +45,11 @@ while IFS= read -r line; do
     continue
   fi
   if awk -v got="$pct" -v want="$min" 'BEGIN { exit !(got + 0 < want + 0) }'; then
+    outer=$(go test -count=1 -short -coverpkg="$pkg" -cover ./test/... 2>&1 | sed -n 's/.*coverage: \([0-9.]*\)% of statements in .*/\1/p' | sort -n | tail -n 1 || true)
+    if [ -n "$outer" ] && awk -v got="$outer" -v want="$min" 'BEGIN { exit !(got + 0 >= want + 0) }'; then
+      echo "cover: $pkg $outer% (with the integration tests under test/; $pct% alone)"
+      continue
+    fi
     echo "cover: $pkg has $pct% coverage, need at least $min%" >&2
     status=1
   else
