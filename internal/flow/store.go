@@ -70,8 +70,23 @@ type ProjectStore interface {
 	ListProjects(ctx context.Context, org identity.OrgID, after identity.ProjectID, limit int) ([]ProjectRecord, error)
 }
 
-// Record is a row of flow. Soft delete columns are read here; the delete,
-// restore and purge operations belong to the retention cut (ADR-0077 section 4).
+// ActivationState says whether the automatic triggers of a flow accept events
+// (ADR-0024 section 1). It is separate from publication: publishing creates a
+// version, activating switches the triggers on.
+type ActivationState string
+
+// Activation states, the spelling the API exposes (ADR-0080 section 3).
+const (
+	// ActivationActive means the automatic triggers accept events.
+	ActivationActive ActivationState = "ACTIVE"
+	// ActivationInactive means no automatic trigger accepts events. It is the
+	// state of every new flow.
+	ActivationInactive ActivationState = "INACTIVE"
+)
+
+// Record is a row of flow. Soft delete columns are read here; the operations
+// that delete, restore and purge a flow belong to the trigger area, because
+// they switch the triggers off in the same transaction (ADR-0024 section 8).
 type Record struct {
 	ID            FlowID
 	OrgID         identity.OrgID
@@ -81,6 +96,9 @@ type Record struct {
 	DraftRevision int64
 	// ActiveVersionID is the zero value while nothing is published.
 	ActiveVersionID FlowVersionID
+	// ActivationState is [ActivationInactive] until the flow is activated.
+	// CreateFlow ignores it: a new flow is always inactive.
+	ActivationState ActivationState
 	// DeletedAt is the zero time while the flow is active.
 	DeletedAt time.Time
 	// DeletedByPrincipalID is the zero value unless a principal deleted the flow.

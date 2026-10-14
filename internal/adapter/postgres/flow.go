@@ -20,6 +20,7 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 		ID: fromPGUUID[flow.FlowID](row.ID), OrgID: fromPGUUID[identity.OrgID](row.OrgID), ProjectID: fromPGUUID[identity.ProjectID](row.ProjectID),
 		Name: row.Name, Draft: row.DraftDocument, DraftRevision: row.DraftRevision,
 		ActiveVersionID:      fromPGUUID[flow.FlowVersionID](row.ActiveFlowVersionID),
+		ActivationState:      flow.ActivationState(row.ActivationState),
 		DeletedAt:            instant(row.DeletedAt),
 		DeletedByPrincipalID: fromPGUUID[identity.PrincipalID](row.DeletedByPrincipalID),
 		CreatedAt:            instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),

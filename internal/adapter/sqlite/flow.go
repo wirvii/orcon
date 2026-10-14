@@ -35,6 +35,7 @@ func flowFrom(row *sqlcgen.GetFlowRow) (flow.Record, error) {
 	out.Name = row.Name
 	out.Draft = row.DraftDocument
 	out.DraftRevision = row.DraftRevision
+	out.ActivationState = flow.ActivationState(row.ActivationState)
 	out.DeletedAt = nullInstant(row.DeletedAt)
 	out.CreatedAt = instant(row.CreatedAt)
 	out.UpdatedAt = instant(row.UpdatedAt)

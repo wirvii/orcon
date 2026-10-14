@@ -222,6 +222,7 @@ type Flow struct {
 	DeletedByPrincipalID []byte
 	CreatedAt            int64
 	UpdatedAt            int64
+	ActivationState      string
 }
 
 type FlowDataOperation struct {
@@ -255,6 +256,22 @@ type FlowSnapshot struct {
 	Document       []byte
 	DocumentFormat string
 	CreatedAt      int64
+}
+
+type FlowTrigger struct {
+	ID                []byte
+	OrgID             []byte
+	FlowID            []byte
+	NodeID            string
+	Family            string
+	Type              string
+	ConfigurationHash string
+	FlowVersionID     []byte
+	Status            string
+	Health            string
+	LastError         sql.NullString
+	CreatedAt         int64
+	UpdatedAt         int64
 }
 
 type FlowVersion struct {
@@ -587,6 +604,45 @@ type Token struct {
 	SuspendReason             sql.NullString
 	CreatedAt                 int64
 	UpdatedAt                 int64
+}
+
+type TriggerAddress struct {
+	ID              []byte
+	OrgID           []byte
+	FlowTriggerID   []byte
+	Family          string
+	Scope           string
+	Pattern         string
+	StaticPrefix    string
+	Host            sql.NullString
+	RandomSuffix    sql.NullString
+	ResponseProfile string
+	Status          string
+	RetiredAt       sql.NullInt64
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
+type TriggerAddressMethod struct {
+	ID               []byte
+	OrgID            []byte
+	TriggerAddressID []byte
+	Method           string
+	CreatedAt        int64
+	UpdatedAt        int64
+}
+
+type TriggerEvent struct {
+	ID                 []byte
+	OrgID              []byte
+	OccurredAt         int64
+	FlowID             []byte
+	NodeID             sql.NullString
+	Type               string
+	SchemaVersion      int64
+	DataDocument       []byte
+	DataDocumentFormat string
+	CreatedAt          int64
 }
 
 type TriggerRate struct {
