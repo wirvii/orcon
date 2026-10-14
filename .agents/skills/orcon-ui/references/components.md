@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Components
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Components live in `@orcon/ui` (`packages/js/ui`). Values are never written here; they come from tokens ([tokens.md](tokens.md)).
 
@@ -61,7 +61,7 @@ Base components under owner review. Each one has a row in "Owner review status" 
 | Skeleton | Loading placeholder; `aria-hidden`; the region is `aria-busy` while loading. |
 | Spinner | Indeterminate indicator with a visually hidden label; static under reduced motion. |
 | EmptyState | Title, description, optional primary action, optional mascot slot (allowed contexts only, [foundations.md#mascot](foundations.md#mascot)). |
-| ErrorBoundary fallback | Error page content: what happened, what to do, retry and copyable request id; no mascot. |
+| ErrorBoundary fallback | Error page content: what happened, what to do, retry and copyable request id; the full-page variant shows the mascot "thinking", inline variants never do. |
 | Avatar | Image with initials fallback; `alt` is the person name; decorative when the name is adjacent. |
 | Kbd | Keyboard key; uses the mono font; platform-aware labels (Ctrl or Cmd) from the catalog. |
 | CodeBlock | Mono font, `surface.sunken`; copy button (copies only visible, non-redacted content); horizontal scroll inside the block. |
@@ -71,8 +71,9 @@ Base components under owner review. Each one has a row in "Owner review status" 
 | Separator | Decorative divider using `border.default`; `role="separator"` only when it separates interactive groups. |
 | ScrollArea | Radix ScrollArea; keyboard scrollable; focusable when it has no focusable children. |
 | ConnectorIcon | Orcon frame + `<img>` connector logo per [foundations.md#iconography](foundations.md#iconography). The only way to render connector SVGs. Variant `tile` renders the bare `<img>` without the inner frame, for the icon box of a canvas node. |
-| BrandMark (placeholder) | Neutral placeholder until the approved assets exist ([foundations.md#brand-mark](foundations.md#brand-mark)). |
-| Mascot (placeholder) | Neutral placeholder; allowed contexts only; lazy-loaded; decorative ([foundations.md#mascot](foundations.md#mascot)). |
+| BrandMark | Approved production lockup, light and dark ([foundations.md#brand-mark](foundations.md#brand-mark)). |
+| BrandHero | Sign-in brand block: descriptor lockup and the tagline as text ([foundations.md#brand-mark](foundations.md#brand-mark)). |
+| Mascot | Approved board cut-outs (welcome, happy, thinking); allowed contexts only; lazy-loaded; decorative ([foundations.md#mascot](foundations.md#mascot)). |
 | AppShell | Layout of [foundations.md#layout](foundations.md#layout): sidebar, rail, bottom navigation + drawer; landmarks `header`, `nav`, `main`; skip link to main content. |
 | TopBar | Product mark, search or command palette trigger, NotificationBell, user menu. |
 | NavItem | Icon + text; current item `aria-current="page"`; in the rail the text becomes the tooltip and accessible name. |
@@ -168,14 +169,14 @@ Screen templates live in `src/screens/`, use sample data fixtures and make no HT
 
 | Template | Content | Required viewports |
 |---|---|---|
-| S1 | Shell + welcome/onboarding (mascot "welcome", neutral placeholder) | Phone, desktop |
+| S1 | Shell + welcome/onboarding (mascot "welcome") | Phone, desktop |
 | S2 | Flow list (enable/disable a flow) | Phone, desktop |
 | S3 | Flow editor in style A (desktop/tablet): top bar, canvas, controls, minimap, node palette, node details view with three panes and the data panel; read-only canvas (phone); hosts the `Editor/Parity/*` stories | Desktop, tablet; phone read-only |
 | S4 | Execution list | Phone, desktop |
 | S5 | Execution detail: style A canvas with execution states, timeline, attempts per node, UNCERTAIN resolution panel, continue/retry/cancel | Phone, desktop |
 | S6 | Human attention inbox + notifications panel | Phone, desktop |
 | S7 | Approval page: tool, arguments or RedactedValue, approve / deny with reason / edit arguments, relative expiry with Intl, 409 with current outcome | Phone, desktop |
-| S8 | Empty states, 404 (mascot "explorer", neutral placeholder), error page (no mascot) | Phone, desktop |
+| S8 | Empty states (mascot "happy" on the first-run state only), 404 (mascot "thinking"), error page (mascot "thinking") | Phone, desktop |
 | S9 | Settings › Appearance and language (theme system/light/dark, density, language) | Phone, desktop |
 
 Every template is checked in light and dark, comfortable and compact, and the pseudo-locale, and passes the manual pass of [accessibility.md#manual-pass](accessibility.md#manual-pass).

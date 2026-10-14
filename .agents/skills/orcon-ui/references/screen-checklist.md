@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Screen checklist
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007
 
 Step-by-step procedure for every screen template in `@orcon/ui` (`src/screens/`) and every screen in `apps/web`. Copy the checklist into the pull request and tick each item. Each step links to the rule that governs it.
 
@@ -28,6 +28,6 @@ Step-by-step procedure for every screen template in `@orcon/ui` (`src/screens/`)
 - [ ] Protected data shows `RedactedValue`; copy never copies hidden values ([components.md#redaction](components.md#redaction)).
 - [ ] UNCERTAIN is never shown as failure or success and "repeat" is never the primary action ([components.md#status](components.md#status)).
 - [ ] Dates, numbers and relative times use Intl ([content-and-i18n.md#formatting](content-and-i18n.md#formatting)).
-- [ ] Mascot only in allowed contexts (never on error pages, security warnings, canvas or dense views) ([foundations.md#mascot](foundations.md#mascot)).
+- [ ] Mascot only in allowed contexts (sign-in and welcome, first-run empty states, full-page error screens; never inline errors, security warnings, toasts, help, canvas or dense views) ([foundations.md#mascot](foundations.md#mascot)).
 - [ ] Focus is never hidden by sticky UI; zoom to 200 % and reflow work ([accessibility.md#focus](accessibility.md#focus), [accessibility.md#manual-pass](accessibility.md#manual-pass)).
 - [ ] Comments, stories, commit messages and PR text use neutral contributor wording (no coding-agent product names, no AI authorship trailers).

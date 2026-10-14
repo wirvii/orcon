@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Design tokens
 
-Status: Accepted | Version: 1.1.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. The token source of truth is the package `@orcon/tokens` (`packages/js/tokens`); this document defines what that package contains and how code uses it.
 
