@@ -9,7 +9,7 @@
 name: Benchmarks
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
 permissions:
@@ -18,7 +18,7 @@ jobs:
   # The comparison needs the pull request base, body and labels. In the merge queue
   # the job is skipped, and a skipped job counts as passed for a required check.
   benchgate:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
