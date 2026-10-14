@@ -4,7 +4,7 @@ description: Applies the Orcon Go engineering standards - idiomatic Go (Effectiv
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with Go (two latest stable releases), GNU make, git and uv.
 metadata:
-  version: 1.1.2
+  version: 1.1.3
   pinned: true
   owner: wirvii
 ---

@@ -262,6 +262,8 @@ linters:
             - "!**/internal/adapter/sqlite/*_test.go"
             - "!**/internal/adapter/postgres/*_test.go"
             - "!**/cmd/**"
+            # AL-2.4 exception: code under test/** may import storetest and nothing else (approved by the owner).
+            - "!**/test/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/storetest
               desc: only cmd/orcon wires adapters (AL-8)
