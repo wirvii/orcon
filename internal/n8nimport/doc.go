@@ -35,7 +35,7 @@
 // reported with the node and the field, and the node is not mapped. The n8n
 // resource and operation pair becomes the single reserved parameter
 // operation, resource.verb (SPEC-003 amendment 8). HTTP Request nodes that
-// write are marked for review, and [CheckActivation] refuses a flow whose
+// write are marked for review, and [flow.CheckImportReview] refuses a flow whose
 // marked nodes were not reviewed.
 //
 // The package is an area: it reads files through io/fs and JSON through

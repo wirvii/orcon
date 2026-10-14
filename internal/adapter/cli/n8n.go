@@ -33,7 +33,7 @@ const (
 // N8n runs "orcon n8n <command>". The args exclude the word "n8n".
 func N8n(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
-		_, _ = fmt.Fprintln(stdout, "usage: orcon n8n coverage --corpus <dir> [--catalog core|planned|<file>] [flags]")
+		_, _ = fmt.Fprintln(stdout, "usage: orcon n8n coverage --corpus <dir> [--catalog installed|planned|core|<file>] [flags]")
 		if len(args) == 0 {
 			return exitUsage
 		}

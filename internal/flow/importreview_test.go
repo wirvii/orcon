@@ -78,10 +78,25 @@ func TestImportExtOnlyWhereDefined(t *testing.T) {
 	t.Run("not in the document ext", func(t *testing.T) {
 		doc := load(t, "linear")
 		doc.Ext = importExt(t, mark)
-		if report := flow.Validate(&doc); !report.HasErrors() {
-			t.Fatal("orcon.import in the document ext must fail")
+		report := flow.Validate(&doc)
+		if !hasCode(report, flow.CodeExt) {
+			t.Fatalf("orcon.import in the document ext must fail with %s: %v", flow.CodeExt, report.Errors())
 		}
 	})
+	for _, key := range []string{"orcon.importX", "orcon.Import", "orcon.import2", "Orcon.import", "orcon.imports"} {
+		t.Run("look-alike "+key, func(t *testing.T) {
+			doc := load(t, "linear")
+			v, err := jsonvalue.Parse([]byte(`{"` + key + `":` + mark + `}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc.Nodes[1].Ext = v
+			report := flow.Validate(&doc)
+			if !hasCode(report, flow.CodeExt) {
+				t.Fatalf("%s in a node must fail with %s: %v", key, flow.CodeExt, report.Errors())
+			}
+		})
+	}
 	t.Run("another reserved key still fails in a node", func(t *testing.T) {
 		doc := load(t, "linear")
 		v, err := jsonvalue.Parse([]byte(`{"orcon.mine":1}`))
@@ -89,15 +104,19 @@ func TestImportExtOnlyWhereDefined(t *testing.T) {
 			t.Fatal(err)
 		}
 		doc.Nodes[1].Ext = v
-		report := flow.Validate(&doc)
-		var found bool
-		for _, e := range report.Errors() {
-			found = found || e.Code == flow.CodeExt
-		}
-		if !found {
+		if report := flow.Validate(&doc); !hasCode(report, flow.CodeExt) {
 			t.Fatal("orcon.mine must fail with the EXT code")
 		}
 	})
+}
+
+func hasCode(report flow.Report, code string) bool {
+	for _, e := range report.Errors() {
+		if e.Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 func TestImportedNodesNeedReviewBeforeActivation(t *testing.T) {

@@ -165,7 +165,11 @@ func (r *Report) Markdown() string {
 	b.WriteString("A template is fully importable when every node maps, every operation it selects is in the catalog, no selector is an expression and every expression passes the analyzer of ADR-0018. An AI (LangChain) node counts as mapped only if the measured catalog maps it. Core nodes are counted at the type level: the translation of their parameters belongs to the cut that implements each node. Sticky notes are editor data and are not counted as nodes or types.\n\n")
 	b.WriteString("| Measure | Value |\n|---|---|\n")
 	row := func(name, value string) { fmt.Fprintf(&b, "| %s | %s |\n", name, value) }
-	row("Fully importable (release gate figure, unweighted)", pctStr(Pct(int64(c.Importable), int64(c.Templates)))+fmt.Sprintf(" (%d of %d)", c.Importable, c.Templates))
+	label := "Fully importable (release gate figure, unweighted)"
+	if r.Catalog != "installed" {
+		label = "Fully importable with the " + r.Catalog + " catalog (not a release figure, unweighted)"
+	}
+	row(label, pctStr(Pct(int64(c.Importable), int64(c.Templates)))+fmt.Sprintf(" (%d of %d)", c.Importable, c.Templates))
 	row("Fully importable, weighted by views (information only)", pctStr(Pct(c.ViewsImportable, c.Views)))
 	row("Templates without AI nodes", fmt.Sprintf("%d, of which %s importable", c.WithoutAI, pctStr(Pct(int64(c.WithoutAIImportable), int64(c.WithoutAI)))))
 	row("Templates with AI nodes", fmt.Sprintf("%d, of which %s importable", c.WithAI, pctStr(Pct(int64(c.WithAIImportable), int64(c.WithAI)))))

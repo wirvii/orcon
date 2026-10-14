@@ -12,13 +12,16 @@ import (
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
-// Inventory is the node-type list of one n8n release, as an extraction step
-// outside this repository writes it from the public node reference:
+// Inventory is the node-type list of one n8n release. The tool n8ncorpus writes
+// it next to the corpus from the nodes.json file that the n8n-nodes-base npm
+// package publishes (the list of node descriptions, in the version the pinned
+// n8n release depends on). Only the node name and the group are kept; no n8n
+// code or text is copied and nothing from n8n is run:
 //
 //	{"n8nVersion":"2.43.4","nodes":[{"type":"n8n-nodes-base.if","group":"CORE"}]}
 //
-// Group is CORE for the nodes the n8n documentation lists as core nodes.
-// Only type names are kept; no n8n source is involved.
+// Group is CORE for the nodes whose published category is the core nodes one,
+// and OTHER for the rest.
 type Inventory struct {
 	N8nVersion string
 	Nodes      []InventoryNode
