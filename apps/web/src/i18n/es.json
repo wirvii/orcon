@@ -269,7 +269,6 @@
   "flows.create.name": "Nombre",
   "flows.create.submit": "Crear y abrir",
   "flows.create.title": "Nuevo flujo",
-  "flows.list.column.name": "Nombre",
   "flows.list.column.state": "Estado",
   "flows.list.column.updated": "Último cambio",
   "flows.list.description": "Un flujo es un proceso formado por pasos. Los flujos nuevos empiezan inactivos.",

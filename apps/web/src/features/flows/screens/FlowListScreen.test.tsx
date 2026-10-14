@@ -25,6 +25,8 @@ describe('FlowListScreen', () => {
     server.use(...beforeFlows(), productApi.flows([]));
     renderRoute(address);
     expect(await screen.findByRole('heading', { name: 'No flows yet' })).toBeVisible();
+    // The first-run empty state shows the happy mascot (SPEC-018).
+    expect(document.querySelector('[data-mascot-pose="happy"]')).not.toBeNull();
   });
 
   it('error', async () => {
@@ -45,7 +47,7 @@ describe('FlowListScreen', () => {
     renderRoute(address);
     const name = await screen.findByRole('link', { name: 'Order notifications' });
     expect(name).toHaveAttribute('href', `/flows/${flow.id}`);
-    // The state is words, never color alone.
-    expect(screen.getByRole('cell', { name: 'Inactive' })).toBeVisible();
+    // The state is words, never color alone; on a phone the label precedes it.
+    expect(screen.getByText(/Inactive$/)).toBeVisible();
   });
 });

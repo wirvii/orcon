@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Button, Link, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@orcon/ui';
+import { Button, Link, Mascot, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link as RouterLink } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -65,7 +65,12 @@ export function ProjectListScreen() {
       <PageHeader title={intl.formatMessage(messages.title)} description={intl.formatMessage(messages.description)} actions={newProject} />
       <QueryState
         query={projects}
-        empty={{ title: intl.formatMessage(messages.emptyTitle), description: intl.formatMessage(messages.emptyDescription), action: newProject }}
+        empty={{
+          title: intl.formatMessage(messages.emptyTitle),
+          description: intl.formatMessage(messages.emptyDescription),
+          action: newProject,
+          illustration: <Mascot pose="happy" />,
+        }}
       >
         {(items) => (
           <Table>

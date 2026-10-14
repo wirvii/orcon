@@ -34,7 +34,13 @@ export interface QueryStateProps<TData> {
   /** True when the data holds nothing to show. Defaults to an empty array. */
   isEmpty?: ((data: TData) => boolean) | undefined;
   /** What an empty result says and, usually, the next step to take. */
-  empty: { title: string; description?: string | undefined; action?: ReactNode };
+  empty: {
+    title: string;
+    description?: string | undefined;
+    action?: ReactNode;
+    /** A decorative picture shown above the text on a first-run empty state (the mascot, SPEC-018). */
+    illustration?: ReactNode | undefined;
+  };
   /** Placeholder rows shown while loading. */
   skeletonRows?: number | undefined;
   /** The screen's content for loaded data. */
@@ -79,7 +85,14 @@ export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, skel
 
   const { data } = query;
   if (data === undefined || isEmpty(data)) {
-    return <EmptyState title={empty.title} description={empty.description} action={empty.action} />;
+    const state = <EmptyState title={empty.title} description={empty.description} action={empty.action} />;
+    if (empty.illustration === undefined) return state;
+    return (
+      <div className="flex flex-col items-center gap-2">
+        {empty.illustration}
+        {state}
+      </div>
+    );
   }
   return <>{children(data)}</>;
 }

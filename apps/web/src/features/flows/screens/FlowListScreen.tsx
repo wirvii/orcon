@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Button, Link, PageHeader, RelativeTime, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@orcon/ui';
+import { Button, Link, Mascot, PageHeader, RelativeTime } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link as RouterLink } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -26,7 +26,6 @@ const messages = defineMessages({
     defaultMessage: 'Create the first flow to open it in the editor.',
     description: 'Explains the empty flows list and the next step.',
   },
-  columnName: { id: 'flows.list.column.name', defaultMessage: 'Name', description: 'Column heading of the flow name, which opens the editor.' },
   columnState: { id: 'flows.list.column.state', defaultMessage: 'State', description: 'Column heading of whether the flow is active.' },
   columnUpdated: { id: 'flows.list.column.updated', defaultMessage: 'Last change', description: 'Column heading of when the flow last changed.' },
   active: { id: 'flows.list.state.active', defaultMessage: 'Active', description: 'State of a flow that runs when its triggers fire, shown as text.' },
@@ -61,35 +60,37 @@ export function FlowListScreen() {
       <PageHeader title={intl.formatMessage(messages.title)} description={intl.formatMessage(messages.description)} actions={newFlow} />
       <QueryState
         query={flows}
-        empty={{ title: intl.formatMessage(messages.emptyTitle), description: intl.formatMessage(messages.emptyDescription), action: newFlow }}
+        empty={{
+          title: intl.formatMessage(messages.emptyTitle),
+          description: intl.formatMessage(messages.emptyDescription),
+          action: newFlow,
+          illustration: <Mascot pose="happy" />,
+        }}
       >
         {(items) => (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{intl.formatMessage(messages.columnName)}</TableHead>
-                <TableHead>{intl.formatMessage(messages.columnState)}</TableHead>
-                <TableHead>{intl.formatMessage(messages.columnUpdated)}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((flow) => (
-                <TableRow key={flow.id}>
-                  <TableCell>
-                    <Link asChild>
-                      <RouterLink to="/flows/$flowId" params={{ flowId: flow.id }}>
-                        {flow.name}
-                      </RouterLink>
-                    </Link>
-                  </TableCell>
-                  <TableCell>{intl.formatMessage(flow.activationState === 'ACTIVE' ? messages.active : messages.inactive)}</TableCell>
-                  <TableCell>
-                    <RelativeTime value={flow.updatedAt} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          // A row on a computer, a card on a phone: the same markup, laid out by the width. The labels of the
+          // columns show only on a phone, where the card has no column heads.
+          <ul className="border-border flex flex-col rounded-lg border">
+            {items.map((flow) => (
+              <li key={flow.id} className="border-border flex flex-col gap-1 border-b p-4 last:border-b-0 md:grid md:grid-cols-3 md:items-center md:gap-4">
+                <span className="font-medium wrap-anywhere">
+                  <Link asChild>
+                    <RouterLink to="/flows/$flowId" params={{ flowId: flow.id }}>
+                      {flow.name}
+                    </RouterLink>
+                  </Link>
+                </span>
+                <span>
+                  <span className="text-fg-muted md:hidden">{intl.formatMessage(messages.columnState)}: </span>
+                  {intl.formatMessage(flow.activationState === 'ACTIVE' ? messages.active : messages.inactive)}
+                </span>
+                <span className="text-fg-muted">
+                  <span className="md:hidden">{intl.formatMessage(messages.columnUpdated)}: </span>
+                  <RelativeTime value={flow.updatedAt} />
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </QueryState>
       <CreateFlowDialog open={creating} onOpenChange={setCreating} orgId={organization.id} projectId={project.id} />
