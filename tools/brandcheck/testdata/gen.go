@@ -59,6 +59,24 @@ func main() {
 	// Partial-alpha edge pixels may carry a de-contaminated color.
 	write(dir, "mascot-soft-edge.png", encode(softEdge(good)))
 
+	// A redraw hidden behind almost-opaque black: most pixels have alpha 254.
+	write(dir, "mascot-semi-redraw.png", encode(semiRedraw(good)))
+
+	write(dir, "mascot-16bit.png", encode(to16(good, func(v uint8) uint16 { return uint16(v) * 257 }, 0xffff)))
+	write(dir, "mascot-16bit-shifted.png", encode(to16(good, func(v uint8) uint16 { return uint16(v) << 8 }, 0xffff)))
+	write(dir, "mascot-16bit-alpha.png", encode(to16(good, func(v uint8) uint16 { return uint16(v) * 257 }, 0xff00)))
+
+	// Palette image whose transparency comes from a tRNS chunk.
+	pal := image.NewPaletted(image.Rect(0, 0, regionW, regionH), color.Palette{color.NRGBA{}, board.NRGBAAt(regionX+regionW/2, regionY+regionH/2)})
+	for y := range regionH {
+		for x := range regionW {
+			if good.NRGBAAt(x, y).A == 255 {
+				pal.SetColorIndex(x, y, 1)
+			}
+		}
+	}
+	write(dir, "mascot-palette-trns.png", encode(pal))
+
 	gray := image.NewGray(image.Rect(0, 0, regionW, regionH))
 	write(dir, "mascot-no-alpha.png", encode(gray))
 
@@ -102,7 +120,8 @@ func cutOut(board *image.NRGBA, radius float64) *image.NRGBA {
 }
 
 // softEdge marks the opaque pixels that touch a transparent one as half
-// transparent with a different color, as a background-removal step would.
+// transparent, as an anti-aliased background removal would. The color stays the
+// board's: a cut-out never recolors a visible pixel.
 func softEdge(src *image.NRGBA) *image.NRGBA {
 	out := cloneNRGBA(src)
 	b := src.Bounds()
@@ -113,9 +132,40 @@ func softEdge(src *image.NRGBA) *image.NRGBA {
 			}
 			for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
 				if image.Pt(x+d[0], y+d[1]).In(b) && src.NRGBAAt(x+d[0], y+d[1]).A == 0 {
-					out.SetNRGBA(x, y, color.NRGBA{R: 1, G: 2, B: 3, A: 128})
+					c := src.NRGBAAt(x, y)
+					c.A = 128
+					out.SetNRGBA(x, y, c)
 					break
 				}
+			}
+		}
+	}
+	return out
+}
+
+// semiRedraw keeps the first columns of the disc and replaces the rest with
+// black at alpha 254.
+func semiRedraw(good *image.NRGBA) *image.NRGBA {
+	out := cloneNRGBA(good)
+	for y := range regionH {
+		for x := 12; x < regionW; x++ {
+			if good.NRGBAAt(x, y).A == 255 {
+				out.SetNRGBA(x, y, color.NRGBA{A: 254})
+			}
+		}
+	}
+	return out
+}
+
+// to16 re-encodes the opaque pixels of src as 16-bit RGBA, widening each
+// channel with widen and using the given alpha.
+func to16(src *image.NRGBA, widen func(uint8) uint16, alpha uint16) *image.NRGBA64 {
+	out := image.NewNRGBA64(src.Bounds())
+	b := src.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if c := src.NRGBAAt(x, y); c.A == 255 {
+				out.SetNRGBA64(x, y, color.NRGBA64{R: widen(c.R), G: widen(c.G), B: widen(c.B), A: alpha})
 			}
 		}
 	}

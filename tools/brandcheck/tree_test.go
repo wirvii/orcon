@@ -137,9 +137,26 @@ func TestMascotOpaquePixelsComeFromBoard(t *testing.T) {
 	}{
 		{name: "board pixels over a transparent background", fixture: "raster/mascot-good.png"},
 		{name: "soft edge pixels may change color", fixture: "raster/mascot-soft-edge.png"},
+		{name: "16-bit RGBA widened exactly (v*257)", fixture: "raster/mascot-16bit.png"},
+		{
+			name: "redraw hidden behind alpha 254", fixture: "raster/mascot-semi-redraw.png",
+			want: []want{{ruleMascot, mascotPath, "158 visible pixels (alpha > 0) differ from the board crop"}},
+		},
+		{
+			name: "16-bit channels shifted instead of widened", fixture: "raster/mascot-16bit-shifted.png",
+			want: []want{{ruleMascot, mascotPath, "visible pixels (alpha > 0) differ from the board crop"}},
+		},
+		{
+			name: "16-bit alpha 0xff00 is not opaque", fixture: "raster/mascot-16bit-alpha.png",
+			want: []want{{ruleMascot, mascotPath, "0.0% of the pixels are fully opaque"}},
+		},
+		{
+			name: "palette image with tRNS", fixture: "raster/mascot-palette-trns.png",
+			want: []want{{ruleMascot, mascotPath, "PNG color type 3: cut-outs must be RGBA"}},
+		},
 		{
 			name: "one opaque pixel was redrawn", fixture: "raster/mascot-bad-pixel.png",
-			want: []want{{ruleMascot, mascotPath, "1 opaque pixels differ from the board crop"}},
+			want: []want{{ruleMascot, mascotPath, "1 visible pixels (alpha > 0) differ from the board crop"}},
 		},
 		{
 			name: "wrong size is not a crop of the region", fixture: "raster/mascot-wrong-size.png",
@@ -147,7 +164,7 @@ func TestMascotOpaquePixelsComeFromBoard(t *testing.T) {
 		},
 		{
 			name: "no alpha channel", fixture: "raster/mascot-no-alpha.png",
-			want: []want{{ruleMascot, mascotPath, "has no alpha channel"}},
+			want: []want{{ruleMascot, mascotPath, "PNG color type 0"}},
 		},
 		{
 			name: "region outside the board", fixture: "raster/mascot-good.png",
@@ -163,7 +180,7 @@ func TestMascotOpaquePixelsComeFromBoard(t *testing.T) {
 				tr.asset(mascotPath).Source.Region = []int{regionX + 1, regionY, regionW, regionH}
 				tr.saveManifest()
 			},
-			want: []want{{ruleMascot, mascotPath, "opaque pixels differ from the board crop"}},
+			want: []want{{ruleMascot, mascotPath, "visible pixels (alpha > 0) differ from the board crop"}},
 		},
 		{
 			name: "not a PNG", fixture: "raster/icon-16-32.ico",
@@ -195,11 +212,11 @@ func TestMascotCornersTransparent(t *testing.T) {
 		{name: "all four corners transparent", fixture: "raster/mascot-good.png"},
 		{
 			name: "an opaque board pixel in a corner", fixture: "raster/mascot-opaque-corner.png",
-			want: []want{{ruleMascot, mascotPath, "corner (0,0) has alpha 255"}},
+			want: []want{{ruleMascot, mascotPath, "corner (0,0) has alpha 65535"}},
 		},
 		{
 			name: "too few opaque pixels", fixture: "raster/mascot-sparse.png",
-			want: []want{{ruleMascot, mascotPath, "of the pixels are opaque, want at least 20%"}},
+			want: []want{{ruleMascot, mascotPath, "of the pixels are fully opaque, want at least 20%"}},
 		},
 		{
 			name: "file over the size limit", fixture: "raster/mascot-good.png",
@@ -515,6 +532,20 @@ func TestManifestMustBeWellFormed(t *testing.T) {
 			if !strings.Contains(render(got), tc.sub) {
 				t.Errorf("findings:\n%swant one containing %q", render(got), tc.sub)
 			}
+		})
+	}
+}
+
+func TestMascotRejectsColorManagementChunks(t *testing.T) {
+	t.Parallel()
+	for _, chunk := range []string{"gAMA", "iCCP", "sRGB", "cHRM", "cICP"} {
+		t.Run(chunk, func(t *testing.T) {
+			t.Parallel()
+			tr := goodTree(t)
+			managed := injectChunk(t, readFixture(t, "raster/mascot-good.png"), chunk, []byte{0, 0, 0x4e, 0x20})
+			tr.put(mascotPath, managed)
+			tr.put(mascotCopy, managed)
+			requireExactly(t, tr.check(), want{ruleMascot, mascotPath, "carries a " + chunk + " chunk"})
 		})
 	}
 }

@@ -4,8 +4,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"strings"
@@ -242,3 +245,20 @@ func goodTree(t *testing.T) *tree {
 // Region of the synthetic board that the mascot fixtures are cut from; it is
 // the one tools/brandcheck/testdata/gen.go uses.
 const regionX, regionY, regionW, regionH = 8, 6, 24, 20
+
+// injectChunk returns png with an extra chunk right after IHDR, with a valid CRC.
+func injectChunk(t *testing.T, png []byte, kind string, body []byte) []byte {
+	t.Helper()
+	const afterIHDR = 8 + 12 + 13 // signature, IHDR length+type+crc, IHDR body
+	var chunk bytes.Buffer
+	_ = binary.Write(&chunk, binary.BigEndian, uint32(len(body))) // a bytes.Buffer never fails
+	chunk.WriteString(kind)
+	chunk.Write(body)
+	sum := crc32.NewIEEE()
+	sum.Write([]byte(kind))
+	sum.Write(body)
+	_ = binary.Write(&chunk, binary.BigEndian, sum.Sum32())
+	out := append([]byte(nil), png[:afterIHDR]...)
+	out = append(out, chunk.Bytes()...)
+	return append(out, png[afterIHDR:]...)
+}
