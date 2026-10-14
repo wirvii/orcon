@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/platform/clock"
 )
@@ -65,6 +67,9 @@ type Store struct {
 	opts  Options
 	clock clock.Clock
 	pool  *pgxpool.Pool
+
+	// rule routes the events the engine functions append to the outbox.
+	rule atomic.Pointer[store.OutboxRule]
 
 	// mu orders Close after the operations in flight: every operation holds a
 	// read lock for its whole duration, Close takes the write lock.
@@ -249,6 +254,23 @@ func assertFreshSession(ctx context.Context, tx pgx.Tx) error {
 	}
 	if orgContext != "" {
 		return fmt.Errorf("%w: the organization context is %q at the start of a transaction, want empty", ErrSession, orgContext)
+	}
+	return nil
+}
+
+// RouteEvents implements [store.EventRouter].
+func (s *Store) RouteEvents(rule store.OutboxRule) {
+	if rule == nil {
+		s.rule.Store(nil)
+		return
+	}
+	s.rule.Store(&rule)
+}
+
+// outboxRule returns the rule in force, nil when none is.
+func (s *Store) outboxRule() store.OutboxRule {
+	if r := s.rule.Load(); r != nil {
+		return *r
 	}
 	return nil
 }

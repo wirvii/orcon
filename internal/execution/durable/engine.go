@@ -48,6 +48,9 @@ func New(cfg *Config, st Store, revisions Revisions, reader DocumentReader, deps
 		cfg: *cfg, store: st, plans: NewPlans(revisions, reader, limits), interp: execution.NewInterpreter(deps),
 		leases: newLeaseTable(cfg.LeaseTTL), wake: make(chan struct{}, cfg.Concurrency), meta: make(map[store.ExecutionID]*store.Execution),
 	}
+	if router, ok := st.(store.EventRouter); ok {
+		router.RouteEvents(cfg.Outbox)
+	}
 	return e, nil
 }
 
@@ -112,12 +115,8 @@ func (e *Engine) Start(ctx context.Context, r StartRequest) (store.ExecutionID, 
 			return fmt.Errorf("insert execution: %w", err)
 		}
 		created := execution.Event{Type: "execution.created", Execution: executionText(execID)}
-		row, err := eventRow(r.OrgID, ex, &created, now, e.cfg.IDs)
-		if err != nil {
+		if err := e.appendEvent(ctx, tx, ex, &created, now); err != nil {
 			return err
-		}
-		if _, err := tx.AppendEvent(ctx, row); err != nil {
-			return fmt.Errorf("append event execution.created: %w", err)
 		}
 		_, err = e.apply(ctx, tx, &applyInput{exec: ex, plan: plan, delta: &delta, revision: 0, now: now})
 		return err

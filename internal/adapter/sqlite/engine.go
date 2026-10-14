@@ -345,24 +345,43 @@ func eventDocument(kv ...any) []byte {
 	return out
 }
 
-// appendRecoveryEvent appends an event of the engine plane to an execution.
-func appendRecoveryEvent(ctx context.Context, q *sqlcgen.Queries, exec *sqlcgen.GetExecutionRow, typ string, eventID id.UUID, ref, data []byte, now time.Time) error {
+// appendRecoveryEvent appends an event of the engine plane to an execution and
+// applies the outbox rule to it in the same writer job.
+func appendRecoveryEvent(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, exec *sqlcgen.GetExecutionRow, ev *execution.Event, eventID id.UUID, ref, data []byte, now time.Time) error {
 	p := sqlcgen.AppendExecutionEventParams{
 		ID: uuidBytes(eventID), OrgID: exec.OrgID, ExecutionID: exec.ID, RootExecutionID: exec.RootExecutionID,
-		OccurredAt: micros(now), Type: typ, SchemaVersion: 1, ReferenceDocument: ref, DataDocument: data, CreatedAt: micros(now),
+		OccurredAt: micros(now), Type: string(ev.Type), SchemaVersion: 1, ReferenceDocument: ref, DataDocument: data, CreatedAt: micros(now),
 	}
 	if data != nil {
 		p.DataDocumentFormat = sql.NullString{String: "orcon/event-data@1", Valid: true}
 	}
-	_, err := q.AppendExecutionEvent(ctx, p)
-	return err
+	seq, err := q.AppendExecutionEvent(ctx, p)
+	if err != nil || rule == nil {
+		return err
+	}
+	var d decode
+	org := uuidField[identity.OrgID](&d, exec.OrgID)
+	execID := uuidField[store.ExecutionID](&d, exec.ID)
+	if d.err != nil {
+		return d.err
+	}
+	ev.Execution = execution.ID(id.UUID(execID).String())
+	ev.Sequence = int(seq)
+	topic, payload, ok := rule(org, execID, *ev)
+	if !ok {
+		return nil
+	}
+	return q.InsertOutbox(ctx, sqlcgen.InsertOutboxParams{
+		ID: uuidBytes(id.UUID(store.OutboxRowID(store.EventID(eventID)))), OrgID: exec.OrgID, Topic: topic, PayloadDocument: payload,
+		CreatedAt: micros(now), UpdatedAt: micros(now),
+	})
 }
 
 // refreshExecution recomputes the counters of an execution and applies the
 // status moves that follow from them (ADR-0009 section 1): RUNNING or WAITING
 // to SUSPENDED when only suspended tokens are left, WAITING or SUSPENDED to
 // RUNNING when work is runnable again.
-func refreshExecution(ctx context.Context, q *sqlcgen.Queries, org, exec []byte, now time.Time) error {
+func refreshExecution(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, org, exec []byte, now time.Time) error {
 	if err := q.UpdateExecutionCounters(ctx, micros(now), org, exec); err != nil {
 		return err
 	}
@@ -392,11 +411,11 @@ func refreshExecution(ctx context.Context, q *sqlcgen.Queries, org, exec []byte,
 		return err
 	}
 	evID := id.Derive("event", typ, execID.String(), row.Status, stamp(now))
-	return appendRecoveryEvent(ctx, q, &row, typ, evID, []byte("{}"), nil, now)
+	return appendRecoveryEvent(ctx, q, rule, &row, &execution.Event{Type: execution.EventType(typ)}, evID, []byte("{}"), nil, now)
 }
 
 // startExecution starts a queued execution on the claim of its first token.
-func startExecution(ctx context.Context, q *sqlcgen.Queries, org, exec []byte, now time.Time) error {
+func startExecution(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, org, exec []byte, now time.Time) error {
 	n, err := q.UpdateStartedExecution(ctx, micros(now), org, exec)
 	if err != nil || n == 0 {
 		return err
@@ -409,14 +428,14 @@ func startExecution(ctx context.Context, q *sqlcgen.Queries, org, exec []byte, n
 	if err != nil {
 		return err
 	}
-	return appendRecoveryEvent(ctx, q, &row, "execution.started", id.Derive("event", "execution.started", execID.String()), []byte("{}"), nil, now)
+	return appendRecoveryEvent(ctx, q, rule, &row, &execution.Event{Type: execution.EventExecutionStarted}, id.Derive("event", "execution.started", execID.String()), []byte("{}"), nil, now)
 }
 
 // afterAbandon finishes the release of tokens an update statement moved: the
 // attempts of their node executions, the events, the attention request of a
 // poisoned token and the counters of the executions, all in the writer job of
 // the update (ADR-0013 sections 4 and 9).
-func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rows []abandoned, now time.Time) ([]store.Reaped, error) {
+func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rule store.OutboxRule, rows []abandoned, now time.Time) ([]store.Reaped, error) {
 	out := make([]store.Reaped, 0, len(rows))
 	for i := range rows {
 		a := &rows[i]
@@ -439,11 +458,16 @@ func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rows []abandoned, now
 		epoch := strconv.FormatInt(a.epoch, 10)
 		ref := eventDocument("tokenId", tokenText, "nodeId", a.node)
 		data := eventDocument("abandonedCount", a.count)
-		if err := appendRecoveryEvent(ctx, q, &exec, "lease.expired", id.Derive("event", "lease.expired", tokenText, epoch), ref, data, now); err != nil {
+		tokenEvent := execution.Event{Token: execution.TokenID(tokenText), Node: flow.NodeID(a.node)}
+		expired := tokenEvent
+		expired.Type = execution.EventType("lease.expired")
+		if err := appendRecoveryEvent(ctx, q, rule, &exec, &expired, id.Derive("event", "lease.expired", tokenText, epoch), ref, data, now); err != nil {
 			return nil, err
 		}
 		if a.poisoned {
-			if err := appendRecoveryEvent(ctx, q, &exec, "token.poisoned", id.Derive("event", "token.poisoned", tokenText, epoch), ref, data, now); err != nil {
+			poisoned := tokenEvent
+			poisoned.Type = execution.EventType("token.poisoned")
+			if err := appendRecoveryEvent(ctx, q, rule, &exec, &poisoned, id.Derive("event", "token.poisoned", tokenText, epoch), ref, data, now); err != nil {
 				return nil, err
 			}
 			err := q.InsertAttentionRequest(ctx, sqlcgen.InsertAttentionRequestParams{
@@ -456,7 +480,7 @@ func afterAbandon(ctx context.Context, q *sqlcgen.Queries, rows []abandoned, now
 				return nil, err
 			}
 		}
-		if err := refreshExecution(ctx, q, a.org, a.execution, now); err != nil {
+		if err := refreshExecution(ctx, q, rule, a.org, a.execution, now); err != nil {
 			return nil, err
 		}
 		out = append(out, reaped)
@@ -477,7 +501,7 @@ func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThres
 		for i, r := range rows {
 			moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 		}
-		out, err = afterAbandon(ctx, q, moved, now)
+		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, now)
 		return err
 	})
 	return out, err
@@ -499,7 +523,7 @@ func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.Worker
 			for i, r := range rows {
 				moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 			}
-			page, err := afterAbandon(ctx, q, moved, now)
+			page, err := afterAbandon(ctx, q, s.outboxRule(), moved, now)
 			if err != nil {
 				return err
 			}
@@ -528,7 +552,7 @@ func (s *Store) ReleaseTokenLease(ctx context.Context, f store.Fence, poisonThre
 		for i, r := range rows {
 			moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 		}
-		out, err = afterAbandon(ctx, q, moved, now)
+		out, err = afterAbandon(ctx, q, s.outboxRule(), moved, now)
 		return err
 	})
 	if err != nil || len(out) == 0 {
@@ -557,7 +581,7 @@ func (s *Store) releaseAllLeases(ctx context.Context) (int, error) {
 			for i, r := range rows {
 				moved[i] = abandoned{org: r.OrgID, token: r.ID, execution: r.ExecutionID, count: r.AbandonedCount, epoch: r.LeaseEpoch, node: r.NodeID, poisoned: r.Column7 == 1}
 			}
-			if _, err := afterAbandon(ctx, q, moved, now); err != nil {
+			if _, err := afterAbandon(ctx, q, s.outboxRule(), moved, now); err != nil {
 				return err
 			}
 			n += len(rows)
@@ -600,11 +624,12 @@ func (s *Store) FireDueTimers(ctx context.Context, limit int, _ time.Time) ([]st
 			}
 			ref := eventDocument("tokenId", id.UUID(ft.TokenID).String())
 			data := eventDocument("timerId", id.UUID(ft.TimerID).String(), "kind", ft.Kind)
-			if err := appendRecoveryEvent(ctx, q, &exec, "timer.fired", id.Derive("event", "timer.fired", id.UUID(ft.TimerID).String()), ref, data, now); err != nil {
+			fired := execution.Event{Type: execution.EventType("timer.fired"), Token: execution.TokenID(id.UUID(ft.TokenID).String()), Detail: ft.Kind}
+			if err := appendRecoveryEvent(ctx, q, s.outboxRule(), &exec, &fired, id.Derive("event", "timer.fired", id.UUID(ft.TimerID).String()), ref, data, now); err != nil {
 				return err
 			}
 			if woken == 1 {
-				if err := refreshExecution(ctx, q, rows[i].OrgID, rows[i].ExecutionID, now); err != nil {
+				if err := refreshExecution(ctx, q, s.outboxRule(), rows[i].OrgID, rows[i].ExecutionID, now); err != nil {
 					return err
 				}
 			}

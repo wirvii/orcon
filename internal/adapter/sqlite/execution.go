@@ -620,7 +620,7 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 			if d.err != nil {
 				return d.err
 			}
-			if err := startExecution(ctx, q, row.OrgID, row.ExecutionID, now); err != nil {
+			if err := startExecution(ctx, q, s.outboxRule(), row.OrgID, row.ExecutionID, now); err != nil {
 				return err
 			}
 		}

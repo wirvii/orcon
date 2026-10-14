@@ -324,6 +324,8 @@ func engineCalls() []dbrules.EngineCall {
 		{Name: "release_expired_leases", SQL: "SELECT org_id FROM orcon_engine.release_expired_leases(10, 3, now())"},
 		{Name: "release_worker_leases", SQL: "SELECT org_id FROM orcon_engine.release_worker_leases(" + worker + ", 3, now())"},
 		{Name: "release_token_lease", SQL: "SELECT org_id FROM orcon_engine.release_token_lease(" + worker + ", 1, " + worker + ", 3, now())"},
+		{Name: "appended_events", List: true, SQL: "SELECT org_id FROM orcon_engine.appended_events()"},
+		{Name: "enqueue_outbox", SQL: "SELECT orcon_engine.enqueue_outbox(" + worker + ", " + worker + ", 't', 'x'::bytea, now())"},
 		{Name: "fire_due_timers", List: true, SQL: "SELECT org_id FROM orcon_engine.fire_due_timers(10, now())"},
 		{Name: "claim_outbox", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_outbox(" + worker + ", 10, 1000, now())"},
 		{Name: "resolve_wait_secret", SQL: "SELECT org_id FROM orcon_engine.resolve_wait_secret(" + worker + ")"},

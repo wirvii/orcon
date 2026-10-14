@@ -332,6 +332,24 @@ type Wait struct {
 	CreatedAt  time.Time
 }
 
+// OutboxRule decides which events leave the database and where to: it returns
+// the topic and payload of the row to insert in the transaction that persists
+// the event, or false for an event that stays inside (ADR-0013 section 8).
+type OutboxRule func(org identity.OrgID, execution ExecutionID, e execution.Event) (topic string, payload []byte, ok bool)
+
+// EventRouter is implemented by stores that append events themselves, in the
+// same transaction as the state change they make (claiming, reaping, firing
+// timers): they apply the rule to each such event, so that every event goes
+// through the same outbox rule as the ones the engine appends. A nil rule
+// publishes nothing.
+type EventRouter interface {
+	RouteEvents(rule OutboxRule)
+}
+
+// OutboxRowID is the identity of the outbox row of an event: derived from the
+// event, so that appending the same event twice cannot publish it twice.
+func OutboxRowID(event EventID) OutboxID { return OutboxID(id.Derive("outbox", event.String())) }
+
 // OutboxRow is a row of outbox.
 type OutboxRow struct {
 	ID        OutboxID

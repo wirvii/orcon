@@ -63,10 +63,8 @@ type Deliverer interface {
 	Deliver(ctx context.Context, d Delivery) error
 }
 
-// OutboxRule decides which events leave the database and where to: it returns
-// the topic and payload of the row to insert in the transaction that persists
-// the event, or false for an event that stays inside (ADR-0013 section 8).
-type OutboxRule func(org identity.OrgID, execution store.ExecutionID, e execution.Event) (topic string, payload []byte, ok bool)
+// OutboxRule decides which events leave the database; see [store.OutboxRule].
+type OutboxRule = store.OutboxRule
 
 // Point names a moment of a step at which a fault test can act.
 type Point string

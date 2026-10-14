@@ -106,7 +106,34 @@ BEGIN
           CASE WHEN p_data IS NULL THEN NULL ELSE convert_to(p_data, 'UTF8') END,
           CASE WHEN p_data IS NULL THEN NULL ELSE 'orcon/event-data@1' END, p_now)
   ON CONFLICT (id) DO NOTHING;
+  IF FOUND THEN
+    -- The ids of the events this transaction appended, for orcon_engine.appended_events: the outbox rule lives in
+    -- the application, so the caller reads them back and routes them in the same transaction (ADR-0013 section 8).
+    PERFORM set_config('orcon.appended_events', COALESCE(current_setting('orcon.appended_events', true), '') || p_id::text || ',', true);
+  END IF;
 END
+$$;
+
+-- The events appended by the functions of this schema in the current transaction, in the order of their rows.
+CREATE FUNCTION orcon_engine.appended_events()
+RETURNS TABLE (org_id uuid, execution_id uuid, id uuid, type text, reference_document bytea, sequence_number bigint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+  SELECT v.org_id, v.execution_id, v.id, v.type, v.reference_document, v.sequence_number
+  FROM execution_event v
+  WHERE v.id = ANY (string_to_array(trim(trailing ',' FROM COALESCE(current_setting('orcon.appended_events', true), '')), ',')::uuid[])
+  ORDER BY v.org_id, v.execution_id, v.sequence_number;
+$$;
+
+-- Inserts the outbox row of an event the application chose to publish. The id is derived from the event, so the
+-- same event cannot be published twice.
+CREATE FUNCTION orcon_engine.enqueue_outbox(p_org_id uuid, p_id uuid, p_topic text, p_payload bytea, p_now timestamptz)
+RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = orcon_engine, public AS
+$$
+  INSERT INTO outbox (id, org_id, topic, payload_document, payload_document_format, attempt_count, created_at, updated_at)
+  VALUES (p_id, p_org_id, p_topic, p_payload, 'orcon/outbox-payload@1', 0, p_now, p_now)
+  ON CONFLICT (id) DO NOTHING;
 $$;
 
 -- Recomputes the token counters of an execution from its live tokens and applies the status moves that follow from
@@ -443,6 +470,12 @@ REVOKE ALL ON FUNCTION orcon_engine.derive_uuid(text[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.derive_uuid(text[]) TO orcon_application;
 ALTER FUNCTION orcon_engine.append_event(uuid, uuid, uuid, text, text, text, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.append_event(uuid, uuid, uuid, text, text, text, timestamptz) FROM PUBLIC;
+ALTER FUNCTION orcon_engine.appended_events() OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.appended_events() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.appended_events() TO orcon_application;
+ALTER FUNCTION orcon_engine.enqueue_outbox(uuid, uuid, text, bytea, timestamptz) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.enqueue_outbox(uuid, uuid, text, bytea, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION orcon_engine.enqueue_outbox(uuid, uuid, text, bytea, timestamptz) TO orcon_application;
 ALTER FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) OWNER TO orcon_engine;
 REVOKE ALL ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.refresh_execution(uuid, uuid, timestamptz) TO orcon_application;

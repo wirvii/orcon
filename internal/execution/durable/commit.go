@@ -349,27 +349,14 @@ func (e *Engine) writeEnvs(ctx context.Context, tx store.Tx, a *applyInput) erro
 }
 
 func (e *Engine) writeEvents(ctx context.Context, tx store.Tx, a *applyInput) error {
-	org, ex, now := a.exec.OrgID, a.exec, a.now
+	ex, now := a.exec, a.now
 	for i := range a.delta.Events {
 		ev := &a.delta.Events[i]
 		if !persisted(a.plan, ev) {
 			continue
 		}
-		row, err := eventRow(org, ex, ev, now, e.cfg.IDs)
-		if err != nil {
+		if err := e.appendEvent(ctx, tx, ex, ev, now); err != nil {
 			return err
-		}
-		if _, err := tx.AppendEvent(ctx, row); err != nil {
-			return fmt.Errorf("append event %s: %w", ev.Type, err)
-		}
-		if e.cfg.Outbox == nil {
-			continue
-		}
-		if topic, payload, ok := e.cfg.Outbox(org, ex.ID, *ev); ok {
-			err := tx.InsertOutbox(ctx, store.OutboxRow{ID: store.OutboxID(e.cfg.IDs.New()), OrgID: org, Topic: topic, Payload: payload, CreatedAt: now})
-			if err != nil {
-				return fmt.Errorf("insert outbox row of %s: %w", ev.Type, err)
-			}
 		}
 	}
 	return nil
@@ -412,4 +399,28 @@ func persisted(plan *execution.Plan, e *execution.Event) bool {
 		return plan.IsJoin(e.Node)
 	}
 	return true
+}
+
+// appendEvent stores an event and, when the outbox rule publishes it, its outbox
+// row, in the transaction of the state change that produced it. Every event the
+// engine appends goes through here; the events the store appends itself go
+// through the same rule (see [store.EventRouter]).
+func (e *Engine) appendEvent(ctx context.Context, tx store.Tx, ex *store.Execution, ev *execution.Event, now time.Time) error {
+	row, err := eventRow(ex.OrgID, ex, ev, now, e.cfg.IDs)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.AppendEvent(ctx, row); err != nil {
+		return fmt.Errorf("append event %s: %w", ev.Type, err)
+	}
+	if e.cfg.Outbox == nil {
+		return nil
+	}
+	if topic, payload, ok := e.cfg.Outbox(ex.OrgID, ex.ID, *ev); ok {
+		err := tx.InsertOutbox(ctx, store.OutboxRow{ID: store.OutboxRowID(row.ID), OrgID: ex.OrgID, Topic: topic, Payload: payload, CreatedAt: now})
+		if err != nil {
+			return fmt.Errorf("insert outbox row of %s: %w", ev.Type, err)
+		}
+	}
+	return nil
 }
