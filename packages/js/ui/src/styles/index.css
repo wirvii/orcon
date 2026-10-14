@@ -65,13 +65,13 @@
 }
 
 /*
- * A menu, a select list or a popover opened from inside a dialog or a sheet must sit above it. Radix
+ * A select list, a menu or a popover opened from inside a dialog or a sheet must sit above it. Radix
  * gives the wrapper of floating content the layer of the content (dropdown, 20), which is under the
- * scrim (30) and the modal panel (40), so a list opened in a dialog would open behind it. The wrapper
- * takes the modal layer instead: floating content is portaled to the end of the page, so at the same
- * layer it is drawn over the dialog that was already open.
+ * scrim (30) and the modal panel (40), so a list opened in a dialog would open behind it. These
+ * wrappers take the modal layer instead: floating content is portaled to the end of the page, so at the
+ * same layer it is drawn over the dialog that was already open. Tooltips keep their own layer.
  */
-[data-radix-popper-content-wrapper] {
+[data-radix-popper-content-wrapper]:has(> [role='listbox'], > [role='menu'], > [role='dialog']) {
   z-index: var(--orcon-z-modal) !important;
 }
 
