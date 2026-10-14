@@ -125,10 +125,10 @@ func TestSVGRequiresViewBoxAndShapes(t *testing.T) {
 
 func TestSVGRejectsOversizedFile(t *testing.T) {
 	t.Parallel()
-	const head = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><path d=\"M0 0h10v10z\"/><!--"
-	const tail = "--></svg>"
+	const head = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><path d=\"M0 0h10v10z\"/>"
+	const tail = "</svg>"
 	pad := func(total int) []byte {
-		return []byte(head + strings.Repeat("x", total-len(head)-len(tail)) + tail)
+		return []byte(head + strings.Repeat(" ", total-len(head)-len(tail)) + tail)
 	}
 	tests := []struct {
 		name   string
@@ -191,7 +191,7 @@ func TestSVGAllowlistCoversRealAssets(t *testing.T) {
 		{"text outside title", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z"/><g>hello</g></svg>`, "only allowed inside <title>"},
 		{"fill with a function", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" fill="rgb(1,2,3)"/></svg>`, "plain paint"},
 		{"backslash in a value", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" id="a\b"/></svg>`, "backslash"},
-		{"parenthesis in an arbitrary attribute", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" stroke-width="calc(1px)"/></svg>`, "parenthesis"},
+		{"parenthesis in an arbitrary attribute", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" stroke-width="calc(1px)"/></svg>`, "optional px"},
 		{"url with a fallback is not exact url(#id)", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><path d="M0 0h4v4z" fill="url(#a) url(https://x/y)"/></svg>`, "plain paint"},
 		{"upper case attribute name", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><use HREF="#a"/><path d="M0 0h4v4z"/></svg>`, "not allowed"},
 	}

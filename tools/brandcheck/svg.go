@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 )
 
@@ -79,50 +78,6 @@ func attrSet(base []string, extra ...string) map[string]bool {
 	return set
 }
 
-var (
-	idValue        = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.:-]*$`)
-	localRef       = regexp.MustCompile(`^#[A-Za-z_][A-Za-z0-9_.:-]*$`)
-	urlRef         = regexp.MustCompile(`^url\(#[A-Za-z_][A-Za-z0-9_.:-]*\)$`)
-	paintValue     = regexp.MustCompile(`^(none|currentColor|inherit|#[0-9A-Fa-f]{3,8}|[A-Za-z]+)$`)
-	transformValue = regexp.MustCompile(`^\s*((matrix|translate|scale|rotate|skewX|skewY)\s*\(\s*[-+0-9.eE,\s]*\)\s*,?\s*)+$`)
-)
-
-// checkValue validates one attribute value and returns the problem, or "".
-// A value never holds a backslash (CSS escapes) and holds a parenthesis only as
-// a transform function or as exactly url(#id).
-func checkValue(name, value string) string {
-	if strings.Contains(value, `\`) {
-		return "contains a backslash"
-	}
-	switch name {
-	case "id":
-		if !idValue.MatchString(value) {
-			return fmt.Sprintf("id %q is not a plain identifier", shorten(value))
-		}
-	case "href":
-		if !localRef.MatchString(strings.TrimSpace(value)) {
-			return fmt.Sprintf("reference %q is not a local #fragment (no external resources)", shorten(value))
-		}
-	case "fill", "stroke", "stop-color":
-		if v := strings.TrimSpace(value); !paintValue.MatchString(v) && !urlRef.MatchString(v) {
-			return fmt.Sprintf("value %q is not a plain paint or a local url(#id)", shorten(value))
-		}
-	case "clip-path", "mask":
-		if v := strings.TrimSpace(value); v != "none" && !urlRef.MatchString(v) {
-			return fmt.Sprintf("value %q is not none or a local url(#id)", shorten(value))
-		}
-	case "transform", "gradientTransform":
-		if !transformValue.MatchString(value) {
-			return fmt.Sprintf("value %q is not a plain transform list", shorten(value))
-		}
-	default:
-		if strings.ContainsAny(value, "()") {
-			return fmt.Sprintf("value %q contains a parenthesis; only url(#id) and transforms may", shorten(value))
-		}
-	}
-	return ""
-}
-
 // checkSVG applies BC-1 to one SVG document; file only labels the findings.
 func checkSVG(file string, data []byte) []Finding {
 	c := svgChecker{file: file, data: data}
@@ -141,6 +96,12 @@ type svgChecker struct {
 	roots    int
 	stack    []string
 	hasShape bool
+
+	owners   []string // nearest element id (or "" for the document) per open element
+	ids      map[string]bool
+	refs     map[string][]refEdge
+	spdx     map[string]bool
+	rootSeen bool
 }
 
 // add records a finding at a byte offset of the document.
@@ -167,15 +128,16 @@ func (c *svgChecker) run() {
 		case xml.EndElement:
 			if len(c.stack) > 0 {
 				c.stack = c.stack[:len(c.stack)-1]
+				c.owners = c.owners[:len(c.owners)-1]
 			}
 		case xml.CharData:
 			c.chars(start, string(t))
 		case xml.Directive:
 			c.add(start, "directive <!%s> is not allowed (no DOCTYPE or entity declarations)", shorten(string(t)))
 		case xml.ProcInst:
-			if t.Target != "xml" {
-				c.add(start, "processing instruction <?%s?> is not allowed", t.Target)
-			}
+			c.add(start, "processing instruction <?%s?> is not allowed (not even the XML declaration)", t.Target)
+		case xml.Comment:
+			c.comment(start, string(t))
 		}
 	}
 	switch {
@@ -184,6 +146,25 @@ func (c *svgChecker) run() {
 	case !c.hasShape:
 		c.add(0, "no shape element (path, polygon, polyline, rect, circle, ellipse or line): not a drawn vector")
 	}
+	c.checkReferences()
+}
+
+// spdxComments are the only comments a brand vector may carry: the license
+// header every file in the repository starts with, before the root element.
+var spdxComments = map[string]bool{
+	" SPDX-FileCopyrightText: The Orcon Authors ": true,
+	" SPDX-License-Identifier: Apache-2.0 ":       true,
+}
+
+func (c *svgChecker) comment(offset int64, text string) {
+	if c.rootSeen || len(c.stack) > 0 || !spdxComments[text] || c.spdx[text] {
+		c.add(offset, "comment is not allowed (only the two SPDX header lines before the root element)")
+		return
+	}
+	if c.spdx == nil {
+		c.spdx = map[string]bool{}
+	}
+	c.spdx[text] = true
 }
 
 func (c *svgChecker) start(offset int64, el xml.StartElement) {
@@ -199,7 +180,9 @@ func (c *svgChecker) start(offset int64, el xml.StartElement) {
 			c.add(offset, "root <svg> has no viewBox")
 		}
 	}
+	nested := len(c.stack) > 0 && name == "svg"
 	c.stack = append(c.stack, name)
+	c.rootSeen = true
 
 	allowed, known := elementAttrs[name]
 	switch {
@@ -208,6 +191,9 @@ func (c *svgChecker) start(offset int64, el xml.StartElement) {
 		known = false
 	case !known:
 		c.add(offset, "element <%s> is not in the allowed vector element set", name)
+	case nested:
+		c.add(offset, "nested <svg> is not allowed; only the root is an <svg>")
+		known = false
 	}
 	if shapeElements[name] && known {
 		c.hasShape = true
@@ -215,6 +201,48 @@ func (c *svgChecker) start(offset int64, el xml.StartElement) {
 	for _, a := range el.Attr {
 		c.attr(offset, name, a, allowed, known)
 	}
+	c.track(offset, name, el, known)
+}
+
+// track records the id and the references of an element for the cycle check.
+func (c *svgChecker) track(offset int64, name string, el xml.StartElement, known bool) {
+	parent := ""
+	if n := len(c.owners); n > 0 {
+		parent = c.owners[n-1]
+	}
+	owner := parent
+	if known {
+		for _, a := range el.Attr {
+			if a.Name.Space != "" || a.Name.Local != "id" || !idValue.MatchString(a.Value) {
+				continue
+			}
+			if c.ids[a.Value] {
+				c.add(offset, "<%s id>: duplicate id %q", name, a.Value)
+			}
+			if c.ids == nil {
+				c.ids = map[string]bool{}
+			}
+			c.ids[a.Value] = true
+			owner = a.Value
+			c.addRef(parent, owner, false, offset)
+		}
+		for _, a := range el.Attr {
+			if a.Name.Space != "" {
+				continue
+			}
+			switch a.Name.Local {
+			case "href":
+				if localRef.MatchString(a.Value) {
+					c.addRef(owner, a.Value[1:], name == "use", offset)
+				}
+			case "fill", "stroke", "clip-path", "mask":
+				if m := urlRef.FindStringSubmatch(a.Value); m != nil {
+					c.addRef(owner, m[1], false, offset)
+				}
+			}
+		}
+	}
+	c.owners = append(c.owners, owner)
 }
 
 func hasViewBox(el xml.StartElement) bool {
@@ -259,21 +287,22 @@ func (c *svgChecker) attr(offset int64, element string, a xml.Attr, allowed map[
 }
 
 // chars checks character data: only <title> and <desc> may carry text, and it
-// may not be markup or a payload.
+// must be short plain words. Elsewhere only ASCII white space is allowed.
 func (c *svgChecker) chars(offset int64, text string) {
 	c.payload(offset, "text node", text)
-	if strings.TrimSpace(text) == "" {
+	if strings.Trim(text, " \t\r\n") == "" {
 		return
 	}
 	parent := ""
 	if len(c.stack) > 0 {
 		parent = c.stack[len(c.stack)-1]
 	}
-	switch {
-	case !textElements[parent]:
+	if !textElements[parent] {
 		c.add(offset, "text %q is only allowed inside <title> and <desc>", shorten(text))
-	case strings.Contains(text, "<"):
-		c.add(offset, "<%s> text contains markup", parent)
+		return
+	}
+	if problem := checkText(text); problem != "" {
+		c.add(offset, "<%s>: %s", parent, problem)
 	}
 }
 
