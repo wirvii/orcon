@@ -23,6 +23,8 @@ export { Banner } from './components/banner/Banner';
 export type { BannerTone, BannerProps } from './components/banner/Banner';
 export { BrandMark } from './components/brand-mark/BrandMark';
 export type { BrandMarkProps } from './components/brand-mark/BrandMark';
+export { BrandHero } from './components/brand-hero/BrandHero';
+export type { BrandHeroProps } from './components/brand-hero/BrandHero';
 export { Breadcrumb } from './components/breadcrumb/Breadcrumb';
 export type { BreadcrumbItem, BreadcrumbProps } from './components/breadcrumb/Breadcrumb';
 export { buttonVariants, Button } from './components/button/Button';

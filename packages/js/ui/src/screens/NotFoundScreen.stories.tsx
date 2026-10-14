@@ -17,7 +17,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-mascot-pose="explorer"]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-mascot-pose="thinking"]')).not.toBeNull();
     await expect(within(canvasElement).getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
   },
 };

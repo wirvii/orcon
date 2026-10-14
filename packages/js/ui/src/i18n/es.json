@@ -1,5 +1,6 @@
 {
   "bell.label": "{count, plural, =0 {Nada requiere tu atención} one {# elemento requiere tu atención} other {# elementos requieren tu atención}}",
+  "brand.tagline": "Build. Orchestrate. Execute. Your way.",
   "canvas.addFirstStep": "Agregar primer paso",
   "canvas.ai.blockSet": "{block}: {detail}. Abre los ajustes del agente.",
   "canvas.ai.blockUnset": "{block}: sin configurar. Abre los ajustes del agente.",

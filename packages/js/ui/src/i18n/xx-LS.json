@@ -1,5 +1,6 @@
 {
   "bell.label": "{count,plural,=0{Nothing needs your attention} one{# item needs your attention} other{# items need your attention}}SSSSSSSSSSSSSSSSSSSSSSSSS",
+  "brand.tagline": "Build. Orchestrate. Execute. Your way.SSSSSSSSSSSSSSSSSSSSSSSSS",
   "canvas.addFirstStep": "Add first stepSSSSSSSSSSSSSSSSSSSSSSSSS",
   "canvas.ai.blockSet": "{block}: {detail}. Opens the agent settings.SSSSSSSSSSSSSSSSSSSSSSSSS",
   "canvas.ai.blockUnset": "{block}: not set. Opens the agent settings.SSSSSSSSSSSSSSSSSSSSSSSSS",

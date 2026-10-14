@@ -36,7 +36,9 @@
           "iou_min": 0.95
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-symbol.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -69,7 +71,9 @@
           "iou_min": 0.95
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-app-icon.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -168,7 +172,9 @@
           "iou_min": 0.93
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-lockup-on-dark.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -201,7 +207,9 @@
           "iou_min": 0.93
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-lockup-on-light.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -245,7 +253,9 @@
           "iou_min": 0.85
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-lockup-descriptor-on-dark.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -289,7 +299,9 @@
           "iou_min": 0.85
         }
       ],
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/brand/orcon-lockup-descriptor-on-light.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -310,7 +322,9 @@
         ]
       },
       "fidelity": [],
-      "copies": [],
+      "copies": [
+        "apps/web/public/favicon.svg"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -415,7 +429,9 @@
       "from": "brand/logo/orcon-symbol.svg",
       "width": 180,
       "height": 180,
-      "copies": [],
+      "copies": [
+        "apps/web/public/apple-touch-icon.png"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -530,7 +546,9 @@
         48
       ],
       "from": "brand/icon/favicon-16.svg",
-      "copies": [],
+      "copies": [
+        "apps/web/public/favicon.ico"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -572,7 +590,9 @@
         ]
       },
       "max_bytes": 204800,
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/mascot/mascot-happy.png"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -593,7 +613,9 @@
         ]
       },
       "max_bytes": 204800,
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/mascot/mascot-thinking.png"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",
@@ -614,7 +636,9 @@
         ]
       },
       "max_bytes": 204800,
-      "copies": [],
+      "copies": [
+        "packages/js/ui/src/assets/mascot/mascot-crossed-arms.png"
+      ],
       "approval": {
         "status": "approved",
         "by": "owner",

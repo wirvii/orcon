@@ -15,6 +15,8 @@ const browser = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Brand art stays a file (never a data: URI), as in the app build, so tests see the real file names.
+  build: { assetsInlineLimit: (file: string) => (/[\\/]assets[\\/](brand|mascot)[\\/]/.test(file) ? false : undefined) },
   // Pre-bundle everything the browser projects import, so Vite never re-optimizes (and reloads) mid-run.
   optimizeDeps: {
     include: [

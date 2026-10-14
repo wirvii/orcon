@@ -98,6 +98,8 @@ export function tailwindColorName(key) {
       const [family, role] = rest;
       return role === 'fg' ? `status-${family}` : `status-${family}-bg`;
     }
+    case 'mascot':
+      return `mascot-${rest[0]}`;
     case 'overlay':
       return rest[0];
     case 'canvas':

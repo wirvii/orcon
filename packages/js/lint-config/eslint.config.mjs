@@ -29,8 +29,11 @@ const testsAndStories = ['**/*.test.{ts,tsx}', '**/test/**', '**/*.stories.tsx']
 export const mascotFreeViews = [
   '**/canvas/**',
   '**/{execution,executions,errors,error,security,inbox,data-table}/**',
-  '**/screens/**/*{Execution,Inbox,ErrorPage,Security,Approval}*.{ts,tsx}',
+  '**/screens/**/*{Execution,Inbox,Security,Approval}*.{ts,tsx}',
 ];
+
+// Full-page error screens (not found, generic error page) may show the mascot even under errors/.
+export const mascotAllowedScreens = ['**/*NotFound*.{ts,tsx}', '**/*ErrorPage*.{ts,tsx}'];
 
 export const mascotImport = {
   group: ['**/Mascot', '**/mascot', '**/mascot/**', '@orcon/ui/mascot'],
@@ -114,6 +117,13 @@ export function createConfig({ tailwindEntryPoint, cwd } = {}) {
       files: mascotFreeViews,
       rules: {
         'no-restricted-imports': ['error', { patterns: [mascotImport, mascotName, svgImports] }],
+      },
+    },
+    {
+      // After the block above, so it wins: the full-page error screens show the thinking mascot.
+      files: mascotAllowedScreens,
+      rules: {
+        'no-restricted-imports': ['error', { patterns: [svgImports] }],
       },
     },
     {

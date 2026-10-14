@@ -32,6 +32,7 @@
     "test:visual:docker": "pnpm build-storybook && sh visual/run-docker.sh",
     "test:virtual": "vitest run --project virtual",
     "test:brand": "playwright test -c test/brand/playwright.config.ts",
+    "brand:sync": "node scripts/brand-sync.mjs",
     "brand:render": "node scripts/brand-render.mjs",
     "brand:review-shots": "node scripts/brand-review-shots.mjs"
   },
