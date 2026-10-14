@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/fairness"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -25,6 +26,9 @@ type Engine struct {
 	store  Store
 	plans  *Plans
 	interp *execution.Interpreter
+	// fair plans the claims of the worker across fairness keys (ADR-0014 §1).
+	fair   *fairness.Scheduler
+	fairMu sync.Mutex
 
 	leases   *leaseTable
 	claims   *claimState
@@ -51,6 +55,7 @@ func New(cfg *Config, st Store, revisions Revisions, reader DocumentReader, deps
 	e := &Engine{
 		cfg: *cfg, store: st, plans: NewPlans(revisions, reader, limits), interp: execution.NewInterpreter(deps),
 		leases: newLeaseTable(cfg.LeaseTTL), claims: &claimState{}, wake: make(chan struct{}, cfg.Concurrency), meta: make(map[store.ExecutionID]*store.Execution),
+		fair: fairness.NewScheduler(),
 	}
 	if router, ok := st.(store.EventRouter); ok {
 		router.RouteEvents(cfg.Outbox)

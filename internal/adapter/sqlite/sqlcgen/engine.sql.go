@@ -166,8 +166,9 @@ WHERE id IN (
   WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
     AND (?4 = 1 OR t.fairness_key IN (/*SLICE:fairness_keys*/?))
     AND t.abandoned_count < ?6 - 1
+    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED') < CAST(?7 AS INTEGER)
   ORDER BY t.effective_priority, t.available_at, t.id
-  LIMIT ?7)
+  LIMIT ?8)
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
           lease_epoch, lease_expires_at
 `
@@ -179,6 +180,7 @@ type ClaimTokensParams struct {
 	AnyFairnessKey  interface{}
 	FairnessKeys    []string
 	PoisonThreshold interface{}
+	ExecutionLimit  int64
 	PageSize        int64
 }
 
@@ -219,6 +221,7 @@ func (q *Queries) ClaimTokens(ctx context.Context, arg ClaimTokensParams) ([]Cla
 		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
 	}
 	queryParams = append(queryParams, arg.PoisonThreshold)
+	queryParams = append(queryParams, arg.ExecutionLimit)
 	queryParams = append(queryParams, arg.PageSize)
 	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
@@ -287,6 +290,52 @@ func (q *Queries) CountJoinArrivals(ctx context.Context, arg CountJoinArrivalsPa
 	var i CountJoinArrivalsRow
 	err := row.Scan(&i.ArrivalCount, &i.LiveCount)
 	return i, err
+}
+
+const countRunnableTokens = `-- name: CountRunnableTokens :many
+SELECT t.fairness_key, t.effective_priority, count(*) AS runnable_count, CAST(min(t.available_at) AS INTEGER) AS oldest_available_at
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= ?1
+GROUP BY t.fairness_key, t.effective_priority
+LIMIT ?2
+`
+
+type CountRunnableTokensRow struct {
+	FairnessKey       string
+	EffectivePriority int64
+	RunnableCount     int64
+	OldestAvailableAt int64
+}
+
+// The claimable tokens grouped by fairness key and priority: the snapshot a worker plans its claims from (ADR-0014 section 1).
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) CountRunnableTokens(ctx context.Context, now int64, rowLimit int64) ([]CountRunnableTokensRow, error) {
+	rows, err := q.db.QueryContext(ctx, countRunnableTokens, now, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountRunnableTokensRow{}
+	for rows.Next() {
+		var i CountRunnableTokensRow
+		if err := rows.Scan(
+			&i.FairnessKey,
+			&i.EffectivePriority,
+			&i.RunnableCount,
+			&i.OldestAvailableAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getOldestLastChance = `-- name: GetOldestLastChance :one

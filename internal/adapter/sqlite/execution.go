@@ -591,6 +591,33 @@ func boolToInt(b bool) int64 {
 }
 
 // ClaimTokens implements [store.WorkQueue].
+func executionLimitOf(r store.ClaimRequest) int64 {
+	if r.ExecutionLimit <= 0 {
+		return store.DefaultExecutionLimit
+	}
+	return r.ExecutionLimit
+}
+
+// RunnableCounts implements [store.WorkQueue].
+func (s *Store) RunnableCounts(ctx context.Context, now time.Time) ([]store.RunnableCount, error) {
+	var out []store.RunnableCount
+	err := s.read(ctx, "count runnable tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.CountRunnableTokens(ctx, micros(now), store.MaxRunnableRows)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			out = append(out, store.RunnableCount{
+				FairnessKey: r.FairnessKey, Priority: r.EffectivePriority, Runnable: r.RunnableCount,
+				Oldest: time.UnixMicro(r.OldestAvailableAt).UTC(),
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ClaimTokens implements [store.WorkQueue].
 func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
 	// One process owns the file, so its clock is the database clock: the instant of the
 	// caller is not used, and a worker whose clock is off cannot make a lease
@@ -605,6 +632,7 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 		rows, err := q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
 			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
 			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r), PageSize: clampPage(r.Limit),
+			ExecutionLimit: executionLimitOf(r),
 		})
 		if err != nil {
 			return err
