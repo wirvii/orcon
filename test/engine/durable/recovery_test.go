@@ -258,8 +258,11 @@ func TestReaper(t *testing.T) {
 			t.Errorf("attention requests = %+v, %v; want one POISON_TOKEN for the suspended execution", requests, err)
 		}
 		// Another execution is not affected: it runs to its end.
-		other := env.Start(eng, pub, input())
-		env.Drain(eng)
+		// It is worked by an engine with the normal lease: the 30 ms lease above is for the reaper,
+		// and a slow machine would let it expire in the middle of an honest step.
+		worker := env.Engine(durable.Config{Concurrency: 1}, runner())
+		other := env.Start(worker, pub, input())
+		env.Drain(worker)
 		if got := statusOf(env, other); got != execution.ExecSucceeded {
 			t.Errorf("another execution is %s, want SUCCEEDED", got)
 		}
