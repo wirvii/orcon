@@ -78,11 +78,17 @@ func (t *leaseTable) drop(l *heldLease) {
 	l.cancel(nil)
 }
 
-// extend re-registers the lease under a new fence after a commit that kept a
-// token: the same token keeps its epoch, a child starts at epoch 1.
+// extend follows a commit that changed which token the worker holds: a token that
+// left it holds nothing, a child created leased starts at epoch 1 with a lease
+// the commit itself granted at start. A commit that kept the same token does not
+// renew its lease in the database, so it must not renew it here either: only a
+// renewal does.
 func (t *leaseTable) extend(l *heldLease, f store.Fence, start time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if f.Epoch != 0 && f == l.fence {
+		return
+	}
 	if t.held[l.fence.Token] == l {
 		delete(t.held, l.fence.Token)
 	}

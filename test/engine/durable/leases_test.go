@@ -274,3 +274,46 @@ func TestFailedStepGivesItsLeaseBack(t *testing.T) {
 		}
 	})
 }
+
+// TestCommitsDoNotRenewTheLocalLease (BL-068): a commit that keeps the same token
+// does not extend its lease in the database, so it must not extend the local
+// validity either. A worker that cannot renew (no renewal loop here) and keeps
+// committing steps has to fence itself within the lease, not run on until the
+// flow ends.
+func TestCommitsDoNotRenewTheLocalLease(t *testing.T) {
+	eachStore(t, storetest.EngineOptions{Weak: true}, func(t *testing.T, env *storetest.EngineEnv) {
+		t.Helper()
+		ctx := t.Context()
+		pub := env.Publish(docOf(sequence(40)))
+		slow := &slowRunner{each: 40 * time.Millisecond}
+		const lease = 400 * time.Millisecond
+		eng := env.Engine(durable.Config{Concurrency: 1, LeaseTTL: lease, CheckpointActivations: 1}, execution.Deps{Runner: slow})
+		execID := env.Start(eng, pub, input())
+		claimed, start, err := eng.Claim(ctx, 1)
+		if err != nil || len(claimed) != 1 {
+			t.Fatalf("claim = %d, %v", len(claimed), err)
+		}
+		began := time.Now()
+		if err := eng.Work(ctx, claimed[0], start); err != nil {
+			t.Fatalf("Work() = %v", err)
+		}
+		if took := time.Since(began); took > 3*lease {
+			t.Errorf("the worker ran %v on a lease of %v with no renewal", took, lease)
+		}
+		if got := statusOf(env, execID); got == execution.ExecSucceeded {
+			t.Error("the flow ended on a lease that was never renewed: commits extended the local validity")
+		}
+	})
+}
+
+// slowRunner takes a fixed time for every node and passes its input on.
+type slowRunner struct{ each time.Duration }
+
+func (s *slowRunner) Execute(ctx context.Context, call execution.NodeCall) (execution.NodeOutput, error) {
+	select {
+	case <-ctx.Done():
+		return execution.NodeOutput{}, ctx.Err()
+	case <-time.After(s.each):
+	}
+	return execution.NodeOutput{Ports: []execution.PortBatch{{Port: flow.PortMain, Batch: call.Input}}}, nil
+}
