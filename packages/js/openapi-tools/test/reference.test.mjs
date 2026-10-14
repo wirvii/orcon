@@ -7,6 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import vm from 'node:vm';
 
 import { BUDGET_BYTES, buildReference, externalResourceProblems, hostsIn, renderConfigJs, renderIndexHtml, scalarScript } from '../scripts/build-reference.mjs';
 import { bundle } from '../scripts/bundle.mjs';
@@ -58,6 +59,25 @@ test('P1: the site loads nothing from another origin and "try it" is same-origin
   assert.match(config, /url: "\/api\/v1"/);
   const published = JSON.parse(readFileSync(join(work, 'site', 'openapi.json'), 'utf8'));
   assert.deepEqual(published.servers, [{ url: '/api/v1' }]);
+});
+
+test('the page reads the contract with the browser credentials and sends "try it" calls without them', async () => {
+  const config = readFileSync(join(work, 'site', 'reference-config.js'), 'utf8');
+  const calls = [];
+  let options;
+  const context = vm.createContext({
+    URL,
+    Request,
+    document: { baseURI: 'https://host.example/api/reference/' },
+    Scalar: { createApiReference: (_selector, o) => (options = o) },
+    fetch: async (input, init) => calls.push({ url: String(input.url ?? input), credentials: init?.credentials }),
+  });
+  vm.runInContext(config, context);
+  await options.customFetch('openapi.json', {});
+  await options.customFetch('https://host.example/api/reference/openapi.json', undefined);
+  await options.customFetch(new Request('https://host.example/api/v1/flows'), { method: 'GET' });
+  await options.customFetch('/api/v1/flows', {});
+  assert.deepEqual(calls.map((c) => c.credentials), [undefined, undefined, 'omit', 'omit']);
 });
 
 test('the external resource check catches a CDN stylesheet, script, proxy and server', () => {
