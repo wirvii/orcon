@@ -27,7 +27,7 @@ apps/web/src/
 
 ## Import direction
 
-- **AR-5** Dependency direction inside a feature: `routes → screens → (forms, components, api, model)`; `api → @orcon/sdk, @orcon/api-contract, model`; `model →` nothing from React or the UI. Features may import from `app/` only `boundary`, `errors`, `forms`, `perf`, `query-state` and the live-events subscription hook. `app/` imports features only through the route tree.
+- **AR-5** Dependency direction inside a feature: `routes → (screens, api, model)`; `screens → (forms, components, api, model)`; `forms → (components, api, model)`; `components → model`; `api → @orcon/sdk, @orcon/api-contract, model`; `model →` nothing from React or the UI. Two exceptions, only in `features/editor/`: `screens`, `forms` and `components` may import `store/`, and `store/` imports only the editor's `model/` (ST-6); and `components/` may import `forms/`, because the node details view is a component that hosts the node configuration form (SPEC-014 FE9). A form never imports a component that imports `forms/` (no import cycle; checked in review). Features may import from `app/` only `boundary`, `errors`, `forms`, `perf`, `query-state` and the live-events subscription hook. `app/` imports features only through the route tree.
 - **AR-6** A feature never imports another feature. Links between features use typed router links (no import). Shared code is promoted: visual → `@orcon/ui` under `orcon-ui` ([components](../../orcon-ui/references/components.md#contract)); server access → `@orcon/sdk` or `@orcon/api-contract`; app-wide runtime → `app/`; pure logic used by two or more features → a new `packages/js` package created by an approved spec.
 
 ## Names
