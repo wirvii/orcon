@@ -42,6 +42,7 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
   | `deprecated-removed` | 410 | confirmed |
   | `precondition-failed` | 412 | confirmed |
   | `payload-too-large` | 413 | confirmed |
+  | `unsupported-media-type` | 415 | confirmed |
   | `idempotency-key-reused` | 422 | confirmed |
   | `precondition-required` | 428 | confirmed |
   | `rate-limited` | 429 | confirmed |
