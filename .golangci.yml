@@ -77,6 +77,11 @@ linters:
             - "**/internal/**/*.go"
             - "!**/internal/adapter/**"
             - "!**/internal/platform/jsonvalue/**"
+          # The engine tests of internal/execution run the engine over the real stores through the storetest
+          # package (SPEC-001 C4a, criteria E-REC-1, E-REC-2, E-CF-1). Only storetest is carved out of the adapter
+          # deny below, and adapter-private-storetest limits who may import it to those test files.
+          allow:
+            - github.com/wirvii/orcon/internal/adapter/storetest
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter
               desc: areas declare ports; only cmd/orcon wires adapters (architecture-layers.md AL-2)
@@ -247,6 +252,10 @@ linters:
             # Excluded here because adapter-private-storetest-dbrules below governs them (it allows only dbrules).
             - "!**/internal/adapter/sqlite/*_test.go"
             - "!**/internal/adapter/postgres/*_test.go"
+            # The engine tests under internal/execution run the engine over the real stores (SPEC-001 C4a). Proposed
+            # exception to AL-2.4, pending the approval of the owner like the one for dbrules; it covers test files
+            # of the execution area only.
+            - "!**/internal/execution/**/*_test.go"
             - "!**/cmd/**"
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/storetest

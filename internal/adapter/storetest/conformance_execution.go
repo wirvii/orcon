@@ -434,7 +434,9 @@ func fencingCase(t *testing.T, newStore Factory) {
 		err := e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AssertFence(ctx, bad, base) })
 		wantErr(t, name, err, store.ErrFenced)
 	}
-	// A fenced step that fails takes everything else of its transaction with it.
+	// A fenced step that fails takes everything else of its transaction with it. The claim started the execution, so
+	// its event is already there.
+	eventsBefore, _ := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 10)
 	err = e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		if _, err := tx.AppendEvent(ctx, store.Event{ID: next[store.EventID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, OccurredAt: base, Type: "lost", SchemaVersion: 1, Reference: []byte(`{}`), CreatedAt: base}); err != nil {
 			return err
@@ -442,8 +444,8 @@ func fencingCase(t *testing.T, newStore Factory) {
 		return tx.AssertFence(ctx, store.Fence{OrgID: e.orgA, Token: tok.ID, Epoch: fence.Epoch + 7, Owner: w}, base)
 	})
 	wantErr(t, "a step with a lost lease", err, store.ErrFenced)
-	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 10); len(evs) != 0 {
-		t.Fatalf("a fenced transaction left %d events", len(evs))
+	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 10); len(evs) != len(eventsBefore) {
+		t.Fatalf("a fenced transaction left %d events", len(evs)-len(eventsBefore))
 	}
 	// Moving the token ends the lease; the same fence then fails.
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.MoveToken(ctx, fence, "WAITING", base) }), "move the token")
@@ -532,8 +534,8 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 		t.Fatalf("poisoned token = %+v", got)
 	}
 	// Graceful shutdown gives every lease of a worker back at once.
-	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, now)
-	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID {
+	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, 3, now)
+	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID || released[0].AbandonedCount != 1 || released[0].Poisoned {
 		t.Fatalf("released = %+v, %v", released, err)
 	}
 	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() {

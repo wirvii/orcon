@@ -11,6 +11,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/execution/executiontest"
 )
 
 // storeFlag selects the stores the conformance battery runs against:
@@ -19,11 +20,11 @@ import (
 //	sqlite    SQLite only
 //	postgres  PostgreSQL only; the test starts a server and fails if it cannot
 //	both      SQLite and PostgreSQL; PostgreSQL must be available
-var storeFlag = flag.String("store", "auto", "stores to test: auto, sqlite, postgres or both")
+func storeFlag() string { return executiontest.StoreFlag("auto") }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	switch *storeFlag {
+	switch storeFlag() {
 	case "auto", "sqlite":
 	case "postgres", "both":
 		enablePostgres()
@@ -36,16 +37,16 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func wantSQLite() bool   { return *storeFlag != "postgres" }
-func wantPostgres() bool { return *storeFlag != "sqlite" }
+func wantSQLite() bool   { return storeFlag() != "postgres" }
+func wantPostgres() bool { return storeFlag() != "sqlite" }
 
 // TestConformance runs the shared battery against the selected stores
 // (E-STO-1: the same battery passes on SQLite and PostgreSQL).
 func TestConformance(t *testing.T) {
-	switch *storeFlag {
+	switch storeFlag() {
 	case "auto", "sqlite", "postgres", "both":
 	default:
-		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", *storeFlag)
+		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", storeFlag())
 	}
 	ran := 0
 	if wantSQLite() {
