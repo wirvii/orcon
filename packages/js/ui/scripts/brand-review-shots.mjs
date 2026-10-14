@@ -45,6 +45,7 @@ try {
         (await card.getAttribute('data-fidelity')) ??
         (uses ? `sizes ${uses.replace(/^brand\/(logo|icon)\//, '')}` : null) ??
         (await card.getAttribute('data-mascot')) ??
+        (await card.getAttribute('data-composite')) ??
         (await card.getAttribute('data-icons') ? 'favicon set' : null) ??
         'card';
       let file = `${String(++n).padStart(2, '0')}-${name}-${slug(label.replace(/^brand\//, ''))}.png`;

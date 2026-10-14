@@ -256,6 +256,16 @@ async function main() {
     mascotCards.append(h('article', { class: 'card', 'data-mascot': a.path }, h('h3', {}, a.path.split('/').pop(), h('span', { class: 'file' }, `${w}x${hh} px from board (${x}, ${y})`), statusBadge(a)), row));
   }
 
+  if (mascots.length > 0) {
+    // how the cut-outs will sit in the app: on a soft rounded box, light and dark theme (owner decision Q3 = A)
+    const boxes = [['light theme', '#ecfdf5', '#0f172a'], ['dark theme', '#1e293b', '#e2e8f0']].map(([label, bg, fg]) =>
+      h('div', { class: 'cell' },
+        h('div', { style: `display:flex;gap:16px;padding:16px;border-radius:16px;background:${bg}` },
+          mascots.map((a) => h('div', { style: `border-radius:16px;background:${bg};display:flex;align-items:flex-end` }, h('img', { src: ROOT + a.path, alt: '', style: 'height:160px;display:block' })))),
+        h('small', { style: `color:${fg === '#e2e8f0' ? '#64748b' : '#64748b'}` }, `${label}: 160 px tall, soft rounded box`)));
+    mascotCards.append(h('article', { class: 'card', 'data-composite': 'mascot-in-the-app' }, h('h3', {}, 'All four cut-outs as they will appear in the app', h('span', { class: 'file' }, 'preview colors are an assumption; the app uses design tokens')), h('div', { class: 'row' }, boxes)));
+  }
+
   // contrast
   const rows = [];
   for (const asset of manifest.assets.filter((a) => a.kind === 'svg')) {
