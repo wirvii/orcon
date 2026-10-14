@@ -5,10 +5,10 @@ package bpmn
 
 import (
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/flow"
@@ -114,47 +114,65 @@ func checkProcessOrder(tb testing.TB, p *element) {
 	}
 }
 
-// TestRoundTripXSD validates the exported XML against the BPMN 2.0 XSD. The OMG
-// schema files are not part of this repository, so the test needs
-// ORCON_BPMN_XSD_DIR to name a directory holding BPMN20.xsd and its imports,
-// and the xmllint tool. Without them it is skipped.
+// xsdChunk is the number of files given to one xmllint run; the schema is
+// loaded once per run.
+const xsdChunk = 250
+
+// TestRoundTripXSD validates the exported XML against the BPMN 2.0 XSD: the
+// supported conformance flows and every generated flow of TestRoundTripGenerated.
+// The OMG schema files are not part of this repository: CI fetches them with
+// scripts/fetch-bpmn-xsd.sh and sets ORCON_BPMN_XSD_DIR to their directory;
+// xmllint must be installed. Elsewhere the test is skipped, but when CI is set
+// a missing directory or tool is a failure, so the check cannot silently
+// disappear from the pipeline.
 func TestRoundTripXSD(t *testing.T) {
 	dir := os.Getenv("ORCON_BPMN_XSD_DIR")
-	if dir == "" {
-		t.Skip("ORCON_BPMN_XSD_DIR is not set; the BPMN 2.0 XSD is not vendored")
+	lint, lintErr := exec.LookPath("xmllint")
+	if dir == "" || lintErr != nil {
+		const why = "ORCON_BPMN_XSD_DIR is not set or xmllint is not installed; see scripts/fetch-bpmn-xsd.sh"
+		if os.Getenv("CI") != "" {
+			t.Fatal(why)
+		}
+		t.Skip(why)
 	}
-	lint, err := exec.LookPath("xmllint")
-	if err != nil {
-		t.Skip("xmllint is not installed")
+	schema := filepath.Join(dir, "BPMN20.xsd")
+	if _, err := os.Stat(schema); err != nil { //nolint:gosec // G703: the path comes from the test environment
+		t.Fatalf("the schema directory has no BPMN20.xsd: %v", err)
 	}
-	flows := supportedFlows(t)
+
 	docs := map[string]*flow.Document{}
-	for name, doc := range flows {
+	for name, doc := range supportedFlows(t) {
 		docs[name] = doc
 	}
-	// A sample of generated flows, whose odd strings stress the escaping.
-	rng := rand.New(rand.NewPCG(7, 11)) //nolint:gosec // G404: deterministic test data
-	for i := range 40 {
-		doc := mutate(rng, flows["exclusive-and-inclusive"], false)
-		if flow.Validate(doc).HasErrors() {
-			continue
+	for i, doc := range generatedValidFlows(t, generatedFlows) {
+		docs[fmt.Sprintf("generated-%04d", i)] = doc
+	}
+	names := make([]string, 0, len(docs))
+	for name := range docs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	tmp := t.TempDir()
+	files := make([]string, 0, len(names))
+	for _, name := range names {
+		data, err := Export(docs[name])
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
 		}
-		docs[fmt.Sprintf("generated-%d", i)] = doc
+		file := filepath.Join(tmp, name+".bpmn")
+		if err := os.WriteFile(file, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, file)
 	}
-	for name, doc := range docs {
-		t.Run(name, func(t *testing.T) {
-			data, err := Export(doc)
-			if err != nil {
-				t.Fatal(err)
-			}
-			file := filepath.Join(t.TempDir(), name+".bpmn")
-			if err := os.WriteFile(file, data, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			out, err := exec.CommandContext(t.Context(), lint, "--noout", "--schema", filepath.Join(dir, "BPMN20.xsd"), file).CombinedOutput() //nolint:gosec // G204: the tool and schema path come from the test environment
-			if err != nil {
-				t.Fatalf("xmllint: %v\n%s", err, out)
-			}
-		})
+	for start := 0; start < len(files); start += xsdChunk {
+		chunk := files[start:min(start+xsdChunk, len(files))]
+		args := append([]string{"--noout", "--schema", schema}, chunk...)
+		out, err := exec.CommandContext(t.Context(), lint, args...).CombinedOutput() //nolint:gosec // G204: the tool and schema path come from the test environment
+		if err != nil {
+			t.Fatalf("xmllint rejected a document:\n%s", out)
+		}
 	}
+	t.Logf("%d exported documents validate against the BPMN 2.0 XSD", len(files))
 }

@@ -110,7 +110,10 @@ func TestRoundTripDeterministic(t *testing.T) {
 	}
 }
 
-func TestRoundTripGenerated(t *testing.T) {
+// generatedValidFlows returns n valid flows built from the supported ones with
+// random open-ended data. The sequence is the same on every run.
+func generatedValidFlows(t *testing.T, n int) []*flow.Document {
+	t.Helper()
 	flows := supportedFlows(t)
 	bases := make([]string, 0, len(flows))
 	for name := range flows {
@@ -119,11 +122,10 @@ func TestRoundTripGenerated(t *testing.T) {
 	slices.Sort(bases)
 
 	rng := rand.New(rand.NewPCG(20261013, 14)) //nolint:gosec // G404: deterministic test data
-	valid, attempts := 0, 0
-	for valid < generatedFlows {
-		attempts++
-		if attempts > generatedFlows*4 {
-			t.Fatalf("only %d of %d generated flows were valid", valid, attempts)
+	var out []*flow.Document
+	for attempts := 0; len(out) < n; attempts++ {
+		if attempts > n*4 {
+			t.Fatalf("only %d of %d generated flows were valid", len(out), attempts)
 		}
 		base := flows[bases[rng.IntN(len(bases))]]
 		doc := mutate(rng, base, true)
@@ -134,10 +136,17 @@ func TestRoundTripGenerated(t *testing.T) {
 		if flow.Validate(doc).HasErrors() {
 			continue
 		}
-		valid++
+		out = append(out, doc)
+	}
+	return out
+}
+
+func TestRoundTripGenerated(t *testing.T) {
+	docs := generatedValidFlows(t, generatedFlows)
+	for _, doc := range docs {
 		roundTrip(t, doc)
 	}
-	t.Logf("%d valid generated flows round-tripped out of %d attempts", valid, attempts)
+	t.Logf("%d valid generated flows round-tripped", len(docs))
 }
 
 func TestExportRefusesUnrepresentableStrings(t *testing.T) {
@@ -166,6 +175,19 @@ func TestExportRefusesUnrepresentableStrings(t *testing.T) {
 	}
 	if want := "/nodes/0/parameters/k~11"; bad.Pointer != want {
 		t.Errorf("pointer = %q, want %q", bad.Pointer, want)
+	}
+}
+
+func TestExportRefusesInvalidUTF8(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4)) //nolint:gosec // G404: deterministic test data
+	for _, name := range []string{"bad\xffname", "cut\xe4\xb8"} {
+		doc := mutate(rng, conformanceFlows(t)["linear"], false)
+		doc.Name = name
+		_, err := Export(doc)
+		var bad *UnrepresentableError
+		if !errors.As(err, &bad) || bad.Pointer != "/name" {
+			t.Errorf("%q: want UnrepresentableError at /name, got %v", name, err)
+		}
 	}
 }
 

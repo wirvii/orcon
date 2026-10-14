@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
@@ -101,8 +102,13 @@ func (w *xmlWriter) text(s string) {
 	}
 }
 
-// xmlSafe reports whether every rune of s is a Char of XML 1.0 (production 2).
+// xmlSafe reports whether s is valid UTF-8 and every rune of it is a Char of
+// XML 1.0 (production 2). Invalid bytes would read back as U+FFFD, so they
+// are refused like any other character XML cannot carry.
 func xmlSafe(s string) bool {
+	if !utf8.ValidString(s) {
+		return false
+	}
 	for _, r := range s {
 		switch {
 		case r == '\t', r == '\n', r == '\r':
