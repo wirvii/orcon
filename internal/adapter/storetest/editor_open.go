@@ -22,7 +22,7 @@ const editorBinaryVersion = "1.0.0"
 
 // OpenSQLiteEditorStore opens a fresh, migrated SQLite store for one test or case. The store is closed
 // when tb ends. Test drivers outside this package reach the adapters only through this function.
-func OpenSQLiteEditorStore(tb testing.TB) EditorStore {
+func OpenSQLiteEditorStore(tb testing.TB) *sqlite.Store {
 	tb.Helper()
 	s, err := sqlite.Open(tb.Context(), sqlite.Options{Path: filepath.Join(tb.TempDir(), "orcon.db"), BinaryVersion: editorBinaryVersion})
 	if err != nil {
@@ -34,7 +34,7 @@ func OpenSQLiteEditorStore(tb testing.TB) EditorStore {
 
 // OpenPostgresEditorStore opens a fresh, migrated PostgreSQL store on a database created for tb. The
 // administrative connection string comes from ORCON_TEST_POSTGRES_DSN; the database is dropped when tb ends.
-func OpenPostgresEditorStore(tb testing.TB) EditorStore {
+func OpenPostgresEditorStore(tb testing.TB) *postgres.Store {
 	tb.Helper()
 	dsn := newFreshEditorDatabase(tb)
 	s, err := postgres.Open(tb.Context(), postgres.Options{DSN: dsn, BinaryVersion: editorBinaryVersion})
@@ -58,7 +58,8 @@ func newFreshEditorDatabase(tb testing.TB) string {
 		tb.Fatal(err)
 	}
 	tb.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		// The test context is already canceled here; the cleanup keeps its values and gets its own deadline.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(tb.Context()), time.Minute)
 		defer cancel()
 		if err := DropDatabase(ctx, admin, name); err != nil {
 			tb.Errorf("%v", err)

@@ -68,6 +68,7 @@ func newEditorFixture(t *testing.T, newStore EditorFactory) *editorFixture {
 	t.Helper()
 	var ed EditorStore
 	ef := newExecFixture(t, func(t *testing.T) Store {
+		t.Helper()
 		ed = newStore(t)
 		return ed
 	})
