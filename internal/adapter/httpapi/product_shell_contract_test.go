@@ -92,7 +92,7 @@ func TestProductShellContract(t *testing.T) {
 	// x-orcon-audit: the sign-in and the new flows and projects are audited; the reads are not.
 	audits := map[string]string{
 		"createSession":  "login.succeeded",
-		"revokeSession":  "session.revoked",
+		"revokeSession":  "logout",
 		"getCurrentUser": "none",
 		"listOrgs":       "none",
 		"listProjects":   "none",

@@ -305,7 +305,7 @@
         "x-orcon-rate-class": "write",
         "x-orcon-stability": "stable",
         "x-orcon-idempotency": "optional",
-        "x-orcon-audit": "session.revoked",
+        "x-orcon-audit": "logout",
         "x-orcon-problems": [
           "validation-failed",
           "unauthenticated",
