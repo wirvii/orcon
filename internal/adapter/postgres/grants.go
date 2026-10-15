@@ -15,9 +15,9 @@ import (
 )
 
 // CreateProjectWithGrant implements [identity.ProjectStore]: the project, the role binding of
-// its creator, the authorization epoch increment and the creation entry, in one transaction.
+// its creator, the authorization epoch increment and the audit entries, in one transaction.
 // The idempotency claim of the context, when there is one, is written in the same transaction.
-func (s *Store) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, grant identity.RoleBindingRecord, entry audit.Entry) error {
+func (s *Store) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
 	return s.inScopeRecord(ctx, "create project", org, p.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		if !grant.OrgID.Matches(org) {
 			return fmt.Errorf("role binding of organization %s: %w", grant.OrgID, identity.ErrScopeMismatch)
@@ -38,7 +38,12 @@ func (s *Store) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p 
 		if _, err := q.UpdateAuthorizationEpoch(ctx, pgUUID(org.UUID())); err != nil {
 			return fmt.Errorf("bump authorization epoch: %w", err)
 		}
-		return insertPendingOrg(ctx, q, org, entry)
+		for i := range entries {
+			if err := insertPendingOrg(ctx, q, org, entries[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

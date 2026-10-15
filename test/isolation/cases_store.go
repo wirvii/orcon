@@ -635,10 +635,10 @@ func caseCreateProjectWithGrant(ctx context.Context, tb testing.TB, env *Env) {
 	}
 	// A project of B under A's scope is refused before the database is asked.
 	wantErr(tb, "a project of B with its grant under A's scope",
-		env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, audittest.Org(tb, env.B.UUID, "project.created")), identity.ErrScopeMismatch)
+		env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, []audit.Entry{audittest.Org(tb, env.B.UUID, "project.created")}), identity.ErrScopeMismatch)
 	// A project of A whose grant names B's organization is refused as well.
 	rec.OrgID, rec.Handle, rec.Slug = identity.OrgID(env.A.UUID), "intruder-a", "intruder-a"
-	err := env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, audittest.Org(tb, env.A.UUID, "project.created"))
+	err := env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, []audit.Entry{audittest.Org(tb, env.A.UUID, "project.created")})
 	wantErr(tb, "a grant of B inside A's project", err, identity.ErrScopeMismatch)
 	AssertNoLeak(tb, "the refusal", errText(err), env.B.Sentinel("project-name"), env.B.Sentinel("org-name"))
 	intact(ctx, tb, env)

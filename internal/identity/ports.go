@@ -192,10 +192,11 @@ type ProjectStore interface {
 	// [ErrReference]. The entry belongs to the organization chain of the scope.
 	CreateProject(ctx context.Context, org orgscope.Org, p ProjectRecord, entry audit.Entry) error
 	// CreateProjectWithGrant is [ProjectStore.CreateProject] with a role binding of the creator
-	// in the project and the increment of the authorization epoch, all in one transaction. When
-	// the context carries an idempotency claim, the record of the claim is written in the same
-	// transaction (see internal/platform/idempotencyclaim).
-	CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p ProjectRecord, grant RoleBindingRecord, entry audit.Entry) error
+	// in the project, the increment of the authorization epoch and the audit entries of the
+	// creation and of the binding, all in one transaction: a failure before the commit leaves no
+	// project, no binding and no entry. When the context carries an idempotency claim, the record
+	// of the claim is written in the same transaction (see internal/platform/idempotencyclaim).
+	CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p ProjectRecord, grant RoleBindingRecord, entries []audit.Entry) error
 	// GetProject returns one project of the organization, or [ErrNotFound].
 	GetProject(ctx context.Context, org orgscope.Org, project ProjectID) (ProjectRecord, error)
 	// ListProjects returns at most limit projects of the organization with an

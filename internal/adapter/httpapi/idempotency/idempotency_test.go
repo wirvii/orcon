@@ -6,6 +6,7 @@ package idempotency_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -133,7 +134,7 @@ func problemCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return doc.Code
 }
 
-func TestFirstRequestRunsAndTheRepeatReplays(t *testing.T) {
+func TestIdempotencyReplay(t *testing.T) {
 	r := newRig(t, nil)
 	first := r.post("key-1", `{"name":"a"}`)
 	if first.Code != http.StatusCreated {
@@ -157,7 +158,7 @@ func TestFirstRequestRunsAndTheRepeatReplays(t *testing.T) {
 	}
 }
 
-func TestSameKeyWithAnotherBodyIsRefused(t *testing.T) {
+func TestIdempotencyFingerprintMismatch(t *testing.T) {
 	r := newRig(t, nil)
 	r.post("key-1", `{"name":"a"}`)
 	rec := r.post("key-1", `{"name":"b"}`)
@@ -183,7 +184,7 @@ func TestClientErrorReleasesTheKey(t *testing.T) {
 	}
 }
 
-func TestRunningRequestAnswersConflict(t *testing.T) {
+func TestIdempotencyInProgress(t *testing.T) {
 	r := newRig(t, nil)
 	r.preclaim("key-1", keyA, `{}`)
 	rec := r.post("key-1", `{}`)
@@ -195,6 +196,106 @@ func TestRunningRequestAnswersConflict(t *testing.T) {
 	}
 	if r.runs.Load() != 0 {
 		t.Errorf("the operation ran while its twin was running")
+	}
+}
+
+// TestIdempotencySecretNotStored: a response that issues a secret is shown once. The record keeps
+// no body, a repeat is refused with 409 secret-already-issued, the repeat does not leak the secret
+// and it points at the resource.
+func TestIdempotencySecretNotStored(t *testing.T) {
+	const secret = "example-secret-1"
+	r := newRig(t, func(c *idempotency.Config, _ *rig) { c.IssuesSecret = true })
+	r.handler = func(w http.ResponseWriter, req *http.Request) {
+		r.runs.Add(1)
+		if err := r.store.Claim(req.Context(), scopeOf(), "api-keys/created"); err != nil {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Location", "/api/v1/api-keys/created")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"created","secret":"` + secret + `"}`))
+	}
+	first := r.post("key-1", `{}`)
+	if first.Code != http.StatusCreated || !strings.Contains(first.Body.String(), secret) {
+		t.Fatalf("first = %d %s: the creator must see the secret once", first.Code, first.Body.String())
+	}
+	key := identity.IdempotencyKey{Requester: string(keyA.CredentialType) + ":" + keyA.CredentialID, Value: "key-1"}
+	rec, found, err := r.store.LookupIdempotency(t.Context(), scopeOf(), key, r.clk.Now())
+	if err != nil || !found || !rec.Completed {
+		t.Fatalf("record = %+v, %v, %v; want a completed record", rec, found, err)
+	}
+	if len(rec.Response.Body) != 0 || !rec.Response.SecretIssued {
+		t.Errorf("the stored record holds a body %q (secret issued %v); it must hold none", rec.Response.Body, rec.Response.SecretIssued)
+	}
+	again := r.post("key-1", `{}`)
+	if again.Code != http.StatusConflict || problemCode(t, again) != "secret-already-issued" {
+		t.Fatalf("repeat = %d %s, want 409 secret-already-issued", again.Code, again.Body.String())
+	}
+	if strings.Contains(again.Body.String(), secret) {
+		t.Error("the repeat leaks the secret")
+	}
+	if got := again.Header().Get("Location"); got != "/api/v1/api-keys/created" {
+		t.Errorf("the repeat points at %q, want the resource", got)
+	}
+	if n := r.runs.Load(); n != 1 {
+		t.Errorf("the operation ran %d times, want 1", n)
+	}
+}
+
+// TestIdempotencyCrashAfterCommit (SPEC-005 Amendment 8 section 8-2 item 5): the process dies
+// after the change committed and before the response is written. The record stays in progress and
+// names the resource. A retry while the first request may still be alive answers 409; a retry after
+// the record is stale answers the resource that was created, and the operation does not run again.
+func TestIdempotencyCrashAfterCommit(t *testing.T) {
+	r := newRig(t, func(c *idempotency.Config, _ *rig) {
+		c.Rebuild = func(_ context.Context, rec identity.IdempotencyRecord) (identity.IdempotencyResponse, error) {
+			if rec.ResourceRef != "things/created" {
+				return identity.IdempotencyResponse{}, idempotency.ErrNoRebuild
+			}
+			return identity.IdempotencyResponse{Status: http.StatusCreated, ContentType: "application/json", Location: "/api/v1/things/created", Body: []byte(`{"run":1}`)}, nil
+		}
+	})
+	// The first request commits (claims its record with the resource) and the process is killed
+	// before the response: nothing after the change runs, as in a crash.
+	r.handler = func(_ http.ResponseWriter, req *http.Request) {
+		r.runs.Add(1)
+		if err := r.store.Claim(req.Context(), scopeOf(), "things/created"); err != nil {
+			t.Errorf("claim: %v", err)
+		}
+		panic(http.ErrAbortHandler)
+	}
+	func() {
+		defer func() {
+			recovered := recover()
+			if err, _ := recovered.(error); !errors.Is(err, http.ErrAbortHandler) {
+				t.Fatalf("recovered %v, want the abort of the first request", recovered)
+			}
+		}()
+		r.post("key-1", `{"name":"a"}`)
+	}()
+	key := identity.IdempotencyKey{Requester: string(keyA.CredentialType) + ":" + keyA.CredentialID, Value: "key-1"}
+	rec, found, err := r.store.LookupIdempotency(t.Context(), scopeOf(), key, r.clk.Now())
+	if err != nil || !found || rec.Completed || rec.ResourceRef != "things/created" {
+		t.Fatalf("record after the crash = %+v, %v, %v; want in progress and naming the resource", rec, found, err)
+	}
+
+	// The retry comes back at once: the first request may still be running.
+	r.handler = func(http.ResponseWriter, *http.Request) { t.Error("the operation ran again") }
+	if soon := r.post("key-1", `{"name":"a"}`); soon.Code != http.StatusConflict || problemCode(t, soon) != "idempotency-in-progress" {
+		t.Fatalf("early retry = %d %s, want 409 idempotency-in-progress", soon.Code, soon.Body.String())
+	}
+	// The retry after the record is stale gets the resource of the first request.
+	r.clk.Advance(40 * time.Second)
+	late := r.post("key-1", `{"name":"a"}`)
+	if late.Code != http.StatusCreated || late.Body.String() != `{"run":1}` || late.Header().Get("Location") != "/api/v1/things/created" {
+		t.Fatalf("late retry = %d %s %q, want the created resource", late.Code, late.Body.String(), late.Header().Get("Location"))
+	}
+	if late.Header().Get(idempotency.ReplayedHeader) != "true" {
+		t.Errorf("the answer is not marked as replayed")
+	}
+	if n := r.runs.Load(); n != 1 {
+		t.Errorf("the operation ran %d times, want 1", n)
 	}
 }
 

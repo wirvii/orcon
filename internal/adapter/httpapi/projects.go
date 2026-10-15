@@ -32,6 +32,7 @@ import (
 // authorization, so the organization it works in is the one the authorization decided
 // (authz.OrgScopeFrom); a handler never builds a scope from a request value.
 type Projects struct {
+	access    ProjectAccessResolver
 	projects  *identity.Projects
 	store     identity.ProjectStore
 	flows     *flow.Creator
@@ -39,9 +40,16 @@ type Projects struct {
 	codec     *page.Codec
 }
 
-// NewProjects returns the handlers over their services and the page-token codec.
-func NewProjects(projects *identity.Projects, store identity.ProjectStore, flows *flow.Creator, flowStore flow.Store, codec *page.Codec) *Projects {
-	return &Projects{projects: projects, store: store, flows: flows, flowStore: flowStore, codec: codec}
+// ProjectAccessResolver says which projects of an organization a user can read (the SE6
+// evaluator implements it). It is asked once per request, never once per project.
+type ProjectAccessResolver interface {
+	ProjectAccess(ctx context.Context, user identity.UserID, org orgscope.Org) (authz.ProjectAccess, error)
+}
+
+// NewProjects returns the handlers over their services, the project access resolver and the
+// page-token codec.
+func NewProjects(access ProjectAccessResolver, projects *identity.Projects, store identity.ProjectStore, flows *flow.Creator, flowStore flow.Store, codec *page.Codec) *Projects {
+	return &Projects{access: access, projects: projects, store: store, flows: flows, flowStore: flowStore, codec: codec}
 }
 
 // Sort fields of the listings (the allowlists of the contract, without the minus).
@@ -57,8 +65,8 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // maxSlug is the length bound of a project slug (the project table).
 const maxSlug = 100
 
-// ListProjects lists the projects of the organization that the caller can read, one page at a
-// time, filtered by name prefix, environment and handle, and sorted by name or update time.
+// ListProjects lists the projects of the organization that the caller can read (project:read in
+// the project or project:read-all, R-SH-PRJ-01), one page at a time, filtered by name prefix, environment and handle, and sorted by name or update time.
 func (p *Projects) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	org, err := scopeOf(ctx)
 	if err != nil {
@@ -75,20 +83,29 @@ func (p *Projects) ListProjects(ctx context.Context, req apigen.ListProjectsRequ
 	q := derefString(req.Params.Q)
 	env := derefString(req.Params.Environment)
 	handle := derefString(req.Params.Handle)
+	filter := identity.ProjectFilter{NamePrefix: q, Environment: env, Handle: handle}
 	binding := page.Binding("sort="+page.String(terms), "q="+q, "environment="+env, "handle="+handle)
 	cursor, err := cursorFor(p.codec, derefString(req.Params.PageToken), org.String(), binding, terms)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := p.readProjects(ctx, org)
+	principal, ok := middleware.PrincipalFrom(ctx)
+	if !ok || principal.UserID.IsZero() {
+		return nil, identity.ErrUnauthenticated
+	}
+	access, err := p.access.ProjectAccess(ctx, principal.UserID, org)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := authz.ReadableProjects(ctx, p.store, org, access, page.MaxLimit, maxListRows)
 	if err != nil {
 		return nil, err
 	}
 	var items []listItem
 	for i := range rows {
 		rec := &rows[i]
-		if !hasPrefixFold(rec.Name, q) || (env != "" && rec.Environment != env) || (handle != "" && rec.Handle != handle) {
+		if !filter.Match(*rec) {
 			continue
 		}
 		items = append(items, listItem{
@@ -137,10 +154,21 @@ func (p *Projects) CreateProject(ctx context.Context, req apigen.CreateProjectRe
 	if slug == "" || len(slug) > maxSlug || !slugPattern.MatchString(slug) {
 		return nil, fmt.Errorf("%w: slug must be 1 to %d lowercase letters, digits and single hyphens", identity.ErrInvalidInput, maxSlug)
 	}
+	access, err := p.access.ProjectAccess(ctx, principal.UserID, org)
+	if err != nil {
+		return nil, err
+	}
+	// A creator who already reads every project (Owner, Admin, project:read-all) gets no binding;
+	// anyone else becomes Project Admin of the project they create (SPEC-016 Q3 = A, R-SH-PRJ-03).
+	creator := principal.UserID
+	if access.ReadsEveryProject() {
+		creator = identity.UserID{}
+	}
+	// The request cannot create an unprotected project: a new project is always protected
+	// (ADR-0059 section 5, SH-PRJ-1); a protected:false in the body is ignored.
 	rec, err := p.projects.Create(ctx, org, identity.NewProject{
 		Name: req.Body.Name, Slug: slug, Environment: derefString(req.Body.Environment),
-		Unprotected: req.Body.Protected != nil && !*req.Body.Protected,
-		By:          actorOf(principal), Creator: principal.UserID,
+		By: actorOf(principal), Creator: creator,
 	})
 	if err != nil {
 		return nil, err
@@ -169,6 +197,7 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 	q := derefString(req.Params.Q)
 	state := derefString(flowStateParam(req.Params.ActivationState))
 	project := identity.ProjectID(req.ProjectId)
+	filter := flow.ListFilter{NamePrefix: q, ActivationState: flow.ActivationState(state)}
 	binding := page.Binding("sort="+page.String(terms), "q="+q, "activationState="+state, "project="+project.String())
 	cursor, err := cursorFor(p.codec, derefString(req.Params.PageToken), org.String(), binding, terms)
 	if err != nil {
@@ -182,7 +211,7 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 	var items []listItem
 	for i := range rows {
 		rec := &rows[i]
-		if !hasPrefixFold(rec.Name, q) || (state != "" && string(rec.ActivationState) != state) {
+		if !filter.Match(*rec) {
 			continue
 		}
 		items = append(items, listItem{
@@ -289,25 +318,6 @@ func (p *Projects) rebuildFlow(ctx context.Context, rec identity.IdempotencyReco
 	return encodeResponse(201, flowBody(f), map[string]string{"Location": flowLocation(f.ID)}, flowETag(f))
 }
 
-// readProjects reads the projects of the organization, at most maxListRows of them, in
-// identity order.
-func (p *Projects) readProjects(ctx context.Context, org orgscope.Org) ([]identity.ProjectRecord, error) {
-	var out []identity.ProjectRecord
-	var after identity.ProjectID
-	for len(out) < maxListRows {
-		batch, err := p.store.ListProjects(ctx, org, after, page.MaxLimit)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, batch...)
-		if len(batch) < page.MaxLimit {
-			break
-		}
-		after = batch[len(batch)-1].ID
-	}
-	return out, nil
-}
-
 // readFlows reads the flows of the project, at most maxListRows of them, in identity order.
 func (p *Projects) readFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) ([]flow.Record, error) {
 	var out []flow.Record
@@ -377,11 +387,6 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
-}
-
-// hasPrefixFold reports whether name starts with prefix, ignoring case; an empty prefix matches.
-func hasPrefixFold(name, prefix string) bool {
-	return prefix == "" || strings.HasPrefix(strings.ToLower(name), strings.ToLower(prefix))
 }
 
 // slugOf derives a slug from a project name: lowercase letters and digits, runs of other

@@ -48,7 +48,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security) (*ht
 		deps.OrgSelector = sec.evaluator
 		deps.Idempotency = sec.store
 		projects := httpapi.NewProjects(
-			identity.NewProjects(sec.store, sec.store, sec.clock, sec.ids), sec.store,
+			sec.evaluator, identity.NewProjects(sec.store, sec.store, sec.clock, sec.ids), sec.store,
 			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec,
 		)
 		deps.Rebuilds = projects.Rebuilds()

@@ -70,7 +70,7 @@ func TestCreateProjectWithGrantBindsCreator(t *testing.T) {
 		}
 		p := g.newProject("grant")
 		grant := g.bindingFor(p.ID, g.user.ID)
-		if err := g.s.CreateProjectWithGrant(g.ctx(), scope, p, grant, audittest.Org(t, id.UUID(g.orgA), "project.created")); err != nil {
+		if err := g.s.CreateProjectWithGrant(g.ctx(), scope, p, grant, []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")}); err != nil {
 			t.Fatalf("create project with grant: %v", err)
 		}
 		bindings, err := g.s.Bindings(g.ctx(), g.user.ID, scope)
@@ -101,7 +101,7 @@ func TestCreateProjectWithGrantIsAtomic(t *testing.T) {
 		epochBefore, _ := g.s.Epoch(g.ctx(), scope)
 		p := g.newProject("atomic")
 		ghost := identity.UserID(g.ids.New())
-		err := g.s.CreateProjectWithGrant(g.ctx(), scope, p, g.bindingFor(p.ID, ghost), audittest.Org(t, id.UUID(g.orgA), "project.created"))
+		err := g.s.CreateProjectWithGrant(g.ctx(), scope, p, g.bindingFor(p.ID, ghost), []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")})
 		if !errors.Is(err, identity.ErrReference) {
 			t.Fatalf("grant to an unknown user = %v, want ErrReference", err)
 		}
@@ -126,7 +126,7 @@ func TestCreateProjectClaimsIdempotencyKeyInItsTransaction(t *testing.T) {
 		ctx := idempotencyclaim.With(g.ctx(), claim)
 
 		p := g.newProject("claimed")
-		if err := g.s.CreateProjectWithGrant(ctx, scope, p, g.bindingFor(p.ID, g.user.ID), audittest.Org(t, id.UUID(g.orgA), "project.created")); err != nil {
+		if err := g.s.CreateProjectWithGrant(ctx, scope, p, g.bindingFor(p.ID, g.user.ID), []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")}); err != nil {
 			t.Fatalf("claimed create: %v", err)
 		}
 		rec, found, err := g.s.LookupIdempotency(g.ctx(), scope, key, base.Add(time.Second))
@@ -138,7 +138,7 @@ func TestCreateProjectClaimsIdempotencyKeyInItsTransaction(t *testing.T) {
 		}
 
 		second := g.newProject("second")
-		err = g.s.CreateProjectWithGrant(ctx, scope, second, g.bindingFor(second.ID, g.user.ID), audittest.Org(t, id.UUID(g.orgA), "project.created"))
+		err = g.s.CreateProjectWithGrant(ctx, scope, second, g.bindingFor(second.ID, g.user.ID), []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")})
 		if !errors.Is(err, idempotencyclaim.ErrTaken) {
 			t.Fatalf("second create under the same claim = %v, want ErrTaken", err)
 		}
@@ -150,7 +150,7 @@ func TestCreateProjectClaimsIdempotencyKeyInItsTransaction(t *testing.T) {
 		refusedCtx := idempotencyclaim.With(g.ctx(), refusedClaim)
 		ghost := identity.UserID(g.ids.New())
 		third := g.newProject("third")
-		if err := g.s.CreateProjectWithGrant(refusedCtx, scope, third, g.bindingFor(third.ID, ghost), audittest.Org(t, id.UUID(g.orgA), "project.created")); !errors.Is(err, identity.ErrReference) {
+		if err := g.s.CreateProjectWithGrant(refusedCtx, scope, third, g.bindingFor(third.ID, ghost), []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")}); !errors.Is(err, identity.ErrReference) {
 			t.Fatalf("refused grant = %v, want ErrReference", err)
 		}
 		if _, found, _ := g.s.LookupIdempotency(g.ctx(), scope, refusedKey, base); found {
@@ -208,7 +208,7 @@ func TestIdempotencyRecordExpiresAndIsReclaimed(t *testing.T) {
 		p := g.newProject("reclaimed")
 		ctxAt := later
 		p.CreatedAt, p.UpdatedAt = ctxAt, ctxAt
-		if err := g.s.CreateProjectWithGrant(ctx, scope, p, g.bindingFor(p.ID, g.user.ID), audittest.Org(t, id.UUID(g.orgA), "project.created")); err != nil {
+		if err := g.s.CreateProjectWithGrant(ctx, scope, p, g.bindingFor(p.ID, g.user.ID), []audit.Entry{audittest.Org(t, id.UUID(g.orgA), "project.created")}); err != nil {
 			t.Fatalf("claim over an expired record: %v", err)
 		}
 		rec, found, _ := g.s.LookupIdempotency(g.ctx(), scope, key, ctxAt)
@@ -246,7 +246,7 @@ func TestCreateOrganizationWithAdminGrantsTheAdministrator(t *testing.T) {
 			ID: identity.RoleBindingID(g.ids.New()), OrgID: org.ID, ScopeKind: identity.RoleScopeOrg, UserID: g.user.ID,
 			RoleName: identity.RoleAdmin, CreatedAt: base, UpdatedAt: base,
 		}
-		entries := []audit.Entry{audittest.Org(t, id.UUID(org.ID), "org.created"), audittest.Org(t, id.UUID(org.ID), "member.role_changed")}
+		entries := []audit.Entry{audittest.Org(t, id.UUID(org.ID), "org.created"), audittest.Org(t, id.UUID(org.ID), "member.joined"), audittest.Org(t, id.UUID(org.ID), "role_binding.created")}
 		if err := g.s.CreateOrganizationWithAdmin(g.ctx(), org, m, grant, entries); err != nil {
 			t.Fatalf("create organization with admin: %v", err)
 		}

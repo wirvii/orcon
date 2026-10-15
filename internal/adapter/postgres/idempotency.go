@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
@@ -25,6 +26,12 @@ import (
 // httpStatus is the column value of an HTTP status, a three-digit code.
 func httpStatus(status int) pgtype.Int4 {
 	return pgtype.Int4{Int32: int32(status), Valid: true} //nolint:gosec // an HTTP status is a three-digit code, which fits in int32
+}
+
+// isUniqueViolation reports whether err is a unique-constraint violation of the driver.
+func isUniqueViolation(err error) bool {
+	var pe *pgconn.PgError
+	return errors.As(err, &pe) && pe.Code == codeUnique
 }
 
 // claimIdempotency writes the record of the idempotency claim carried by ctx, in the
@@ -45,7 +52,10 @@ func claimIdempotency(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org,
 			Fingerprint: claim.Fingerprint[:], Status: "IN_PROGRESS", ResourceReference: nullText(resourceRef),
 			IsSecretIssued: false, ExpiresAt: timestamp(now.Add(identity.IdempotencyTTL)), CreatedAt: timestamp(now), UpdatedAt: timestamp(now),
 		})
-		if errors.Is(err, identity.ErrConflict) {
+		// Two requests that carry the same key race to insert the record; the loser meets the unique
+		// index of the key once the winner commits. That is the key being taken, not a conflict of
+		// the resource (BL-127): translate it here, before the generic mapping of constraint violations.
+		if errors.Is(err, identity.ErrConflict) || isUniqueViolation(err) {
 			return idempotencyclaim.ErrTaken
 		}
 		if err != nil {

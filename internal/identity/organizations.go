@@ -85,14 +85,19 @@ func (o *Organizations) Create(ctx context.Context, in NewOrganization) (OrgReco
 	if err != nil {
 		return OrgRecord{}, err
 	}
-	granted, err := orgEntry(actor, org.ID, "member.role_changed", now, o.ids,
+	joined, err := orgEntry(actor, org.ID, "member.joined", now, o.ids,
+		jsonvalue.Member{Key: "userId", Value: jsonvalue.String(admin.ID.String())})
+	if err != nil {
+		return OrgRecord{}, err
+	}
+	bound, err := orgEntry(actor, org.ID, "role_binding.created", now, o.ids,
 		jsonvalue.Member{Key: "userId", Value: jsonvalue.String(admin.ID.String())},
 		jsonvalue.Member{Key: "roleName", Value: jsonvalue.String(RoleAdmin)},
 		jsonvalue.Member{Key: "scopeKind", Value: jsonvalue.String(RoleScopeOrg)})
 	if err != nil {
 		return OrgRecord{}, err
 	}
-	if err := o.store.CreateOrganizationWithAdmin(ctx, org, membership, grant, []audit.Entry{created, granted}); err != nil {
+	if err := o.store.CreateOrganizationWithAdmin(ctx, org, membership, grant, []audit.Entry{created, joined, bound}); err != nil {
 		return OrgRecord{}, fmt.Errorf("create organization: %w", err)
 	}
 	return org, nil
