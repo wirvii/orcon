@@ -253,7 +253,7 @@ skill-check:
 # connectors-check applies the brand icon rules (orcon-connector IC-1, IC-6, IC-8) to every
 # official connector package: icon-missing, icon-source-missing and icon-placeholder.
 connectors-check:
-	go test -race -count=1 -run 'TestIcon|TestOfficialConnectorIcons' ./internal/connector/authoring/...
+	go test -race -count=1 -run 'TestIcon|TestOfficialConnectorIcons|TestSanitize|TestLoadIcon' ./internal/connector/authoring/...
 
 # ---------------------------------------------------------------------------
 # Build
