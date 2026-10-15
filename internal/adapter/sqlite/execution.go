@@ -238,10 +238,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, oper
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
 	err := s.readOf(ctx, "list external operations", org, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: uuidBytes(org.UUID()), NodeExecutionID: uuidBytes(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: uuidBytes(org.UUID()), NodeExecutionID: uuidBytes(node), FromItemIndex: fromItem, FromID: uuidBytes(fromID), PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -468,7 +468,10 @@ func (t *sqliteTx) AppendJournal(ctx context.Context, operations []store.Externa
 	return nil
 }
 
-func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
+	// SQLite runs in one process: the injected clock is the database clock here (TY-5).
+	now := t.now()
+	deadline := now.Add(attemptTimeout)
 	var moved int64
 	for _, op := range operations {
 		n, err := t.q.MarkExternalOperationDispatching(ctx, sqlcgen.MarkExternalOperationDispatchingParams{
@@ -480,6 +483,11 @@ func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.Exter
 		moved += n
 	}
 	return moved, nil
+}
+
+// DatabaseNow implements [store.Tx]: the injected clock, as SQLite has one process.
+func (t *sqliteTx) DatabaseNow(context.Context) (time.Time, error) {
+	return t.now(), nil
 }
 
 func (t *sqliteTx) ResolveOperation(ctx context.Context, operation store.ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error) {

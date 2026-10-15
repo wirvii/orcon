@@ -141,6 +141,10 @@ SET state = 'DISPATCHING', dispatch_deadline_at = sqlc.arg(dispatch_deadline_at)
     first_dispatched_at = COALESCE(first_dispatched_at, sqlc.arg(dispatched_at)), updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND state = 'PREPARED';
 
+-- name: GetDatabaseTime :one
+-- orcon:scope instance
+SELECT clock_timestamp()::timestamptz AS database_time;
+
 -- name: MarkExternalOperationOutcome :execrows
 -- orcon:scope org
 -- orcon:hot
@@ -162,7 +166,8 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 SELECT id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state, batch_key,
        dispatch_deadline_at, first_dispatched_at, retry_epoch, response_reference
 FROM external_operation
-WHERE org_id = sqlc.arg(org_id) AND node_execution_id = sqlc.arg(node_execution_id) AND item_index >= sqlc.arg(from_item_index)
+WHERE org_id = sqlc.arg(org_id) AND node_execution_id = sqlc.arg(node_execution_id)
+  AND (item_index > sqlc.arg(from_item_index) OR (item_index = sqlc.arg(from_item_index) AND id > sqlc.arg(from_id)))
 ORDER BY item_index, id
 LIMIT sqlc.arg(page_size);
 

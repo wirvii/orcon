@@ -44,12 +44,15 @@ const (
 	// The send guard is the margin kept before the dispatch deadline: a send
 	// that would start later than this is not started at all (ADR-0012 section 5).
 	sendGuard = time.Second
+	// The recovery scan reads operations in pages of listPage rows.
+	listPage = 512
 )
 
 // Errors of the journal.
 var (
 	// ErrNotPrepared means a DISPATCHING mark moved fewer rows than requested:
-	// some items were not PREPARED. Nothing of that group is sent.
+	// some items were not PREPARED. The mark is rolled back as a whole, so no
+	// item of that window is left DISPATCHING, and nothing of it is sent.
 	ErrNotPrepared = errors.New("journal: some operations were not PREPARED")
 )
 
@@ -90,8 +93,8 @@ type Reply struct {
 }
 
 // Provider is the external system. Send performs one request; it runs outside
-// every transaction. Lookup asks whether the operation took effect, for
-// contracts with reconciliation.
+// every transaction, and its context ends at the attempt timeout. Lookup asks
+// whether the operation took effect, for contracts with reconciliation.
 type Provider interface {
 	Send(ctx context.Context, attempt *Attempt) (Reply, error)
 	Lookup(ctx context.Context, attempt *Attempt) (Reply, error)
@@ -121,7 +124,7 @@ type Summary struct {
 // implement it; each call is one transaction of its own.
 type Store interface {
 	InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error
-	ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error)
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error)
 }
 
 // Journal writes and recovers the operations of one store.
@@ -130,6 +133,8 @@ type Journal struct {
 	provider Provider
 	clock    clock.Clock
 	cfg      Config
+	// page is the page size of the recovery scan: listPage, unless a test shrinks it.
+	page int
 }
 
 // New returns a journal over st and provider. Zero config fields take their
@@ -150,7 +155,7 @@ func New(db Store, provider Provider, clk clock.Clock, cfg Config) (*Journal, er
 	if cfg.Concurrency <= 0 {
 		cfg.Concurrency = defaultConcurrency
 	}
-	return &Journal{db: db, provider: provider, clock: clk, cfg: cfg}, nil
+	return &Journal{db: db, provider: provider, clock: clk, cfg: cfg, page: listPage}, nil
 }
 
 // CorrelationKey derives the key of an item (ADR-0012 section 3): base32 of
@@ -204,24 +209,24 @@ func (j *Journal) dispatchWindow(ctx context.Context, org orgscope.Org, window [
 	for i := range window {
 		ids[i] = window[i].ID
 	}
-	markedAt := j.clock.Now()
-	deadline := markedAt.Add(j.cfg.AttemptTimeout)
-	var moved int64
 	err := j.db.InTx(ctx, org, func(ctx context.Context, tx store.Tx) error {
-		n, err := tx.MarkDispatching(ctx, ids, deadline, markedAt)
-		moved = n
-		return err
+		moved, err := tx.MarkDispatching(ctx, ids, j.cfg.AttemptTimeout)
+		if err != nil {
+			return err
+		}
+		// A partial mark is rolled back, not committed: an item that did move
+		// must not stay DISPATCHING while the rest of the window is refused.
+		if moved != int64(len(window)) {
+			return fmt.Errorf("%w: %d of %d", ErrNotPrepared, moved, len(window))
+		}
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("journal: mark dispatching: %w", err)
 	}
-	if moved != int64(len(window)) {
-		return fmt.Errorf("%w: %d of %d", ErrNotPrepared, moved, len(window))
-	}
-	// The mark is committed: the guard starts from the moment the worker can
-	// observe it, which is no earlier than now.
-	guard := j.clock.Now().Add(j.cfg.AttemptTimeout - sendGuard)
-	outcomes := j.send(ctx, window, c, guard)
+	// The mark is committed: the guard starts from the moment the worker observes it.
+	observed := j.clock.Now()
+	outcomes := j.send(ctx, window, c, observed)
 	applied, err := j.record(ctx, org, outcomes, j.clock.Now(), sum)
 	sum.Pending += len(window) - applied
 	return err
@@ -235,25 +240,34 @@ type outcome struct {
 }
 
 // send runs the sends of a window with bounded concurrency. It holds no
-// transaction. Items whose send is not started or fails in a way a later
-// recovery may repeat keep no outcome and stay in DISPATCHING.
-func (j *Journal) send(ctx context.Context, window []store.ExternalOperation, c Contract, guard time.Time) []outcome {
+// transaction. The send guard is checked again each time a slot is acquired,
+// immediately before the send, so an item that waited for a slot past the guard
+// is not sent. Every send ends at the attempt timeout, measured from observed.
+// Items whose send is not started or fails in a way a later recovery may repeat
+// keep no outcome and stay in DISPATCHING.
+func (j *Journal) send(ctx context.Context, window []store.ExternalOperation, c Contract, observed time.Time) []outcome {
+	guard := observed.Add(j.cfg.AttemptTimeout - sendGuard)
+	limit := observed.Add(j.cfg.AttemptTimeout)
 	results := make([]*outcome, len(window))
 	sem := make(chan struct{}, j.cfg.Concurrency)
 	var wg sync.WaitGroup
 	for i := range window {
-		if !j.clock.Now().Before(guard) {
+		sem <- struct{}{}
+		now := j.clock.Now()
+		if !now.Before(guard) {
+			<-sem
 			break
 		}
 		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int) {
+		go func(i int, timeout time.Duration) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			op := window[i]
-			reply, err := j.provider.Send(ctx, &Attempt{Operation: op, Contract: c})
+			sctx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+			reply, err := j.provider.Send(sctx, &Attempt{Operation: op, Contract: c})
 			results[i] = classify(op.ID, c, reply, err)
-		}(i)
+		}(i, limit.Sub(now))
 	}
 	wg.Wait()
 	out := make([]outcome, 0, len(window))

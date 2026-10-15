@@ -28,6 +28,7 @@ sqlite:UpdateFlowVersionPublishedByPrincipalToNull  # PostgreSQL clears the same
 sqlite:UpdateMembershipInvitedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateInstanceAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateExternalOperationResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+postgres:GetDatabaseTime  # SPEC-001 C6: the dispatch deadline and recovery windows read the PostgreSQL clock (clock_timestamp, ADR-0012 sections 5-6); SQLite runs in one process and reads the injected clock in Go (orcon-db TY-5)
 sqlite:UpdateHumanTaskResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateAttentionRequestAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateAttentionRequestResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions

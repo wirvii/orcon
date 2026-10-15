@@ -38,32 +38,71 @@ type fakeDB struct {
 	keys      map[string]bool
 	open      int
 	committed int
+	// dbClock is the database clock. It is separate from the application clock
+	// of a test, so a test can show which one decides.
+	dbClock *clock.Fake
 }
 
 func newFakeDB() *fakeDB {
-	return &fakeDB{rows: map[store.ExternalOperationID]*store.ExternalOperation{}, keys: map[string]bool{}}
+	return &fakeDB{rows: map[store.ExternalOperationID]*store.ExternalOperation{}, keys: map[string]bool{}, dbClock: clock.NewFake(t0)}
 }
 
+// image is a copy of the rows and keys of a fakeDB, taken to roll a transaction back.
+type image struct {
+	rows map[store.ExternalOperationID]store.ExternalOperation
+	keys map[string]bool
+}
+
+// imageLocked copies the content of f. The caller holds f.mu.
+func (f *fakeDB) imageLocked() image {
+	img := image{rows: make(map[store.ExternalOperationID]store.ExternalOperation, len(f.rows)), keys: make(map[string]bool, len(f.keys))}
+	for id, r := range f.rows {
+		img.rows[id] = *r
+	}
+	for k := range f.keys {
+		img.keys[k] = true
+	}
+	return img
+}
+
+// restoreLocked puts back the content of img. The caller holds f.mu.
+func (f *fakeDB) restoreLocked(img image) {
+	f.rows = make(map[store.ExternalOperationID]*store.ExternalOperation, len(img.rows))
+	for id := range img.rows {
+		r := img.rows[id]
+		f.rows[id] = &r
+	}
+	f.keys = img.keys
+}
+
+// InTx runs fn as one transaction: when fn returns an error, the writes of fn are
+// rolled back, as the storage adapters do.
 func (f *fakeDB) InTx(ctx context.Context, _ orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error {
 	f.mu.Lock()
 	f.open++
+	before := f.imageLocked()
 	f.mu.Unlock()
 	err := fn(ctx, &fakeTx{db: f})
 	f.mu.Lock()
 	f.open--
 	if err == nil {
 		f.committed++
+	} else {
+		f.restoreLocked(before)
 	}
 	f.mu.Unlock()
 	return err
 }
 
-func (f *fakeDB) ListExternalOperations(_ context.Context, _ orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+// ListExternalOperations returns the rows of node after the cursor (fromItem, fromID)
+// in (item index, id) order, as the adapters do.
+func (f *fakeDB) ListExternalOperations(_ context.Context, _ orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []store.ExternalOperation
 	for _, r := range f.rows {
-		if r.NodeExecutionID == node && r.ItemIndex >= fromItem {
+		after := r.ItemIndex > fromItem || (r.ItemIndex == fromItem && r.ID.String() > fromID.String())
+		if r.NodeExecutionID == node && after {
 			out = append(out, *r)
 		}
 	}
@@ -77,6 +116,16 @@ func (f *fakeDB) ListExternalOperations(_ context.Context, _ orgscope.Org, node 
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+// deadline returns the dispatch deadline stored for an operation.
+func (f *fakeDB) deadline(id store.ExternalOperationID) time.Time {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if r, ok := f.rows[id]; ok {
+		return r.DispatchDeadlineAt
+	}
+	return time.Time{}
 }
 
 // state returns the state of an operation, or "" when unknown.
@@ -97,12 +146,12 @@ func (f *fakeDB) isOpen() bool {
 
 // seed puts operations straight into the store in a given state, as a crashed
 // worker would have left them.
-func (f *fakeDB) seed(ops []store.ExternalOperation, state string, deadline, dispatchedAt time.Time) {
+func (f *fakeDB) seed(ops []store.ExternalOperation, deadline, dispatchedAt time.Time) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for i := range ops {
 		o := ops[i]
-		o.State = state
+		o.State = StateDispatching
 		o.DispatchDeadlineAt = deadline
 		o.FirstDispatchedAt = dispatchedAt
 		f.rows[o.ID] = &o
@@ -134,9 +183,11 @@ func (t *fakeTx) AppendJournal(_ context.Context, ops []store.ExternalOperation)
 	return nil
 }
 
-func (t *fakeTx) MarkDispatching(_ context.Context, ids []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+// MarkDispatching sets the deadline from the database clock, as the adapters do.
+func (t *fakeTx) MarkDispatching(_ context.Context, ids []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
 	t.db.mu.Lock()
 	defer t.db.mu.Unlock()
+	now := t.db.dbClock.Now()
 	var moved int64
 	for _, id := range ids {
 		r, ok := t.db.rows[id]
@@ -144,11 +195,15 @@ func (t *fakeTx) MarkDispatching(_ context.Context, ids []store.ExternalOperatio
 			continue
 		}
 		r.State = StateDispatching
-		r.DispatchDeadlineAt = deadline
+		r.DispatchDeadlineAt = now.Add(attemptTimeout)
 		r.FirstDispatchedAt = now
 		moved++
 	}
 	return moved, nil
+}
+
+func (t *fakeTx) DatabaseNow(context.Context) (time.Time, error) {
+	return t.db.dbClock.Now(), nil
 }
 
 func (t *fakeTx) ResolveOperation(_ context.Context, op store.ExternalOperationID, from, to, response string, _ time.Time) (bool, error) {
@@ -357,19 +412,18 @@ func TestUncertainSuspends(t *testing.T) {
 
 func TestRecoverDispatching(t *testing.T) {
 	db := newFakeDB()
-	clk := clock.NewFake(t0)
 	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
 		return Reply{Outcome: StateSucceeded}, nil
 	})
 	const timeout, grace = 30 * time.Second, 5 * time.Second
-	j := newJournal(t, db, p, clk, Config{AttemptTimeout: timeout, Grace: grace})
+	j := newJournal(t, db, p, clock.NewFake(t0), Config{AttemptTimeout: timeout, Grace: grace})
 	ops := makeOps(3)
 	deadline := t0.Add(timeout)
-	db.seed(ops, StateDispatching, deadline, t0)
+	db.seed(ops, deadline, t0)
 	contract := Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour}
 
 	// Before the deadline plus grace, nothing is touched: the worker may be alive.
-	clk.Set(deadline.Add(grace - time.Second))
+	db.dbClock.Set(deadline.Add(grace - time.Second))
 	sum, err := j.Recover(t.Context(), testScope, testNode, contract)
 	if err != nil {
 		t.Fatal(err)
@@ -379,7 +433,7 @@ func TestRecoverDispatching(t *testing.T) {
 	}
 
 	// After it, a key still inside its TTL is resent with the same key.
-	clk.Set(deadline.Add(grace + time.Second))
+	db.dbClock.Set(deadline.Add(grace + time.Second))
 	sum, err = j.Recover(t.Context(), testScope, testNode, contract)
 	if err != nil {
 		t.Fatal(err)
@@ -404,7 +458,7 @@ func TestKeyTTLExpired(t *testing.T) {
 	j := newJournal(t, db, p, clk, Config{AttemptTimeout: timeout, Grace: grace})
 	ops := makeOps(2)
 	dispatched := t0.Add(-2 * time.Hour)
-	db.seed(ops, StateDispatching, dispatched.Add(timeout), dispatched)
+	db.seed(ops, dispatched.Add(timeout), dispatched)
 	clk.Set(t0)
 
 	sum, err := j.Recover(t.Context(), testScope, testNode, Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour})
@@ -454,6 +508,213 @@ func TestSendGuardKeepsLateItemsInDispatching(t *testing.T) {
 	}
 	if p.totalSends() != 0 || sum.Pending != 1 {
 		t.Fatalf("sends=%d summary=%+v", p.totalSends(), sum)
+	}
+}
+
+// hangingProvider answers only when its context ends, as a stalled peer does.
+type hangingProvider struct {
+	mu          sync.Mutex
+	hasDeadline bool
+	remaining   time.Duration
+}
+
+func (p *hangingProvider) Send(ctx context.Context, _ *Attempt) (Reply, error) {
+	p.mu.Lock()
+	d, ok := ctx.Deadline()
+	p.hasDeadline = ok
+	if ok {
+		p.remaining = time.Until(d)
+	}
+	p.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return Reply{}, ctx.Err()
+	case <-time.After(20 * time.Second): // a broken bound ends here, so the test fails instead of hanging
+		return Reply{Outcome: StateSucceeded}, nil
+	}
+}
+
+func (p *hangingProvider) Lookup(context.Context, *Attempt) (Reply, error) {
+	return Reply{}, errors.New("no lookup in this test")
+}
+
+// BL-113: an item that waited for a send slot past the guard is not sent.
+func TestSendThatWaitedPastTheGuardIsNotSent(t *testing.T) {
+	db := newFakeDB()
+	clk := clock.NewFake(t0)
+	const timeout = 10 * time.Second
+	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
+		// The first send takes until the guard (the attempt timeout minus the send guard).
+		clk.Advance(timeout - sendGuard)
+		return Reply{Outcome: StateSucceeded}, nil
+	})
+	j := newJournal(t, db, p, clk, Config{AttemptTimeout: timeout, Concurrency: 1})
+	ops := makeOps(3)
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
+		t.Fatal(err)
+	}
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.totalSends() != 1 || sum.Succeeded != 1 || sum.Pending != 2 {
+		t.Fatalf("sends=%d summary=%+v, want one send and two items left in DISPATCHING", p.totalSends(), sum)
+	}
+	for _, op := range ops[1:] {
+		if got := db.state(op.ID); got != StateDispatching {
+			t.Fatalf("item %d is %q, want DISPATCHING", op.ItemIndex, got)
+		}
+	}
+}
+
+// BL-113: a send that hangs is cut at the attempt timeout, measured from the mark.
+func TestHangingSendIsCutAtTheAttemptTimeout(t *testing.T) {
+	db := newFakeDB()
+	const timeout = 1500 * time.Millisecond
+	p := &hangingProvider{}
+	j := newJournal(t, db, p, clock.NewFake(t0), Config{AttemptTimeout: timeout})
+	ops := makeOps(1)
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Uncertain != 1 || db.state(ops[0].ID) != StateUncertain {
+		t.Fatalf("summary=%+v state=%q, want the cut send UNCERTAIN", sum, db.state(ops[0].ID))
+	}
+	if elapsed > 10*time.Second {
+		t.Fatalf("the send ran %v, past the attempt timeout %v", elapsed, timeout)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.hasDeadline || p.remaining > timeout || p.remaining < timeout-sendGuard {
+		t.Fatalf("send context: deadline=%v remaining=%v, want a deadline of about %v", p.hasDeadline, p.remaining, timeout)
+	}
+}
+
+// BL-113: the dispatch deadline is the database clock plus the attempt timeout, not the application clock.
+func TestDispatchDeadlineComesFromTheDatabaseClock(t *testing.T) {
+	db := newFakeDB()
+	db.dbClock.Set(t0.Add(time.Hour))
+	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
+		return Reply{Outcome: StateSucceeded}, nil
+	})
+	j := newJournal(t, db, p, clock.NewFake(t0), Config{AttemptTimeout: 30 * time.Second})
+	ops := makeOps(2)
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone}); err != nil {
+		t.Fatal(err)
+	}
+	want := t0.Add(time.Hour + 30*time.Second)
+	for _, op := range ops {
+		if got := db.deadline(op.ID); !got.Equal(want) {
+			t.Fatalf("item %d deadline = %v, want %v (database clock + attempt timeout)", op.ItemIndex, got, want)
+		}
+	}
+}
+
+// BL-113: recovery decides with the database clock: an application clock far past the deadline changes nothing.
+func TestRecoveryReadsTheDatabaseClock(t *testing.T) {
+	db := newFakeDB()
+	clk := clock.NewFake(t0.Add(3 * time.Hour))
+	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
+		return Reply{Outcome: StateSucceeded}, nil
+	})
+	const timeout, grace = 30 * time.Second, 5 * time.Second
+	j := newJournal(t, db, p, clk, Config{AttemptTimeout: timeout, Grace: grace})
+	ops := makeOps(2)
+	deadline := t0.Add(timeout)
+	db.seed(ops, deadline, t0)
+	contract := Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour}
+
+	db.dbClock.Set(deadline.Add(grace - time.Second))
+	sum, err := j.Recover(t.Context(), testScope, testNode, contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Pending != 2 || p.totalSends() != 0 {
+		t.Fatalf("recovery followed the application clock: %+v sends=%d", sum, p.totalSends())
+	}
+
+	db.dbClock.Set(deadline.Add(grace + time.Second))
+	sum, err = j.Recover(t.Context(), testScope, testNode, contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Succeeded != 2 {
+		t.Fatalf("recovery after the database deadline = %+v", sum)
+	}
+}
+
+// BL-114: recovery pages by the full key, so rows that share an item index (one
+// per retry epoch) are all settled, also across page boundaries.
+func TestRecoverPagesThroughRetryEpochsSharingAnItem(t *testing.T) {
+	db := newFakeDB()
+	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
+		return Reply{Outcome: StateSucceeded}, nil
+	})
+	j := newJournal(t, db, p, clock.NewFake(t0), Config{AttemptTimeout: 30 * time.Second, Grace: 5 * time.Second})
+	j.page = 2
+	var ops []store.ExternalOperation
+	for _, row := range []struct{ item, epoch int64 }{{0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 1}, {2, 0}} {
+		ops = append(ops, store.ExternalOperation{
+			ID:                store.ExternalOperationID(id.Derive("op", strconv.FormatInt(row.item, 10), strconv.FormatInt(row.epoch, 10))),
+			OrgID:             testOrg,
+			ExecutionID:       store.ExecutionID(id.Derive("exec")),
+			NodeExecutionID:   testNode,
+			ItemIndex:         row.item,
+			RetryEpoch:        row.epoch,
+			CorrelationKey:    CorrelationKey("exec", "t1", "", "tok", row.item, row.epoch),
+			ContractReference: "orcon.http@1",
+			CreatedAt:         t0,
+		})
+	}
+	db.seed(ops, t0.Add(30*time.Second), t0)
+	db.dbClock.Set(t0.Add(40 * time.Second))
+	sum, err := j.Recover(t.Context(), testScope, testNode, Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Succeeded != len(ops) || p.totalSends() != len(ops) {
+		t.Fatalf("recovery = %+v sends=%d, want all %d rows settled", sum, p.totalSends(), len(ops))
+	}
+	for _, op := range ops {
+		if got := db.state(op.ID); got != StateSucceeded {
+			t.Fatalf("item %d epoch %d is %q", op.ItemIndex, op.RetryEpoch, got)
+		}
+	}
+}
+
+// BL-115: a window that is not entirely PREPARED is rolled back as a whole: no
+// item of it stays DISPATCHING, and nothing is sent.
+func TestPartialMarkIsRolledBack(t *testing.T) {
+	db := newFakeDB()
+	p := newFakeProvider(t, db, func(int, *Attempt) (Reply, error) {
+		return Reply{Outcome: StateSucceeded}, nil
+	})
+	j := newJournal(t, db, p, clock.NewFake(t0), Config{})
+	ops := makeOps(3)
+	// The third operation is never prepared, so the mark of the window moves two of three.
+	if err := j.Prepare(t.Context(), testScope, ops[:2]); err != nil {
+		t.Fatal(err)
+	}
+	_, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
+	if !errors.Is(err, ErrNotPrepared) {
+		t.Fatalf("err = %v, want ErrNotPrepared", err)
+	}
+	for _, op := range ops[:2] {
+		if got := db.state(op.ID); got != StatePrepared {
+			t.Fatalf("item %d is %q after a refused mark, want PREPARED", op.ItemIndex, got)
+		}
+	}
+	if p.totalSends() != 0 {
+		t.Fatalf("sends = %d after a refused mark", p.totalSends())
 	}
 }
 

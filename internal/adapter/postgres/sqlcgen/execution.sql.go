@@ -62,6 +62,18 @@ func (q *Queries) AppendExecutionEvent(ctx context.Context, arg AppendExecutionE
 	return sequence_number, err
 }
 
+const getDatabaseTime = `-- name: GetDatabaseTime :one
+SELECT clock_timestamp()::timestamptz AS database_time
+`
+
+// orcon:scope instance
+func (q *Queries) GetDatabaseTime(ctx context.Context) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getDatabaseTime)
+	var database_time pgtype.Timestamptz
+	err := row.Scan(&database_time)
+	return database_time, err
+}
+
 const getEngineState = `-- name: GetEngineState :one
 SELECT status, engine_state_revision, engine_state_document
 FROM execution
@@ -1282,15 +1294,17 @@ const listExternalOperations = `-- name: ListExternalOperations :many
 SELECT id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state, batch_key,
        dispatch_deadline_at, first_dispatched_at, retry_epoch, response_reference
 FROM external_operation
-WHERE org_id = $1 AND node_execution_id = $2 AND item_index >= $3
+WHERE org_id = $1 AND node_execution_id = $2
+  AND (item_index > $3 OR (item_index = $3 AND id > $4))
 ORDER BY item_index, id
-LIMIT $4
+LIMIT $5
 `
 
 type ListExternalOperationsParams struct {
 	OrgID           pgtype.UUID
 	NodeExecutionID pgtype.UUID
 	FromItemIndex   int64
+	FromID          pgtype.UUID
 	PageSize        int32
 }
 
@@ -1317,6 +1331,7 @@ func (q *Queries) ListExternalOperations(ctx context.Context, arg ListExternalOp
 		arg.OrgID,
 		arg.NodeExecutionID,
 		arg.FromItemIndex,
+		arg.FromID,
 		arg.PageSize,
 	)
 	if err != nil {

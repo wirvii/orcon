@@ -1286,15 +1286,17 @@ const listExternalOperations = `-- name: ListExternalOperations :many
 SELECT id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state, batch_key,
        dispatch_deadline_at, first_dispatched_at, retry_epoch, response_reference
 FROM external_operation
-WHERE org_id = ?1 AND node_execution_id = ?2 AND item_index >= ?3
+WHERE org_id = ?1 AND node_execution_id = ?2
+  AND (item_index > ?3 OR (item_index = ?3 AND id > ?4))
 ORDER BY item_index, id
-LIMIT ?4
+LIMIT ?5
 `
 
 type ListExternalOperationsParams struct {
 	OrgID           []byte
 	NodeExecutionID []byte
 	FromItemIndex   int64
+	FromID          []byte
 	PageSize        int64
 }
 
@@ -1321,6 +1323,7 @@ func (q *Queries) ListExternalOperations(ctx context.Context, arg ListExternalOp
 		arg.OrgID,
 		arg.NodeExecutionID,
 		arg.FromItemIndex,
+		arg.FromID,
 		arg.PageSize,
 	)
 	if err != nil {

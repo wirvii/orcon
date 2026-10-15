@@ -510,9 +510,11 @@ type Reader interface {
 	ListExecutionEvents(ctx context.Context, org orgscope.Org, execution ExecutionID, after int64, limit int) ([]Event, error)
 	// GetExternalOperation returns one journal entry, or flow.ErrNotFound.
 	GetExternalOperation(ctx context.Context, org orgscope.Org, operation ExternalOperationID) (ExternalOperation, error)
-	// ListExternalOperations returns the journal of a node execution from an
-	// item index on, in item order.
-	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
+	// ListExternalOperations returns up to limit operations of a node execution
+	// that come after the cursor (fromItem, fromID) in (item index, id) order.
+	// The zero ExternalOperationID with fromItem 0 starts the list. Operations
+	// sharing an item index (one per retry epoch) are all returned, page by page.
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, fromID ExternalOperationID, limit int) ([]ExternalOperation, error)
 }
 
 // EngineReader reads what a worker needs to open an execution.
@@ -574,9 +576,15 @@ type Tx interface {
 	// (intent before dispatch, ADR-0012 section 4). A repeated correlation key
 	// fails with flow.ErrConflict and inserts none.
 	AppendJournal(ctx context.Context, operations []ExternalOperation) error
-	// MarkDispatching moves PREPARED operations to DISPATCHING with their
-	// deadline and returns how many moved (ADR-0012 section 4, step 2).
-	MarkDispatching(ctx context.Context, operations []ExternalOperationID, deadline, now time.Time) (int64, error)
+	// MarkDispatching moves PREPARED operations to DISPATCHING and returns how
+	// many moved (ADR-0012 section 4, step 2). The dispatch deadline is the
+	// database clock read inside this transaction plus attemptTimeout
+	// (ADR-0012 section 5): the application clock is not used for it.
+	MarkDispatching(ctx context.Context, operations []ExternalOperationID, attemptTimeout time.Duration) (int64, error)
+	// DatabaseNow returns the instant of the database clock. PostgreSQL reads
+	// clock_timestamp(); SQLite runs in one process and returns the injected
+	// clock (orcon-db TY-5).
+	DatabaseNow(ctx context.Context) (time.Time, error)
 	// ResolveOperation moves an operation from one state to another and reports
 	// whether it was in the expected state.
 	ResolveOperation(ctx context.Context, operation ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error)

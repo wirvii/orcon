@@ -203,10 +203,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, oper
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
 	err := s.inScope(ctx, "list external operations", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, FromID: pgUUID(fromID), PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -415,11 +415,17 @@ func (t *pgTx) AppendJournal(ctx context.Context, operations []store.ExternalOpe
 	return nil
 }
 
-func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
+	// The deadline is the database clock of this transaction plus the attempt timeout (ADR-0012 section 5).
+	now, err := t.DatabaseNow(ctx)
+	if err != nil {
+		return 0, err
+	}
+	deadline := now.Add(attemptTimeout)
 	var moved int64
 	for _, op := range operations {
 		n, err := t.q.MarkExternalOperationDispatching(ctx, sqlcgen.MarkExternalOperationDispatchingParams{
-			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: nullTimestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
+			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: timestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
 		})
 		if err != nil {
 			return moved, err
@@ -427,6 +433,16 @@ func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalO
 		moved += n
 	}
 	return moved, nil
+}
+
+// DatabaseNow implements [store.Tx] with the PostgreSQL clock_timestamp(), so
+// that every process decides recovery windows with one clock (ADR-0013 section 4).
+func (t *pgTx) DatabaseNow(ctx context.Context) (time.Time, error) {
+	ts, err := t.q.GetDatabaseTime(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.Time.UTC(), nil
 }
 
 func (t *pgTx) ResolveOperation(ctx context.Context, operation store.ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error) {

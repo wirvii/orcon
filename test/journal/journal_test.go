@@ -248,9 +248,10 @@ func TestRecoverDispatching(t *testing.T) {
 	eachStore(t, func(t *testing.T, env *storetest.EngineEnv) {
 		t.Helper()
 		s := newScenario(t, env)
-		start := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-		clk := clock.NewFake(start)
-		const timeout, grace = 30 * time.Second, 5 * time.Second
+		// Recovery windows are read from the database clock (ADR-0012 section 6). The stores
+		// of this suite keep real time, so the test waits the window out instead of moving a clock.
+		clk := clock.NewFake(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC))
+		const timeout, grace = 1500 * time.Millisecond, 100 * time.Millisecond
 		failing := &provider{t: t, env: env, sends: map[string]int{}, reply: func(int, *journal.Attempt) (journal.Reply, error) {
 			return journal.Reply{}, errors.New("connection reset")
 		}}
@@ -270,12 +271,11 @@ func TestRecoverDispatching(t *testing.T) {
 			return journal.Reply{Outcome: journal.StateSucceeded}, nil
 		}}
 		j = newJournal(t, env.Store, healthy, clk, journal.Config{AttemptTimeout: timeout, Grace: grace})
-		clk.Set(start.Add(timeout + grace - time.Second))
 		sum, err = j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil || sum.Pending != 3 || healthy.total() != 0 {
 			t.Fatalf("early recovery acted: %+v sends=%d err=%v", sum, healthy.total(), err)
 		}
-		clk.Set(start.Add(timeout + grace + time.Second))
+		time.Sleep(timeout + grace + 300*time.Millisecond)
 		sum, err = j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil || sum.Succeeded != 3 {
 			t.Fatalf("recovery = %+v err=%v", sum, err)
@@ -320,13 +320,15 @@ func TestKeyTTLExpired(t *testing.T) {
 	eachStore(t, func(t *testing.T, env *storetest.EngineEnv) {
 		t.Helper()
 		s := newScenario(t, env)
-		now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-		clk := clock.NewFake(now.Add(-2 * time.Hour))
+		// The key age counts from the first dispatch on the database clock: a TTL shorter than the
+		// wait makes the key expired by the time of recovery.
+		clk := clock.NewFake(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC))
+		const timeout, grace, keyTTL = 1500 * time.Millisecond, 100 * time.Millisecond, 500 * time.Millisecond
 		failing := &provider{t: t, env: env, sends: map[string]int{}, reply: func(int, *journal.Attempt) (journal.Reply, error) {
 			return journal.Reply{}, errors.New("connection reset")
 		}}
-		contract := journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: time.Hour}
-		j := newJournal(t, env.Store, failing, clk, journal.Config{AttemptTimeout: 30 * time.Second, Grace: 5 * time.Second})
+		contract := journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: keyTTL}
+		j := newJournal(t, env.Store, failing, clk, journal.Config{AttemptTimeout: timeout, Grace: grace})
 		ops := s.ops(2)
 		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
@@ -334,7 +336,7 @@ func TestKeyTTLExpired(t *testing.T) {
 		if _, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, contract); err != nil {
 			t.Fatal(err)
 		}
-		clk.Set(now)
+		time.Sleep(timeout + grace + 300*time.Millisecond)
 		sum, err := j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil {
 			t.Fatal(err)
