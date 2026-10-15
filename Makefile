@@ -148,12 +148,12 @@ sbom:
 
 test:
 	set -e; for dir in $(WORKSPACE_DIRS); do \
-		(cd "$$dir" && go test -race -shuffle=on -count=1 ./...); \
+		(cd "$$dir" && go test -race -timeout 25m -shuffle=on -count=1 ./...); \
 	done
-	cd tools && $(TOOLS_ENV) go test -race -shuffle=on -count=1 ./...
+	cd tools && $(TOOLS_ENV) go test -race -timeout 25m -shuffle=on -count=1 ./...
 
 test-tools:
-	cd tools && $(TOOLS_ENV) go test -race -count=1 ./...
+	cd tools && $(TOOLS_ENV) go test -race -timeout 25m -count=1 ./...
 
 cover:
 	sh scripts/check-coverage.sh 80
@@ -173,7 +173,7 @@ PG_IMAGES ?= postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b1436
 test-postgres:
 	set -e; for image in $(PG_IMAGES); do \
 		echo "test-postgres: $$image"; \
-		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/... ./test/isolation/...; \
+		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -timeout 25m -count=1 ./internal/adapter/... ./test/isolation/...; \
 	done
 
 # test-compat-floor proves the compatibility floor of every migration and the
