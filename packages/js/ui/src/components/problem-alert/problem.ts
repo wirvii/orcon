@@ -69,11 +69,6 @@ export const problemMessages = defineMessages({
     defaultMessage: 'This changed since you opened it. Reload and try again.',
     description: 'Shown when the item changed since the person loaded it.',
   },
-  validationFailed: {
-    id: 'problem.validation-failed',
-    defaultMessage: 'Some of the data is not valid. Check the highlighted fields.',
-    description: 'Shown when the server rejects the data sent.',
-  },
   payloadTooLarge: {
     id: 'problem.payload-too-large',
     defaultMessage: 'What you sent is too large.',
@@ -105,7 +100,6 @@ export const knownProblemMessages: Readonly<Record<string, MessageDescriptor>> =
   'not-found': problemMessages.notFound,
   'conflict': problemMessages.conflict,
   'precondition-failed': problemMessages.preconditionFailed,
-  'validation-failed': problemMessages.validationFailed,
   'payload-too-large': problemMessages.payloadTooLarge,
   'csrf-check-failed': problemMessages.csrfCheckFailed,
   'step-up-required': problemMessages.stepUpRequired,

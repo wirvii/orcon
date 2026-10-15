@@ -314,7 +314,6 @@
   "problem.technicalDetails": "Technical detailsSSSSSSSSSSSSSSSSSSSSSSSSS",
   "problem.type": "TypeSSSSSSSSSSSSSSSSSSSSSSSSS",
   "problem.unauthenticated": "Your session ended. Sign in again.SSSSSSSSSSSSSSSSSSSSSSSSS",
-  "problem.validation-failed": "Some of the data is not valid. Check the highlighted fields.SSSSSSSSSSSSSSSSSSSSSSSSS",
   "redacted.copied": "CopiedSSSSSSSSSSSSSSSSSSSSSSSSS",
   "redacted.copyValue": "Copy valueSSSSSSSSSSSSSSSSSSSSSSSSS",
   "redacted.hidden": "Hidden — you need permission to view execution dataSSSSSSSSSSSSSSSSSSSSSSSSS",

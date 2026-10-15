@@ -314,7 +314,6 @@
   "problem.technicalDetails": "Technical details",
   "problem.type": "Type",
   "problem.unauthenticated": "Your session ended. Sign in again.",
-  "problem.validation-failed": "Some of the data is not valid. Check the highlighted fields.",
   "redacted.copied": "Copied",
   "redacted.copyValue": "Copy value",
   "redacted.hidden": "Hidden — you need permission to view execution data",

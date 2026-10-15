@@ -314,7 +314,6 @@
   "problem.technicalDetails": "Detalles técnicos",
   "problem.type": "Tipo",
   "problem.unauthenticated": "Tu sesión terminó. Inicia sesión de nuevo.",
-  "problem.validation-failed": "Algunos datos no son válidos. Revisa los campos marcados.",
   "redacted.copied": "Copiado",
   "redacted.copyValue": "Copiar el valor",
   "redacted.hidden": "Oculto: necesitas permiso para ver los datos de la ejecución",
