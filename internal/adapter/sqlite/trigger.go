@@ -6,6 +6,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -316,6 +317,44 @@ func (t *triggerTx) ReplaceAddressMethods(ctx context.Context, address trigger.A
 		return err
 	}
 	return t.insertMethods(ctx, address, methods, now)
+}
+
+// ResolveRoute implements [trigger.Store]. It reads the one store without an
+// organization scope on purpose: see the query ResolveTriggerRoute.
+func (s *Store) ResolveRoute(ctx context.Context, method, path string) (trigger.Resolved, error) {
+	var out trigger.Resolved
+	err := s.read(ctx, "resolve route", func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.ResolveTriggerRoute(ctx, path, method)
+		if errors.Is(err, sql.ErrNoRows) {
+			return trigger.ErrNoRoute
+		}
+		if err != nil {
+			return err
+		}
+		return resolvedInto(&out, &row)
+	})
+	return out, err
+}
+
+func resolvedInto(out *trigger.Resolved, row *sqlcgen.ResolveTriggerRouteRow) error {
+	var err error
+	if out.Org, err = uuidOf[identity.OrgID](row.OrgID); err != nil {
+		return fmt.Errorf("route org id: %w", err)
+	}
+	if out.ProjectID, err = uuidOf[identity.ProjectID](row.ProjectID); err != nil {
+		return fmt.Errorf("route project id: %w", err)
+	}
+	if out.FlowID, err = uuidOf[flow.FlowID](row.FlowID); err != nil {
+		return fmt.Errorf("route flow id: %w", err)
+	}
+	out.NodeID = flow.NodeID(row.NodeID)
+	if out.TriggerID, err = uuidOf[trigger.ID](row.FlowTriggerID); err != nil {
+		return fmt.Errorf("route trigger id: %w", err)
+	}
+	if out.AddressID, err = uuidOf[trigger.AddressID](row.TriggerAddressID); err != nil {
+		return fmt.Errorf("route address id: %w", err)
+	}
+	return nil
 }
 
 // LockRoute has no SQL on SQLite: one writer applies every transaction in turn,

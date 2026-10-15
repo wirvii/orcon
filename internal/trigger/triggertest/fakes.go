@@ -77,10 +77,25 @@ type StartedRun struct {
 	Input []byte
 }
 
+// StartedTrigger is one execution a [RecordingStarter] started for an event.
+type StartedTrigger struct {
+	Run   trigger.TriggeredRun
+	Input []byte
+}
+
 // RecordingStarter is a [trigger.Starter] that records the runs it is given.
 type RecordingStarter struct {
-	mu   sync.Mutex
-	Runs []StartedRun
+	mu        sync.Mutex
+	Runs      []StartedRun
+	Triggered []StartedTrigger
+}
+
+// StartTriggered implements [trigger.Starter].
+func (s *RecordingStarter) StartTriggered(_ context.Context, run trigger.TriggeredRun, input []byte) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Triggered = append(s.Triggered, StartedTrigger{Run: run, Input: input})
+	return fmt.Sprintf("triggered-%d", len(s.Triggered)), nil
 }
 
 // StartManual implements [trigger.Starter].

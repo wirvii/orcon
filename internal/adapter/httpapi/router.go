@@ -57,6 +57,9 @@ type Deps struct {
 	// Reference is the file system of the reference site; nil means the
 	// embedded one.
 	Reference fs.FS
+	// Webhooks accepts the public trigger addresses under /hooks/ (SPEC-002 T2).
+	// Nil means the process serves none, for example a process without an engine.
+	Webhooks WebhookIngress
 }
 
 // RouteKind says what a registered route is.
@@ -167,6 +170,9 @@ func build(supplied *Deps, rawSpec []byte, register func(mux apigen.ServeMux, ba
 	routes = append(routes, mountReference(mux, reference.Handler(site))...)
 	mux.Handle("/api/", fallback(mux))
 	routes = append(routes, Route{Pattern: "/api/", Kind: KindFallback})
+	if deps.Webhooks != nil {
+		mux.Handle(WebhookPrefix, webhookHandler(deps.Webhooks, deps.Logger))
+	}
 
 	handler := middleware.Chain(mux,
 		middleware.RequestID(deps.IDs),

@@ -525,3 +525,40 @@ func (t *memTx) ResolveAcceptance(_ context.Context, flowID flow.FlowID, node fl
 	}
 	return trigger.Acceptance{}, fmt.Errorf("node %q of flow %s: %w", node, flowID, flow.ErrNotFound)
 }
+
+// ResolveRoute implements [trigger.Store]: the active production address with
+// the path and the method, smallest identity first, as the SQL statements order it.
+func (m *Memory) ResolveRoute(_ context.Context, method, path string) (trigger.Resolved, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var best *trigger.Address
+	for _, a := range m.s.addresses {
+		if a.Scope != trigger.ScopeProduction || a.Status != trigger.AddressActive || a.Pattern != path || !hasMethod(a, method) {
+			continue
+		}
+		if best == nil || bytes.Compare(a.ID[:], best.ID[:]) < 0 {
+			best = a
+		}
+	}
+	if best == nil {
+		return trigger.Resolved{}, trigger.ErrNoRoute
+	}
+	tr := m.s.triggers[best.TriggerID]
+	f := m.s.flows[tr.FlowID]
+	if f == nil || !f.DeletedAt.IsZero() {
+		return trigger.Resolved{}, trigger.ErrNoRoute
+	}
+	return trigger.Resolved{
+		Org: best.OrgID, ProjectID: f.ProjectID, FlowID: tr.FlowID, NodeID: tr.NodeID,
+		TriggerID: best.TriggerID, AddressID: best.ID,
+	}, nil
+}
+
+func hasMethod(a *trigger.Address, method string) bool {
+	for _, m := range a.Methods {
+		if m.Method == method {
+			return true
+		}
+	}
+	return false
+}
