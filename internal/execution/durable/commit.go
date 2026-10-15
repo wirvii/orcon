@@ -131,7 +131,7 @@ func (e *Engine) recompute(ctx context.Context, tx store.Tx, s *step) (execution
 	for _, a := range s.delta.Activations {
 		oracle[a.NodeExecution] = a
 	}
-	sess, err := e.interp.OpenSession(s.plan, esnap, execution.SessionOptions{Known: known, Oracle: oracle})
+	sess, err := e.interp.OpenSession(s.plan, esnap, execution.SessionOptions{Org: s.exec.OrgID, Known: known, Oracle: oracle})
 	if err != nil {
 		return execution.Delta{}, execution.WorkResult{}, fmt.Errorf("reopen execution %s: %w", s.exec.ID, err)
 	}
@@ -321,8 +321,8 @@ func (e *Engine) writeNodeExecutions(ctx context.Context, tx store.Tx, a *applyI
 		if ne.State != execution.NodeRunning {
 			rec.FinishedAt = now
 		}
-		if err := tx.InsertNodeExecution(ctx, rec); err != nil {
-			return fmt.Errorf("insert node execution %s: %w", ne.ID, err)
+		if err := tx.UpsertNodeExecution(ctx, rec); err != nil {
+			return fmt.Errorf("write node execution %s: %w", ne.ID, err)
 		}
 	}
 	return nil

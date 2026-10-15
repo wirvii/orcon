@@ -184,6 +184,22 @@ func (j *Journal) Prepare(ctx context.Context, org orgscope.Org, ops []store.Ext
 	return nil
 }
 
+// PrepareTx records the intent of the operations inside the caller's transaction,
+// which is the checkpoint before an effect (ADR-0012 section 4, ADR-0013 section
+// 6). The intent commits with the checkpoint, before anything is sent. The
+// checkpoint may run again after a crash: an operation whose correlation key the
+// journal already holds keeps its row, so the caller reloads the rows of the node
+// execution rather than trusting the ids it generated.
+func (j *Journal) PrepareTx(ctx context.Context, tx store.Tx, ops []store.ExternalOperation) error {
+	for start := 0; start < len(ops); start += intentGroup {
+		group := ops[start:min(start+intentGroup, len(ops))]
+		if err := tx.InsertJournalIfAbsent(ctx, group); err != nil {
+			return fmt.Errorf("journal: prepare: %w", err)
+		}
+	}
+	return nil
+}
+
 // Dispatch sends the PREPARED operations of ops and records their outcomes. Items
 // go out in windows of at most 1000: each window is marked DISPATCHING in its
 // own transaction, committed before its first send, and its outcomes are

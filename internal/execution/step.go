@@ -172,6 +172,7 @@ func (r *run) emitPorts(ctx context.Context, n *planNode, ne *nodeExec, ports []
 // emitActivity runs the node through the NodeRunner port.
 func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeExec, input Batch) ([]emission, error) {
 	call := NodeCall{
+		Org:           r.req.Org,
 		Execution:     r.req.Execution,
 		Token:         t.id,
 		NodeExecution: ne.id,
@@ -179,6 +180,12 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 		Scope:         t.scope,
 		Input:         input,
 		Env:           r.envOf(ne.id),
+	}
+	if cp := r.checkpoint; cp != nil {
+		at := call
+		call.Checkpoint = func(ctx context.Context, fn func(ctx context.Context, tx any) error) error {
+			return cp(ctx, at, fn)
+		}
 	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {

@@ -64,6 +64,13 @@ func (e *Engine) Run(ctx context.Context) error {
 		}()
 	}
 	if e.cfg.Workers {
+		if n := e.notifier(); n != nil {
+			loops.Add(1)
+			go func() {
+				defer loops.Done()
+				e.listenLoop(loopCtx, n)
+			}()
+		}
 		for range e.cfg.Concurrency {
 			workers.Add(1)
 			go func() {
@@ -212,6 +219,9 @@ func (e *Engine) Reap(ctx context.Context) (int, error) {
 		return len(reaped), fmt.Errorf("fire due timers: %w", err)
 	}
 	e.signal(runnable + len(fired))
+	if runnable+len(fired) > 0 {
+		e.notifyRunnable(ctx)
+	}
 	return len(reaped) + len(fired), nil
 }
 
