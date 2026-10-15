@@ -143,7 +143,7 @@ func (q *Queries) GetApplicationUserCredentialsByEmail(ctx context.Context, emai
 }
 
 const getLoginThrottle = `-- name: GetLoginThrottle :one
-SELECT id, failures, locked_until, created_at, updated_at
+SELECT id, failures, locked_until_at, created_at, updated_at
 FROM login_throttle
 WHERE id = $1
 `
@@ -155,7 +155,7 @@ func (q *Queries) GetLoginThrottle(ctx context.Context, id []byte) (LoginThrottl
 	err := row.Scan(
 		&i.ID,
 		&i.Failures,
-		&i.LockedUntil,
+		&i.LockedUntilAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -631,6 +631,21 @@ func (q *Queries) ListProjects(ctx context.Context, orgID pgtype.UUID, afterID p
 	return items, nil
 }
 
+const markLoginThrottleLocked = `-- name: MarkLoginThrottleLocked :execrows
+UPDATE login_throttle
+SET locked_until_at = $1, updated_at = $2
+WHERE id = $3
+`
+
+// orcon:scope instance
+func (q *Queries) MarkLoginThrottleLocked(ctx context.Context, lockedUntilAt pgtype.Timestamptz, updatedAt pgtype.Timestamptz, iD []byte) (int64, error) {
+	result, err := q.db.Exec(ctx, markLoginThrottleLocked, lockedUntilAt, updatedAt, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const markSessionRevoked = `-- name: MarkSessionRevoked :execrows
 UPDATE session
 SET revoked_at = $1, updated_at = $1
@@ -704,17 +719,17 @@ func (q *Queries) UpdateSessionActivity(ctx context.Context, lastSeenAt pgtype.T
 }
 
 const upsertLoginThrottle = `-- name: UpsertLoginThrottle :exec
-INSERT INTO login_throttle (id, failures, locked_until, created_at, updated_at)
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until = excluded.locked_until, updated_at = excluded.updated_at
+ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until_at = excluded.locked_until_at, updated_at = excluded.updated_at
 `
 
 type UpsertLoginThrottleParams struct {
-	ID          []byte
-	Failures    int64
-	LockedUntil pgtype.Timestamptz
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID            []byte
+	Failures      int64
+	LockedUntilAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 }
 
 // orcon:scope instance
@@ -722,9 +737,25 @@ func (q *Queries) UpsertLoginThrottle(ctx context.Context, arg UpsertLoginThrott
 	_, err := q.db.Exec(ctx, upsertLoginThrottle,
 		arg.ID,
 		arg.Failures,
-		arg.LockedUntil,
+		arg.LockedUntilAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 	return err
+}
+
+const upsertLoginThrottleFailure = `-- name: UpsertLoginThrottleFailure :one
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
+VALUES ($1, 1, $2, $2, $2)
+ON CONFLICT (id) DO UPDATE SET failures = login_throttle.failures + 1, updated_at = excluded.updated_at
+RETURNING failures
+`
+
+// The failure count moves in one statement: concurrent failed attempts never lose a count (SPEC-004 R-AUTH-02).
+// orcon:scope instance
+func (q *Queries) UpsertLoginThrottleFailure(ctx context.Context, iD []byte, createdAt pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertLoginThrottleFailure, iD, createdAt)
+	var failures int64
+	err := row.Scan(&failures)
+	return failures, err
 }

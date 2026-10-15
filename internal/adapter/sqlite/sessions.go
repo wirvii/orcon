@@ -141,7 +141,7 @@ func (s *Store) GetLoginThrottle(ctx context.Context, identifier []byte) (identi
 		if err != nil {
 			return err
 		}
-		out = identity.LoginThrottle{Failures: int(row.Failures), LockedUntil: instant(row.LockedUntil), UpdatedAt: instant(row.UpdatedAt)}
+		out = identity.LoginThrottle{Failures: int(row.Failures), LockedUntil: instant(row.LockedUntilAt), UpdatedAt: instant(row.UpdatedAt)}
 		return nil
 	})
 	return out, err
@@ -151,9 +151,34 @@ func (s *Store) GetLoginThrottle(ctx context.Context, identifier []byte) (identi
 func (s *Store) PutLoginThrottle(ctx context.Context, identifier []byte, t identity.LoginThrottle) error {
 	return s.write(ctx, "put login throttle", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.UpsertLoginThrottle(ctx, sqlcgen.UpsertLoginThrottleParams{
-			ID: identifier, Failures: int64(t.Failures), LockedUntil: micros(t.LockedUntil),
+			ID: identifier, Failures: int64(t.Failures), LockedUntilAt: micros(t.LockedUntil),
 			CreatedAt: micros(t.UpdatedAt), UpdatedAt: micros(t.UpdatedAt),
 		})
+	})
+}
+
+// IncrementLoginThrottle implements [identity.LoginThrottleStore].
+func (s *Store) IncrementLoginThrottle(ctx context.Context, identifier []byte, now time.Time) (int, error) {
+	var out int
+	err := s.write(ctx, "increment login throttle", func(ctx context.Context, q *sqlcgen.Queries) error {
+		n, err := q.UpsertLoginThrottleFailure(ctx, identifier, micros(now))
+		out = int(n)
+		return err
+	})
+	return out, err
+}
+
+// LockLoginThrottle implements [identity.LoginThrottleStore].
+func (s *Store) LockLoginThrottle(ctx context.Context, identifier []byte, until, now time.Time) error {
+	return s.write(ctx, "lock login throttle", func(ctx context.Context, q *sqlcgen.Queries) error {
+		n, err := q.MarkLoginThrottleLocked(ctx, micros(until), micros(now), identifier)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("login throttle: %w", identity.ErrNotFound)
+		}
+		return nil
 	})
 }
 

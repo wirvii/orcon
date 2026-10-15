@@ -125,6 +125,15 @@ type LoginThrottleStore interface {
 	//
 	//orcon:scope instance login_throttle is an instance table
 	ClearLoginThrottle(ctx context.Context, identifier []byte) error
+	// IncrementLoginThrottle counts one failed attempt in one atomic statement and returns the
+	// count after it, so parallel failures are never lost (SPEC-004 R-AUTH-02).
+	//
+	//orcon:scope instance login_throttle is an instance table
+	IncrementLoginThrottle(ctx context.Context, identifier []byte, now time.Time) (int, error)
+	// LockLoginThrottle sets the instant before which the identifier is refused, or fails with [ErrNotFound].
+	//
+	//orcon:scope instance login_throttle is an instance table
+	LockLoginThrottle(ctx context.Context, identifier []byte, until, now time.Time) error
 }
 
 // MembershipStore persists the memberships of an organization.

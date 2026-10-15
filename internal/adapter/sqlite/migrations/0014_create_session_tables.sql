@@ -36,11 +36,11 @@ CREATE INDEX ix_session_application_user_id ON session (application_user_id);
 
 -- Failed sign-in attempts per identifier. id is the keyed identifier of the normalized address: the HMAC-SHA-256
 -- with the instance key, truncated to 16 bytes, so the address itself never reaches the table (SPEC-004 R-AUTH-02).
--- locked_until is the instant before which the identifier is refused, in microseconds.
+-- locked_until_at is the instant before which the identifier is refused, in microseconds.
 CREATE TABLE login_throttle (
   id BLOB NOT NULL,
   failures INTEGER NOT NULL,
-  locked_until INTEGER NOT NULL,
+  locked_until_at INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CONSTRAINT pk_login_throttle PRIMARY KEY (id),

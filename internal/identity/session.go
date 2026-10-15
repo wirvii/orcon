@@ -273,7 +273,7 @@ func (s *Sessions) SignIn(ctx context.Context, in SignIn) (SignedIn, error) {
 		reason = ReasonWrongPassword
 	}
 	if reason != "" {
-		if err := s.recordFailure(ctx, key, now, state, known); err != nil {
+		if err := s.recordFailure(ctx, key, now); err != nil {
 			return SignedIn{}, err
 		}
 		return SignedIn{}, &SignInError{Reason: reason}
@@ -320,19 +320,17 @@ func (s *Sessions) start(ctx context.Context, in SignIn, key []byte, now time.Ti
 	return SignedIn{Token: token, CSRFToken: CSRFTokenFor(token), Session: rec, User: creds.User}, nil
 }
 
-// recordFailure counts one failed attempt of the identifier and, past the free
-// attempts, locks it for the policy delay.
-func (s *Sessions) recordFailure(ctx context.Context, key []byte, now time.Time, previous LoginThrottle, known bool) error {
-	failures := 1
-	if known {
-		failures = previous.Failures + 1
-	}
-	next := LoginThrottle{Failures: failures, UpdatedAt: now}
-	if failures >= s.attempts.FreeAttempts {
-		next.LockedUntil = now.Add(s.attempts.Delay(failures))
-	}
-	if err := s.throttle.PutLoginThrottle(ctx, key, next); err != nil {
+// recordFailure counts one failed attempt of the identifier in the store, and past the
+// free attempts locks it for the delay of the count that the store returned.
+func (s *Sessions) recordFailure(ctx context.Context, key []byte, now time.Time) error {
+	failures, err := s.throttle.IncrementLoginThrottle(ctx, key, now)
+	if err != nil {
 		return fmt.Errorf("sign in: record failure: %w", err)
+	}
+	if failures >= s.attempts.FreeAttempts {
+		if err := s.throttle.LockLoginThrottle(ctx, key, now.Add(s.attempts.Delay(failures)), now); err != nil {
+			return fmt.Errorf("sign in: lock: %w", err)
+		}
 	}
 	return nil
 }
