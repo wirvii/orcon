@@ -9,6 +9,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
 	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -91,7 +92,7 @@ func bumpAuthorizationEpoch(ctx context.Context, q *sqlcgen.Queries, scope []byt
 // CreateOrganizationWithAdmin implements [identity.OrgStore]: the organization, the membership
 // and role binding of its administrator and the audit entries of the creation, in one
 // transaction. The organization is new, so its authorization epoch starts at zero.
-func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, m identity.MembershipRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
+func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, key identity.OrgKeyRecord, m identity.MembershipRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
 	if m.OrgID != o.ID || grant.OrgID != o.ID {
 		return fmt.Errorf("create organization %s: %w", o.ID, identity.ErrScopeMismatch)
 	}
@@ -104,6 +105,12 @@ func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgR
 			return fmt.Errorf("insert organization: %w", err)
 		}
 		scope := uuidBytes(o.ID)
+		if err := q.InsertOrgKey(ctx, sqlcgen.InsertOrgKeyParams{
+			ID: keyRowID("key", envelope.LevelOrg, o.ID, key.Version), OrgID: scope, KeyVersion: int64(key.Version), Wrapped: key.Wrapped,
+			MasterKeyReference: key.MasterKeyReference, Status: key.Status, Probe: key.Probe, CreatedAt: micros(key.CreatedAt),
+		}); err != nil {
+			return fmt.Errorf("insert organization key: %w", err)
+		}
 		if err := q.InsertMembership(ctx, sqlcgen.InsertMembershipParams{
 			ID: uuidBytes(m.ID), OrgID: scope, ApplicationUserID: uuidBytes(m.UserID), Status: m.Status,
 			InvitedByPrincipalID: nullUUIDBytes(m.InvitedByPrincipalID),

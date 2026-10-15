@@ -141,6 +141,15 @@ func accountFailure(stderr io.Writer, err error) int {
 
 // openAccountsStore loads the configuration the way serve does and opens the store it names.
 func openAccountsStore(ctx context.Context) (persistence, error) { //nolint:ireturn // the same store the server opens, used through the account ports
+	cfg, err := loadCommandConfig()
+	if err != nil {
+		return nil, err
+	}
+	return openStore(ctx, cfg, version)
+}
+
+// loadCommandConfig loads the configuration the way serve does, for the commands that open the store.
+func loadCommandConfig() (*config.Config, error) {
 	schema := config.Default()
 	flags := flag.NewFlagSet("orcon accounts", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -151,5 +160,5 @@ func openAccountsStore(ctx context.Context) (persistence, error) { //nolint:iret
 	if err := res.Err(); err != nil {
 		return nil, err
 	}
-	return openStore(ctx, res.Config, version)
+	return res.Config, nil
 }

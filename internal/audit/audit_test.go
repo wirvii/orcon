@@ -187,6 +187,38 @@ func TestSealerEmptyChainSealsNothing(t *testing.T) {
 	}
 }
 
+// brokenChainKeys fails for one chain, as an organization without a key does.
+type brokenChainKeys struct {
+	keys
+	broken audit.Chain
+}
+
+func (b brokenChainKeys) ActiveMACKey(ctx context.Context, c audit.Chain) (int64, []byte, error) {
+	if c == b.broken {
+		return 0, nil, errors.New("active ORG key: key not found")
+	}
+	return b.keys.ActiveMACKey(ctx, c)
+}
+
+// TestSealerSealsTheOtherChainsWhenOneFails: a chain that cannot be sealed is reported, and the
+// chains after it are still sealed in the same pass.
+func TestSealerSealsTheOtherChainsWhenOneFails(t *testing.T) {
+	t.Parallel()
+	st := newMemStore()
+	gen := id.NewSequence()
+	bad, good := audit.OrganizationChain(gen.New()), audit.OrganizationChain(gen.New())
+	st.pending[bad] = []audit.Entry{entry(t, gen, bad, epoch, "org.created")}
+	st.pending[good] = []audit.Entry{entry(t, gen, good, epoch, "org.created")}
+	sealer := audit.NewSealer(st, brokenChainKeys{keys: keys{version: 1}, broken: bad}, gen, fixedClock{at: epoch})
+	n, err := sealer.SealOnce(t.Context())
+	if err == nil || !strings.Contains(err.Error(), bad.Label()) {
+		t.Fatalf("SealOnce error = %v, want the failure of the broken chain", err)
+	}
+	if n != 1 || len(st.events[good]) != 1 || len(st.pending[good]) != 0 {
+		t.Errorf("sealed %d events, good chain has %d events and %d pending; want the good chain sealed", n, len(st.events[good]), len(st.pending[good]))
+	}
+}
+
 func TestSealerSkipsChainMovedUnderIt(t *testing.T) {
 	t.Parallel()
 	st, c := seeded(t, 2)

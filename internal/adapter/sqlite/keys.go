@@ -232,3 +232,23 @@ func keyRowID(kind string, level envelope.KeyLevel, org identity.OrgID, version 
 	sum := sha256.Sum256([]byte("orcon key row v1|" + kind + "|" + string(level) + "|" + org.String() + "|" + strconv.Itoa(version)))
 	return sum[:16]
 }
+
+// ListOrgsWithoutActiveKey implements [identity.OrgKeyGapStore].
+func (s *Store) ListOrgsWithoutActiveKey(ctx context.Context, limit int) ([]identity.OrgID, error) {
+	var out []identity.OrgID
+	err := s.read(ctx, "list organizations without an active key", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListOrgsWithoutActiveKey(ctx, int64(limit))
+		if err != nil {
+			return err
+		}
+		for _, b := range rows {
+			org, err := uuidOf[identity.OrgID](b)
+			if err != nil {
+				return err
+			}
+			out = append(out, org)
+		}
+		return nil
+	})
+	return out, err
+}

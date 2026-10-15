@@ -550,7 +550,8 @@ func TestOrganizationsCreateAuditsBindingAndMembership(t *testing.T) {
 		t.Helper()
 		f := newFixture(t, newStore)
 		admin := f.user("boss@example.test")
-		orgs := identity.NewOrganizations(f.s, clock.NewFake(base), f.ids)
+		kr, _ := keyringOf(t, f)
+		orgs := identity.NewOrganizations(f.s, keyringIssuer{kr: kr}, clock.NewFake(base), f.ids)
 		org, err := orgs.Create(f.ctx(), identity.NewOrganization{Name: "Fresh", Slug: "fresh", AdminEmail: "boss@example.test"})
 		if err != nil {
 			t.Fatalf("create organization: %v", err)

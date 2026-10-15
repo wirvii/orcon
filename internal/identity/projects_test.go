@@ -40,7 +40,7 @@ type fakeStore struct {
 func newFakeStore() *fakeStore { return &fakeStore{orgs: map[identity.OrgID]identity.OrgRecord{}} }
 
 // CreateOrganizationWithAdmin is CreateOrganization: the fake keeps no memberships or bindings.
-func (f *fakeStore) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+func (f *fakeStore) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.OrgKeyRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
 	return f.CreateOrganization(ctx, o)
 }
 

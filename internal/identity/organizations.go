@@ -42,18 +42,25 @@ type NewOrganization struct {
 	AdminEmail string
 }
 
+// OrgKeyIssuer prepares the first key of a new organization, wrapped by the master key, without
+// storing it: the store writes it in the transaction that creates the organization.
+type OrgKeyIssuer interface {
+	NewOrgKey(ctx context.Context, org OrgID) (OrgKeyRecord, error)
+}
+
 // Organizations creates organizations for the operator's command line. The creation, the
-// administrator's membership and role binding, and the audit entries are one transaction; the
-// installation acts as the actor (SYSTEM principal).
+// organization's key, the administrator's membership and role binding, and the audit entries
+// are one transaction; the installation acts as the actor (SYSTEM principal).
 type Organizations struct {
 	store OrgCreateStore
+	keys  OrgKeyIssuer
 	clock clock.Clock
 	ids   id.Generator
 }
 
 // NewOrganizations returns the organization service over its ports.
-func NewOrganizations(store OrgCreateStore, clk clock.Clock, ids id.Generator) *Organizations {
-	return &Organizations{store: store, clock: clk, ids: ids}
+func NewOrganizations(store OrgCreateStore, keys OrgKeyIssuer, clk clock.Clock, ids id.Generator) *Organizations {
+	return &Organizations{store: store, keys: keys, clock: clk, ids: ids}
 }
 
 // Create creates the organization and makes the account of AdminEmail its Admin. A repeated
@@ -79,6 +86,10 @@ func (o *Organizations) Create(ctx context.Context, in NewOrganization) (OrgReco
 		ID: RoleBindingID(o.ids.New()), OrgID: org.ID, ScopeKind: RoleScopeOrg, UserID: admin.ID, RoleName: RoleAdmin,
 		CreatedAt: now, UpdatedAt: now,
 	}
+	key, err := o.keys.NewOrgKey(ctx, org.ID)
+	if err != nil {
+		return OrgRecord{}, fmt.Errorf("create organization: organization key: %w", err)
+	}
 	created, err := orgEntry(actor, org.ID, "org.created", now, o.ids,
 		jsonvalue.Member{Key: "orgId", Value: jsonvalue.String(org.ID.String())},
 		jsonvalue.Member{Key: "slug", Value: jsonvalue.String(org.Slug)})
@@ -97,7 +108,7 @@ func (o *Organizations) Create(ctx context.Context, in NewOrganization) (OrgReco
 	if err != nil {
 		return OrgRecord{}, err
 	}
-	if err := o.store.CreateOrganizationWithAdmin(ctx, org, membership, grant, []audit.Entry{created, joined, bound}); err != nil {
+	if err := o.store.CreateOrganizationWithAdmin(ctx, org, key, membership, grant, []audit.Entry{created, joined, bound}); err != nil {
 		return OrgRecord{}, fmt.Errorf("create organization: %w", err)
 	}
 	return org, nil

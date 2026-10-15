@@ -105,3 +105,6 @@
 - dialect: sqlite
   query: ListActiveOrgKeys
   reason: "startup check of every active organization key (SPEC-004 R-KEY-05); returns keys only in their encrypted form, in pages; PostgreSQL uses orcon_engine.list_active_org_keys; owner approved 2026-10-15"
+- dialect: sqlite
+  query: ListOrgsWithoutActiveKey
+  reason: "the startup check finds the organizations that have no active key so it can create one (SPEC-004 R-KEY-05, SE3b); returns org_id only; PostgreSQL uses orcon_engine.list_orgs_without_active_key; urgent preview fix, orchestrator decision 2026-10-15, owner review pending"

@@ -83,6 +83,29 @@ func caseActiveKey(ctx context.Context, tb testing.TB, env *Env) {
 	}
 }
 
+// caseListOrgsWithoutActiveKey: the startup repair read lists the organizations that have no active
+// key, across organizations: B has a key, A has none.
+func caseListOrgsWithoutActiveKey(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	if err := env.Stores.PutKey(ctx, keyOfB(env)); err != nil {
+		tb.Fatalf("put the key of B: %v", err)
+	}
+	got, err := env.Stores.ListOrgsWithoutActiveKey(ctx, 100)
+	if err != nil {
+		tb.Fatalf("organizations without a key: %v", err)
+	}
+	var sawA bool
+	for _, org := range got {
+		if org == identity.OrgID(env.B.UUID) {
+			tb.Fatalf("organizations without a key = %v, which lists B although B has an active key", got)
+		}
+		sawA = sawA || org == identity.OrgID(env.A.UUID)
+	}
+	if !sawA {
+		tb.Fatalf("organizations without a key = %v, want A listed", got)
+	}
+}
+
 // caseActiveKeys: the verification read lists the active keys of every organization.
 func caseActiveKeys(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
