@@ -28,6 +28,9 @@ sqlite:UpdateAttentionRequestResolvedByPrincipalToNull  # PostgreSQL clears the 
 sqlite:UpdateOperationalAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorPackageInstalledByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorGrantGrantedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateCredentialCreatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0019); SQLite has no engine functions
+sqlite:UpdateCredentialVersionCreatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0019); SQLite has no engine functions
+sqlite:UpdateCredentialShareGrantedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0019); SQLite has no engine functions
 sqlite:ResolveUserOrganizations  # PostgreSQL reads the same rows through orcon_engine.resolve_user_organizations (migration 0015) in a hand-written method (DA-8); SQLite has no engine functions
 sqlite:ListActiveOrgKeys  # PostgreSQL lists the same keys through the engine function orcon_engine.list_active_org_keys (migration 0016); SQLite reads them in batches
 sqlite:GetProjectOrganization  # PostgreSQL resolves a project's organization through orcon_engine.project_organization (migration 0017); SQLite has no engine functions

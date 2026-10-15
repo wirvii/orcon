@@ -186,6 +186,46 @@ type ConnectorReference struct {
 	UpdatedAt        pgtype.Timestamptz
 }
 
+type Credential struct {
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	Name                      string
+	ConnectorReference        string
+	Status                    string
+	AllowedHostDocument       []byte
+	AllowedHostDocumentFormat string
+	CurrentVersionNumber      int64
+	CreatedByPrincipalID      pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+}
+
+type CredentialShare struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	CredentialID         pgtype.UUID
+	ProjectID            pgtype.UUID
+	GrantedByPrincipalID pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type CredentialVersion struct {
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	CredentialID              pgtype.UUID
+	VersionNumber             int64
+	PublicFieldDocument       []byte
+	PublicFieldDocumentFormat string
+	SecretFieldCiphertext     []byte
+	DataKeyWrapped            []byte
+	OrgKeyVersionNumber       int64
+	CreatedByPrincipalID      pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+}
+
 type CustomRole struct {
 	ID        pgtype.UUID
 	OrgID     pgtype.UUID

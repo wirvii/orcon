@@ -186,6 +186,46 @@ type ConnectorReference struct {
 	UpdatedAt        int64
 }
 
+type Credential struct {
+	ID                        []byte
+	OrgID                     []byte
+	ProjectID                 []byte
+	Name                      string
+	ConnectorReference        string
+	Status                    string
+	AllowedHostDocument       []byte
+	AllowedHostDocumentFormat string
+	CurrentVersionNumber      int64
+	CreatedByPrincipalID      []byte
+	CreatedAt                 int64
+	UpdatedAt                 int64
+}
+
+type CredentialShare struct {
+	ID                   []byte
+	OrgID                []byte
+	CredentialID         []byte
+	ProjectID            []byte
+	GrantedByPrincipalID []byte
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
+type CredentialVersion struct {
+	ID                        []byte
+	OrgID                     []byte
+	CredentialID              []byte
+	VersionNumber             int64
+	PublicFieldDocument       []byte
+	PublicFieldDocumentFormat string
+	SecretFieldCiphertext     []byte
+	DataKeyWrapped            []byte
+	OrgKeyVersionNumber       int64
+	CreatedByPrincipalID      []byte
+	CreatedAt                 int64
+	UpdatedAt                 int64
+}
+
 type CustomRole struct {
 	ID        []byte
 	OrgID     []byte

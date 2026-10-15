@@ -25,6 +25,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/connector"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
@@ -49,6 +50,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore
+	credential.Store
 	flow.Store
 	flow.VersionStore
 	flow.SnapshotStore

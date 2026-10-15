@@ -13,5 +13,8 @@ func BuildRegistry() *Registry {
 	if err := addStoreCases(r); err != nil {
 		panic("isolation: " + err.Error()) // a duplicate case is a mistake in this package, found by any test run
 	}
+	if err := addCredentialCases(r); err != nil {
+		panic("isolation: " + err.Error())
+	}
 	return r
 }
