@@ -6,6 +6,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useIntl } from 'react-intl';
 
 import { clipboardEventText, setClipboardEventText } from '../../../app/boundary/clipboard';
+import { PublishControls } from '../forms/PublishControls';
 import type { FlowDocument } from '../model/flow-document';
 import { chordKeys, EDITOR_KEYMAP, resolveEntry, type EditorAction } from '../model/keymap';
 import { useEditorStore, useEditorStoreApi } from '../store/editor-context';
@@ -36,6 +37,8 @@ export interface EditorWorkspaceProps {
   reload: () => Promise<{ document: FlowDocument; revision: string }>;
   /** True while the page shows a sample flow that is not stored on the server. */
   preview: boolean;
+  /** The flow the publish controls act on. Absent when the flow is not stored on the server, so there is nothing to publish. */
+  flowId?: string | undefined;
 }
 
 /** Actions a key can still trigger while a text field has focus: they never change what is typed. */
@@ -59,7 +62,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
   );
 }
 
-function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
+function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const editable = useMediaQuery(EDITING_QUERY);
@@ -278,6 +281,7 @@ function Workspace({ save, reload, preview }: EditorWorkspaceProps) {
         onSave={saveNow}
       />
       <div className="flex flex-col gap-2 empty:hidden px-4 pt-2">
+        {editable && flowId !== undefined ? <PublishControls flowId={flowId} /> : null}
         {preview && previewShown && editable ? (
           <Banner
             tone="info"

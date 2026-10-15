@@ -99,6 +99,14 @@ type Node struct {
 
 	Attention *Attention
 
+	// SensitivePaths are the user-declared sensitive fields of the node's
+	// output items (ADR-0017 section 3): JSON Pointers (RFC 6901) into the
+	// "json" of each output item, on every output port including "error". A
+	// segment that is exactly "*" matches every array element and every
+	// object member at that level. The member is part of the content hash.
+	// Nil means no marks.
+	SensitivePaths []string
+
 	// Trigger is the trigger block of a startEvent node (ADR-0020 section 2).
 	Trigger *Trigger
 }

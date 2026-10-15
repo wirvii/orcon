@@ -10,6 +10,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/codec/permissionsyaml"
 	"github.com/wirvii/orcon/internal/adapter/httpapi"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
@@ -34,6 +35,9 @@ func newAPIRouter(role config.Role, logger *slog.Logger) (*httpapi.Router, error
 		Catalog:       catalog,
 		Authenticator: identity.RejectAll{},
 		Authorizer:    authz.DenyAll{},
+		// No durable store exists yet; operations that take an Idempotency-Key answer 503
+		// until the first API2-core pull request wires it.
+		Idempotency: idempotency.UnavailableStore{},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build the API: %w", err)

@@ -66,7 +66,7 @@ for (const device of ['light', 'dark'] as const) {
 
       for (const moment of ['saved', 'reloaded', 'opened again'] as const) {
         if (moment === 'reloaded') await page.reload();
-        if (moment === 'opened again') await page.goto('/');
+        if (moment === 'opened again') await page.goto(SETTINGS);
         await expect(page.locator('#root')).toBeVisible();
         const now = await shown(page);
         const colours = await tokenColours(page, expected);

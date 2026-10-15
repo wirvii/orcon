@@ -33,28 +33,58 @@ func (v *validator) safety() {
 
 // resolve finds the node type of a node. With a catalog that knows connector
 // packages it asks for the pinned version and the selected operation and
-// reports the reasons the pin cannot be used (CodeConnector); otherwise it is
-// the plain lookup. It reports false when the type cannot be used, after
-// recording why.
+// reports the reasons the pin or the selection cannot be used; otherwise it is
+// the plain lookup. A type no package can own is never judged on selection,
+// and when the resolver does not know it the plain lookup gets a second
+// chance before the type is declared unknown. It reports false when the type
+// cannot be used, after recording why.
 func (v *validator) resolve(base string, n *Node) (NodeType, bool) {
+	unknown := func() {
+		v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+	}
 	if v.cfg.resolve == nil {
 		nt, known := v.cfg.lookup(n.Type)
 		if !known {
-			v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
+			unknown()
 		}
 		return nt, known
 	}
 	res := v.cfg.resolve(n)
-	switch {
-	case !res.Known && len(res.Problems) == 0:
-		v.r.errorf(CodeV10, base+"/type", "node %q has type %q, which the node-type catalog does not know", n.ID, n.Type)
-	case res.UnknownOperation:
-		v.r.errorf(CodeV10, base+"/parameters/operation", "node %q selects operation %q, which type %q does not have", n.ID, operationOf(n), n.Type)
+	_, packaged := ConnectorIDOf(n.Type)
+	if !res.Known && len(res.Problems) == 0 && !packaged {
+		if nt, ok := v.cfg.lookup(n.Type); ok {
+			res = NodeResolution{Type: nt, Known: true}
+		}
+	}
+	if !res.Known && len(res.Problems) == 0 {
+		unknown()
+		return NodeType{}, false
+	}
+	usable := res.Known
+	if packaged && res.Known && res.Selection != SelectionOK {
+		v.selection(base+"/parameters/operation", n, res)
+		usable = false
 	}
 	for _, problem := range res.Problems {
 		v.r.errorf(CodeConnector, base+"/connector", "node %q: %s", n.ID, strings.TrimSpace(problem))
 	}
-	return res.Type, res.Known && !res.UnknownOperation
+	return res.Type, usable
+}
+
+// selection reports a selection problem of a package node (rule V10).
+func (v *validator) selection(path string, n *Node, res NodeResolution) {
+	switch res.Selection {
+	case SelectionOK:
+		return
+	case SelectionMissing:
+		v.r.errorf(CodeV10, path, "node %q must select the operation it runs with the literal parameter \"operation\" (resource.verb), even when type %q has a single operation; it has: %s", n.ID, n.Type, strings.Join(res.Operations, ", "))
+	case SelectionNotLiteral:
+		v.r.errorf(CodeV10, path, "node %q selects its operation with an expression; the \"operation\" parameter must be a literal resource.verb so publication can read the safety contract of what it runs", n.ID)
+	case SelectionUnknown:
+		v.r.errorf(CodeV10, path, "node %q selects operation %q, which type %q does not have in the pinned version; it has: %s", n.ID, SelectionOf(n).Operation, n.Type, strings.Join(res.Operations, ", "))
+	case SelectionOnTrigger:
+		v.r.errorf(CodeV10, path, "node %q is a trigger; trigger node types select no operation, remove the \"operation\" parameter", n.ID)
+	}
 }
 
 // contract implements V10 for one node: an effect type must carry a valid

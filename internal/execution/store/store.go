@@ -25,6 +25,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Errors of the ports. The errors of internal/flow (ErrNotFound, ErrConflict,
@@ -352,30 +353,34 @@ type ExecutionFilter struct {
 // Reader reads inside one organization.
 type Reader interface {
 	// GetExecution returns an execution, or flow.ErrNotFound.
-	GetExecution(ctx context.Context, org identity.OrgID, execution ExecutionID) (Execution, error)
+	GetExecution(ctx context.Context, org orgscope.Org, execution ExecutionID) (Execution, error)
 	// ListExecutions returns at most limit executions matching the filter,
 	// newest first, after the cursor. Exactly one filter field must be set.
-	ListExecutions(ctx context.Context, org identity.OrgID, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
+	ListExecutions(ctx context.Context, org orgscope.Org, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
 	// GetToken returns a token, or flow.ErrNotFound.
-	GetToken(ctx context.Context, org identity.OrgID, token TokenID) (Token, error)
+	GetToken(ctx context.Context, org orgscope.Org, token TokenID) (Token, error)
 	// ListExecutionEvents returns at most limit events of the execution with a
 	// sequence number greater than after, in order.
-	ListExecutionEvents(ctx context.Context, org identity.OrgID, execution ExecutionID, after int64, limit int) ([]Event, error)
+	ListExecutionEvents(ctx context.Context, org orgscope.Org, execution ExecutionID, after int64, limit int) ([]Event, error)
 	// GetExternalOperation returns one journal entry, or flow.ErrNotFound.
-	GetExternalOperation(ctx context.Context, org identity.OrgID, operation ExternalOperationID) (ExternalOperation, error)
+	GetExternalOperation(ctx context.Context, org orgscope.Org, operation ExternalOperationID) (ExternalOperation, error)
 	// ListExternalOperations returns the journal of a node execution from an
 	// item index on, in item order.
-	ListExternalOperations(ctx context.Context, org identity.OrgID, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
 }
 
 // Inbox reads the rows people and the editor look at.
 type Inbox interface {
 	// ListAttentionRequests returns at most limit requests in one status,
 	// oldest first, after the cursor (the attention inbox, ADR-0073 section 9).
-	ListAttentionRequests(ctx context.Context, org identity.OrgID, status string, after Cursor, limit int) ([]AttentionRequest, error)
+	ListAttentionRequests(ctx context.Context, org orgscope.Org, status string, after Cursor, limit int) ([]AttentionRequest, error)
 	// GetTimer returns a timer, or flow.ErrNotFound.
-	GetTimer(ctx context.Context, org identity.OrgID, timer TimerID) (Timer, error)
-	// GetJoinInstance returns a join instance, or flow.ErrNotFound.
+	GetTimer(ctx context.Context, org orgscope.Org, timer TimerID) (Timer, error)
+	// GetJoinInstance returns a join instance, or flow.ErrNotFound. The engine
+	// reads the join of a token it has claimed; the key names the organization of
+	// that join, so the lookup is not a read of one organization by a person.
+	//
+	//orcon:scope engine the engine resumes a join of the organization its claimed token names (ADR-0047 section 2)
 	GetJoinInstance(ctx context.Context, key JoinKey) (JoinInstance, error)
 }
 
@@ -424,7 +429,7 @@ type Tx interface {
 // function may be run again after a serialization or busy failure, so it must
 // be safe to repeat; it holds no external call (AL-6.3).
 type Transactor interface {
-	InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx Tx) error) error
+	InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
 }
 
 // ClaimRequest asks for runnable tokens across organizations.
@@ -515,18 +520,28 @@ type WaitLookup struct {
 type WorkQueue interface {
 	// ClaimTokens leases up to Limit runnable tokens in fairness order. A token
 	// is claimed by one worker only, however many claim at once.
+	//
+	//orcon:scope engine the engine claims work of every organization (ADR-0047 section 2)
 	ClaimTokens(ctx context.Context, r ClaimRequest) ([]Claimed, error)
 	// RenewLeases extends every lease of the worker that has not expired. A
 	// lease the worker held and that is not returned was lost.
+	//
+	//orcon:scope engine the engine renews the leases of its worker across organizations (ADR-0047 section 2)
 	RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]Renewed, error)
 	// ReleaseExpiredLeases returns up to limit expired leases to RUNNABLE, or to
 	// SUSPENDED with reason POISON once a token was abandoned poisonThreshold
 	// times, and marks the started attempts of their node executions ABANDONED.
+	//
+	//orcon:scope engine the reaper sweeps expired leases of every organization (ADR-0047 section 2)
 	ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]Reaped, error)
 	// ReleaseWorkerLeases gives up every lease of the worker (graceful shutdown).
+	//
+	//orcon:scope engine the leases of one worker can name tokens of several organizations (ADR-0047 section 2)
 	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, now time.Time) ([]TokenRef, error)
 	// FireDueTimers marks up to limit due timers FIRED; concurrent callers never
 	// fire the same timer.
+	//
+	//orcon:scope engine the timer scan covers the due timers of every organization (ADR-0047 section 2)
 	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
 }
 
@@ -534,6 +549,8 @@ type WorkQueue interface {
 type Deliveries interface {
 	// ClaimOutbox leases up to limit undelivered rows whose lease is free or
 	// expired and counts the attempt.
+	//
+	//orcon:scope engine the dispatchers lease outbox rows of every organization (ADR-0047 section 2)
 	ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, now time.Time) ([]ClaimedOutbox, error)
 }
 
@@ -542,5 +559,7 @@ type Deliveries interface {
 type WaitResolver interface {
 	// ResolveWaitSecret returns the wait and its organization, or
 	// flow.ErrNotFound. The caller compares SecretHash in constant time.
+	//
+	//orcon:scope engine the organization of a wait is unknown until the wait is found (ADR-0010 section 8)
 	ResolveWaitSecret(ctx context.Context, wait WaitID) (WaitLookup, error)
 }

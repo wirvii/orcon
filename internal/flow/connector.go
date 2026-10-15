@@ -27,28 +27,77 @@ var (
 )
 
 // ConnectorNodeTypes is implemented by a node-type catalog that knows
-// installed connector packages. Validation level 5 prefers it to
-// [NodeTypes.Lookup] for connector nodes, because only it can answer for the
+// installed connector packages and the node types no package owns. Validation
+// level 5 prefers it to [NodeTypes.Lookup], because only it can answer for the
 // package version a node pins and for the operation it selects.
 type ConnectorNodeTypes interface {
 	NodeTypes
-	// ResolveNode describes a node type as the pinned package version defines
-	// it. pin is the connector pin of the node, nil when it has none;
-	// operation is the operation the node selects with a literal "operation"
-	// parameter, "" when it names none.
-	ResolveNode(ctx context.Context, nodeType string, pin *ConnectorPin, operation string) NodeResolution
+	// ResolveNode describes one node as publication needs it: a package node
+	// by its pinned version and the operation it selects, a node type that no
+	// package owns by the catalog of core types. The node is read-only.
+	ResolveNode(ctx context.Context, n *Node) NodeResolution
+}
+
+// SelectionProblem says why the operation selection of a connector package
+// node cannot be used (SPEC-003 Amendment 8, rules S-1 to S-4).
+type SelectionProblem int
+
+const (
+	// SelectionOK means the selection is usable, or the node needs none.
+	SelectionOK SelectionProblem = iota
+	// SelectionMissing means an action node carries no selector (S-3).
+	SelectionMissing
+	// SelectionNotLiteral means the selector is not a literal string (S-2).
+	SelectionNotLiteral
+	// SelectionUnknown means the pinned version has no such operation (S-1).
+	SelectionUnknown
+	// SelectionOnTrigger means a trigger node carries a selector (S-4).
+	SelectionOnTrigger
+)
+
+// Selection is how a node names the operation it runs: the reserved parameter
+// "operation", whose value is "resource.verb" (ADR-0029 section 4).
+type Selection struct {
+	// Present is true when the node carries the selector.
+	Present bool
+	// Literal is true when the value is a string that does not start with "="
+	// (an expression, ADR-0018).
+	Literal bool
+	// Operation is the literal value; "" unless Present and Literal.
+	Operation string
+}
+
+// SelectionOf reads the operation selector of a node.
+func SelectionOf(n *Node) Selection {
+	if n.Parameters.IsZero() {
+		return Selection{}
+	}
+	p, ok := n.Parameters.Get("operation")
+	if !ok {
+		return Selection{}
+	}
+	s, ok := p.Str()
+	if !ok || strings.HasPrefix(s, "=") {
+		return Selection{Present: true}
+	}
+	return Selection{Present: true, Literal: true, Operation: s}
 }
 
 // NodeResolution is the answer of [ConnectorNodeTypes.ResolveNode].
 type NodeResolution struct {
 	// Type is what validation needs to know about the node type; meaningful
-	// when Known and UnknownOperation is false.
+	// when Known and Selection is [SelectionOK]. For a package action node it
+	// is the contract of the selected operation, never of another one.
 	Type NodeType
-	// Known is false when no installed package defines the node type.
+	// Known is false when no installed package and no core type defines the
+	// node type.
 	Known bool
-	// UnknownOperation is true when the package has the type but not the
-	// selected operation.
-	UnknownOperation bool
+	// Selection says why the operation selection cannot be used. It is only
+	// reported for connector package node types.
+	Selection SelectionProblem
+	// Operations are the names of the operations the node type has in the
+	// pinned version, in manifest order; set for action nodes of a package.
+	Operations []string
 	// Problems has one message per reason the pin cannot be used: the version
 	// is not installed, the digest differs, the organization has not granted
 	// the package, the policy blocks it, or the node has no pin although its
@@ -130,21 +179,4 @@ func (v *validator) connectorPin(base string, n *Node) {
 	if _, ok := ConnectorIDOf(n.Type); !ok {
 		v.r.errorf(CodeConnector, path, "node %q has type %q, which no connector package can own; a connector node type reads <publisher>.<name>.<node>@<major>", n.ID, n.Type)
 	}
-}
-
-// operationOf returns the operation a node selects with its "operation"
-// parameter, or "" when it does not name one literally.
-func operationOf(n *Node) string {
-	if n.Parameters.IsZero() {
-		return ""
-	}
-	p, ok := n.Parameters.Get("operation")
-	if !ok {
-		return ""
-	}
-	s, ok := p.Str()
-	if !ok || strings.HasPrefix(s, "=") {
-		return ""
-	}
-	return s
 }

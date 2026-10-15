@@ -5,6 +5,7 @@ package envelope
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -218,6 +219,46 @@ func TestKeyringRandomFailure(t *testing.T) {
 	if _, err := ring.CreateKey(ctx, OrgScope(newOrg(t))); err == nil {
 		t.Error("CreateKey with a failing random source = nil, want error")
 	}
+}
+
+// TestKeyringCacheConcurrentRefresh hammers one key while its cache entry
+// keeps expiring, so cache hits copy the cached bytes while refreshes wipe the
+// entry they replace. A copy made outside the keyring's lock can read the
+// entry after the wipe and yield an all-zero key, so the unwrap fails with a
+// decryption error; that failure, not a race report, is what this test catches.
+func TestKeyringCacheConcurrentRefresh(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	ring := NewKeyring(newMasterKey(t), newFakeStore(), WithCacheTTL(20*time.Microsecond))
+	if err := ring.InitMasterCanary(ctx); err != nil {
+		t.Fatal(err)
+	}
+	scope := OrgScope(newOrg(t))
+	if _, err := ring.CreateKey(ctx, scope); err != nil {
+		t.Fatal(err)
+	}
+	dk, err := ring.GenerateDataKey(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dk.Key.Destroy()
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 500 {
+				key, err := ring.UnwrapDataKey(ctx, dk.ID, dk.Wrapped)
+				if err != nil {
+					t.Errorf("UnwrapDataKey = %v", err)
+					return
+				}
+				key.Destroy()
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 type zeroReader struct{}

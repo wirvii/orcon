@@ -5,10 +5,10 @@ package flow
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // The ports below are what the flow area needs from durable storage
@@ -20,55 +20,28 @@ import (
 // ID-1); the adapters convert them to the stored form. Documents travel as the
 // bytes the flow codec produced; the store keeps them whole and never reads
 // inside them (orcon-db JS-1, JS-5). Every method of an organization-scoped
-// record takes the organization first: a row of another organization is never
-// visible (ADR-0046).
+// record takes the [orgscope.Org] first after the context: a row of another
+// organization is never visible, and a record that names another organization
+// than its scope fails with [identity.ErrScopeMismatch] (ADR-0046).
 
-// Errors the stores return. Adapters map constraint violations to them by
-// constraint name (orcon-db IN-8).
+// Errors the stores return. They are the errors of the identity area, shared so
+// that one failure satisfies errors.Is for every area (orcon-db IN-8).
 var (
 	// ErrNotFound means no row matches, or the row belongs to another organization.
-	ErrNotFound = errors.New("not found")
+	ErrNotFound = identity.ErrNotFound
 	// ErrConflict means a uniqueness rule rejected the write: a duplicate name,
 	// slug, version number, content hash or identity.
-	ErrConflict = errors.New("conflict")
+	ErrConflict = identity.ErrConflict
 	// ErrReference means a referenced row does not exist, or a row that is still
 	// referenced cannot be removed.
-	ErrReference = errors.New("referenced row missing or still in use")
+	ErrReference = identity.ErrReference
 	// ErrClosed means the store was closed; an operation that was in flight when
 	// Close was called finishes first, one that starts after it fails with this.
-	ErrClosed = errors.New("store is closed")
+	ErrClosed = identity.ErrClosed
 	// ErrInvalidRecord means a database constraint rejected the values
 	// (a CHECK: unknown enumeration value, empty name, wrong format tag).
-	ErrInvalidRecord = errors.New("record violates a database constraint")
+	ErrInvalidRecord = identity.ErrInvalidRecord
 )
-
-// ProjectRecord is a row of project.
-type ProjectRecord struct {
-	ID    identity.ProjectID
-	OrgID identity.OrgID
-	Name  string
-	Slug  string
-	// Environment is a free label; empty means the project has none.
-	Environment string
-	// IsProtected is true for new projects.
-	IsProtected bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-// ProjectStore persists projects. The identity area takes projects over
-// (SPEC-004); this port is their interim home next to the flows they hold.
-type ProjectStore interface {
-	// CreateProject inserts a project. A second project with the same slug in
-	// the organization fails with [ErrConflict]; an unknown organization with
-	// [ErrReference].
-	CreateProject(ctx context.Context, p ProjectRecord) error
-	// GetProject returns one project of the organization, or [ErrNotFound].
-	GetProject(ctx context.Context, org identity.OrgID, project identity.ProjectID) (ProjectRecord, error)
-	// ListProjects returns at most limit projects of the organization with an
-	// identity greater than after, ordered by identity (keyset pagination).
-	ListProjects(ctx context.Context, org identity.OrgID, after identity.ProjectID, limit int) ([]ProjectRecord, error)
-}
 
 // ActivationState says whether the automatic triggers of a flow accept events
 // (ADR-0024 section 1). It is separate from publication: publishing creates a
@@ -115,21 +88,21 @@ func (r Record) IsDeleted() bool { return !r.DeletedAt.IsZero() }
 type Store interface {
 	// CreateFlow inserts a flow with draft revision 0. A second non-deleted
 	// flow with the same name in the project fails with [ErrConflict].
-	CreateFlow(ctx context.Context, f Record) error
+	CreateFlow(ctx context.Context, org orgscope.Org, f Record) error
 	// GetFlow returns a non-deleted flow, or [ErrNotFound].
-	GetFlow(ctx context.Context, org identity.OrgID, flow FlowID) (Record, error)
+	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
 	// GetFlowByName returns the non-deleted flow of the project with that name.
-	GetFlowByName(ctx context.Context, org identity.OrgID, project identity.ProjectID, name string) (Record, error)
+	GetFlowByName(ctx context.Context, org orgscope.Org, project identity.ProjectID, name string) (Record, error)
 	// ListFlows returns at most limit non-deleted flows of the project with an
 	// identity greater than after, ordered by identity.
-	ListFlows(ctx context.Context, org identity.OrgID, project identity.ProjectID, after FlowID, limit int) ([]Record, error)
+	ListFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID, after FlowID, limit int) ([]Record, error)
 	// UpdateFlowDraft replaces the draft document when the stored revision still
 	// equals expectedRevision, increments the revision and returns it. In the
 	// same transaction it replaces the connector references recorded for the
 	// draft with references (nil clears them), so a retirement never reads
 	// inside a document (ADR-0034 section 6). A different stored revision fails
 	// with [ErrDraftConflict] and changes nothing.
-	UpdateFlowDraft(ctx context.Context, org identity.OrgID, flow FlowID, draft []byte, expectedRevision int64, references []ConnectorReference, now time.Time) (int64, error)
+	UpdateFlowDraft(ctx context.Context, org orgscope.Org, flow FlowID, draft []byte, expectedRevision int64, references []ConnectorReference, now time.Time) (int64, error)
 }
 
 // VersionRecord is a row of flow_version: an immutable published version.
@@ -155,15 +128,15 @@ type VersionStore interface {
 	// PublishVersion inserts the version, records its connector references and
 	// makes it the flow's active version in one transaction. A repeated version
 	// number fails with [ErrConflict].
-	PublishVersion(ctx context.Context, v VersionRecord) error
+	PublishVersion(ctx context.Context, org orgscope.Org, v VersionRecord) error
 	// GetVersion returns a version by identity, or [ErrVersionNotFound].
-	GetVersion(ctx context.Context, org identity.OrgID, version FlowVersionID) (VersionRecord, error)
+	GetVersion(ctx context.Context, org orgscope.Org, version FlowVersionID) (VersionRecord, error)
 	// GetVersionByNumber returns a version of the flow by its number, or
 	// [ErrVersionNotFound].
-	GetVersionByNumber(ctx context.Context, org identity.OrgID, flow FlowID, number int64) (VersionRecord, error)
+	GetVersionByNumber(ctx context.Context, org orgscope.Org, flow FlowID, number int64) (VersionRecord, error)
 	// ListVersions returns at most limit versions of the flow with a number
 	// greater than after, ordered by number.
-	ListVersions(ctx context.Context, org identity.OrgID, flow FlowID, after int64, limit int) ([]VersionRecord, error)
+	ListVersions(ctx context.Context, org orgscope.Org, flow FlowID, after int64, limit int) ([]VersionRecord, error)
 }
 
 // ConnectorReferenceRecord is a row of connector_reference as it is read.
@@ -181,10 +154,10 @@ type ConnectorReferenceRecord struct {
 type ReferenceStore interface {
 	// ListDraftConnectorReferences returns at most limit references of the
 	// flow's draft with an identity greater than after, ordered by identity.
-	ListDraftConnectorReferences(ctx context.Context, org identity.OrgID, flow FlowID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
+	ListDraftConnectorReferences(ctx context.Context, org orgscope.Org, flow FlowID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
 	// ListVersionConnectorReferences returns at most limit references of a
 	// published version with an identity greater than after, ordered by identity.
-	ListVersionConnectorReferences(ctx context.Context, org identity.OrgID, version FlowVersionID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
+	ListVersionConnectorReferences(ctx context.Context, org orgscope.Org, version FlowVersionID, after ConnectorReferenceID, limit int) ([]ConnectorReferenceRecord, error)
 }
 
 // SnapshotRecord is a row of flow_snapshot: the content-addressed document of
@@ -202,63 +175,7 @@ type SnapshotRecord struct {
 type SnapshotStore interface {
 	// CreateSnapshot inserts the snapshot, or returns the stored one when the
 	// organization already has a snapshot with the same content hash.
-	CreateSnapshot(ctx context.Context, s SnapshotRecord) (SnapshotRecord, error)
+	CreateSnapshot(ctx context.Context, org orgscope.Org, s SnapshotRecord) (SnapshotRecord, error)
 	// GetSnapshot returns a snapshot by identity, or [ErrSnapshotNotFound].
-	GetSnapshot(ctx context.Context, org identity.OrgID, snapshot FlowSnapshotID) (SnapshotRecord, error)
-}
-
-// OrgRecord is a row of org.
-type OrgRecord struct {
-	ID   identity.OrgID
-	Name string
-	// Slug is unique across the instance.
-	Slug   string
-	Status string
-	// DeletionScheduledAt is set exactly when Status is [OrgDeletionScheduled].
-	DeletionScheduledAt time.Time
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-}
-
-// Organization statuses.
-const (
-	OrgActive            = "ACTIVE"
-	OrgSuspended         = "SUSPENDED"
-	OrgDeletionScheduled = "DELETION_SCHEDULED"
-)
-
-// PrincipalRecord is a row of principal: whoever acts.
-type PrincipalRecord struct {
-	ID        identity.PrincipalID
-	Kind      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-// Principal kinds, the spelling the API exposes.
-const (
-	PrincipalUser           = "USER"
-	PrincipalServiceAccount = "SERVICE_ACCOUNT"
-	PrincipalSystem         = "SYSTEM"
-)
-
-// InstanceStore persists the organization and principal tables an
-// installation bootstraps with.
-//
-// It is a temporary port: organizations, principals and projects move to the
-// identity area (internal/identity, SPEC-004 cut SE1b), which declares its own
-// ports. No non-test code of this package calls it. The worker registry has
-// already moved to internal/execution (execution.WorkerStore).
-type InstanceStore interface {
-	// CreateOrganization inserts an organization. A repeated slug fails with
-	// [ErrConflict].
-	CreateOrganization(ctx context.Context, o OrgRecord) error
-	// GetOrganization returns one organization, or [ErrNotFound].
-	GetOrganization(ctx context.Context, org identity.OrgID) (OrgRecord, error)
-	// CreatePrincipal inserts a principal. A second SYSTEM principal fails with
-	// [ErrConflict].
-	CreatePrincipal(ctx context.Context, p PrincipalRecord) error
-	// GetSystemPrincipal returns the single SYSTEM principal, or [ErrNotFound]
-	// before the instance is bootstrapped.
-	GetSystemPrincipal(ctx context.Context) (PrincipalRecord, error)
+	GetSnapshot(ctx context.Context, org orgscope.Org, snapshot FlowSnapshotID) (SnapshotRecord, error)
 }

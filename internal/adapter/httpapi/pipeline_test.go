@@ -246,7 +246,7 @@ func TestAuthenticatedAndAnonymousOperationsSkipTheAuthorizer(t *testing.T) {
 func TestDefaultsRejectEveryProtectedRoute(t *testing.T) {
 	// With no authenticator and no authorizer configured the router answers
 	// 401 to every protected operation, and DenyAll would refuse the rest.
-	rt, err := build(&Deps{Role: config.RoleStandalone}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
+	rt, err := build(&Deps{Role: config.RoleStandalone, Idempotency: memStore()}, []byte(syntheticSpec), func(mux apigen.ServeMux, base string) {
 		fakeHandlers(mux, base, nil)
 	})
 	if err != nil {

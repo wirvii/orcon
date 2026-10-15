@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -33,27 +34,31 @@ func newTestRunner(t *testing.T, srv *httptest.Server) *runner {
 }
 
 func TestAwaitOperationFailures(t *testing.T) {
-	status := "RUNNING"
+	// The handler runs on server goroutines, so the status it reports is
+	// shared through an atomic value to keep the race detector quiet.
+	var status atomic.Value
+	status.Store("RUNNING")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprintf(w, `{"id":"x","status":%q}`, status)
+		current, _ := status.Load().(string)
+		_, _ = fmt.Fprintf(w, `{"id":"x","status":%q}`, current)
 	}))
 	defer srv.Close()
 	r := newTestRunner(t, srv)
 	def := exampleDef{Operation: &operationDef{TerminalStatus: "SUCCEEDED"}}
 	located := &Response{Status: http.StatusAccepted, Header: http.Header{"Location": {"/op/1"}}}
 
-	status = "FAILED"
+	status.Store("FAILED")
 	if f := r.awaitOperation(t.Context(), def, located); f == nil || f.kind != KindOperation || !strings.Contains(f.detail, "ended FAILED") {
 		t.Errorf("wrong terminal status: %+v", f)
 	}
-	status = "RUNNING"
+	status.Store("RUNNING")
 	if f := r.awaitOperation(t.Context(), def, located); f == nil || f.kind != KindOperation || !strings.Contains(f.detail, "not terminal") {
 		t.Errorf("timeout: %+v", f)
 	}
 	if f := r.awaitOperation(t.Context(), def, &Response{Status: http.StatusAccepted, Header: http.Header{}}); f == nil || !strings.Contains(f.detail, "no Location") {
 		t.Errorf("missing Location: %+v", f)
 	}
-	status = "SUCCEEDED"
+	status.Store("SUCCEEDED")
 	if f := r.awaitOperation(t.Context(), def, located); f != nil {
 		t.Errorf("the expected terminal status failed: %+v", f)
 	}

@@ -14,16 +14,16 @@ const viewports = [
 
 for (const theme of ['light', 'dark'] as const) {
   for (const viewport of viewports) {
-    test(`the welcome screen has no accessibility violations in the ${theme} theme on a ${viewport.name}`, async ({ page }) => {
+    test(`the sign-in page has no accessibility violations in the ${theme} theme on a ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       // The saved preference is what theme-init.js applies before the first paint.
       await page.addInitScript((value) => {
         window.localStorage.setItem('orcon.theme', value);
       }, theme);
-      await page.goto('/');
+      await page.goto('/login');
 
       await expect(page.locator('#root')).toBeVisible();
-      await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Orcon' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
 
       const results = await new AxeBuilder({ page }).withTags(wcag).analyze();
@@ -39,7 +39,7 @@ test('the page asks nothing from another origin', async ({ page }) => {
     const url = new URL(request.url());
     if (url.protocol.startsWith('http') && url.origin !== 'http://127.0.0.1:4173') external.push(request.url());
   });
-  await page.goto('/');
+  await page.goto('/login');
   await expect(page.locator('#root')).toBeVisible();
   expect(external).toEqual([]);
 });
@@ -49,8 +49,8 @@ test('the saved density and language are on the page before it paints', async ({
     window.localStorage.setItem('orcon.density', 'compact');
     window.localStorage.setItem('orcon.locale', 'es');
   });
-  await page.goto('/');
+  await page.goto('/login');
   await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Te damos la bienvenida a Orcon');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Iniciar sesión');
 });

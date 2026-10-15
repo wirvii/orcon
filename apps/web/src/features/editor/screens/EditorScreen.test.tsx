@@ -114,12 +114,13 @@ describe('the editor screen', () => {
       expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     });
 
-    it('shows the flow: its name, the sample notice, the tools and the canvas with every node', async () => {
+    it('shows the flow: its name, the tools and the canvas with every node, and no sample notice', async () => {
       const mark = vi.spyOn(performance, 'mark');
       renderEditor();
       await opened();
       expect(screen.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
-      expect(screen.getByText('Preview with a sample flow')).toBeVisible();
+      // The draft comes from the server, so the page does not call it a sample.
+      expect(screen.queryByText('Preview with a sample flow')).toBeNull();
       expect(screen.getByRole('toolbar', { name: 'Flow editor tools' })).toBeVisible();
       expect(screen.getByRole('region', { name: 'Flow canvas: 6 nodes' })).toBeVisible();
       for (const name of [/^Webhook,/, /^Validate order,/, /^HTTP Request,/, /^Slack,/, /^Ignore invalid order,/, /^Done,/]) expect(canvasNode(name)).toBeInTheDocument();
@@ -615,7 +616,8 @@ describe('the node details view', () => {
       });
       // The canvas was told about the new line and port; that is not an edit of its own, so nothing was renamed.
       expect(status()).not.toMatch(/Renamed/);
-    });
+      // Types a long address key by key and walks three controls: slower than the 5 s default on CI runners (BL-107).
+    }, 15_000);
 
     it('takes the canvas back with the draft when the edits are undone', async () => {
       renderEditor();

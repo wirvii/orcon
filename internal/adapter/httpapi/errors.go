@@ -8,10 +8,13 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/conditional"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 )
 
@@ -51,6 +54,11 @@ func (h errorHandler) request(w http.ResponseWriter, r *http.Request, err error)
 		problem.Write(w, r, problem.PayloadTooLarge)
 		return
 	}
+	var missingHeader *apigen.RequiredHeaderError
+	if errors.As(err, &missingHeader) && strings.EqualFold(missingHeader.ParamName, "If-Match") {
+		problem.Write(w, r, problem.PreconditionRequired)
+		return
+	}
 	if field, ok := invalidField(err); ok {
 		problem.Write(w, r, problem.ValidationFailed, problem.Fields(field))
 		return
@@ -65,13 +73,35 @@ func (h errorHandler) request(w http.ResponseWriter, r *http.Request, err error)
 // in the table of area errors yet, so it is an internal error: logged once
 // with the request id, never shown to the client (API-4.1).
 func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, errUnavailable) {
-		problem.Write(w, r, problem.ServiceUnavailable, problem.RetryAfter(unavailableRetry))
+	if answered := knownError(w, r, err); answered {
 		return
 	}
 	h.logger.ErrorContext(r.Context(), "request failed",
 		"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
 	problem.Write(w, r, problem.InternalError)
+}
+
+// knownError answers the errors that handlers share: an operation without a
+// handler, the pagination errors and the failed preconditions. It reports
+// whether it answered.
+func knownError(w http.ResponseWriter, r *http.Request, err error) bool {
+	switch {
+	case errors.Is(err, errUnavailable):
+		problem.Write(w, r, problem.ServiceUnavailable, problem.RetryAfter(unavailableRetry))
+	case errors.Is(err, page.ErrInvalidToken):
+		problem.Write(w, r, problem.InvalidPageToken)
+	case errors.Is(err, page.ErrInvalidLimit):
+		problem.Write(w, r, problem.ValidationFailed, problem.Fields(problem.FieldError{Pointer: "/limit", Code: "out-of-range", Message: "The limit is an integer from 1 to 200."}))
+	case errors.Is(err, page.ErrInvalidSort):
+		problem.Write(w, r, problem.ValidationFailed, problem.Fields(problem.FieldError{Pointer: "/sort", Code: "not-allowed", Message: "The sort expression names a field this operation does not sort by."}))
+	case errors.Is(err, conditional.ErrRequired):
+		problem.Write(w, r, problem.PreconditionRequired)
+	case errors.Is(err, conditional.ErrMismatch), errors.Is(err, conditional.ErrMalformed):
+		problem.Write(w, r, problem.PreconditionFailed)
+	default:
+		return false
+	}
+	return true
 }
 
 // invalidField describes the parameter the generated code rejected. Messages

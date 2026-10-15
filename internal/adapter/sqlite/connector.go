@@ -12,6 +12,7 @@ import (
 	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 var (
@@ -119,10 +120,14 @@ func (s *Store) ListPackageVersions(ctx context.Context, connectorID, afterVersi
 }
 
 // InsertGrant implements [connector.GrantStore].
-func (s *Store) InsertGrant(ctx context.Context, g connector.GrantRecord) error {
+func (s *Store) InsertGrant(ctx context.Context, org orgscope.Org, g connector.GrantRecord) error {
 	return s.write(ctx, "insert connector grant", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, g.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.InsertConnectorGrant(ctx, sqlcgen.InsertConnectorGrantParams{
-			ID: uuidBytes(g.ID), OrgID: uuidBytes(g.OrgID), ConnectorPackageID: uuidBytes(g.PackageID),
+			ID: uuidBytes(g.ID), OrgID: scope, ConnectorPackageID: uuidBytes(g.PackageID),
 			ProjectID: nullUUIDBytes(g.ProjectID), PermissionsDigest: g.PermissionsDigest,
 			GrantedByPrincipalID: nullUUIDBytes(g.GrantedByPrincipalID), GrantedAt: micros(g.GrantedAt),
 			CreatedAt: micros(g.CreatedAt), UpdatedAt: micros(g.UpdatedAt),
@@ -131,10 +136,10 @@ func (s *Store) InsertGrant(ctx context.Context, g connector.GrantRecord) error 
 }
 
 // FindGrant implements [connector.GrantStore].
-func (s *Store) FindGrant(ctx context.Context, org identity.OrgID, pkg connector.PackageID, project identity.ProjectID) (connector.GrantRecord, error) {
+func (s *Store) FindGrant(ctx context.Context, org orgscope.Org, pkg connector.PackageID, project identity.ProjectID) (connector.GrantRecord, error) {
 	var out connector.GrantRecord
-	err := s.read(ctx, "find connector grant", func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetConnectorGrant(ctx, uuidBytes(org), uuidBytes(pkg), nullUUIDBytes(project))
+	err := s.readOf(ctx, "find connector grant", org, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetConnectorGrant(ctx, uuidBytes(org.UUID()), uuidBytes(pkg), nullUUIDBytes(project))
 		if err != nil {
 			return err
 		}
@@ -162,13 +167,13 @@ func (s *Store) FindGrant(ctx context.Context, org identity.OrgID, pkg connector
 
 // replaceDraftReferences stores the connector references of a draft, in the
 // transaction of the caller, replacing the ones recorded before.
-func replaceDraftReferences(ctx context.Context, q *sqlcgen.Queries, org identity.OrgID, flowID flow.FlowID, refs []flow.ConnectorReference, now time.Time) error {
-	if err := q.DeleteDraftConnectorReferences(ctx, uuidBytes(org), uuidBytes(flowID)); err != nil {
+func replaceDraftReferences(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org, flowID flow.FlowID, refs []flow.ConnectorReference, now time.Time) error {
+	if err := q.DeleteDraftConnectorReferences(ctx, uuidBytes(org.UUID()), uuidBytes(flowID)); err != nil {
 		return err
 	}
 	for _, ref := range refs {
 		if err := q.InsertConnectorReference(ctx, sqlcgen.InsertConnectorReferenceParams{
-			ID: uuidBytes(ref.ID), OrgID: uuidBytes(org), FlowID: uuidBytes(flowID),
+			ID: uuidBytes(ref.ID), OrgID: uuidBytes(org.UUID()), FlowID: uuidBytes(flowID),
 			ConnectorID: ref.ConnectorID, ConnectorVersion: ref.ConnectorVersion, CreatedAt: micros(now),
 		}); err != nil {
 			return err
@@ -211,11 +216,11 @@ func referenceFrom(row *sqlcgen.ConnectorReference) (flow.ConnectorReferenceReco
 }
 
 // ListDraftConnectorReferences implements [flow.ReferenceStore].
-func (s *Store) ListDraftConnectorReferences(ctx context.Context, org identity.OrgID, flowID flow.FlowID, after flow.ConnectorReferenceID, limit int) ([]flow.ConnectorReferenceRecord, error) {
+func (s *Store) ListDraftConnectorReferences(ctx context.Context, org orgscope.Org, flowID flow.FlowID, after flow.ConnectorReferenceID, limit int) ([]flow.ConnectorReferenceRecord, error) {
 	var out []flow.ConnectorReferenceRecord
-	err := s.read(ctx, "list draft connector references", func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.readOf(ctx, "list draft connector references", org, func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ListDraftConnectorReferences(ctx, sqlcgen.ListDraftConnectorReferencesParams{
-			OrgID: uuidBytes(org), FlowID: uuidBytes(flowID), AfterID: uuidBytes(after), PageSize: clampPage(limit),
+			OrgID: uuidBytes(org.UUID()), FlowID: uuidBytes(flowID), AfterID: uuidBytes(after), PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err
@@ -233,11 +238,11 @@ func (s *Store) ListDraftConnectorReferences(ctx context.Context, org identity.O
 }
 
 // ListVersionConnectorReferences implements [flow.ReferenceStore].
-func (s *Store) ListVersionConnectorReferences(ctx context.Context, org identity.OrgID, version flow.FlowVersionID, after flow.ConnectorReferenceID, limit int) ([]flow.ConnectorReferenceRecord, error) {
+func (s *Store) ListVersionConnectorReferences(ctx context.Context, org orgscope.Org, version flow.FlowVersionID, after flow.ConnectorReferenceID, limit int) ([]flow.ConnectorReferenceRecord, error) {
 	var out []flow.ConnectorReferenceRecord
-	err := s.read(ctx, "list version connector references", func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.readOf(ctx, "list version connector references", org, func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ListVersionConnectorReferences(ctx, sqlcgen.ListVersionConnectorReferencesParams{
-			OrgID: uuidBytes(org), FlowVersionID: uuidBytes(version), AfterID: uuidBytes(after), PageSize: clampPage(limit),
+			OrgID: uuidBytes(org.UUID()), FlowVersionID: uuidBytes(version), AfterID: uuidBytes(after), PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err

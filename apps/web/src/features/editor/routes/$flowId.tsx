@@ -5,9 +5,19 @@ import { createFileRoute, notFound } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { RouteError } from '../../../app/errors/RouteError';
+import { PageShell } from '../../../app/shell/PageShell';
 import { EditorScreen } from '../screens/EditorScreen';
 
 const flowIdSchema = z.uuid();
+
+/** The editor fills the page between the bars, so it is the one page with the full-height frame. */
+function EditorPage() {
+  return (
+    <PageShell fill>
+      <EditorScreen />
+    </PageShell>
+  );
+}
 
 // The editor is the route the whole flow is edited in. This file stays thin: it is part of the
 // initial JavaScript, so the data layer is imported in the loader, when the route is entered, and
@@ -29,5 +39,5 @@ export const Route = createFileRoute('/flows/$flowId')({
     return context.queryClient.query({ ...draftQueryOptions(params.flowId), staleTime: 'static' });
   },
   errorComponent: RouteError,
-  component: EditorScreen,
+  component: EditorPage,
 });
