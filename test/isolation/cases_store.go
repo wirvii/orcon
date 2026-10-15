@@ -54,13 +54,14 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"CustomRoles":         caseCustomRoles,
 	"ProjectOrganization": caseProjectOrganization,
 	// Key store (ADR-0042).
-	"MasterCanary":    caseMasterCanary,
-	"PutMasterCanary": caseMasterCanary,
-	"PutKey":          casePutKey,
-	"Key":             caseKey,
-	"ActiveKey":       caseActiveKey,
-	"ActiveKeys":      caseActiveKeys,
-	"SetPasswordHash": caseSetPasswordHash,
+	"MasterCanary":             caseMasterCanary,
+	"PutMasterCanary":          caseMasterCanary,
+	"PutKey":                   casePutKey,
+	"Key":                      caseKey,
+	"ActiveKey":                caseActiveKey,
+	"ActiveKeys":               caseActiveKeys,
+	"ListOrgsWithoutActiveKey": caseListOrgsWithoutActiveKey,
+	"SetPasswordHash":          caseSetPasswordHash,
 	// Sessions and the sign-in throttle (instance tables).
 	"CreateSession":          caseCreateSession,
 	"AppendInstanceEntry":    caseAppendInstanceEntry,
@@ -658,6 +659,11 @@ func caseCreateFlowWithEntry(ctx context.Context, tb testing.TB, env *Env) {
 	intact(ctx, tb, env)
 }
 
+// orgKeyOf is a first organization key the store keeps as opaque bytes.
+func orgKeyOf() identity.OrgKeyRecord {
+	return identity.OrgKeyRecord{Version: 1, Wrapped: []byte("wrapped"), MasterKeyReference: "test", Status: "ACTIVE", Probe: []byte("probe"), CreatedAt: seededAt}
+}
+
 func caseCreateOrganizationWithAdmin(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	org := identity.OrgRecord{ID: fresh[identity.OrgID](env), Name: "Newco", Slug: "newco", Status: identity.OrgActive, CreatedAt: seededAt, UpdatedAt: seededAt}
@@ -670,10 +676,10 @@ func caseCreateOrganizationWithAdmin(ctx context.Context, tb testing.TB, env *En
 	bad := m
 	bad.OrgID = identity.OrgID(env.B.UUID)
 	wantErr(tb, "a membership of B in the new organization",
-		env.Stores.CreateOrganizationWithAdmin(ctx, org, bad, grant, []audit.Entry{audittest.Org(tb, id.UUID(org.ID), "org.created")}), identity.ErrScopeMismatch)
+		env.Stores.CreateOrganizationWithAdmin(ctx, org, orgKeyOf(), bad, grant, []audit.Entry{audittest.Org(tb, id.UUID(org.ID), "org.created")}), identity.ErrScopeMismatch)
 	// An audit entry of B's chain written with the new organization is refused.
 	wantErr(tb, "an entry of B's chain in the new organization",
-		env.Stores.CreateOrganizationWithAdmin(ctx, org, m, grant, []audit.Entry{audittest.Org(tb, env.B.UUID, "org.created")}), identity.ErrScopeMismatch)
+		env.Stores.CreateOrganizationWithAdmin(ctx, org, orgKeyOf(), m, grant, []audit.Entry{audittest.Org(tb, env.B.UUID, "org.created")}), identity.ErrScopeMismatch)
 	intact(ctx, tb, env)
 }
 

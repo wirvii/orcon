@@ -33,13 +33,37 @@ type OrgStore interface {
 	CreateOrganization(ctx context.Context, o OrgRecord) error
 	// GetOrganization returns the organization of the scope, or [ErrNotFound].
 	GetOrganization(ctx context.Context, org orgscope.Org) (OrgRecord, error)
-	// CreateOrganizationWithAdmin inserts an organization, the first membership of its
-	// administrator, the administrator's role binding and the audit entries of the creation,
-	// all in one transaction (SPEC-004 R-AUD-02). The entries join the organization chain. A
-	// repeated slug fails with [ErrConflict]; an unknown user with [ErrReference].
+	// CreateOrganizationWithAdmin inserts an organization, its first (active) key, the first
+	// membership of its administrator, the administrator's role binding and the audit entries
+	// of the creation, all in one transaction (SPEC-004 R-AUD-02, SE3b): no organization exists
+	// without an organization key. The entries join the organization chain. A repeated slug
+	// fails with [ErrConflict]; an unknown user with [ErrReference].
 	//
 	//orcon:scope instance the organization does not exist before this call, so there is no scope to hold
-	CreateOrganizationWithAdmin(ctx context.Context, o OrgRecord, m MembershipRecord, grant RoleBindingRecord, entries []audit.Entry) error
+	CreateOrganizationWithAdmin(ctx context.Context, o OrgRecord, key OrgKeyRecord, m MembershipRecord, grant RoleBindingRecord, entries []audit.Entry) error
+}
+
+// OrgKeyRecord is the first version of an organization key, wrapped by the master key, as the
+// store keeps it. It is opaque to identity: the key hierarchy (internal/credential/envelope)
+// builds it and reads it back.
+type OrgKeyRecord struct {
+	Version            int
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	// Probe is the canary encrypted under this key version.
+	Probe     []byte
+	CreatedAt time.Time
+}
+
+// OrgKeyGapStore finds the organizations the startup check has to give a key.
+type OrgKeyGapStore interface {
+	// ListOrgsWithoutActiveKey returns the organizations that are not scheduled for deletion
+	// and have no active organization key, at most limit of them, ordered by id. It reads
+	// across organizations, in the engine plane (ADR-0047 section 2).
+	//
+	//orcon:scope engine the check covers every organization, as the startup key verification does
+	ListOrgsWithoutActiveKey(ctx context.Context, limit int) ([]OrgID, error)
 }
 
 // PrincipalStore persists principals, the rows of whoever acts.

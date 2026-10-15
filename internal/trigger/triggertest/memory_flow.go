@@ -119,7 +119,7 @@ func (m *Memory) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p
 
 // CreateOrganizationWithAdmin implements [identity.OrgStore]. The fake keeps no memberships,
 // role bindings or audit entries.
-func (m *Memory) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+func (m *Memory) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.OrgKeyRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
 	return m.CreateOrganization(ctx, o)
 }
 

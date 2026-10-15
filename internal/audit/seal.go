@@ -38,24 +38,31 @@ func NewSealer(store Store, keys KeySource, ids id.Generator, clk clock.Clock) *
 
 // SealOnce seals at most one batch of every chain that has pending entries and
 // returns how many events it sealed. A chain that another sealer moved meanwhile is
-// skipped, not an error.
+// skipped, not an error. A chain that fails does not stop the others: the pass goes on
+// and returns the failures joined, so one broken organization cannot hold back the
+// audit entries of every organization after it.
 func (s *Sealer) SealOnce(ctx context.Context) (int, error) {
 	chains, err := s.store.PendingChains(ctx, maxChainsPerPass)
 	if err != nil {
 		return 0, fmt.Errorf("seal audit: %w", err)
 	}
 	total := 0
+	var failures []error
 	for _, chain := range chains {
 		n, err := s.sealChain(ctx, chain)
 		if errors.Is(err, ErrTailMoved) {
 			continue
 		}
 		if err != nil {
-			return total, fmt.Errorf("seal audit of %s: %w", chain.Label(), err)
+			failures = append(failures, fmt.Errorf("seal audit of %s: %w", chain.Label(), err))
+			if ctx.Err() != nil {
+				break
+			}
+			continue
 		}
 		total += n
 	}
-	return total, nil
+	return total, errors.Join(failures...)
 }
 
 // sealChain seals one batch of one chain.

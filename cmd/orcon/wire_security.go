@@ -59,6 +59,7 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	identity.MembershipStore
 	authz.Store
 	envelope.KeyStore
+	identity.OrgKeyGapStore
 	audit.Store
 	io.Closer
 }
@@ -157,6 +158,7 @@ func wireSecurity(ctx context.Context, cfg *config.Config, logger *slog.Logger, 
 	if err := checkOrBootstrapKeys(ctx, cfg, mk, kr, store, logger); err != nil {
 		return nil, err
 	}
+	ensureOrgKeys(ctx, kr, store, logger)
 	_, identKey, err := kr.ActiveSubkey(ctx, envelope.InstanceScope(), identifierPurpose)
 	if err != nil {
 		return nil, fmt.Errorf("derive the identifier key: %w", err)
@@ -243,6 +245,37 @@ func checkOrBootstrapKeys(ctx context.Context, cfg *config.Config, mk envelope.M
 	return nil
 }
 
+// ensureOrgKeys gives a key to every organization that has none (SPEC-004 R-KEY-05, SE3b). An
+// organization is created together with its key, so an organization without one was created
+// before that held; without a key its audit chain cannot be sealed and its credentials cannot be
+// stored. It runs after the master key is verified, so every key it writes is wrapped by the
+// verified master key. Each repair is logged; a failure is logged and does not stop the start,
+// because it affects that organization only. Replicas that start together are safe: the second
+// writer of the same key version gets [envelope.ErrKeyExists] and moves on.
+func ensureOrgKeys(ctx context.Context, kr *envelope.Keyring, store identity.OrgKeyGapStore, logger *slog.Logger) {
+	err := kr.EnsureOrgKeys(ctx, store, func(org identity.OrgID) {
+		logger.WarnContext(ctx, "created the missing organization key", "org_id", org.String())
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "organization key check failed", "error", err)
+	}
+}
+
+// orgKeyIssuer prepares the first key of a new organization from the keyring, without storing it.
+type orgKeyIssuer struct{ kr *envelope.Keyring }
+
+// NewOrgKey implements [identity.OrgKeyIssuer].
+func (i orgKeyIssuer) NewOrgKey(ctx context.Context, org identity.OrgID) (identity.OrgKeyRecord, error) {
+	k, err := i.kr.NewKey(ctx, envelope.OrgScope(org))
+	if err != nil {
+		return identity.OrgKeyRecord{}, err
+	}
+	return identity.OrgKeyRecord{
+		Version: k.ID.Version, Wrapped: k.Wrapped, MasterKeyReference: k.MasterKeyReference,
+		Status: string(k.Status), Probe: k.Canary, CreatedAt: k.CreatedAt,
+	}, nil
+}
+
 // auditKeys gives the audit sealer the MAC keys of each chain: the organization key for an
 // organization chain, the instance key for the instance chain (ADR-0048 section 3).
 type auditKeys struct{ kr *envelope.Keyring }
@@ -276,18 +309,7 @@ func (k auditKeys) MACKey(ctx context.Context, chain audit.Chain, version int64)
 
 // runSealer seals the pending audit entries until ctx ends.
 func (s *security) runSealer(ctx context.Context, logger *slog.Logger) {
-	ticker := time.NewTicker(sealInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := s.sealer.SealOnce(ctx); err != nil && ctx.Err() == nil {
-				logger.ErrorContext(ctx, "audit sealing failed", "error", err)
-			}
-		}
-	}
+	sealLoop(ctx, logger, defaultSealPace, s.sealer.SealOnce)
 }
 
 // close releases the store.

@@ -201,6 +201,23 @@ func pgInstanceKey(version int64, wrapped []byte, reference, status string, crea
 	}
 }
 
+// ListOrgsWithoutActiveKey implements [identity.OrgKeyGapStore], through the engine function.
+func (s *Store) ListOrgsWithoutActiveKey(ctx context.Context, limit int) ([]identity.OrgID, error) {
+	var out []identity.OrgID
+	err := s.engineRows(ctx, "list organizations without an active key",
+		"SELECT org_id FROM orcon_engine.list_orgs_without_active_key($1)",
+		[]any{pgLimit(limit)},
+		func(rows pgx.Rows) error {
+			var org pgtype.UUID
+			if err := rows.Scan(&org); err != nil {
+				return err
+			}
+			out = append(out, fromPGUUID[identity.OrgID](org))
+			return nil
+		})
+	return out, err
+}
+
 func pgOrgKey(org identity.OrgID, version int64, wrapped []byte, reference, status string, created pgtype.Timestamptz, probe []byte) envelope.StoredKey {
 	return envelope.StoredKey{
 		ID:      envelope.KeyID{Level: envelope.LevelOrg, OrgID: org, Version: int(version)},

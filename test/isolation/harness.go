@@ -80,6 +80,7 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	identity.LoginThrottleStore
 	identity.OrganizationResolver
 	envelope.KeyStore
+	identity.OrgKeyGapStore
 	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore

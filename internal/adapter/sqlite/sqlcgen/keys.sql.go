@@ -321,3 +321,37 @@ func (q *Queries) ListActiveOrgKeys(ctx context.Context, afterOrgID []byte, page
 	}
 	return items, nil
 }
+
+const listOrgsWithoutActiveKey = `-- name: ListOrgsWithoutActiveKey :many
+SELECT o.id
+FROM org AS o
+WHERE o.status <> 'DELETION_SCHEDULED'
+  AND NOT EXISTS (SELECT 1 FROM org_key AS k WHERE k.org_id = o.id AND k.status = 'ACTIVE')
+ORDER BY o.id
+LIMIT ?1
+`
+
+// orcon:scope engine
+// the organizations that have no active key, for the startup check that gives each one a key (SPEC-004 R-KEY-05, SE3b)
+func (q *Queries) ListOrgsWithoutActiveKey(ctx context.Context, rowLimit int64) ([][]byte, error) {
+	rows, err := q.db.QueryContext(ctx, listOrgsWithoutActiveKey, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var id []byte
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

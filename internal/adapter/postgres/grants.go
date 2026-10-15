@@ -63,7 +63,7 @@ func insertRoleBindingRow(ctx context.Context, q *sqlcgen.Queries, org id.UUID, 
 // and role binding of its administrator and the audit entries of the creation, in one
 // transaction. The transaction runs in the organization being created, so the row-level
 // security of its rows admits them.
-func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, m identity.MembershipRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
+func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, key identity.OrgKeyRecord, m identity.MembershipRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
 	if m.OrgID != o.ID || grant.OrgID != o.ID {
 		return fmt.Errorf("create organization %s: %w", o.ID, identity.ErrScopeMismatch)
 	}
@@ -74,6 +74,13 @@ func (s *Store) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgR
 			CreatedAt:           timestamp(o.CreatedAt), UpdatedAt: timestamp(o.UpdatedAt),
 		}); err != nil {
 			return fmt.Errorf("insert organization: %w", err)
+		}
+		if err := q.InsertOrgKey(ctx, sqlcgen.InsertOrgKeyParams{
+			OrgID: pgUUID(o.ID), KeyVersion: int64(key.Version), Wrapped: key.Wrapped,
+			MasterKeyReference: key.MasterKeyReference, Status: key.Status, Probe: key.Probe,
+			CreatedAt: timestamp(key.CreatedAt),
+		}); err != nil {
+			return fmt.Errorf("insert organization key: %w", err)
 		}
 		if err := q.InsertMembership(ctx, sqlcgen.InsertMembershipParams{
 			ID: pgUUID(m.ID), OrgID: pgUUID(o.ID), ApplicationUserID: pgUUID(m.UserID), Status: m.Status,

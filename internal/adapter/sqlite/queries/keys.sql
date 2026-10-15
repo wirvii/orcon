@@ -68,3 +68,13 @@ JOIN org AS o ON o.id = k.org_id
 WHERE k.status = 'ACTIVE' AND o.id > sqlc.arg(after_org_id)
 ORDER BY o.id
 LIMIT sqlc.arg(page_size);
+
+-- name: ListOrgsWithoutActiveKey :many
+-- orcon:scope engine
+-- the organizations that have no active key, for the startup check that gives each one a key (SPEC-004 R-KEY-05, SE3b)
+SELECT o.id
+FROM org AS o
+WHERE o.status <> 'DELETION_SCHEDULED'
+  AND NOT EXISTS (SELECT 1 FROM org_key AS k WHERE k.org_id = o.id AND k.status = 'ACTIVE')
+ORDER BY o.id
+LIMIT sqlc.arg(row_limit);

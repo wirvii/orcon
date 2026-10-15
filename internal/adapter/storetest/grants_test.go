@@ -14,6 +14,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -247,8 +248,25 @@ func TestCreateOrganizationWithAdminGrantsTheAdministrator(t *testing.T) {
 			RoleName: identity.RoleAdmin, CreatedAt: base, UpdatedAt: base,
 		}
 		entries := []audit.Entry{audittest.Org(t, id.UUID(org.ID), "org.created"), audittest.Org(t, id.UUID(org.ID), "member.joined"), audittest.Org(t, id.UUID(org.ID), "role_binding.created")}
-		if err := g.s.CreateOrganizationWithAdmin(g.ctx(), org, m, grant, entries); err != nil {
+		mk := envelope.NewLocalMasterKey("file", "storetest-master", mustKey(t))
+		kr := envelope.NewKeyring(mk, g.s)
+		stored, err := kr.NewKey(g.ctx(), envelope.OrgScope(org.ID))
+		if err != nil {
+			t.Fatalf("new organization key: %v", err)
+		}
+		key := identity.OrgKeyRecord{
+			Version: stored.ID.Version, Wrapped: stored.Wrapped, MasterKeyReference: stored.MasterKeyReference,
+			Status: string(stored.Status), Probe: stored.Canary, CreatedAt: stored.CreatedAt,
+		}
+		if err := g.s.CreateOrganizationWithAdmin(g.ctx(), org, key, m, grant, entries); err != nil {
 			t.Fatalf("create organization with admin: %v", err)
+		}
+		// The organization has its active key, written in the same transaction, and the key opens.
+		if got, err := g.s.ActiveKey(g.ctx(), envelope.OrgScope(org.ID)); err != nil || got.ID != stored.ID {
+			t.Fatalf("active key of the new organization = %+v, %v; want %v", got, err, stored.ID)
+		}
+		if _, err := kr.GenerateDataKey(g.ctx(), envelope.OrgScope(org.ID)); err != nil {
+			t.Fatalf("the new organization's key does not wrap a data key: %v", err)
 		}
 		scope := scopeOf(org.ID)
 		if got, err := g.s.GetOrganization(g.ctx(), scope); err != nil || got.Slug != "acme" {
