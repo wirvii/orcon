@@ -32,6 +32,12 @@ type Node struct {
 	// Credentials are references by type and name. Nothing else of the
 	// credentials member is ever read, so no secret can reach a mapping.
 	Credentials []CredentialRef
+	// WebhookID is the webhookId n8n gave a webhook-based node; empty when
+	// the export has none.
+	WebhookID string
+	// Source is the node object as the workflow wrote it. The converter keeps
+	// it in the ext of a node Orcon cannot run; zero when built by hand.
+	Source jsonvalue.Value
 }
 
 // CredentialRef points at a credential of an n8n workflow by type and name.
@@ -115,6 +121,8 @@ func nodeFrom(v jsonvalue.Value) (Node, error) {
 	if d, ok := v.Get("disabled"); ok {
 		n.Disabled, _ = d.Bool()
 	}
+	n.WebhookID = strMember(v, "webhookId")
+	n.Source = v
 	if c, ok := v.Get("credentials"); ok {
 		for _, m := range c.Members() {
 			ref := CredentialRef{Type: m.Key}

@@ -1,0 +1,85 @@
+{
+  "name": "Legacy edge cases",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "33333333-0000-4000-8000-000000000001",
+      "name": "Legacy start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [ { "value1": "={{ $json.status }}", "operation": "equal", "value2": "paid" } ]
+        }
+      },
+      "id": "33333333-0000-4000-8000-000000000002",
+      "name": "Old IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {},
+      "id": "33333333-0000-4000-8000-000000000003",
+      "name": "Paid branch",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [440, -100],
+      "disabled": true
+    },
+    {
+      "parameters": { "mode": "combine", "combinationMode": "mergeByPosition" },
+      "id": "33333333-0000-4000-8000-000000000004",
+      "name": "Combine by position",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [440, 100]
+    },
+    {
+      "parameters": { "path": "/lead/:leadId", "httpMethod": ["GET", "POST"], "responseMode": "responseNode" },
+      "id": "33333333-0000-4000-8000-000000000005",
+      "name": "Lead lookup",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "c0ffee00-0000-4000-8000-000000000005"
+    },
+    {
+      "parameters": { "amount": "={{ $json.wait }}", "unit": "minutes" },
+      "id": "33333333-0000-4000-8000-000000000006",
+      "name": "Dynamic wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": { "text": "hello" },
+      "id": "33333333-0000-4000-8000-000000000007",
+      "name": "Acme message",
+      "type": "n8n-nodes-community.acme-chat",
+      "typeVersion": 1,
+      "position": [440, 300]
+    }
+  ],
+  "connections": {
+    "Legacy start": {
+      "main": [
+        [{ "node": "Old IF", "type": "main", "index": 0 }],
+        [{ "node": "Ghost node", "type": "main", "index": 0 }]
+      ]
+    },
+    "Old IF": {
+      "main": [
+        [{ "node": "Paid branch", "type": "main", "index": 0 }],
+        [{ "node": "Combine by position", "type": "main", "index": 0 }]
+      ]
+    },
+    "Lead lookup": { "main": [[{ "node": "Dynamic wait", "type": "main", "index": 0 }]] },
+    "Dynamic wait": { "main": [[{ "node": "Acme message", "type": "main", "index": 0 }]] }
+  },
+  "settings": {},
+  "active": false
+}

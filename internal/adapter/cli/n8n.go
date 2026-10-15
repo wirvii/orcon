@@ -34,6 +34,7 @@ const (
 func N8n(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
 		_, _ = fmt.Fprintln(stdout, "usage: orcon n8n coverage --corpus <dir> [--catalog installed|planned|core|<file>] [flags]")
+		_, _ = fmt.Fprintln(stdout, "       orcon n8n convert <workflow.json> [--out flow.json] [--report report.md] [--id uuid]")
 		if len(args) == 0 {
 			return exitUsage
 		}
@@ -42,6 +43,8 @@ func N8n(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "coverage":
 		return n8nCoverage(ctx, args[1:], stdout, stderr)
+	case "convert":
+		return n8nConvert(ctx, args[1:], stdout, stderr)
 	default:
 		_, _ = fmt.Fprintf(stderr, "orcon n8n: unknown command %q\n", args[0])
 		return exitUsage
