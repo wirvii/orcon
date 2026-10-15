@@ -22,5 +22,6 @@ test-engine:
 	go test ./test/engine/... -count=1 -timeout 870s -run 'TestFencing|TestLeaseExpiry|TestReaper' -args -store=both
 	go test ./test/engine/... -count=1 -timeout 870s -run 'TestAtomicCheckpoint|TestForkAtomic|TestJoinExactlyOneContinuation' -args -store=both
 	go test ./test/engine/... -count=1 -timeout 870s -run 'TestRecomputeDeterminism' -args -iterations=500
+	go test ./test/engine/... -count=1 -timeout 870s -run 'TestNotifyFallbackPoll' -args -store=both
 	go test ./internal/adapter/storetest/... ./test/engine/... -count=1 -timeout 870s -run 'TestAbandonCount' -args -store=both
 	go test ./internal/execution/... -count=1 -run 'TestUpgradedDocumentCache'

@@ -8,6 +8,8 @@ import { cn } from '../../lib/cn';
 export interface AvatarProps {
   /** Full name. It is the accessible name and the source of the initials. */
   name: string;
+  /** The letters to show instead of the ones taken from the name, such as two letters of an email address. */
+  initials?: string | undefined;
   /** Image URL. When it is missing or fails to load, the initials show. */
   src?: string | undefined;
   size?: 'sm' | 'md' | 'lg' | undefined;
@@ -24,7 +26,7 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
+export function Avatar({ name, src, initials: letters, size = 'md', className }: AvatarProps) {
   return (
     <AvatarPrimitive.Root
       role="img"
@@ -36,7 +38,7 @@ export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
         aria-hidden
         className="bg-surface-sunken text-fg flex size-full items-center justify-center font-medium"
       >
-        {initials(name)}
+        {letters ?? initials(name)}
       </AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>
   );

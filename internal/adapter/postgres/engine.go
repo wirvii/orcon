@@ -6,10 +6,13 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/execution"
@@ -136,19 +139,63 @@ func engineEvent(typ string, exec store.ExecutionID, ref []byte, seq int64) exec
 
 func milliseconds(d time.Duration) int64 { return d.Milliseconds() }
 
-// ClaimTokens implements [store.WorkQueue].
+// claimAttempts bounds how often a claim runs when the database aborts it for a deadlock or a
+// serialization failure.
+const claimAttempts = 5
+
+// ClaimTokens implements [store.WorkQueue]. The claim function takes the tokens it returns with
+// SKIP LOCKED and then locks their executions in the order it finds them. Two claims that take
+// tokens of the same executions can wait for each other, and PostgreSQL then aborts one of them
+// with a deadlock. The abort rolls the whole statement back, so the aborted claim leased nothing
+// and runs again; the retry is bounded and waits a little longer each time.
 func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
-	var out []store.Claimed
 	var keys []string
 	if len(r.FairnessKeys) > 0 {
 		keys = r.FairnessKeys
 	}
-	err := s.engineRowsRouted(ctx, "claim tokens",
-		`SELECT org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key, lease_epoch, lease_expires_at
-		 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5, $6)`,
-		[]any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r)},
-		r.Now,
-		scanClaimed(&out))
+	args := []any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r), executionLimitOf(r)}
+	for attempt := 1; ; attempt++ {
+		var out []store.Claimed
+		err := s.engineRowsRouted(ctx, "claim tokens",
+			`SELECT org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key, lease_epoch, lease_expires_at
+			 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5, $6, $7)`,
+			args, r.Now, scanClaimed(&out))
+		if err == nil || attempt == claimAttempts || !abortedByDatabase(err) {
+			return out, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, mapError("claim tokens", ctx.Err())
+		case <-time.After(time.Duration(attempt) * 2 * time.Millisecond):
+		}
+	}
+}
+
+// abortedByDatabase reports whether PostgreSQL aborted the statement for a deadlock or a
+// serialization failure, the two aborts that a statement can simply run again after.
+func abortedByDatabase(err error) bool {
+	var pe *pgconn.PgError
+	return errors.As(err, &pe) && (pe.Code == codeSerializationFailure || pe.Code == codeDeadlockDetected)
+}
+
+// RunnableCounts implements [store.WorkQueue].
+func (s *Store) RunnableCounts(ctx context.Context, now time.Time) ([]store.RunnableCount, error) {
+	var out []store.RunnableCount
+	err := s.engineRows(ctx, "count runnable tokens",
+		`SELECT fairness_key, effective_priority, runnable_count, oldest_available_at
+		 FROM orcon_engine.runnable_counts($1, $2)`,
+		[]any{timestamp(now), int32(store.MaxRunnableRows)},
+		func(rows pgx.Rows) error {
+			// engineRows advances to each row before it calls scan: read the current one.
+			var c store.RunnableCount
+			var oldest pgtype.Timestamptz
+			if err := rows.Scan(&c.FairnessKey, &c.Priority, &c.Runnable, &oldest); err != nil {
+				return err
+			}
+			c.Oldest = oldest.Time.UTC()
+			out = append(out, c)
+			return nil
+		})
 	return out, err
 }
 
@@ -178,6 +225,13 @@ func (s *Store) LastChanceWaiting(ctx context.Context, poisonThreshold int64) (t
 }
 
 // thresholdOf returns the poison threshold of a claim.
+func executionLimitOf(r store.ClaimRequest) int32 {
+	if r.ExecutionLimit <= 0 {
+		return store.DefaultExecutionLimit
+	}
+	return int32(min(r.ExecutionLimit, math.MaxInt32))
+}
+
 func thresholdOf(r store.ClaimRequest) int64 {
 	if r.PoisonThreshold <= 0 {
 		return store.DefaultPoisonThreshold

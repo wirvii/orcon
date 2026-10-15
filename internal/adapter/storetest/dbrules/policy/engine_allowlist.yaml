@@ -112,6 +112,15 @@
   query: UpdateFlowEditingSessionOpenedByPrincipalToNull
   reason: clears flow_editing_session.opened_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
+  query: ClaimOneToken
+  reason: single-token claim across organizations, same shape as ClaimTokens, skipping executions at their cap (SPEC-001 C11, BL-126); owner approved 2026-10-15
+- dialect: sqlite
+  query: CountRunnableTokens
+  reason: runnable token counts per flow for fair claim planning (SPEC-001 C11); returns counts only; owner approved 2026-10-15
+- dialect: sqlite
+  query: ResolveTriggerRoute
+  reason: webhook route lookup before the organization is known (SPEC-002 T2); returns ids only; PostgreSQL uses orcon_engine.resolve_trigger_route; owner approved 2026-10-15
+>- dialect: sqlite
   query: ResolveUserOrganizations
   reason: lists the active organizations of one user from membership rows of every organization (SPEC-004 R-ID-02, section 7-3); PostgreSQL reads them through orcon_engine.resolve_user_organizations
 - dialect: sqlite
@@ -126,4 +135,3 @@
 - dialect: sqlite
   query: ListOrgsWithoutActiveKey
   reason: "the startup check finds the organizations that have no active key so it can create one (SPEC-004 R-KEY-05, SE3b); returns org_id only; PostgreSQL uses orcon_engine.list_orgs_without_active_key; urgent preview fix, orchestrator decision 2026-10-15, owner review pending"
->

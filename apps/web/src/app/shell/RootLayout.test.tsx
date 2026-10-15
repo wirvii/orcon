@@ -4,11 +4,18 @@
 import { onlineManager } from '@tanstack/react-query';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { http } from 'msw';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderRoute } from '../../../test/screen-harness';
+import { renderRoute, server } from '../../../test/screen-harness';
+import { problem } from '../../../test/session-fixtures';
 import type { LiveConnectionState, LiveEventSource } from '../live-events/dispatcher';
 import { FIRST_USEFUL_MARK } from '../perf/marks';
+
+beforeEach(() => {
+  // Nobody is signed in: the settings pages ask once and keep the plain frame.
+  server.use(http.get('/api/v1/users/me', () => problem(401, 'unauthenticated', 'unauthenticated')));
+});
 
 afterEach(() => {
   onlineManager.setOnline(true);

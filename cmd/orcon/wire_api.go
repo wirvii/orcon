@@ -27,7 +27,9 @@ import (
 // answers 401 and nothing is allowed. With sec, the sessions authenticate the
 // requests, the evaluator decides them, and the operations that are wired answer from the
 // services; the others keep answering 503.
-func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security) (*httpapi.Router, error) {
+//
+// The public trigger addresses under /hooks/ are served by webhooks; nil serves none.
+func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webhooks httpapi.WebhookIngress) (*httpapi.Router, error) {
 	catalog, err := permissionsyaml.Parse(authz.CatalogSource())
 	if err != nil {
 		return nil, fmt.Errorf("load the permission catalog: %w", err)
@@ -38,6 +40,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security) (*ht
 		Catalog:       catalog,
 		Authenticator: identity.RejectAll{},
 		Authorizer:    authz.DenyAll{},
+		Webhooks:      webhooks,
 		// Without the security wiring there is no store, so an operation that takes an
 		// Idempotency-Key answers 503 rather than running without the protection.
 		Idempotency: idempotency.UnavailableStore{},
@@ -109,15 +112,20 @@ func (s productServer) ListOrgs(ctx context.Context, req apigen.ListOrgsRequestO
 
 // mountAPI registers the public API on mux under /api/.
 func mountAPI(mux *http.ServeMux, role config.Role, logger *slog.Logger) error {
-	return mountAPIWith(mux, role, logger, nil)
+	return mountAPIWith(mux, role, logger, nil, nil)
 }
 
-// mountAPIWith registers the API over the security wiring on mux under /api/.
-func mountAPIWith(mux *http.ServeMux, role config.Role, logger *slog.Logger, sec *security) error {
-	router, err := newAPIRouterWith(role, logger, sec)
+// mountAPIWith registers the API over the security wiring on mux under /api/. The public
+// trigger addresses under /hooks/ go through the same router when webhooks is not nil, so they
+// share its request pipeline.
+func mountAPIWith(mux *http.ServeMux, role config.Role, logger *slog.Logger, sec *security, webhooks httpapi.WebhookIngress) error {
+	router, err := newAPIRouterWith(role, logger, sec, webhooks)
 	if err != nil {
 		return err
 	}
 	mux.Handle("/api/", router)
+	if webhooks != nil {
+		mux.Handle(httpapi.WebhookPrefix, router)
+	}
 	return nil
 }

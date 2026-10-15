@@ -28,5 +28,6 @@ export const routes = rootRoute('shell/RootLayout.tsx', [
     // The address the editor had before flows lived under a project. It only forwards (see the file).
     route('/flows/$flowId', '../features/editor/routes/legacy-flow.tsx'),
   ]),
-  physical('/settings', '../features/settings/routes'),
+  // Public, but framed like the signed-in pages when a session exists (see the layout file).
+  route('/settings', '../features/session/routes/SettingsLayout.tsx', [physical('', '../features/settings/routes')]),
 ]);

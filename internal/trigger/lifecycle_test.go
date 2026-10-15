@@ -32,9 +32,18 @@ func memory(t *testing.T) triggertest.Backend {
 	default:
 		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", *storeFlag)
 	}
-	b := triggertest.NewMemory().Backend()
+	m := triggertest.NewMemory()
+	m.Scopes = scopeIssuer{}
+	b := m.Backend()
 	b.Scope = scopeFor
 	return b
+}
+
+// scopeIssuer issues the scopes of the scenarios (the store does that in production).
+type scopeIssuer struct{}
+
+func (scopeIssuer) ScopeOf(org identity.OrgID) (orgscope.Org, error) {
+	return scopeFor(org), nil
 }
 
 // scopeFor is the scope of an organization of a scenario. Only tests create

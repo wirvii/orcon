@@ -9,9 +9,10 @@
 import { Route as rootRouteImport } from './shell/RootLayout'
 import { Route as DotDotFeaturesSessionRoutesSessionLayoutRouteImport } from './../features/session/routes/SessionLayout'
 import { Route as DotDotFeaturesSessionRoutesLoginRouteImport } from './../features/session/routes/login'
+import { Route as DotDotFeaturesSessionRoutesSettingsLayoutRouteImport } from './../features/session/routes/SettingsLayout'
 import { Route as DotDotFeaturesSessionRoutesLandingRouteImport } from './../features/session/routes/landing'
 import { Route as DotDotFeaturesSessionRoutesOrgsRouteImport } from './../features/session/routes/orgs'
-import { Route as SettingsAppearanceRouteImport } from './../features/settings/routes/appearance'
+import { Route as AppearanceRouteImport } from './../features/settings/routes/appearance'
 import { Route as DotDotFeaturesEditorRoutesLegacyFlowRouteImport } from './../features/editor/routes/legacy-flow'
 import { Route as DotDotFeaturesSessionRoutesOrgRouteImport } from './../features/session/routes/org'
 import { Route as DotDotFeaturesProjectsRoutesOrgIndexRouteImport } from './../features/projects/routes/org-index'
@@ -35,6 +36,12 @@ const DotDotFeaturesSessionRoutesLoginRoute =
     path: '/login',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotDotFeaturesSessionRoutesSettingsLayoutRoute =
+  DotDotFeaturesSessionRoutesSettingsLayoutRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DotDotFeaturesSessionRoutesLandingRoute =
   DotDotFeaturesSessionRoutesLandingRouteImport.update({
     id: '/',
@@ -47,10 +54,10 @@ const DotDotFeaturesSessionRoutesOrgsRoute =
     path: '/orgs',
     getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
   } as any)
-const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
-  id: '/settings/appearance',
-  path: '/settings/appearance',
-  getParentRoute: () => rootRouteImport,
+const AppearanceRoute = AppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
+  getParentRoute: () => DotDotFeaturesSessionRoutesSettingsLayoutRoute,
 } as any)
 const DotDotFeaturesEditorRoutesLegacyFlowRoute =
   DotDotFeaturesEditorRoutesLegacyFlowRouteImport.update({
@@ -122,8 +129,9 @@ const DotDotFeaturesEditorRoutesFlowIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof AppearanceRoute
   '/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
   '/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
@@ -138,9 +146,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren
   '/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof AppearanceRoute
   '/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/orgs/$orgSlug': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
   '/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
@@ -155,9 +164,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_session': typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren
   '/_session/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/_session/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof AppearanceRoute
   '/_session/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/_session/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
   '/_session/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/settings'
     | '/orgs'
     | '/settings/appearance'
     | '/flows/$flowId'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/settings'
     | '/'
     | '/orgs'
     | '/settings/appearance'
@@ -207,6 +219,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_session'
     | '/login'
+    | '/settings'
     | '/_session/'
     | '/_session/orgs'
     | '/settings/appearance'
@@ -226,7 +239,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   DotDotFeaturesSessionRoutesSessionLayoutRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
   DotDotFeaturesSessionRoutesLoginRoute: typeof DotDotFeaturesSessionRoutesLoginRoute
-  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  DotDotFeaturesSessionRoutesSettingsLayoutRoute: typeof DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotFeaturesSessionRoutesLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesSettingsLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_session/': {
       id: '/_session/'
       path: '/'
@@ -261,10 +281,10 @@ declare module '@tanstack/react-router' {
     }
     '/settings/appearance': {
       id: '/settings/appearance'
-      path: '/settings/appearance'
+      path: '/appearance'
       fullPath: '/settings/appearance'
-      preLoaderRoute: typeof SettingsAppearanceRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppearanceRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesSettingsLayoutRoute
     }
     '/_session/flows/$flowId': {
       id: '/_session/flows/$flowId'
@@ -419,11 +439,26 @@ const DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren =
     DotDotFeaturesSessionRoutesSessionLayoutRouteChildren,
   )
 
+interface DotDotFeaturesSessionRoutesSettingsLayoutRouteChildren {
+  AppearanceRoute: typeof AppearanceRoute
+}
+
+const DotDotFeaturesSessionRoutesSettingsLayoutRouteChildren: DotDotFeaturesSessionRoutesSettingsLayoutRouteChildren =
+  {
+    AppearanceRoute: AppearanceRoute,
+  }
+
+const DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren =
+  DotDotFeaturesSessionRoutesSettingsLayoutRoute._addFileChildren(
+    DotDotFeaturesSessionRoutesSettingsLayoutRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   DotDotFeaturesSessionRoutesSessionLayoutRoute:
     DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren,
   DotDotFeaturesSessionRoutesLoginRoute: DotDotFeaturesSessionRoutesLoginRoute,
-  SettingsAppearanceRoute: SettingsAppearanceRoute,
+  DotDotFeaturesSessionRoutesSettingsLayoutRoute:
+    DotDotFeaturesSessionRoutesSettingsLayoutRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

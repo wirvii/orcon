@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // A Session is the durable face of the interpreter. The in-memory interpreter
@@ -38,11 +40,14 @@ type TokenRow struct {
 	// Merged marks the token that starts the next iteration of a loop whose
 	// returns were merged.
 	Merged bool
+	// AvailableAt is the instant a token the session delayed may be claimed
+	// again; zero for any other token.
+	AvailableAt time.Time
 }
 
 func (a TokenRow) equal(b TokenRow) bool {
 	return a.ID == b.ID && a.State == b.State && a.Node == b.Node && a.InEdge == b.InEdge && a.Scope == b.Scope &&
-		a.Payload == b.Payload && a.Passed == b.Passed && a.Merged == b.Merged && slices.Equal(a.Lineage, b.Lineage)
+		a.Payload == b.Payload && a.Passed == b.Passed && a.Merged == b.Merged && a.AvailableAt.Equal(b.AvailableAt) && slices.Equal(a.Lineage, b.Lineage)
 }
 
 // Snapshot is what the store knows of an execution when a worker opens a
@@ -59,6 +64,10 @@ type Snapshot struct {
 
 // SessionOptions carry what earlier work recorded about the execution.
 type SessionOptions struct {
+	// Org is the organization of the execution. A restored session names it in
+	// the requests its activations carry (the dispatcher's rate buckets and
+	// credentials are per organization).
+	Org identity.OrgID
 	// Known holds the environments (activation instant and seed) recorded for
 	// node executions that were activated before; an activation uses its record
 	// instead of making a new one.
@@ -158,7 +167,7 @@ func (in *Interpreter) OpenSession(plan *Plan, snap Snapshot, opt SessionOptions
 
 func (in *Interpreter) newSession(plan *Plan, exec ID, opt SessionOptions) *Session {
 	pl := newSessionPayloads(in.deps.Payloads)
-	r := newRun(in, plan, Request{Execution: exec})
+	r := newRun(in, plan, Request{Org: opt.Org, Execution: exec})
 	r.payloads, r.owned = pl, pl
 	r.rec = newRecorder(plan, in.deps.Clock, opt)
 	return &Session{r: r, base: make(map[TokenID]TokenRow), baseState: ExecQueued}
@@ -224,7 +233,7 @@ func (r *run) tokenOf(row TokenRow) (*token, error) {
 func (r *run) rowOf(t *token) TokenRow {
 	row := TokenRow{
 		ID: t.id, State: t.state, Node: r.nodeID(t.node), Scope: t.scope, Lineage: slices.Clone(t.lineage),
-		Payload: t.payload, Passed: t.passed, Merged: t.merged,
+		Payload: t.payload, Passed: t.passed, Merged: t.merged, AvailableAt: t.availableAt,
 	}
 	if t.inEdge >= 0 {
 		row.InEdge = r.plan.edges[t.inEdge].edge.ID
@@ -268,6 +277,10 @@ type WorkOptions struct {
 	// there, with the token still held (the time bound of a confirmation point,
 	// or a lease that can no longer be trusted).
 	Pause func() bool
+	// Checkpoint opens the checkpoint transaction of each activation, for the
+	// nodes that act on external systems (see [NodeCall.Checkpoint]). Nil when no
+	// durable engine runs the segment.
+	Checkpoint ActivationCheckpoint
 }
 
 // WorkResult says how a segment ended.
@@ -292,6 +305,7 @@ type WorkResult struct {
 // execution is over.
 func (s *Session) Work(ctx context.Context, id TokenID, opt WorkOptions) (WorkResult, error) {
 	r := s.r
+	r.checkpoint = opt.Checkpoint
 	t := r.tokens[id]
 	if t == nil || t.state != TokenLeased {
 		return WorkResult{}, fmt.Errorf("%w: token %s is not leased in this session", ErrInvalidRequest, id)

@@ -55,7 +55,7 @@ export function useSignOut() {
     } catch {
       // The outcome is the same for the person: the page they are on can no longer show their data.
     }
-    await navigate({ to: '/login' });
+    await navigate({ to: '/login', search: { signedOut: true } });
     queryClient.clear();
   };
 }

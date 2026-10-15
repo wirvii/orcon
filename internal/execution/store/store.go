@@ -575,6 +575,13 @@ type Tx interface {
 	// AppendJournal inserts the operations as PREPARED in one statement group
 	// (intent before dispatch, ADR-0012 section 4). A repeated correlation key
 	// fails with flow.ErrConflict and inserts none.
+	// InsertJournalIfAbsent writes the operations whose correlation key the journal
+	// does not hold yet; the rows already there are kept. It is the write of a
+	// checkpoint that may run again after a crash (ADR-0012 section 4).
+	InsertJournalIfAbsent(ctx context.Context, operations []ExternalOperation) error
+	// UpsertNodeExecution writes a node execution, or completes the row an earlier
+	// write made; the start instant of the first write is kept.
+	UpsertNodeExecution(ctx context.Context, n NodeExecution) error
 	AppendJournal(ctx context.Context, operations []ExternalOperation) error
 	// MarkDispatching moves PREPARED operations to DISPATCHING and returns how
 	// many moved (ADR-0012 section 4, step 2). The dispatch deadline is the
@@ -662,6 +669,60 @@ type ClaimRequest struct {
 	// claim skips the tokens one abandonment short of it ([WorkQueue.ClaimLastChanceToken]
 	// takes those); [DefaultPoisonThreshold] when zero.
 	PoisonThreshold int64
+	// ExecutionLimit is the most tokens of one execution that may be leased at
+	// once (ADR-0014 section 2.2); [DefaultExecutionLimit] when zero.
+	ExecutionLimit int64
+}
+
+// DefaultExecutionLimit is the execution token limit of new flows (ADR-0014 §2).
+const DefaultExecutionLimit = 64
+
+// Priority classes as stored on a token (token.effective_priority): the smaller
+// value is claimed first (SPEC-001 R-FAIR-01).
+const (
+	PriorityHigh   int64 = 0
+	PriorityNormal int64 = 1
+	PriorityLow    int64 = 2
+)
+
+// BucketRequest asks the bucket of one credential and service for permits.
+// Key names the bucket within the organization (the credential and the service).
+type BucketRequest struct {
+	Key             string
+	Capacity        int64
+	RefillPerSecond int64
+	Permits         int64
+	Now             time.Time
+}
+
+// BucketVerdict is the answer of a take: granted, or the instant of the retry.
+type BucketVerdict struct {
+	Granted bool
+	RetryAt time.Time
+}
+
+// LimitBuckets is the store of the shared rate buckets (ADR-0014 section 2.4).
+// Each call is one transaction: the bucket row is locked, its state is computed
+// with the arithmetic of internal/connector/limit and written back.
+type LimitBuckets interface {
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	TakeBucketPermits(ctx context.Context, org identity.OrgID, req BucketRequest) (BucketVerdict, error)
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	BlockBucket(ctx context.Context, org identity.OrgID, key string, until, now time.Time) error
+}
+
+// MaxRunnableRows bounds the claim snapshot: fairness keys times three classes.
+const MaxRunnableRows = 10000
+
+// RunnableCount is one row of the claim snapshot: the runnable tokens of a
+// fairness key at one stored priority, and when the oldest became claimable.
+type RunnableCount struct {
+	FairnessKey string
+	Priority    int64
+	Runnable    int64
+	Oldest      time.Time
 }
 
 // DefaultPoisonThreshold is the number of abandonments after which a token is
@@ -763,6 +824,12 @@ type WorkQueue interface {
 	//
 	//orcon:scope engine the timer scan covers the due timers of every organization (ADR-0047 section 2)
 	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
+	// RunnableCounts returns the claimable tokens grouped by fairness key and
+	// priority, at most a fixed number of rows. A worker plans its claims from
+	// it (ADR-0014 section 1); it is a snapshot, not a reservation.
+	//
+	//orcon:scope engine the engine reads the runnable tokens of every organization for fair claims (ADR-0047 section 2)
+	RunnableCounts(ctx context.Context, now time.Time) ([]RunnableCount, error)
 }
 
 // LeaseRecovery gives leases back: the reaper's expired ones, the ones an owner
@@ -820,6 +887,25 @@ type LeaseRecovery interface {
 type Work interface {
 	WorkQueue
 	LeaseRecovery
+}
+
+// Notifier is the optional port of a store that can wake the idle workers of
+// the other processes at once (SPEC-001 C4b, PostgreSQL LISTEN/NOTIFY). A store
+// that does not implement it is polled, which is the guarantee: a notification
+// only makes the claim sooner, and losing one costs at most one poll period
+// (ADR-0013 section 3).
+type Notifier interface {
+	//
+	//orcon:scope engine the notice is about the runnable tokens of every organization (ADR-0047 section 2)
+	// NotifyRunnable tells the listening processes that tokens may be runnable.
+	// It is sent after the commit that made them so; the notice carries no data.
+	NotifyRunnable(ctx context.Context) error
+	//
+	//orcon:scope engine the notices wake the workers of the process, whatever their organization (ADR-0047 section 2)
+	// ListenRunnable calls wake for each notice until ctx ends or the listening
+	// connection fails, in which case it returns the error; the caller starts it
+	// again. Notices that arrive while it is down are lost.
+	ListenRunnable(ctx context.Context, wake func()) error
 }
 
 // Scopes issues the scope of an organization from the id of a row the engine

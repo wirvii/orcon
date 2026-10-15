@@ -8,6 +8,7 @@ import { defineMessages, useIntl } from 'react-intl';
 
 import { clearCacheForOrganizationSwitch } from '../../../app/query-client';
 import { useSignOut } from '../api/mutations';
+import { identityOf } from '../model/identity';
 import { currentUserQueryOptions, organizationsQueryOptions } from '../api/queries';
 
 const messages = defineMessages({
@@ -42,9 +43,10 @@ export function UserMenu() {
 
   const current = user.data;
   if (current === undefined) return null;
+  const identity = identityOf(current);
 
   const items: MenuEntry[] = [
-    { type: 'label', label: current.displayName },
+    { type: 'label', label: identity.name },
     { type: 'label', label: current.email },
     { type: 'separator' },
     ...((organizations.data?.length ?? 0) > 1
@@ -69,7 +71,7 @@ export function UserMenu() {
       items={items}
       trigger={
         <Button variant="ghost" aria-label={intl.formatMessage(messages.account)}>
-          <Avatar name={current.displayName} />
+          <Avatar name={identity.name} initials={identity.initials} />
         </Button>
       }
     />

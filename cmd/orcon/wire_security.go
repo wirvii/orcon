@@ -61,6 +61,7 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	envelope.KeyStore
 	identity.OrgKeyGapStore
 	audit.Store
+	engineStore
 	io.Closer
 }
 
