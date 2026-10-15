@@ -37,7 +37,7 @@ export interface DisplayCondition {
 }
 
 /** The registered custom widgets this cut has (SPEC-014 R-ED-CFG-03); the others arrive with their cuts. */
-export type Widget = 'flow-target';
+export type Widget = 'flow-target' | 'model-ref';
 
 export interface ParamDef {
   readonly name: string;
@@ -181,7 +181,7 @@ const HTTP: NodeManifest = {
     { name: 'responseFormat', type: 'OPTIONS', default: 'auto', options: ['auto', 'json', 'text', 'file'], since: '1.1.0' },
     { name: 'followRedirects', type: 'BOOLEAN', default: false, since: '1.2.0' },
   ],
-  credentials: [{ slot: 'auth', types: ['httpHeaderAuth'] }],
+  credentials: [{ slot: 'auth', types: ['httpHeaderAuth', 'httpBearerAuth', 'httpBasicAuth'] }],
   effect: 'by-method',
   operations: ['op.request'],
   catalog: {
@@ -212,7 +212,7 @@ const HTTP: NodeManifest = {
       'param.followRedirects.label': 'Follow redirects to other hosts',
       'param.followRedirects.description': 'Off by default: a redirect to another host is returned as the response.',
       'credential.auth.label': 'Authentication',
-      'credential.auth.note': 'Optional. A header credential adds a header, for example Authorization, to every request of this node. Its value is never shown.',
+      'credential.auth.note': 'Optional. The credential adds its authentication header to every request of this node. Its value is never shown.',
       'op.request': 'Send one request per item and return the response status, headers and body.',
     },
     es: {
@@ -242,7 +242,7 @@ const HTTP: NodeManifest = {
       'param.followRedirects.label': 'Seguir redirecciones a otros servidores',
       'param.followRedirects.description': 'Desactivado por defecto: una redirección a otro servidor se devuelve como respuesta.',
       'credential.auth.label': 'Autenticación',
-      'credential.auth.note': 'Opcional. Una credencial de cabecera añade una cabecera, por ejemplo Authorization, a cada petición de este nodo. Su valor nunca se muestra.',
+      'credential.auth.note': 'Opcional. La credencial añade su cabecera de autenticación a cada petición de este nodo. Su valor nunca se muestra.',
       'op.request': 'Enviar una petición por elemento y devolver el estado, las cabeceras y el cuerpo de la respuesta.',
     },
   },
@@ -345,7 +345,235 @@ const CALL: NodeManifest = {
   },
 };
 
-const BY_TYPE = new Map<string, NodeManifest>([IF, HTTP, SET, NOOP, END, MERGE, LOOP, CALL].map((manifest) => [manifest.type, manifest]));
+/** The WhatsApp operations of the official connector (orcon.whatsapp, connector.json): each one is a row of the operation list. */
+const WHATSAPP_SENDS = ['message.send', 'templateMessage.send', 'imageMessage.send', 'documentMessage.send'] as const;
+const WHATSAPP_OPERATIONS = [...WHATSAPP_SENDS, 'message.update', 'phoneNumber.get'] as const;
+const whenOperation = (...operations: readonly string[]): DisplayCondition[] => [{ param: 'operation', oneOf: operations }];
+
+const WHATSAPP: NodeManifest = {
+  key: 'whatsapp',
+  type: 'orcon.whatsapp.whatsapp@1',
+  parameters: [
+    { name: 'operation', type: 'OPTIONS', required: true, default: 'message.send', options: [...WHATSAPP_OPERATIONS] },
+    { name: 'phoneNumberId', type: 'STRING', required: true },
+    { name: 'to', type: 'STRING', required: true, displayWhen: whenOperation(...WHATSAPP_SENDS) },
+    { name: 'text', type: 'JSON', required: true, multiline: true, displayWhen: whenOperation('message.send') },
+    { name: 'template', type: 'JSON', required: true, multiline: true, displayWhen: whenOperation('templateMessage.send') },
+    { name: 'image', type: 'JSON', required: true, multiline: true, displayWhen: whenOperation('imageMessage.send') },
+    { name: 'document', type: 'JSON', required: true, multiline: true, displayWhen: whenOperation('documentMessage.send') },
+    { name: 'messageId', type: 'STRING', required: true, displayWhen: whenOperation('message.update') },
+  ],
+  credentials: [{ slot: 'account', types: ['whatsappCloudApi'], required: true }],
+  effect: 'write',
+  operations: ['op.whatsapp'],
+  catalog: {
+    en: {
+      name: 'WhatsApp',
+      description: 'Sends WhatsApp messages through the WhatsApp Cloud API of Meta, or marks one as read.',
+      'param.operation.label': 'Operation',
+      'param.operation.description': 'What to do. Sending a message may reach a customer: a send is never repeated automatically.',
+      'param.operation.option.message.send': 'Send a text message',
+      'param.operation.option.templateMessage.send': 'Send a template message',
+      'param.operation.option.imageMessage.send': 'Send an image',
+      'param.operation.option.documentMessage.send': 'Send a document',
+      'param.operation.option.message.update': 'Mark a message as read',
+      'param.operation.option.phoneNumber.get': 'Read a phone number',
+      'param.phoneNumberId.label': 'Phone number ID',
+      'param.phoneNumberId.description': 'The ID of the WhatsApp Business phone number that sends the message, digits only.',
+      'param.to.label': 'Recipient',
+      'param.to.description': 'The recipient in international format, digits only, for example 573001234567.',
+      'param.text.label': 'Text',
+      'param.text.description': 'The Meta text object, for example {"body": "Hello"}. A formula can build it from the item.',
+      'param.template.label': 'Template',
+      'param.template.description': 'The Meta template object: name, language code and components, as approved in the WhatsApp Business account.',
+      'param.image.label': 'Image',
+      'param.image.description': 'The Meta image object: a link to a JPEG or PNG file and an optional caption.',
+      'param.document.label': 'Document',
+      'param.document.description': 'The Meta document object: a link, a file name and an optional caption.',
+      'param.messageId.label': 'Message ID',
+      'param.messageId.description': 'The WhatsApp message ID (wamid) to mark as read.',
+      'credential.account.label': 'WhatsApp account',
+      'credential.account.note': 'Required. The credential holds the access token of the WhatsApp Business account. Its value is never shown.',
+      'op.whatsapp': 'Run the operation above once for every item. A failed send is not repeated: check the chat before you run it again.',
+    },
+    es: {
+      name: 'WhatsApp',
+      description: 'Envía mensajes de WhatsApp a través de la API de WhatsApp Cloud de Meta, o marca uno como leído.',
+      'param.operation.label': 'Operación',
+      'param.operation.description': 'Qué hacer. Un envío puede llegar a un cliente: un envío nunca se repite automáticamente.',
+      'param.operation.option.message.send': 'Enviar un mensaje de texto',
+      'param.operation.option.templateMessage.send': 'Enviar un mensaje de plantilla',
+      'param.operation.option.imageMessage.send': 'Enviar una imagen',
+      'param.operation.option.documentMessage.send': 'Enviar un documento',
+      'param.operation.option.message.update': 'Marcar un mensaje como leído',
+      'param.operation.option.phoneNumber.get': 'Leer un número de teléfono',
+      'param.phoneNumberId.label': 'ID del número de teléfono',
+      'param.phoneNumberId.description': 'El ID del número de WhatsApp Business que envía el mensaje, solo dígitos.',
+      'param.to.label': 'Destinatario',
+      'param.to.description': 'El destinatario en formato internacional, solo dígitos, por ejemplo 573001234567.',
+      'param.text.label': 'Texto',
+      'param.text.description': 'El objeto de texto de Meta, por ejemplo {"body": "Hola"}. Una fórmula puede construirlo con el elemento.',
+      'param.template.label': 'Plantilla',
+      'param.template.description': 'El objeto de plantilla de Meta: nombre, código de idioma y componentes, tal como se aprobó en la cuenta de WhatsApp Business.',
+      'param.image.label': 'Imagen',
+      'param.image.description': 'El objeto de imagen de Meta: un enlace a un archivo JPEG o PNG y un pie opcional.',
+      'param.document.label': 'Documento',
+      'param.document.description': 'El objeto de documento de Meta: un enlace, un nombre de archivo y un pie opcional.',
+      'param.messageId.label': 'ID del mensaje',
+      'param.messageId.description': 'El ID del mensaje de WhatsApp (wamid) que se marca como leído.',
+      'credential.account.label': 'Cuenta de WhatsApp',
+      'credential.account.note': 'Obligatoria. La credencial guarda el token de acceso de la cuenta de WhatsApp Business. Su valor nunca se muestra.',
+      'op.whatsapp': 'Ejecuta la operación de arriba una vez por cada elemento. Un envío fallido no se repite: revisa el chat antes de volver a ejecutarlo.',
+    },
+  },
+};
+
+const MODEL_KEY_SLOT = { slot: 'apiKey', types: ['modelProviderApiKey'], required: true } as const;
+const modelKeyCatalog = {
+  en: {
+    'credential.apiKey.label': 'Model provider key',
+    'credential.apiKey.note': 'Required. The key of the model provider the model above belongs to. Its value is never shown.',
+  },
+  es: {
+    'credential.apiKey.label': 'Clave del proveedor del modelo',
+    'credential.apiKey.note': 'Obligatoria. La clave del proveedor del modelo indicado arriba. Su valor nunca se muestra.',
+  },
+} as const;
+
+const MODEL_PARAMS: readonly ParamDef[] = [
+  { name: 'model', type: 'JSON', required: true, widget: 'model-ref' },
+  { name: 'system', type: 'STRING', multiline: true },
+  { name: 'inputField', type: 'STRING', default: 'text' },
+  { name: 'maxOutputTokens', type: 'NUMBER' },
+];
+
+const MODEL_PARAMS_CATALOG = {
+  en: {
+    'param.model.label': 'Model',
+    'param.model.description': 'The model provider and the model name, exactly as the provider names them.',
+    'param.model.field.provider': 'Provider',
+    'param.model.field.name': 'Model name',
+    'param.system.label': 'System prompt',
+    'param.system.description': 'The instructions the model follows for every item.',
+    'param.inputField.label': 'Input field',
+    'param.inputField.description': 'The field of the item that holds the text the model answers.',
+    'param.maxOutputTokens.label': 'Maximum output tokens',
+    'param.maxOutputTokens.description': 'The longest answer the model may write. Leave it empty for the default.',
+  },
+  es: {
+    'param.model.label': 'Modelo',
+    'param.model.description': 'El proveedor del modelo y el nombre del modelo, tal como los nombra el proveedor.',
+    'param.model.field.provider': 'Proveedor',
+    'param.model.field.name': 'Nombre del modelo',
+    'param.system.label': 'Instrucciones del sistema',
+    'param.system.description': 'Las instrucciones que sigue el modelo para cada elemento.',
+    'param.inputField.label': 'Campo de entrada',
+    'param.inputField.description': 'El campo del elemento que contiene el texto al que responde el modelo.',
+    'param.maxOutputTokens.label': 'Tokens de salida máximos',
+    'param.maxOutputTokens.description': 'La respuesta más larga que puede escribir el modelo. Déjalo vacío para el valor por defecto.',
+  },
+} as const;
+
+const LLM: NodeManifest = {
+  key: 'llm',
+  type: 'orcon.ai.llm@1',
+  parameters: [
+    ...MODEL_PARAMS,
+    { name: 'responseFormat', type: 'OPTIONS', default: 'TEXT', options: ['TEXT', 'JSON', 'JSON_SCHEMA'] },
+    { name: 'schema', type: 'JSON', multiline: true, displayWhen: [{ param: 'responseFormat', oneOf: ['JSON_SCHEMA'] }] },
+  ],
+  credentials: [MODEL_KEY_SLOT],
+  effect: 'write',
+  operations: ['op.complete'],
+  catalog: {
+    en: {
+      ...MODEL_PARAMS_CATALOG.en,
+      ...modelKeyCatalog.en,
+      name: 'Language model',
+      description: 'Asks a language model one question per item and returns its answer. It does not call tools; use the agent for that.',
+      'param.responseFormat.label': 'Response format',
+      'param.responseFormat.description': 'Text for free answers, JSON for structured answers, or JSON with a schema that the answer must match.',
+      'param.responseFormat.option.TEXT': 'Text',
+      'param.responseFormat.option.JSON': 'JSON',
+      'param.responseFormat.option.JSON_SCHEMA': 'JSON with a schema',
+      'param.schema.label': 'Schema',
+      'param.schema.description': 'The JSON schema the answer must follow.',
+      'op.complete': 'Send each item to the model and pass its answer on.',
+    },
+    es: {
+      ...MODEL_PARAMS_CATALOG.es,
+      ...modelKeyCatalog.es,
+      name: 'Modelo de lenguaje',
+      description: 'Hace una pregunta a un modelo de lenguaje por elemento y devuelve su respuesta. No llama a herramientas; para eso usa el agente.',
+      'param.responseFormat.label': 'Formato de respuesta',
+      'param.responseFormat.description': 'Texto para respuestas libres, JSON para respuestas estructuradas, o JSON con un esquema al que debe ajustarse la respuesta.',
+      'param.responseFormat.option.TEXT': 'Texto',
+      'param.responseFormat.option.JSON': 'JSON',
+      'param.responseFormat.option.JSON_SCHEMA': 'JSON con esquema',
+      'param.schema.label': 'Esquema',
+      'param.schema.description': 'El esquema JSON al que debe ajustarse la respuesta.',
+      'op.complete': 'Enviar cada elemento al modelo y pasar su respuesta.',
+    },
+  },
+};
+
+const AGENT: NodeManifest = {
+  key: 'agent',
+  type: 'orcon.ai.agent@1',
+  parameters: [
+    ...MODEL_PARAMS,
+    {
+      name: 'tools',
+      type: 'FIXED_COLLECTION',
+      fields: [
+        { name: 'name', type: 'STRING', required: true },
+        { name: 'description', type: 'STRING' },
+        { name: 'nodeType', type: 'STRING', required: true },
+      ],
+    },
+    { name: 'memoryWindow', type: 'NUMBER', default: 20 },
+    { name: 'maxSteps', type: 'NUMBER', default: 10 },
+  ],
+  credentials: [MODEL_KEY_SLOT],
+  effect: 'write',
+  operations: ['op.run'],
+  catalog: {
+    en: {
+      ...MODEL_PARAMS_CATALOG.en,
+      ...modelKeyCatalog.en,
+      name: 'AI agent',
+      description: 'A model that decides, step by step, which tools to call and remembers the earlier messages of the same conversation.',
+      'param.tools.label': 'Tools',
+      'param.tools.description': 'Each tool is a name the model can call, what it is for, and the node type that runs it.',
+      'param.tools.field.name': 'Tool name',
+      'param.tools.field.description': 'What the tool is for',
+      'param.tools.field.nodeType': 'Node type that runs it',
+      'param.memoryWindow.label': 'Memory window',
+      'param.memoryWindow.description': 'How many earlier messages of the conversation the model sees. The conversation is named by the conversationKey field of the item.',
+      'param.maxSteps.label': 'Maximum steps',
+      'param.maxSteps.description': 'How many model turns one item may take before the run stops.',
+      'op.run': 'Run the agent once per item, with its tools, and pass its final answer on.',
+    },
+    es: {
+      ...MODEL_PARAMS_CATALOG.es,
+      ...modelKeyCatalog.es,
+      name: 'Agente de IA',
+      description: 'Un modelo que decide, paso a paso, qué herramientas llamar, y recuerda los mensajes anteriores de la misma conversación.',
+      'param.tools.label': 'Herramientas',
+      'param.tools.description': 'Cada herramienta es un nombre que el modelo puede llamar, para qué sirve y el tipo de nodo que la ejecuta.',
+      'param.tools.field.name': 'Nombre de la herramienta',
+      'param.tools.field.description': 'Para qué sirve',
+      'param.tools.field.nodeType': 'Tipo de nodo que la ejecuta',
+      'param.memoryWindow.label': 'Ventana de memoria',
+      'param.memoryWindow.description': 'Cuántos mensajes anteriores de la conversación ve el modelo. La conversación la nombra el campo conversationKey del elemento.',
+      'param.maxSteps.label': 'Pasos máximos',
+      'param.maxSteps.description': 'Cuántos turnos del modelo puede dar un elemento antes de que la ejecución se detenga.',
+      'op.run': 'Ejecutar el agente una vez por elemento, con sus herramientas, y pasar su respuesta final.',
+    },
+  },
+};
+
+const BY_TYPE = new Map<string, NodeManifest>([IF, HTTP, SET, NOOP, END, MERGE, LOOP, CALL, WHATSAPP, LLM, AGENT].map((manifest) => [manifest.type, manifest]));
 
 export const isUnsupported = (node: Pick<FlowNode, 'type'>): boolean => node.type === UNSUPPORTED_TYPE;
 

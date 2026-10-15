@@ -10,6 +10,7 @@ import { expressionCapable, modeOf, normalize, problemOf, switchMode, valueOf, t
 import type { ParamDef } from '../../model/node-manifests';
 
 import { CollectionField } from './CollectionField';
+import { ModelRefField } from './ModelRefField';
 import {
   BinaryField,
   DateTimeField,
@@ -126,7 +127,8 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
       setTouched(true);
     },
   };
-  const Widget = widgets[def.type];
+  // A parameter can ask for a custom widget; the model reference is stored as an object, so it is not a JSON text box.
+  const Widget = def.widget === 'model-ref' ? ModelRefField : widgets[def.type];
   const group = def.type === 'FIXED_COLLECTION' || def.type === 'COLLECTION' || def.type === 'MULTI_OPTIONS';
   const modeSwitch = expressionCapable(def) ? (
     // The switch sits at the right end of the label row, over the space the label leaves free.

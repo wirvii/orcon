@@ -425,7 +425,7 @@ describe('the Docs tab', () => {
     expect(await screen.findByText(/Calls any web address and passes the response/)).toBeInTheDocument();
     expect(screen.getByText('Type orcon.http@1, version 1.0.0')).toBeInTheDocument();
     expect(screen.getByText(/Send one request per item/)).toBeInTheDocument();
-    expect(screen.getByText(/A header credential adds a header/)).toBeInTheDocument();
+    expect(screen.getByText(/adds its authentication header/)).toBeInTheDocument();
     const parameters = screen.getByRole('heading', { name: 'Parameters' }).closest('section');
     expect(parameters).not.toBeNull();
     expect(within(parameters as HTMLElement).getByText('URL')).toBeInTheDocument();
