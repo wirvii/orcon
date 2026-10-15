@@ -822,6 +822,25 @@ type Work interface {
 	LeaseRecovery
 }
 
+// Notifier is the optional port of a store that can wake the idle workers of
+// the other processes at once (SPEC-001 C4b, PostgreSQL LISTEN/NOTIFY). A store
+// that does not implement it is polled, which is the guarantee: a notification
+// only makes the claim sooner, and losing one costs at most one poll period
+// (ADR-0013 section 3).
+type Notifier interface {
+	//
+	//orcon:scope engine the notice is about the runnable tokens of every organization (ADR-0047 section 2)
+	// NotifyRunnable tells the listening processes that tokens may be runnable.
+	// It is sent after the commit that made them so; the notice carries no data.
+	NotifyRunnable(ctx context.Context) error
+	//
+	//orcon:scope engine the notices wake the workers of the process, whatever their organization (ADR-0047 section 2)
+	// ListenRunnable calls wake for each notice until ctx ends or the listening
+	// connection fails, in which case it returns the error; the caller starts it
+	// again. Notices that arrive while it is down are lost.
+	ListenRunnable(ctx context.Context, wake func()) error
+}
+
 // Scopes issues the scope of an organization from the id of a row the engine
 // read (ADR-0046 section 2). Only the storage adapters implement it: they wrap the
 // engine functions, so the engine's ids reach the scoped methods through them.

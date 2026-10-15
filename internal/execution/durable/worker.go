@@ -254,5 +254,6 @@ func (e *Engine) afterCommit(ctx context.Context, c *committed) {
 	}
 	if c.runnable > 0 {
 		e.signal(c.runnable)
+		e.notifyRunnable(ctx)
 	}
 }

@@ -118,6 +118,10 @@ type Config struct {
 	// DisableWake turns the in-process wake-up off, so that every claim is a
 	// poll.
 	DisableWake bool
+	// DisableNotify turns the cross-process wake-up off (a store with
+	// [store.Notifier]): the workers of this process claim by polling only, as
+	// E-REC-3 measures them. Polling stays the guarantee either way.
+	DisableNotify bool
 	// ReapEvery is the period of the reaper and the timer scheduler (1 s).
 	ReapEvery time.Duration
 	// DispatchEvery is the period at which the outbox is dispatched (1 s).

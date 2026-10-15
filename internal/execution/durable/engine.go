@@ -129,6 +129,7 @@ func (e *Engine) Start(ctx context.Context, r StartRequest) (store.ExecutionID, 
 		return store.ExecutionID{}, fmt.Errorf("start execution %s: %w", execID, err)
 	}
 	e.signal(1)
+	e.notifyRunnable(ctx)
 	return execID, nil
 }
 
