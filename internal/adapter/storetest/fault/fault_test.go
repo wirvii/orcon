@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -40,58 +41,81 @@ func TestMain(m *testing.M) {
 	if os.Getenv(envChild) != "" {
 		exitProcess(runChild())
 	}
+	flag.Parse()
+	kinds, _ := storetest.KindsFor(storeFlag())
+	if slices.Contains(kinds, storetest.PostgreSQL) {
+		storetest.EnablePostgres()
+		os.Exit(runWithPostgres(m)) //nolint:forbidigo // AL-8: TestMain ends the test process with the code of the run
+	}
 	m.Run()
+}
+
+// eachKind runs fn as a subtest on each store the -store flag selects. The rows
+// that need a SQLite file of their own (the disk and the writes) do not use it.
+func eachKind(t *testing.T, fn func(t *testing.T, kind storetest.Kind)) {
+	t.Helper()
+	kinds, err := storetest.KindsFor(storeFlag())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range kinds {
+		t.Run(string(kind), func(t *testing.T) { fn(t, kind) })
+	}
 }
 
 func exitProcess(code int) {
 	os.Exit(code) //nolint:forbidigo // AL-8: the child process of a fault test ends with its own exit code
 }
 
-func requireSQLite(t *testing.T) {
-	t.Helper()
-	switch storeFlag() {
-	case "sqlite", "both", "auto":
-	case "postgres":
-		t.Skip("the process rows of the fault matrix run on PostgreSQL with cut C4b; the in-process rows run there with `make test-fault STORE=postgres`")
-	default:
-		t.Fatalf("unknown store %q", storeFlag())
-	}
-}
-
-// world is a database file and what the parent knows about it.
+// world is a database and what the parent knows about it: a SQLite file, or a
+// PostgreSQL database of its own (path then holds the DSN).
 type world struct {
 	t     *testing.T
+	kind  storetest.Kind
 	path  string
 	log   string
-	store *sqlite.Store
+	store storetest.Store
 	env   *storetest.EngineEnv
 	eng   *durable.Engine
 }
 
-func newWorld(t *testing.T) *world {
+func newWorld(t *testing.T, kind storetest.Kind) *world {
 	t.Helper()
 	dir := t.TempDir()
-	w := &world{t: t, path: filepath.Join(dir, "orcon.db"), log: filepath.Join(dir, "activations.log")}
+	w := &world{t: t, kind: kind, log: filepath.Join(dir, "activations.log")}
+	if kind == storetest.SQLite {
+		w.path = filepath.Join(dir, "orcon.db")
+	} else {
+		w.path = storetest.NewPostgresDatabase(t)
+	}
 	w.open()
 	w.env.Setup()
 	return w
 }
 
-// open takes the database file for the parent.
+// open takes the database for the parent.
 func (w *world) open() {
 	w.t.Helper()
-	w.store = storetest.OpenSQLiteFile(w.t, w.path, storetest.EngineOptions{})
+	if w.kind == storetest.SQLite {
+		w.store = storetest.OpenSQLiteFile(w.t, w.path, storetest.EngineOptions{})
+	} else {
+		w.store = storetest.OpenPostgresDSN(w.t, w.path, storetest.EngineOptions{})
+	}
 	if w.env == nil {
-		w.env = storetest.NewEngineEnvOn(w.t, storetest.SQLite, w.store, storetest.EngineOptions{})
+		w.env = storetest.NewEngineEnvOn(w.t, w.kind, w.store, storetest.EngineOptions{})
 	} else {
 		w.env.Store = w.store
 	}
 	w.eng = w.env.Engine(durable.Config{Concurrency: 1}, execution.Deps{Runner: &executiontest.TraceRunner{}})
 }
 
-// release gives the file up so that a child can take it.
+// release gives a SQLite file up so that a child can take it. PostgreSQL serves
+// the parent and the children at once, so there is nothing to give up.
 func (w *world) release() {
 	w.t.Helper()
+	if w.kind != storetest.SQLite {
+		return
+	}
 	if err := w.store.Close(); err != nil {
 		w.t.Fatalf("close the store: %v", err)
 	}
@@ -130,7 +154,7 @@ type child struct {
 func (w *world) startChild(extra ...string) *child {
 	w.t.Helper()
 	cmd := exec.CommandContext(context.WithoutCancel(w.t.Context()), os.Args[0], "-test.run=^$") //nolint:gosec // G204: the test starts its own binary
-	cmd.Env = append(os.Environ(), envChild+"=worker", envDatabase+"="+w.path, envActivations+"="+w.log)
+	cmd.Env = append(os.Environ(), envChild+"=worker", envDatabase+"="+w.path, envActivations+"="+w.log, envOrg+"="+w.env.Org.String())
 	cmd.Env = append(cmd.Env, extra...)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.StdoutPipe()
@@ -259,11 +283,18 @@ func (w *world) verifyExecution(execID store.ExecutionID, wantNodes int) {
 
 func (w *world) integrity() {
 	w.t.Helper()
+	if w.kind != storetest.SQLite {
+		return // PostgreSQL enforces its foreign keys on every write; there is no file check to make
+	}
+	sq, ok := w.store.(*sqlite.Store)
+	if !ok {
+		w.t.Fatalf("integrity: store is %T, want SQLite", w.store)
+	}
 	var result string
-	if err := w.store.Writer().QueryRowContext(w.t.Context(), "PRAGMA integrity_check").Scan(&result); err != nil || result != "ok" {
+	if err := sq.Writer().QueryRowContext(w.t.Context(), "PRAGMA integrity_check").Scan(&result); err != nil || result != "ok" {
 		w.t.Fatalf("PRAGMA integrity_check = %q, %v", result, err)
 	}
-	rows, err := w.store.Writer().QueryContext(w.t.Context(), "PRAGMA foreign_key_check")
+	rows, err := sq.Writer().QueryContext(w.t.Context(), "PRAGMA foreign_key_check")
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -298,38 +329,39 @@ func sequence(names ...string) *executiontest.Builder {
 // fork and join, in the middle of the transaction or right after it, leaves an
 // execution that finishes with every branch exactly once and exactly one continuation.
 func TestKillDuringForkAndJoin(t *testing.T) {
-	requireSQLite(t)
-	const branches = 6
-	const commits = branches + 4 // the fork, the branches, the join continuation and the end
-	for _, point := range []durable.Point{durable.PointInCommit, durable.PointCommitted} {
-		for n := 1; n <= commits; n++ {
-			t.Run(fmt.Sprintf("%s/%d", point, n), func(t *testing.T) {
-				w := newWorld(t)
-				execID := w.start(w.publish(forkJoin(branches)))
-				w.release()
-				c := w.startChild(envPoint+"="+string(point), envCount+"="+strconv.Itoa(n), envAction+"=kill", envLease+"=400")
-				c.waitLine("READY")
-				r := c.wait(60 * time.Second)
-				switch {
-				case r.Killed:
-					w.finish(envLease + "=400")
-				case r.Code != 0:
-					t.Fatalf("worker process ended with %+v", r)
-				case n <= branches+2:
-					t.Fatalf("the worker was not killed at %s %d of a flow that commits %d times", point, n, commits)
-				}
-				w.open()
-				w.verifyExecution(execID, 5+branches)
-				if got := countType(w, execID, "join.fired"); got != 1 {
-					t.Errorf("%d join.fired events, want exactly one continuation", got)
-				}
-				if got := countType(w, execID, "token.forked"); got != 1 {
-					t.Errorf("%d token.forked events, want one fork", got)
-				}
-				w.integrity()
-			})
+	eachKind(t, func(t *testing.T, kind storetest.Kind) { //nolint:thelper // the body of a subtest, not a helper
+		const branches = 6
+		const commits = branches + 4 // the fork, the branches, the join continuation and the end
+		for _, point := range []durable.Point{durable.PointInCommit, durable.PointCommitted} {
+			for n := 1; n <= commits; n++ {
+				t.Run(fmt.Sprintf("%s/%d", point, n), func(t *testing.T) {
+					w := newWorld(t, kind)
+					execID := w.start(w.publish(forkJoin(branches)))
+					w.release()
+					c := w.startChild(envPoint+"="+string(point), envCount+"="+strconv.Itoa(n), envAction+"=kill", envLease+"=400")
+					c.waitLine("READY")
+					r := c.wait(60 * time.Second)
+					switch {
+					case r.Killed:
+						w.finish(envLease + "=400")
+					case r.Code != 0:
+						t.Fatalf("worker process ended with %+v", r)
+					case n <= branches+2:
+						t.Fatalf("the worker was not killed at %s %d of a flow that commits %d times", point, n, commits)
+					}
+					w.open()
+					w.verifyExecution(execID, 5+branches)
+					if got := countType(w, execID, "join.fired"); got != 1 {
+						t.Errorf("%d join.fired events, want exactly one continuation", got)
+					}
+					if got := countType(w, execID, "token.forked"); got != 1 {
+						t.Errorf("%d token.forked events, want one fork", got)
+					}
+					w.integrity()
+				})
+			}
 		}
-	}
+	})
 }
 
 func countType(w *world, execID store.ExecutionID, typ string) int {
@@ -346,33 +378,34 @@ func countType(w *world, execID store.ExecutionID, typ string) int {
 // a token, for longer than its lease, and continued with SIGCONT, does not commit
 // what it computed; its token is recovered and the work is committed once.
 func TestStoppedWorkerIsFenced(t *testing.T) {
-	requireSQLite(t)
-	seconds := 3
-	if v := os.Getenv("ORCON_FAULT_STOP_SECONDS"); v != "" {
-		seconds, _ = strconv.Atoi(v)
-	}
-	w := newWorld(t)
-	execID := w.start(w.publish(sequence("t1", "t2", "t3")))
-	w.release()
-	c := w.startChild(envPoint+"="+string(durable.PointWorked), envCount+"=1", envAction+"=hold", envLease+"=1000")
-	hold := c.waitLine("HOLD")
-	t.Logf("worker process held at %q; stopping it for %d s", hold, seconds)
-	c.signal(syscall.SIGSTOP)
-	time.Sleep(time.Duration(seconds) * time.Second)
-	c.signal(syscall.SIGCONT)
-	if r := c.wait(5*time.Minute + time.Duration(seconds)*time.Second); r.Killed || r.Code != 0 {
-		t.Fatalf("worker process ended with %+v", r)
-	}
-	w.open()
-	w.verifyExecution(execID, 5)
-	if got := countType(w, execID, "lease.expired"); got < 1 {
-		t.Errorf("%d lease.expired events: the lease of the stopped worker was never recovered", got)
-	}
-	// What the stopped worker computed was computed again by the worker that holds the token now.
-	if n := len(w.activations()); n < 6 {
-		t.Logf("%d activations logged; the stopped worker had computed its steps before it was stopped", n)
-	}
-	w.integrity()
+	eachKind(t, func(t *testing.T, kind storetest.Kind) { //nolint:thelper // the body of a subtest, not a helper
+		seconds := 3
+		if v := os.Getenv("ORCON_FAULT_STOP_SECONDS"); v != "" {
+			seconds, _ = strconv.Atoi(v)
+		}
+		w := newWorld(t, kind)
+		execID := w.start(w.publish(sequence("t1", "t2", "t3")))
+		w.release()
+		c := w.startChild(envPoint+"="+string(durable.PointWorked), envCount+"=1", envAction+"=hold", envLease+"=1000")
+		hold := c.waitLine("HOLD")
+		t.Logf("worker process held at %q; stopping it for %d s", hold, seconds)
+		c.signal(syscall.SIGSTOP)
+		time.Sleep(time.Duration(seconds) * time.Second)
+		c.signal(syscall.SIGCONT)
+		if r := c.wait(5*time.Minute + time.Duration(seconds)*time.Second); r.Killed || r.Code != 0 {
+			t.Fatalf("worker process ended with %+v", r)
+		}
+		w.open()
+		w.verifyExecution(execID, 5)
+		if got := countType(w, execID, "lease.expired"); got < 1 {
+			t.Errorf("%d lease.expired events: the lease of the stopped worker was never recovered", got)
+		}
+		// What the stopped worker computed was computed again by the worker that holds the token now.
+		if n := len(w.activations()); n < 6 {
+			t.Logf("%d activations logged; the stopped worker had computed its steps before it was stopped", n)
+		}
+		w.integrity()
+	})
 }
 
 // TestPoisonItem (FI-12, SPEC-001 Enmienda 12 section 12-1): a node that kills the process
@@ -381,14 +414,16 @@ func TestStoppedWorkerIsFenced(t *testing.T) {
 // the healthy ones finish without any of their tokens being suspended. A node longer
 // than the shutdown grace that crosses three orderly shutdowns is never counted.
 func TestPoisonItem(t *testing.T) {
-	requireSQLite(t)
-	t.Run("a poison item next to healthy executions", poisonNextToHealthy)
-	t.Run("three orderly shutdowns across a long node", orderlyShutdowns)
+	eachKind(t, func(t *testing.T, kind storetest.Kind) { //nolint:thelper // the body of a subtest, not a helper
+		t.Run("a poison item next to healthy executions", func(t *testing.T) { poisonNextToHealthy(t, kind) })
+		t.Run("three orderly shutdowns across a long node", func(t *testing.T) { orderlyShutdowns(t, kind) })
+	})
 }
 
-func poisonNextToHealthy(t *testing.T) {
+//nolint:thelper // a test body run as a subtest of TestPoisonItem
+func poisonNextToHealthy(t *testing.T, kind storetest.Kind) {
 	const threshold = 3
-	w := newWorld(t)
+	w := newWorld(t, kind)
 	poison := w.start(w.publish(sequence("poison")))
 	var others []store.ExecutionID
 	healthy := w.publish(sequence("h1", "h2", "h3", "h4", "h5", "h6"))
@@ -469,8 +504,9 @@ func drainLines(c *child, prefix string) string {
 	return last
 }
 
-func orderlyShutdowns(t *testing.T) {
-	w := newWorld(t)
+//nolint:thelper // a test body run as a subtest of TestPoisonItem
+func orderlyShutdowns(t *testing.T, kind storetest.Kind) {
+	w := newWorld(t, kind)
 	long := w.start(w.publish(sequence("long")))
 	for shutdown := 1; shutdown <= 3; shutdown++ {
 		w.release()
@@ -501,9 +537,8 @@ func orderlyShutdowns(t *testing.T) {
 // they commit leave a database with no corruption in which every accepted execution
 // finishes.
 func TestKillDuringWrites(t *testing.T) {
-	requireSQLite(t)
 	const executions = 24
-	w := newWorld(t)
+	w := newWorld(t, storetest.SQLite)
 	p := w.publish(sequence("a", "b", "c"))
 	var ids []store.ExecutionID
 	for range executions {
@@ -535,9 +570,8 @@ func TestKillDuringWrites(t *testing.T) {
 // may write is limited) fails its commits without corrupting the database, and the
 // executions finish once it can write again.
 func TestDiskFull(t *testing.T) {
-	requireSQLite(t)
 	const executions = 40
-	w := newWorld(t)
+	w := newWorld(t, storetest.SQLite)
 	p := w.publish(sequence("a", "b", "c", "d"))
 	var ids []store.ExecutionID
 	for range executions {

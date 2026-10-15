@@ -9,17 +9,21 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/wirvii/orcon/internal/adapter/postgres"
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/durable"
 	"github.com/wirvii/orcon/internal/execution/executiontest"
 	"github.com/wirvii/orcon/internal/execution/store"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // The fault tests run the engine in real processes: the test binary starts itself
@@ -29,8 +33,10 @@ import (
 const (
 	// The presence of this variable makes the test binary a child.
 	envChild = "ORCON_FAULT_CHILD"
-	// The SQLite file the child works.
+	// The database the child works: a SQLite file path, or a postgres:// DSN.
 	envDatabase = "ORCON_FAULT_DB"
+	// The organization of the work: the child asks it whether work is still in progress.
+	envOrg = "ORCON_FAULT_ORG"
 	// The file the child appends a line to for every node it activates.
 	envActivations = "ORCON_FAULT_ACTIVATIONS"
 	// The next three say where and how the child dies or stops:
@@ -127,6 +133,45 @@ func (f *childFaults) Hit(_ context.Context, p durable.Point, token store.TokenI
 	return nil
 }
 
+// childStore is the store of a child process: the engine's ports and the revisions.
+type childStore interface {
+	durable.Store
+	durable.Revisions
+	Close() error
+}
+
+// openChild opens the database of the child: PostgreSQL when the name is a DSN,
+// SQLite otherwise.
+//
+//nolint:ireturn // the child runs the engine over whichever store its database names
+func openChild(ctx context.Context, db string) (childStore, error) {
+	if strings.HasPrefix(db, "postgres://") {
+		return postgres.Open(ctx, postgres.Options{DSN: db, BinaryVersion: "1.0.0"})
+	}
+	return sqlite.Open(ctx, sqlite.Options{Path: db, BinaryVersion: "1.0.0", Synchronous: sqlite.SynchronousFull})
+}
+
+// workInProgress reports whether the organization of the work has an execution
+// queued or running. It asks through the public reader with the scope of the
+// organization, which works the same on both stores (PostgreSQL row-level security
+// needs the scope).
+func workInProgress(ctx context.Context, st childStore, org identity.OrgID) (bool, error) {
+	o, err := issue.New(id.UUID(org))
+	if err != nil {
+		return false, err
+	}
+	for _, status := range []string{"QUEUED", "RUNNING"} {
+		rows, err := st.ListExecutions(ctx, o, store.ExecutionFilter{Status: status}, store.Cursor{}, 1)
+		if err != nil {
+			return false, err
+		}
+		if len(rows) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // runChild is the body of a child process. It returns the exit code.
 func runChild() int {
 	if v := os.Getenv(envFileLimit); v != "" {
@@ -139,12 +184,17 @@ func runChild() int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	st, err := sqlite.Open(ctx, sqlite.Options{Path: os.Getenv(envDatabase), BinaryVersion: "1.0.0", Synchronous: sqlite.SynchronousFull})
+	st, err := openChild(ctx, os.Getenv(envDatabase))
 	if err != nil {
 		sayf("ERROR open: %v", err)
 		return 2
 	}
-	defer st.Close() //nolint:errcheck // the process is ending; the parent verifies the file
+	defer st.Close() //nolint:errcheck // the process is ending; the parent verifies the database
+	orgID, err := id.Parse(os.Getenv(envOrg))
+	if err != nil {
+		sayf("ERROR organization: %v", err)
+		return 2
+	}
 	runner := &activationRunner{crashNode: os.Getenv(envCrashNode)}
 	if path := os.Getenv(envActivations); path != "" {
 		if runner.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err != nil { //nolint:gosec // the path is the one the parent passed through the environment
@@ -188,7 +238,7 @@ func runChild() int {
 	done := make(chan error, 1)
 	go func() { done <- eng.Run(runCtx) }()
 	sayf("READY concurrency=%d", cfg.Concurrency)
-	go watchIdle(runCtx, st, cancel)
+	go watchIdle(runCtx, st, identity.OrgID(orgID), cancel)
 	if err := <-done; err != nil {
 		sayf("ERROR run: %v", err)
 		return 1
@@ -198,7 +248,7 @@ func runChild() int {
 }
 
 // watchIdle ends the run when no execution is running or queued any more.
-func watchIdle(ctx context.Context, st *sqlite.Store, cancel context.CancelFunc) {
+func watchIdle(ctx context.Context, st childStore, org identity.OrgID, cancel context.CancelFunc) {
 	quiet := 0
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
@@ -208,8 +258,9 @@ func watchIdle(ctx context.Context, st *sqlite.Store, cancel context.CancelFunc)
 			return
 		case <-tick.C:
 		}
-		busy, err := anyActive(ctx, st)
+		busy, err := workInProgress(ctx, st, org)
 		if err != nil {
+			quiet = 0 // a database that cannot be read is not idleness
 			continue
 		}
 		if busy {
@@ -222,13 +273,6 @@ func watchIdle(ctx context.Context, st *sqlite.Store, cancel context.CancelFunc)
 			return
 		}
 	}
-}
-
-// anyActive reports whether any organization has an execution that still has work: queued or running.
-func anyActive(ctx context.Context, st *sqlite.Store) (bool, error) {
-	var n int
-	err := st.Reader().QueryRowContext(ctx, `SELECT count(*) FROM execution WHERE status IN ('QUEUED', 'RUNNING')`).Scan(&n)
-	return n > 0, err
 }
 
 // say writes a line on the standard output of the child, which the parent reads.

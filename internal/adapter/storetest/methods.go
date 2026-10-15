@@ -13,7 +13,14 @@ import (
 
 // infrastructureMethods are the exported methods of the stores that are not
 // ports: they open, close and expose connections for the database rule checks.
-var infrastructureMethods = map[string]bool{"Close": true, "Pool": true, "Reader": true, "Writer": true}
+//
+// NotifyRunnable and ListenRunnable are the optional engine Notifier (LISTEN/NOTIFY
+// wake-ups, SPEC-001 C4b): PostgreSQL implements it, SQLite has one process and no
+// notifier. The notices carry no organization data (orcon:scope engine).
+var infrastructureMethods = map[string]bool{
+	"Close": true, "Pool": true, "Reader": true, "Writer": true,
+	"NotifyRunnable": true, "ListenRunnable": true,
+}
 
 // PortMethodNames returns, for each adapter ("sqlite", "postgres"), the sorted names
 // of the exported methods of its Store that implement a port of an area. The

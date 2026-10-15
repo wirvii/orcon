@@ -339,8 +339,8 @@ func TestUpgradeFromSeededPreviousVersion(t *testing.T) {
 func engineCalls() []dbrules.EngineCall {
 	const worker = "'00000000-0000-0000-0000-000000000001'::uuid"
 	return []dbrules.EngineCall{
-		{Name: "claim_tokens", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", NULL, 10, 1000, now(), 3)"},
-		{Name: "claim_tokens with fairness keys", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", ARRAY['k'], 10, 1000, now(), 3)"},
+		{Name: "claim_tokens", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", NULL, 10, 1000, now(), 3, 1000)"},
+		{Name: "claim_tokens with fairness keys", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_tokens(" + worker + ", ARRAY['k'], 10, 1000, now(), 3, 1000)"},
 		{Name: "renew_leases", SQL: "SELECT org_id FROM orcon_engine.renew_leases(" + worker + ", 1000, now())"},
 		{Name: "claim_last_chance_token", List: true, SQL: "SELECT org_id FROM orcon_engine.claim_last_chance_token(" + worker + ", 1000, now(), 3)"},
 		{Name: "oldest_last_chance", SQL: "SELECT orcon_engine.oldest_last_chance(3)"},

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -145,10 +146,31 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 	}
 	err := s.engineRowsRouted(ctx, "claim tokens",
 		`SELECT org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key, lease_epoch, lease_expires_at
-		 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5, $6)`,
-		[]any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r)},
+		 FROM orcon_engine.claim_tokens($1, $2, $3, $4, $5, $6, $7)`,
+		[]any{pgUUID(r.Worker), keys, clampPage(r.Limit), milliseconds(r.LeaseTTL), timestamp(r.Now), thresholdOf(r), executionLimitOf(r)},
 		r.Now,
 		scanClaimed(&out))
+	return out, err
+}
+
+// RunnableCounts implements [store.WorkQueue].
+func (s *Store) RunnableCounts(ctx context.Context, now time.Time) ([]store.RunnableCount, error) {
+	var out []store.RunnableCount
+	err := s.engineRows(ctx, "count runnable tokens",
+		`SELECT fairness_key, effective_priority, runnable_count, oldest_available_at
+		 FROM orcon_engine.runnable_counts($1, $2)`,
+		[]any{timestamp(now), int32(store.MaxRunnableRows)},
+		func(rows pgx.Rows) error {
+			// engineRows advances to each row before it calls scan: read the current one.
+			var c store.RunnableCount
+			var oldest pgtype.Timestamptz
+			if err := rows.Scan(&c.FairnessKey, &c.Priority, &c.Runnable, &oldest); err != nil {
+				return err
+			}
+			c.Oldest = oldest.Time.UTC()
+			out = append(out, c)
+			return nil
+		})
 	return out, err
 }
 
@@ -178,6 +200,13 @@ func (s *Store) LastChanceWaiting(ctx context.Context, poisonThreshold int64) (t
 }
 
 // thresholdOf returns the poison threshold of a claim.
+func executionLimitOf(r store.ClaimRequest) int32 {
+	if r.ExecutionLimit <= 0 {
+		return store.DefaultExecutionLimit
+	}
+	return int32(min(r.ExecutionLimit, math.MaxInt32))
+}
+
 func thresholdOf(r store.ClaimRequest) int64 {
 	if r.PoisonThreshold <= 0 {
 		return store.DefaultPoisonThreshold

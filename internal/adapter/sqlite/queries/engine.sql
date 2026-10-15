@@ -16,6 +16,7 @@ WHERE id IN (
   WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
     AND (sqlc.arg(any_fairness_key) = 1 OR t.fairness_key IN (sqlc.slice(fairness_keys)))
     AND t.abandoned_count < sqlc.arg(poison_threshold) - 1
+    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED') < CAST(sqlc.arg(execution_limit) AS INTEGER)
   ORDER BY t.effective_priority, t.available_at, t.id
   LIMIT sqlc.arg(page_size))
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
@@ -186,3 +187,13 @@ WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id);
 UPDATE execution
 SET status = 'RUNNING', started_at = COALESCE(execution.started_at, sqlc.arg(now)), updated_at = sqlc.arg(now)
 WHERE execution.org_id = sqlc.arg(org_id) AND execution.id = sqlc.arg(id) AND execution.status = 'QUEUED';
+
+-- The claimable tokens grouped by fairness key and priority: the snapshot a worker plans its claims from (ADR-0014 section 1).
+-- name: CountRunnableTokens :many
+-- orcon:scope engine
+-- orcon:hot
+SELECT t.fairness_key, t.effective_priority, count(*) AS runnable_count, CAST(min(t.available_at) AS INTEGER) AS oldest_available_at
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
+GROUP BY t.fairness_key, t.effective_priority
+LIMIT sqlc.arg(row_limit);
