@@ -170,7 +170,7 @@ func Decide(states []BudgetState, reservationMicro int64, priced bool) (Decision
 		if !priced && s.Budget.UnknownPrice == UnknownPriceBlock {
 			return Decision{}, fmt.Errorf("%w (%s budget)", ErrUnknownPrice, s.Budget.Scope.Kind)
 		}
-		if s.SpentMicro+reservationMicro <= s.Budget.LimitMicro {
+		if s.SpentMicro < s.Budget.LimitMicro && s.SpentMicro+reservationMicro <= s.Budget.LimitMicro {
 			continue
 		}
 		switch s.Budget.Exceeded {

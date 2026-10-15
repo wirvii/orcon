@@ -11,6 +11,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AiAgentMessage struct {
+	ID             pgtype.UUID
+	OrgID          pgtype.UUID
+	AiAgentRunID   pgtype.UUID
+	SequenceNumber int64
+	Role           string
+	PartKind       string
+	CallKey        string
+	ToolName       string
+	IsError        bool
+	ContentText    string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type AiAgentRun struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	Status            string
+	StepCount         int64
+	ToolCallCount     int64
+	SpendMicrodollars int64
+	FinalText         pgtype.Text
+	ErrorCode         pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+type AiAgentStep struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	AiAgentRunID       pgtype.UUID
+	StepNumber         int64
+	Kind               string
+	ToolCallKey        string
+	ToolName           string
+	OutputText         string
+	IsError            bool
+	IsArgumentsInvalid bool
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
 type AiBudget struct {
 	ID                    pgtype.UUID
 	OrgID                 pgtype.UUID
@@ -38,6 +81,37 @@ type AiBudgetAlert struct {
 	SpentMicrodollars int64
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+}
+
+type AiConversationMessage struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	ThreadKey       pgtype.UUID
+	ConversationKey string
+	SequenceNumber  int64
+	Role            string
+	ContentText     string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type AiModelCall struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	AiAgentStepID        pgtype.UUID
+	Provider             string
+	Model                string
+	InputTokenCount      int64
+	OutputTokenCount     int64
+	CacheReadTokenCount  int64
+	CacheWriteTokenCount int64
+	ReasoningTokenCount  int64
+	CostMicrodollars     int64
+	CostStatus           string
+	PriceVersion         string
+	FinishReason         string
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
 }
 
 type AiUsageRollup struct {
