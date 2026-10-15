@@ -104,6 +104,7 @@ post:
                 createdAt: '2026-10-12T15:04:05Z'
                 startedAt: '2026-10-12T15:04:05Z'
                 finishedAt: '2026-10-12T15:04:09Z'
+                hasUncertainOperation: false
                 dataHidden: false
     '202':
       description: The execution is still running; read it later from the Location address.
@@ -131,6 +132,7 @@ post:
                 mode: MANUAL
                 status: QUEUED
                 createdAt: '2026-10-12T15:04:05Z'
+                hasUncertainOperation: false
                 dataHidden: false
     '400':
       $ref: ../openapi.yaml#/components/responses/ValidationFailed

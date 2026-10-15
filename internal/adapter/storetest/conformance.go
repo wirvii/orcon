@@ -54,6 +54,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	identity.IdempotencyStore
 	flow.Store
 	flow.ActivityStore
+	store.ProjectExecutionReader
 	flow.VersionStore
 	flow.SnapshotStore
 	flow.ReferenceStore

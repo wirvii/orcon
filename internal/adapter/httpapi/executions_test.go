@@ -254,7 +254,7 @@ func TestListExecutionsFiltersSortsAndPages(t *testing.T) {
 		body := answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body
 		for i := range body.Items {
 			it := &body.Items[i]
-			if it.DataHidden || it.FlowVersion != 3 || it.Mode != "MANUAL" {
+			if it.DataHidden || it.FlowVersion == nil || *it.FlowVersion != 3 || it.Mode != "MANUAL" {
 				t.Fatalf("item = %+v", it)
 			}
 			seen = append(seen, it.CreatedAt)

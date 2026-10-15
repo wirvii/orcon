@@ -39,10 +39,10 @@ Execution:
     - id
     - flowId
     - projectId
-    - flowVersion
     - mode
     - status
     - createdAt
+    - hasUncertainOperation
     - dataHidden
   properties:
     id:
@@ -66,10 +66,18 @@ Execution:
         - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
     flowVersion:
       type: integer
-      description: Number of the flow version the execution runs; it never changes.
+      description: >-
+        Number of the flow version the execution runs; it never changes. Absent for an execution that runs
+        a snapshot of a draft (a test run), which has no version number.
       examples:
         - 3
       minimum: 1
+    hasUncertainOperation:
+      type: boolean
+      description: >-
+        True when an external operation of the execution has an outcome that is unknown, so a person must
+        review it (the "Needs review" state).
+      readOnly: true
     mode:
       type: string
       description: How the execution started.

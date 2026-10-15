@@ -145,6 +145,12 @@ type Execution struct {
 	FinishedAt     time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// The two fields below are read-only: the reads of executions fill them, the writes ignore them.
+	// FlowVersionNumber is the number of the flow version the execution runs; 0 for a snapshot run.
+	FlowVersionNumber int64
+	// HasUncertainOperation is true when an external operation of the execution has an outcome that is
+	// unknown (state UNCERTAIN), so a person must review it (SPEC-019 R-UX-BE-03).
+	HasUncertainOperation bool
 }
 
 // Token is a row of token: the unit of work.
@@ -509,6 +515,31 @@ type ExecutionFilter struct {
 	ProjectID identity.ProjectID
 	FlowID    flow.FlowID
 	Status    string
+	// Uncertain narrows a project listing to the executions that need a review (SPEC-019 R-UX-BE-03).
+	// It is not a filter field of its own: it needs ProjectID and no other field.
+	Uncertain bool
+}
+
+// ExecutionQuery narrows the executions of one project for the organization-wide listing (SPEC-019
+// R-UX-BE-03). A zero field matches everything.
+type ExecutionQuery struct {
+	FlowID flow.FlowID
+	Status string
+	// ID keeps the one execution with that identifier.
+	ID ExecutionID
+	// CreatedAfter keeps the executions accepted at or after it; CreatedBefore those accepted before it.
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	// UncertainOnly keeps the executions with an operation whose outcome is unknown.
+	UncertainOnly bool
+}
+
+// ProjectExecutionReader lists the executions of one project under a query. It is a port of its own,
+// so the organization-wide listing depends on it alone.
+type ProjectExecutionReader interface {
+	// ListProjectExecutions returns at most limit executions of the project that match the query,
+	// newest first, after the cursor.
+	ListProjectExecutions(ctx context.Context, org orgscope.Org, project identity.ProjectID, query ExecutionQuery, after Cursor, limit int) ([]Execution, error)
 }
 
 // Reader reads inside one organization.
