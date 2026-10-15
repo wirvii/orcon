@@ -1,4 +1,7 @@
 -- SPDX-FileCopyrightText: The Orcon Authors
 -- SPDX-License-Identifier: Apache-2.0
--- Migration 0015 changes no schema on SQLite: the rows of the earlier seeds are the data the query reads.
-SELECT 1 WHERE 0;
+UPDATE application_user SET password_hash = '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' WHERE id = X'00000012000070008000000100000001';
+INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at) VALUES (X'00000014000070008000000100000001', X'00000012000070008000000100000001', X'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'AAL1', 1760000000000000, 1760600000000000, 1760028800000000, 1760000000000000, NULL, 1760000000000000);
+INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at) VALUES (X'00000014000070008000000100000002', X'00000012000070008000000100000001', X'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210', 'AAL1', 1760000000000000, 1760600000000000, 1760028800000000, 1760000000000000, 1760000100000000, 1760000100000000);
+INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at) VALUES (X'00000014000070008000000200000001', X'00000012000070008000000200000001', X'00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff', 'AAL1', 1760000000000000, 1760600000000000, 1760028800000000, 1760000000000000, NULL, 1760000000000000);
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at) VALUES (X'a1a2a3a4a5a6a7a8a9aaabacadaeafb0', 6, 1760000600000000, 1760000000000000, 1760000000000000);
