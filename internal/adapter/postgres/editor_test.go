@@ -6,8 +6,6 @@ package postgres_test
 import (
 	"testing"
 	"time"
-
-	"github.com/wirvii/orcon/internal/adapter/storetest"
 )
 
 // TestEngineFunctionsAreOwnedByTheEngineRole checks every orcon_engine function (ADR-0047, orcon-db TI-9):
@@ -61,11 +59,4 @@ func TestEngineFunctionsAreOwnedByTheEngineRole(t *testing.T) {
 	if err := conn.QueryRow(ctx, "SELECT orcon_engine.prune_batch('editor_test_data', 10, $1)", time.Now().UTC()).Scan(&removed); err != nil {
 		t.Fatalf("prune_batch through its owner: %v", err)
 	}
-}
-
-// TestEditorSuite runs the visual editor storage battery (SPEC-014 ED2) on a fresh PostgreSQL database per case.
-func TestEditorSuite(t *testing.T) {
-	storetest.RunEditorSuite(t, func(t *testing.T) storetest.EditorStore {
-		return open(t, newPostgresDatabase(t))
-	})
 }

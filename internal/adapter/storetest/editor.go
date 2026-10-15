@@ -52,6 +52,7 @@ func RunEditorSuite(t *testing.T, newStore EditorFactory) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Helper()
 			c.fn(t, newEditorFixture(t, newStore))
 		})
 	}
@@ -102,6 +103,7 @@ func (f *editorFixture) pinOf(node string, data editor.NodeTestData, at time.Tim
 }
 
 func editorPinsCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	first := f.output("n1", base)
 	mustTx(t, f.ed.PinNode(ctx, f.pinOf("n1", first, base)), "pin node")
@@ -138,6 +140,7 @@ func editorPinsCase(t *testing.T, f *editorFixture) {
 }
 
 func editorTestDataCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	older := f.output("n1", base)
 	newer := f.output("n1", base.Add(time.Second))
@@ -188,6 +191,7 @@ func (f *editorFixture) newRun(exec *store.Execution) editor.TestRun {
 }
 
 func editorTestRunCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	exec := f.execution()
 	run := f.newRun(exec)
@@ -239,6 +243,7 @@ func (f *editorFixture) newNodeExecution(exec *store.Execution, node string) sto
 }
 
 func editorPreviewCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	exec := f.execution()
 	nodeExec := f.newNodeExecution(exec, "send")
@@ -248,12 +253,12 @@ func editorPreviewCase(t *testing.T, f *editorFixture) {
 		IsPreviewAvailable: true, PreviewDocument: []byte(`{}`), PreviewSHA256: sha32(0xef),
 		ExpiresAt: base.Add(time.Hour), Revision: 1, CreatedAt: base, UpdatedAt: base,
 	}
-	mustTx(t, f.ed.InsertEffectPreview(ctx, preview), "insert preview")
+	mustTx(t, f.ed.InsertEffectPreview(ctx, &preview), "insert preview")
 
 	// One preview per gated node activation.
 	again := preview
 	again.ID = next[id.UUID](f.ids)
-	if err := f.ed.InsertEffectPreview(ctx, again); !errors.Is(err, flow.ErrConflict) {
+	if err := f.ed.InsertEffectPreview(ctx, &again); !errors.Is(err, flow.ErrConflict) {
 		t.Fatalf("second preview of one node execution: want ErrConflict, got %v", err)
 	}
 
@@ -276,6 +281,7 @@ func editorPreviewCase(t *testing.T, f *editorFixture) {
 }
 
 func editorSessionsCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	session := editor.EditingSession{
 		ID: next[id.UUID](f.ids), OrgID: f.orgA, FlowID: f.flow.ID, ClientLabel: "Firefox on macOS",
@@ -310,6 +316,7 @@ func editorSessionsCase(t *testing.T, f *editorFixture) {
 }
 
 func editorRetentionCase(t *testing.T, f *editorFixture) {
+	t.Helper()
 	ctx := f.ctx()
 	old := base.Add(-25 * time.Hour)
 	unreferenced := f.output("n1", old)
@@ -328,9 +335,10 @@ func editorRetentionCase(t *testing.T, f *editorFixture) {
 	if _, err := f.ed.GetNodeTestData(ctx, f.orgA, unreferenced.ID); !errors.Is(err, flow.ErrNotFound) {
 		t.Fatalf("unreferenced output after purge: want ErrNotFound, got %v", err)
 	}
-	for _, kept := range []editor.NodeTestData{pinned, fresh} {
-		if _, err := f.ed.GetNodeTestData(ctx, f.orgA, kept.ID); err != nil {
-			t.Fatalf("output %s must survive the purge: %v", kept.NodeID, err)
+	kept := []editor.NodeTestData{pinned, fresh}
+	for i := range kept {
+		if _, err := f.ed.GetNodeTestData(ctx, f.orgA, kept[i].ID); err != nil {
+			t.Fatalf("output %s must survive the purge: %v", kept[i].NodeID, err)
 		}
 	}
 

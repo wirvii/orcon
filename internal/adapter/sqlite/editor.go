@@ -394,7 +394,7 @@ func (s *Store) ListTestRunSeeds(ctx context.Context, org identity.OrgID, runID 
 }
 
 // InsertEffectPreview implements [editor.Store].
-func (s *Store) InsertEffectPreview(ctx context.Context, p editor.EffectPreview) error {
+func (s *Store) InsertEffectPreview(ctx context.Context, p *editor.EffectPreview) error {
 	return s.write(ctx, "insert effect preview", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.InsertEffectPreview(ctx, sqlcgen.InsertEffectPreviewParams{
 			ID: uuidBytes(p.ID), OrgID: uuidBytes(p.OrgID), ExecutionID: uuidBytes(p.ExecutionID),

@@ -19,7 +19,7 @@ import (
 
 // EditorBackend is what the editor cases need from a store: the editor port, the flow and
 // execution rows its tables point at, and the transaction that writes execution rows.
-type EditorBackend interface {
+type EditorBackend interface { //nolint:interfacebloat // the editor cases need the flow, execution and editor ports together
 	editor.Store
 	flow.InstanceStore
 	flow.ProjectStore
@@ -67,7 +67,6 @@ func (EditorSurface) StoreMethods() []string {
 // editorPlant is what organization B owns in a case: one flow with an output, a pin, a test
 // run with a seed, a preview and an editing session. Organization A is the attacker.
 type editorPlant struct {
-	ctx       context.Context
 	tb        testing.TB
 	b         EditorBackend
 	env       *Env
@@ -103,7 +102,7 @@ func parseOrg(tb testing.TB, s string) identity.OrgID {
 // plantEditor creates both organizations, their projects and flows, and what B owns.
 func plantEditor(ctx context.Context, tb testing.TB, b EditorBackend, env *Env) *editorPlant {
 	tb.Helper()
-	p := &editorPlant{ctx: ctx, tb: tb, b: b, env: env, ids: id.NewSequence(), nodeB: env.B.Sentinel("node")}
+	p := &editorPlant{tb: tb, b: b, env: env, ids: id.NewSequence(), nodeB: env.B.Sentinel("node")}
 	p.orgA, p.orgB = parseOrg(tb, env.A.ID), parseOrg(tb, env.B.ID)
 	for _, o := range []struct {
 		org  identity.OrgID
@@ -144,28 +143,28 @@ func plantEditor(ctx context.Context, tb testing.TB, b EditorBackend, env *Env) 
 	must(tb, b.InTx(ctx, p.orgB, func(ctx context.Context, tx store.Tx) error { return tx.InsertNodeExecution(ctx, nodeExec) }), "insert node execution")
 
 	p.dataB = editor.NodeTestData{
-		ID: id.UUID(p.ids.New()), OrgID: p.orgB, FlowID: p.flowB, NodeID: p.nodeB, SourceKind: editor.SourceManual,
+		ID: p.ids.New(), OrgID: p.orgB, FlowID: p.flowB, NodeID: p.nodeB, SourceKind: editor.SourceManual,
 		OutputDocument: []byte(`{"ports":{}}`), SizeBytes: 12, ContentSHA256: make([]byte, 32), CreatedAt: editorBase,
 	}
 	must(tb, b.InsertNodeTestData(ctx, p.dataB), "insert output")
-	p.pinB = editor.NodePin{ID: id.UUID(p.ids.New()), OrgID: p.orgB, FlowID: p.flowB, NodeID: p.nodeB, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase, UpdatedAt: editorBase}
+	p.pinB = editor.NodePin{ID: p.ids.New(), OrgID: p.orgB, FlowID: p.flowB, NodeID: p.nodeB, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase, UpdatedAt: editorBase}
 	must(tb, b.PinNode(ctx, p.pinB), "pin node")
 	p.runB = editor.TestRun{
-		ID: id.UUID(p.ids.New()), OrgID: p.orgB, FlowID: p.flowB, ExecutionID: ex.ID, FlowSnapshotID: p.snapshot,
+		ID: p.ids.New(), OrgID: p.orgB, FlowID: p.flowB, ExecutionID: ex.ID, FlowSnapshotID: p.snapshot,
 		TargetKind: editor.TargetFlow, EffectMode: editor.EffectConfirm, PlanDocument: []byte(`{}`), CreatedAt: editorBase,
 	}
 	must(tb, b.InsertTestRun(ctx, p.runB), "insert test run")
-	p.seedB = editor.TestRunSeed{ID: id.UUID(p.ids.New()), OrgID: p.orgB, TestRunID: p.runB.ID, NodeID: p.nodeB, SeedKind: editor.SeedPin, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase}
+	p.seedB = editor.TestRunSeed{ID: p.ids.New(), OrgID: p.orgB, TestRunID: p.runB.ID, NodeID: p.nodeB, SeedKind: editor.SeedPin, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase}
 	must(tb, b.InsertTestRunSeed(ctx, p.seedB), "insert seed")
 	p.previewB = editor.EffectPreview{
-		ID: id.UUID(p.ids.New()), OrgID: p.orgB, ExecutionID: ex.ID, NodeExecutionID: p.nodeExecB, NodeID: p.nodeB,
+		ID: p.ids.New(), OrgID: p.orgB, ExecutionID: ex.ID, NodeExecutionID: p.nodeExecB, NodeID: p.nodeB,
 		Status: editor.PreviewOpen, Effect: editor.EffectWrite, SafetyLevel: editor.SafetyIdempotencyKey, ItemCount: 1,
 		IsPreviewAvailable: true, PreviewDocument: []byte(`{}`), PreviewSHA256: make([]byte, 32), ExpiresAt: editorBase.Add(time.Hour),
 		Revision: 1, CreatedAt: editorBase, UpdatedAt: editorBase,
 	}
-	must(tb, b.InsertEffectPreview(ctx, p.previewB), "insert preview")
+	must(tb, b.InsertEffectPreview(ctx, &p.previewB), "insert preview")
 	p.sessionB = editor.EditingSession{
-		ID: id.UUID(p.ids.New()), OrgID: p.orgB, FlowID: p.flowB, ClientLabel: "Firefox on macOS", OpenedAt: editorBase,
+		ID: p.ids.New(), OrgID: p.orgB, FlowID: p.flowB, ClientLabel: "Firefox on macOS", OpenedAt: editorBase,
 		LastSeenAt: editorBase, ExpiresAt: editorBase.Add(time.Hour), Revision: 1, CreatedAt: editorBase, UpdatedAt: editorBase,
 	}
 	must(tb, b.UpsertEditingSession(ctx, p.sessionB), "open session")
@@ -220,37 +219,44 @@ func expectNoRows(tb testing.TB, what string, n int, err error) {
 func editorCases() []Case {
 	return []Case{
 		{Subject: StoreMethod("EditorStore.InsertNodeTestData"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			d := p.dataB
-			d.ID, d.OrgID = id.UUID(p.ids.New()), p.orgA // the attacker names its own organization and B's flow
+			d.ID, d.OrgID = p.ids.New(), p.orgA // the attacker names its own organization and B's flow
 			expectRefused(tb, "insert node test data", p.b.InsertNodeTestData(ctx, d))
 		}},
 		{Subject: StoreMethod("EditorStore.GetNodeTestData"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			_, err := p.b.GetNodeTestData(ctx, p.orgA, p.dataB.ID)
 			expectNotFound(tb, "get node test data", err)
 		}},
 		{Subject: StoreMethod("EditorStore.ListNodeTestDataForNode"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListNodeTestDataForNode(ctx, p.orgA, p.flowB, p.nodeB, 50)
 			expectNoRows(tb, "list node test data", len(rows), err)
 		}},
 		{Subject: StoreMethod("EditorStore.PinNode"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
-			pin := editor.NodePin{ID: id.UUID(p.ids.New()), OrgID: p.orgA, FlowID: p.flowB, NodeID: p.nodeB, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase, UpdatedAt: editorBase}
+			pin := editor.NodePin{ID: p.ids.New(), OrgID: p.orgA, FlowID: p.flowB, NodeID: p.nodeB, NodeTestDataID: p.dataB.ID, CreatedAt: editorBase, UpdatedAt: editorBase}
 			expectRefused(tb, "pin node", p.b.PinNode(ctx, pin))
 		}},
 		{Subject: StoreMethod("EditorStore.GetNodePin"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			_, err := p.b.GetNodePin(ctx, p.orgA, p.flowB, p.nodeB)
 			expectNotFound(tb, "get node pin", err)
 		}},
 		{Subject: StoreMethod("EditorStore.ListNodePins"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListNodePins(ctx, p.orgA, p.flowB, "", 50)
 			expectNoRows(tb, "list node pins", len(rows), err)
 		}},
 		{Subject: StoreMethod("EditorStore.UnpinNode"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			expectNotFound(tb, "unpin node", p.b.UnpinNode(ctx, p.orgA, p.flowB, p.nodeB))
 			if _, err := p.b.GetNodePin(ctx, p.orgB, p.flowB, p.nodeB); err != nil {
@@ -258,44 +264,52 @@ func editorCases() []Case {
 			}
 		}},
 		{Subject: StoreMethod("EditorStore.InsertTestRun"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			run := p.runB
-			run.ID, run.OrgID = id.UUID(p.ids.New()), p.orgA
+			run.ID, run.OrgID = p.ids.New(), p.orgA
 			expectRefused(tb, "insert test run", p.b.InsertTestRun(ctx, run))
 		}},
 		{Subject: StoreMethod("EditorStore.GetTestRun"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			_, err := p.b.GetTestRun(ctx, p.orgA, p.runB.ID)
 			expectNotFound(tb, "get test run", err)
 		}},
 		{Subject: StoreMethod("EditorStore.ListTestRuns"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListTestRuns(ctx, p.orgA, p.flowB, 50)
 			expectNoRows(tb, "list test runs", len(rows), err)
 		}},
 		{Subject: StoreMethod("EditorStore.InsertTestRunSeed"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			seed := p.seedB
-			seed.ID, seed.OrgID = id.UUID(p.ids.New()), p.orgA
+			seed.ID, seed.OrgID = p.ids.New(), p.orgA
 			expectRefused(tb, "insert test run seed", p.b.InsertTestRunSeed(ctx, seed))
 		}},
 		{Subject: StoreMethod("EditorStore.ListTestRunSeeds"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListTestRunSeeds(ctx, p.orgA, p.runB.ID, 50)
 			expectNoRows(tb, "list test run seeds", len(rows), err)
 		}},
 		{Subject: StoreMethod("EditorStore.InsertEffectPreview"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			pv := p.previewB
-			pv.ID, pv.OrgID = id.UUID(p.ids.New()), p.orgA
-			expectRefused(tb, "insert effect preview", p.b.InsertEffectPreview(ctx, pv))
+			pv.ID, pv.OrgID = p.ids.New(), p.orgA
+			expectRefused(tb, "insert effect preview", p.b.InsertEffectPreview(ctx, &pv))
 		}},
 		{Subject: StoreMethod("EditorStore.GetEffectPreview"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			_, err := p.b.GetEffectPreview(ctx, p.orgA, p.previewB.ID)
 			expectNotFound(tb, "get effect preview", err)
 		}},
 		{Subject: StoreMethod("EditorStore.DecideEffectPreview"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			if err := p.b.DecideEffectPreview(ctx, p.orgA, p.previewB.ID, 1, editor.PreviewDispatchConfirmed, []byte(`{}`), identity.PrincipalID{}, editorBase); err == nil {
 				tb.Error("a decision of organization A on a preview of organization B was accepted")
@@ -306,17 +320,20 @@ func editorCases() []Case {
 			}
 		}},
 		{Subject: StoreMethod("EditorStore.ListEffectPreviews"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListEffectPreviews(ctx, p.orgA, p.execB, 50)
 			expectNoRows(tb, "list effect previews", len(rows), err)
 		}},
 		{Subject: StoreMethod("EditorStore.UpsertEditingSession"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			s := p.sessionB
-			s.ID, s.OrgID = id.UUID(p.ids.New()), p.orgA
+			s.ID, s.OrgID = p.ids.New(), p.orgA
 			expectRefused(tb, "open editing session", p.b.UpsertEditingSession(ctx, s))
 		}},
 		{Subject: StoreMethod("EditorStore.ListEditingSessions"), Run: func(ctx context.Context, tb testing.TB, env *Env) {
+			tb.Helper()
 			p := openEditor(ctx, tb, env)
 			rows, err := p.b.ListEditingSessions(ctx, p.orgA, p.flowB, editorBase, 50)
 			expectNoRows(tb, "list editing sessions", len(rows), err)

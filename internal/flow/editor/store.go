@@ -178,7 +178,7 @@ type EditingSession struct {
 // Store is the storage port of the editor. Errors: [flow.ErrNotFound] when no
 // row of the organization matches; [flow.ErrConflict] when a compare-and-set
 // misses (a stale revision, or a preview that already has a decision).
-type Store interface {
+type Store interface { //nolint:interfacebloat // one area's storage port; splitting it would scatter the transaction boundaries of one record family
 	// InsertNodeTestData appends an output. The record's organization is used.
 	InsertNodeTestData(ctx context.Context, data NodeTestData) error
 	// GetNodeTestData returns one output of the organization.
@@ -208,7 +208,7 @@ type Store interface {
 	ListTestRunSeeds(ctx context.Context, org identity.OrgID, runID id.UUID, limit int) ([]TestRunSeed, error)
 
 	// InsertEffectPreview records the preview of one gated node activation.
-	InsertEffectPreview(ctx context.Context, preview EffectPreview) error
+	InsertEffectPreview(ctx context.Context, preview *EffectPreview) error
 	// GetEffectPreview returns one preview of the organization.
 	GetEffectPreview(ctx context.Context, org identity.OrgID, previewID id.UUID) (EffectPreview, error)
 	// DecideEffectPreview records the decision of an open preview whose revision is expectedRevision.
