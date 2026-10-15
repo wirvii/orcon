@@ -24,8 +24,10 @@
         }
       },
       "response": {
+        "map": { "id": "$.messages[0].id", "recipient": "$.contacts[0].wa_id" },
         "empty": "ONE_EMPTY_ITEM",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
@@ -51,8 +53,10 @@
         }
       },
       "response": {
+        "map": { "id": "$.messages[0].id", "recipient": "$.contacts[0].wa_id" },
         "empty": "ONE_EMPTY_ITEM",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
@@ -78,8 +82,10 @@
         }
       },
       "response": {
+        "map": { "id": "$.messages[0].id", "recipient": "$.contacts[0].wa_id" },
         "empty": "ONE_EMPTY_ITEM",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
@@ -105,8 +111,10 @@
         }
       },
       "response": {
+        "map": { "id": "$.messages[0].id", "recipient": "$.contacts[0].wa_id" },
         "empty": "ONE_EMPTY_ITEM",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
@@ -132,6 +140,7 @@
       "response": {
         "empty": "ONE_EMPTY_ITEM",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
@@ -150,6 +159,7 @@
       "response": {
         "empty": "NO_ITEMS",
         "errors": [
+          { "body": { "path": "$.error.code", "in": [4, 17, 613, 80007, 130429, 131048, 131056] }, "class": "TRANSIENT", "code": "RateLimited" },
           { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
           { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
           { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },

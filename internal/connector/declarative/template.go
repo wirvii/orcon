@@ -71,6 +71,58 @@ func (s scope) renderValue(tpl string) (jsonvalue.Value, error) {
 	return jsonvalue.String(text), nil
 }
 
+// renderNode renders a body value: strings are templates (see renderValue),
+// arrays and objects are rendered member by member, and other scalars are kept.
+func (s scope) renderNode(v jsonvalue.Value) (jsonvalue.Value, error) {
+	if text, ok := v.Str(); ok {
+		return s.renderValue(text)
+	}
+	if items := v.Items(); v.Kind() == jsonvalue.KindArray {
+		out := make([]jsonvalue.Value, 0, len(items))
+		for _, item := range items {
+			r, err := s.renderNode(item)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, r)
+		}
+		return jsonvalue.Array(out...), nil
+	}
+	if v.Kind() == jsonvalue.KindObject {
+		members := v.Members()
+		out := make([]jsonvalue.Member, 0, len(members))
+		for _, m := range members {
+			r, err := s.renderNode(m.Value)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, jsonvalue.Member{Key: m.Key, Value: r})
+		}
+		obj, err := jsonvalue.Object(out...)
+		if err != nil {
+			return jsonvalue.Value{}, fmt.Errorf("%w: object member", ErrTemplate)
+		}
+		return obj, nil
+	}
+	return v, nil
+}
+
+// templateStrings returns every string of a body value, so validation can check
+// each template it contains.
+func templateStrings(v jsonvalue.Value) []string {
+	if s, ok := v.Str(); ok {
+		return []string{s}
+	}
+	var out []string
+	for _, item := range v.Items() {
+		out = append(out, templateStrings(item)...)
+	}
+	for _, m := range v.Members() {
+		out = append(out, templateStrings(m.Value)...)
+	}
+	return out
+}
+
 func singlePlaceholder(tpl string) (string, bool) {
 	t := strings.TrimSpace(tpl)
 	if !strings.HasPrefix(t, openTag) || !strings.HasSuffix(t, closeTag) {

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 // ambiguousWrite reports whether a failure after the request was sent may have
@@ -75,8 +77,9 @@ func classifyResponse(op Operation, resp HTTPResponse) *CallError {
 			Message: "the provider failed after the request was sent",
 		}
 	}
+	body := parsedBody{raw: resp.Body}
 	for _, rule := range op.Response.Errors {
-		if !containsStatus(rule.Status, resp.Status) {
+		if !ruleMatches(rule, resp.Status, &body) {
 			continue
 		}
 		code := rule.Code
@@ -129,6 +132,54 @@ func defaultCode(status int) string {
 func containsStatus(list []int, status int) bool {
 	for _, s := range list {
 		if s == status {
+			return true
+		}
+	}
+	return false
+}
+
+// parsedBody parses a response body at most once, the first time a rule asks
+// for it. A body that is not JSON matches no body rule.
+type parsedBody struct {
+	raw  []byte
+	done bool
+	ok   bool
+	doc  jsonvalue.Value
+}
+
+func (p *parsedBody) value() (jsonvalue.Value, bool) {
+	if !p.done {
+		p.done = true
+		doc, err := jsonvalue.Parse(p.raw)
+		p.doc, p.ok = doc, err == nil
+	}
+	return p.doc, p.ok
+}
+
+// ruleMatches reports whether an error rule applies to a failed response. A
+// rule with no status condition matches any status; a rule with a body
+// condition needs the member to exist and to equal one of the listed scalars.
+func ruleMatches(rule ErrorRule, status int, body *parsedBody) bool {
+	if len(rule.Status) > 0 && !containsStatus(rule.Status, status) {
+		return false
+	}
+	if rule.Body == nil {
+		return true
+	}
+	doc, ok := body.value()
+	if !ok {
+		return false
+	}
+	got, found, err := lookup(doc, rule.Body.Path)
+	if err != nil || !found {
+		return false
+	}
+	text, err := scalarText(got)
+	if err != nil {
+		return false
+	}
+	for _, want := range rule.Body.In {
+		if wt, err := scalarText(want.Value); err == nil && wt == text {
 			return true
 		}
 	}
