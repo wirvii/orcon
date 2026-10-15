@@ -91,6 +91,11 @@ func ValidateWithTypes(ctx context.Context, d *Document, types NodeTypes) Report
 			return ct.ResolveNode(ctx, n.Type, n.Connector, operationOf(n))
 		}
 	}
+	if mt, ok := types.(ModelNodeTypes); ok {
+		cfg.models = func(ref ModelRef) (ModelCaps, bool) {
+			return mt.ModelCapabilities(ctx, ref)
+		}
+	}
 	return validate(d, cfg)
 }
 
@@ -103,6 +108,9 @@ type validatorConfig struct {
 	// resolve describes a connector node; nil when the catalog does not know
 	// connector packages.
 	resolve func(n *Node) NodeResolution
+	// models answers the capabilities of a model reference; nil when the
+	// catalog does not know models (SPEC-006 R-PRV-05).
+	models func(ref ModelRef) (ModelCaps, bool)
 }
 
 func validate(d *Document, cfg validatorConfig) Report {
@@ -118,6 +126,7 @@ func validate(d *Document, cfg validatorConfig) Report {
 	v.data(g)
 	v.loopExits(g)
 	v.safety()
+	v.models()
 	v.calls()
 	return c.report()
 }
