@@ -509,6 +509,51 @@ func (q *Queries) InsertExternalOperation(ctx context.Context, arg InsertExterna
 	return err
 }
 
+const insertExternalOperationIfAbsent = `-- name: InsertExternalOperationIfAbsent :execrows
+INSERT INTO external_operation (id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state,
+                                batch_key, retry_epoch, compensation_state, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5,
+        ?6, ?7, 'PREPARED', ?8, 0, 'NONE',
+        ?9, ?10)
+ON CONFLICT (org_id, correlation_key) DO NOTHING
+`
+
+type InsertExternalOperationIfAbsentParams struct {
+	ID                []byte
+	OrgID             []byte
+	ExecutionID       []byte
+	NodeExecutionID   []byte
+	ItemIndex         int64
+	CorrelationKey    string
+	ContractReference string
+	BatchKey          sql.NullString
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+// The checkpoint before an effect may run again after a crash: an operation already written with the same
+// correlation key keeps its row, and the caller reloads the rows of the node execution.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertExternalOperationIfAbsent(ctx context.Context, arg InsertExternalOperationIfAbsentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, insertExternalOperationIfAbsent,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.ItemIndex,
+		arg.CorrelationKey,
+		arg.ContractReference,
+		arg.BatchKey,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const insertJoinArrival = `-- name: InsertJoinArrival :execrows
 INSERT INTO join_arrival (id, org_id, execution_id, node_id, scope_path, round_number, edge_index, token_id, payload_reference,
                           is_live, arrived_at, created_at, updated_at)
@@ -2037,4 +2082,46 @@ func (q *Queries) UpdateTokenFenced(ctx context.Context, arg UpdateTokenFencedPa
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const upsertNodeExecution = `-- name: UpsertNodeExecution :exec
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6,
+        ?7, 0, ?8, ?9, ?10, ?11)
+ON CONFLICT (org_id, id) DO UPDATE
+SET status = excluded.status, finished_at = excluded.finished_at, updated_at = excluded.updated_at
+`
+
+type UpsertNodeExecutionParams struct {
+	ID          []byte
+	OrgID       []byte
+	ExecutionID []byte
+	TokenID     []byte
+	NodeID      string
+	ScopePath   string
+	Status      string
+	StartedAt   sql.NullInt64
+	FinishedAt  sql.NullInt64
+	CreatedAt   int64
+	UpdatedAt   int64
+}
+
+// The checkpoint before an external effect records the node execution as RUNNING; the commit of the activation
+// completes the same row. The start instant is kept from the first write.
+// orcon:scope org
+func (q *Queries) UpsertNodeExecution(ctx context.Context, arg UpsertNodeExecutionParams) error {
+	_, err := q.db.ExecContext(ctx, upsertNodeExecution,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.TokenID,
+		arg.NodeID,
+		arg.ScopePath,
+		arg.Status,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }

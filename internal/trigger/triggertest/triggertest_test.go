@@ -18,6 +18,13 @@ import (
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
 
+// scopeIssuer issues the scopes of the tests (the store does that in production).
+type scopeIssuer struct{}
+
+func (scopeIssuer) ScopeOf(org identity.OrgID) (orgscope.Org, error) {
+	return scopeFor(org), nil
+}
+
 // scopeFor is the scope of an organization of a scenario; only tests create scopes.
 func scopeFor(org identity.OrgID) orgscope.Org {
 	scope, err := issue.New(id.UUID(org))
@@ -29,7 +36,9 @@ func scopeFor(org identity.OrgID) orgscope.Org {
 
 // memoryBackend is the in-memory store with the scopes of the scenarios.
 func memoryBackend(*testing.T) triggertest.Backend {
-	b := triggertest.NewMemory().Backend()
+	m := triggertest.NewMemory()
+	m.Scopes = scopeIssuer{}
+	b := m.Backend()
 	b.Scope = scopeFor
 	return b
 }

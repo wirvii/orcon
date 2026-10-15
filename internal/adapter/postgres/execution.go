@@ -415,6 +415,34 @@ func (t *pgTx) AppendJournal(ctx context.Context, operations []store.ExternalOpe
 	return nil
 }
 
+func (t *pgTx) UpsertNodeExecution(ctx context.Context, n store.NodeExecution) error {
+	if err := t.own(n.OrgID); err != nil {
+		return err
+	}
+	return t.q.UpsertNodeExecution(ctx, sqlcgen.UpsertNodeExecutionParams{
+		ID: pgUUID(n.ID), OrgID: pgUUID(n.OrgID), ExecutionID: pgUUID(n.ExecutionID), TokenID: pgUUID(n.TokenID),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt), FinishedAt: nullTimestamp(n.FinishedAt),
+		CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
+	})
+}
+
+func (t *pgTx) InsertJournalIfAbsent(ctx context.Context, operations []store.ExternalOperation) error {
+	for i := range operations {
+		o := &operations[i]
+		if err := t.own(o.OrgID); err != nil {
+			return err
+		}
+		if _, err := t.q.InsertExternalOperationIfAbsent(ctx, sqlcgen.InsertExternalOperationIfAbsentParams{
+			ID: pgUUID(o.ID), OrgID: pgUUID(o.OrgID), ExecutionID: pgUUID(o.ExecutionID), NodeExecutionID: pgUUID(o.NodeExecutionID),
+			ItemIndex: o.ItemIndex, CorrelationKey: o.CorrelationKey, ContractReference: o.ContractReference, BatchKey: nullText(o.BatchKey),
+			CreatedAt: timestamp(o.CreatedAt), UpdatedAt: timestamp(o.CreatedAt),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
 	// The deadline is the database clock of this transaction plus the attempt timeout (ADR-0012 section 5).
 	now, err := t.DatabaseNow(ctx)

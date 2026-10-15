@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -60,6 +61,10 @@ type Backend struct {
 // It is safe for concurrent use; transactions are serialized like the single
 // writer of the SQLite adapter.
 type Memory struct {
+	// Scopes issues the scope of the organization a route names. The owner of the
+	// memory sets it; the store of a deployment gets it from the adapter.
+	Scopes store.Scopes
+
 	mu sync.Mutex
 	s  memState
 }
@@ -545,4 +550,48 @@ func (t *memTx) ResolveAcceptance(_ context.Context, flowID flow.FlowID, node fl
 		}, nil
 	}
 	return trigger.Acceptance{}, fmt.Errorf("node %q of flow %s: %w", node, flowID, flow.ErrNotFound)
+}
+
+// ResolveRoute implements [trigger.Store]: the active production address with
+// the path and the method, smallest identity first, as the SQL statements order it.
+func (m *Memory) ResolveRoute(_ context.Context, method, path string) (trigger.Resolved, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Scopes == nil {
+		return trigger.Resolved{}, errors.New("triggertest: Memory.Scopes is not set")
+	}
+	var best *trigger.Address
+	for _, a := range m.s.addresses {
+		if a.Scope != trigger.ScopeProduction || a.Status != trigger.AddressActive || a.Pattern != path || !hasMethod(a, method) {
+			continue
+		}
+		if best == nil || bytes.Compare(a.ID[:], best.ID[:]) < 0 {
+			best = a
+		}
+	}
+	if best == nil {
+		return trigger.Resolved{}, trigger.ErrNoRoute
+	}
+	tr := m.s.triggers[best.TriggerID]
+	f := m.s.flows[tr.FlowID]
+	if f == nil || !f.DeletedAt.IsZero() {
+		return trigger.Resolved{}, trigger.ErrNoRoute
+	}
+	scope, err := m.Scopes.ScopeOf(best.OrgID)
+	if err != nil {
+		return trigger.Resolved{}, err
+	}
+	return trigger.Resolved{
+		Org: best.OrgID, Scope: scope, ProjectID: f.ProjectID, FlowID: tr.FlowID, NodeID: tr.NodeID,
+		TriggerID: best.TriggerID, AddressID: best.ID,
+	}, nil
+}
+
+func hasMethod(a *trigger.Address, method string) bool {
+	for _, m := range a.Methods {
+		if m.Method == method {
+			return true
+		}
+	}
+	return false
 }

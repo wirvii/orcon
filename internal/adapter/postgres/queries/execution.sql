@@ -101,6 +101,16 @@ INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_p
 VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(token_id), sqlc.arg(node_id), sqlc.arg(scope_path),
         sqlc.arg(status), 0, sqlc.arg(started_at), sqlc.arg(finished_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
+-- The checkpoint before an external effect records the node execution as RUNNING; the commit of the activation
+-- completes the same row. The start instant is kept from the first write.
+-- name: UpsertNodeExecution :exec
+-- orcon:scope org
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(token_id), sqlc.arg(node_id), sqlc.arg(scope_path),
+        sqlc.arg(status), 0, sqlc.arg(started_at), sqlc.arg(finished_at), sqlc.arg(created_at), sqlc.arg(updated_at))
+ON CONFLICT (org_id, id) DO UPDATE
+SET status = excluded.status, finished_at = excluded.finished_at, updated_at = excluded.updated_at;
+
 -- The sequence number is one more than the newest of the execution, assigned in the transaction that writes the
 -- event (orcon-db ID-6); the caller holds the execution row (single writer on SQLite, LockExecution on PostgreSQL).
 -- name: AppendExecutionEvent :one
@@ -170,6 +180,18 @@ WHERE org_id = sqlc.arg(org_id) AND node_execution_id = sqlc.arg(node_execution_
   AND (item_index > sqlc.arg(from_item_index) OR (item_index = sqlc.arg(from_item_index) AND id > sqlc.arg(from_id)))
 ORDER BY item_index, id
 LIMIT sqlc.arg(page_size);
+
+-- The checkpoint before an effect may run again after a crash: an operation already written with the same
+-- correlation key keeps its row, and the caller reloads the rows of the node execution.
+-- name: InsertExternalOperationIfAbsent :execrows
+-- orcon:scope org
+-- orcon:hot
+INSERT INTO external_operation (id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state,
+                                batch_key, retry_epoch, compensation_state, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(execution_id), sqlc.arg(node_execution_id), sqlc.arg(item_index),
+        sqlc.arg(correlation_key), sqlc.arg(contract_reference), 'PREPARED', sqlc.arg(batch_key), 0, 'NONE',
+        sqlc.arg(created_at), sqlc.arg(updated_at))
+ON CONFLICT (org_id, correlation_key) DO NOTHING;
 
 -- name: InsertJoinInstance :execrows
 -- orcon:scope org

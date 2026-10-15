@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/fairness"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/identity"
 )
@@ -22,8 +23,52 @@ import (
 // returns the tokens.
 func (e *Engine) Claim(ctx context.Context, limit int) ([]store.Claimed, time.Time, error) {
 	start := time.Now()
-	claimed, err := e.store.ClaimTokens(ctx, e.claimRequest(limit))
-	return claimed, start, err
+	now := e.cfg.Clock.Now()
+	counts, err := e.store.RunnableCounts(ctx, now)
+	if err != nil {
+		return nil, start, err
+	}
+	entries := make([]fairness.Entry, 0, len(counts))
+	for _, c := range counts {
+		entries = append(entries, fairness.Entry{
+			Key: c.FairnessKey, Class: fairnessClass(c.Priority), Runnable: c.Runnable, Oldest: c.Oldest,
+		})
+	}
+	e.fairMu.Lock()
+	grants := e.fair.Plan(entries, now, fairness.DefaultAgingInterval, int64(limit))
+	e.fairMu.Unlock()
+
+	var out []store.Claimed
+	for _, g := range grants {
+		req := e.claimRequest(int(g.Count))
+		req.FairnessKeys = []string{g.Key}
+		claimed, err := e.store.ClaimTokens(ctx, req)
+		out = append(out, claimed...)
+		if err != nil {
+			return out, start, err
+		}
+	}
+	// The snapshot is not a reservation: whatever the grants did not take is
+	// claimed unscoped, so that no capacity is left idle by a stale count.
+	if rest := limit - len(out); rest > 0 {
+		claimed, err := e.store.ClaimTokens(ctx, e.claimRequest(rest))
+		out = append(out, claimed...)
+		return out, start, err
+	}
+	return out, start, nil
+}
+
+// fairnessClass maps the stored priority of a token to its class (SPEC-001
+// R-FAIR-01). Stored values outside the three classes are read as LOW.
+func fairnessClass(p int64) fairness.Class {
+	switch p {
+	case store.PriorityHigh:
+		return fairness.High
+	case store.PriorityNormal:
+		return fairness.Normal
+	default:
+		return fairness.Low
+	}
 }
 
 // Work runs one claimed token until it ends, waits or is released, committing at
@@ -143,12 +188,13 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 	if err != nil {
 		return false, err
 	}
-	sess, err := e.interp.OpenSession(plan, esnap, execution.SessionOptions{Known: known})
+	sess, err := e.interp.OpenSession(plan, esnap, execution.SessionOptions{Org: org, Known: known})
 	if err != nil {
 		return false, fmt.Errorf("open execution %s: %w", execID, err)
 	}
 	work := execution.WorkOptions{
 		Budget: e.cfg.CheckpointActivations, StopAtFork: true, Release: e.draining.Load(),
+		Checkpoint: e.checkpointOf(org, execID, l.fence),
 		// A worker that shuts down pauses at the next activation boundary, commits, and gives the token back.
 		Pause: func() bool {
 			return time.Since(started) >= e.cfg.CheckpointInterval || !l.valid(e.leases) || e.draining.Load()
@@ -254,5 +300,6 @@ func (e *Engine) afterCommit(ctx context.Context, c *committed) {
 	}
 	if c.runnable > 0 {
 		e.signal(c.runnable)
+		e.notifyRunnable(ctx)
 	}
 }

@@ -23,7 +23,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	// The PostgreSQL test server runs for the whole package when it is on; the
+	// leak check runs after the tests and the server stops in the cleanup, after it.
+	stop := startPostgres()
+	goleak.VerifyTestMain(m, goleak.Cleanup(func(int) { stop() }))
 }
 
 // syncBuffer is a bytes.Buffer safe for concurrent use: run writes logs from
