@@ -1,0 +1,146 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+SessionCredentials:
+  type: object
+  description: The email and the password of an account that signs in.
+  required:
+    - email
+    - password
+  additionalProperties: false
+  properties:
+    email:
+      type: string
+      format: email
+      description: Email of the account; compared case-insensitively.
+      examples:
+        - ana@example.com
+      maxLength: 320
+    password:
+      type: string
+      writeOnly: true
+      description: Password of the account. It is never returned.
+      examples:
+        - example-secret-1
+      minLength: 1
+      maxLength: 1024
+Session:
+  type: object
+  description: >-
+    A browser session. The token that proves it is only in the session cookie, never in the body.
+  required:
+    - id
+    - createdAt
+    - expiresAt
+    - idleExpiresAt
+    - assuranceLevel
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the session; it is what revoking the session names.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+      readOnly: true
+    createdAt:
+      type: string
+      format: date-time
+      description: When the session started, in UTC.
+      examples:
+        - '2026-10-14T15:04:05Z'
+    expiresAt:
+      type: string
+      format: date-time
+      description: When the session ends whatever its activity (maximum age), in UTC.
+      examples:
+        - '2026-11-13T15:04:05Z'
+    idleExpiresAt:
+      type: string
+      format: date-time
+      description: When the session ends without activity (idle timeout), in UTC.
+      examples:
+        - '2026-10-14T23:04:05Z'
+    assuranceLevel:
+      type: string
+      description: How strongly the user was verified; AAL1 is a password, AAL2 adds a second factor.
+      x-orcon-enum-kind: identifier
+      enum:
+        - AAL1
+        - AAL2
+      examples:
+        - AAL1
+CurrentUser:
+  type: object
+  description: The signed-in user and the session the request carries.
+  required:
+    - id
+    - email
+    - displayName
+    - currentSession
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the user.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a81
+      readOnly: true
+    email:
+      type: string
+      format: email
+      description: Email of the user.
+      examples:
+        - ana@example.com
+      maxLength: 320
+    displayName:
+      type: string
+      description: Name the user is shown with.
+      examples:
+        - Ana Torres
+      maxLength: 200
+    currentSession:
+      description: The session the request carries.
+      $ref: ../openapi.yaml#/components/schemas/Session
+Organization:
+  type: object
+  description: An organization the user belongs to.
+  required:
+    - id
+    - slug
+    - name
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the organization.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+      readOnly: true
+    slug:
+      type: string
+      description: Short name of the organization, unique across the installation; it appears in URLs.
+      examples:
+        - acme
+      maxLength: 100
+    name:
+      type: string
+      description: Display name of the organization.
+      examples:
+        - Acme
+      maxLength: 200
+OrganizationList:
+  type: object
+  description: One page of organizations.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/Organization
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024

@@ -287,6 +287,11 @@ export const permission = defineRule((model, report, options) => {
 });
 
 const AUDIT_ACTION = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+/**
+ * The single-word audit actions of Annex B (docs/reference/audit-actions.md). The list is closed: a new
+ * one-word action is an amendment of the annex, not a change of this rule.
+ */
+const SINGLE_WORD_AUDIT_ACTIONS = Object.freeze(['logout']);
 
 export const audit = defineRule((model, report) => {
   for (const entry of model.pathOperations) {
@@ -295,7 +300,7 @@ export const audit = defineRule((model, report) => {
       report('CHAN-8', `${entry.method.toUpperCase()} ${entry.key} declares x-orcon-audit (an action like flow.published, or none).`, entry.loc);
       continue;
     }
-    if (value !== 'none' && !AUDIT_ACTION.test(value)) {
+    if (value !== 'none' && !AUDIT_ACTION.test(value) && !SINGLE_WORD_AUDIT_ACTIONS.includes(value)) {
       report('CHAN-8', `Audit action "${value}" is <area>.<event> in lowercase.`, entry.loc.child(['x-orcon-audit']));
     }
     if (value === 'none' && MUTATING.includes(entry.method)) {

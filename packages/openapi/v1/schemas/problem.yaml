@@ -137,6 +137,7 @@ ProblemCode:
     - service-unavailable
     - confirmation-required
     - federated-token-rejected
+    - csrf-check-failed
   x-orcon-problem-catalog:
     validation-failed:
       status: 400
@@ -266,4 +267,9 @@ ProblemCode:
       when: >-
         The workload identity token was rejected by the trust relationship; protocol endpoints send it
         as invalid_grant.
+      retryable: false
+    csrf-check-failed:
+      status: 403
+      title: CSRF check failed
+      when: The request did not carry a valid CSRF token or came from another origin.
       retryable: false
