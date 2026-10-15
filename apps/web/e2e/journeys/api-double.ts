@@ -60,9 +60,9 @@ const handleOf = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-/** Installs the stand-in on a page. Each page starts signed out, with no projects. */
-export async function installApiDouble(page: Page): Promise<void> {
-  let signedIn = false;
+/** Installs the stand-in on a page. Each page starts signed out, with no projects, unless `signedIn` says otherwise. */
+export async function installApiDouble(page: Page, options: { signedIn?: boolean } = {}): Promise<void> {
+  let signedIn = options.signedIn ?? false;
   const projects: Project[] = [];
   const flows: Flow[] = [];
 
@@ -148,6 +148,9 @@ export async function installApiDouble(page: Page): Promise<void> {
       if (flow === undefined) return route.fulfill(problem(404, 'Flow not found', 'not-found'));
       return route.fulfill(json(200, flowState(flow), { ETag: `"${flow.revision}"` }));
     }
+
+    // The lists of a project's credentials and executions: there are none.
+    if (method === 'GET' && /^\/projects\/[^/]+\/(credentials|executions)$/.test(path)) return route.fulfill(json(200, { items: [] }));
 
     return route.fulfill(problem(404, 'Not found', 'not-found'));
   };

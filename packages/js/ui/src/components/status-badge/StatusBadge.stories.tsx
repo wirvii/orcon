@@ -32,7 +32,7 @@ export const Failed: Story = { args: { status: 'FAILED' } };
 export const Uncertain: Story = {
   args: { status: 'UNCERTAIN' },
   play: async ({ canvasElement }) => {
-    const badge = within(canvasElement).getByText('Uncertain').closest('[data-status]');
+    const badge = within(canvasElement).getByText('Needs review').closest('[data-status]');
     await expect(badge).toHaveAccessibleDescription(
       'The external system may or may not have applied this operation. Review it before continuing.',
     );

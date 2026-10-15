@@ -18,12 +18,16 @@
     },
     "inverse": {
       "$value": "{color.slate.900}"
+    },
+    "hover": {
+      "$value": "{color.slate.100}",
+      "$description": "Background of a hovered or current row, menu item or navigation entry. Text on it keeps the contrast of text on the sunken surface."
     }
   },
   "mascot": {
     "$type": "color",
     "panel": {
-      "$value": "{color.green.100}",
+      "$value": "{color.slate.200}",
       "$description": "Soft green rounded box behind the mascot in the light theme."
     }
   },
@@ -83,6 +87,10 @@
     },
     "control": {
       "$value": "{color.slate.500}"
+    },
+    "strong": {
+      "$value": "{color.slate.300}",
+      "$description": "Outline of a card, dialog or segmented control that sits above the plain divider; the divider stays border.default."
     }
   },
   "focus": {

@@ -3,10 +3,14 @@
 
 import { defineConfig } from '@playwright/test';
 
-// Accessibility check of the screen the Go binary serves. It runs against the production build
-// (`vite preview`), so what is tested is what ships.
+// Browser checks of the screens the Go binary serves. They run against the production build (`vite preview`), so
+// what is tested is what ships. `test/` holds the page-level checks; `e2e/ux/` holds the checks of the redesigned
+// screens (SPEC-019). The captures for a pull request (`e2e/ux/capture.spec.ts`) are evidence, not checks, and run
+// only through `playwright.ux-review.config.ts`.
 export default defineConfig({
-  testDir: 'test',
+  testDir: '.',
+  testMatch: ['test/**/*.spec.ts', 'e2e/ux/**/*.spec.ts'],
+  testIgnore: ['e2e/ux/capture.spec.ts'],
   fullyParallel: true,
   reporter: 'list',
   use: {

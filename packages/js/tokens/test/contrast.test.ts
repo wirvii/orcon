@@ -20,8 +20,8 @@ describe('declared pairs', () => {
     expect(evaluatePairs(pairs, colorValues(theme))).toEqual([]);
   });
 
-  it('certifies 106 text and UI pairs per theme', () => {
-    expect(certified).toHaveLength(106);
+  it('certifies 109 text and UI pairs per theme', () => {
+    expect(certified).toHaveLength(109);
   });
 
   it('keeps the policy minimums', () => {

@@ -5,8 +5,7 @@ import { Button, EmptyState } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
 import { defineMessages, useIntl } from 'react-intl';
 
-import { currentUserQueryOptions } from '../api/queries';
-import { useSignOut } from '../api/mutations';
+import { currentUserQueryOptions, useSignOut } from '../../../app/session/current-user';
 
 const messages = defineMessages({
   title: {

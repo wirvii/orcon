@@ -59,13 +59,15 @@ test('the editor opens at its stable address', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
 });
 
-test('the navigation links to the API reference, a page the server serves, in the same tab', async ({ page }) => {
+test('the Help menu links to the API reference, a page the server serves, in the same tab', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('orcon.locale', 'en');
   });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/settings/appearance');
-  const link = page.getByRole('link', { name: 'API reference' }).first();
+  await mockDraftApi(page);
+  await page.goto(FLOW);
+  await page.getByRole('button', { name: 'Help' }).first().click();
+  const link = page.getByRole('menuitem', { name: 'API reference' });
   await expect(link).toHaveAttribute('href', '/api/reference/');
   await expect(link).not.toHaveAttribute('target', '_blank');
 });
@@ -317,7 +319,7 @@ test.describe('on a computer', () => {
     await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved$/ })).toBeVisible({ timeout: 6_000 });
     // Leave for another page and come back: the saved draft is what opens.
     await page.getByRole('link', { name: 'Settings' }).first().click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
     await goInApp(page, FLOW);
     // The address is loaded through the signed-in frame, so wait for the editor itself before reading its nodes.
     await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();

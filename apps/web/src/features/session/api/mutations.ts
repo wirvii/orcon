@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { mutationOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 
-import { createSession, revokeSession, type Session, type SessionCredentials } from './operations';
+import type { Session } from '../../../app/session/current-user';
+import { createSession, type SessionCredentials } from './operations';
 import { sessionKeys } from './queries';
 
 /**
@@ -33,29 +33,4 @@ export function useSignIn() {
       queryClient.clear();
     },
   });
-}
-
-/**
- * Signs out: revokes the session, goes to the sign-in page and only then clears the cache. The
- * cache is cleared whatever the answer: a session the server no longer knows (401) is signed out
- * here too, and nothing read for that person may stay in memory. The page is left first, so no
- * query of the signed-in pages refetches with a session that is gone.
- */
-export function useSignOut() {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const mutation = useMutation({
-    mutationKey: [...sessionKeys.all, 'revoke'],
-    mutationFn: (sessionId: string) => revokeSession(sessionId),
-    retry: false,
-  });
-  return async (sessionId: string) => {
-    try {
-      await mutation.mutateAsync(sessionId);
-    } catch {
-      // The outcome is the same for the person: the page they are on can no longer show their data.
-    }
-    await navigate({ to: '/login', search: { signedOut: true } });
-    queryClient.clear();
-  };
 }

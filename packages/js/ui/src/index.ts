@@ -2,17 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { cn } from './lib/cn';
-export { ThemeProvider, useTheme, applyTheme, themePreferences, type ThemePreference } from './providers/ThemeProvider';
+export { ThemeProvider, useTheme, useResolvedTheme, applyTheme, themePreferences, type ThemePreference } from './providers/ThemeProvider';
 export { DensityProvider, useDensity, applyDensity, densities, type Density } from './providers/DensityProvider';
 export { I18nProvider, useLocale } from './providers/I18nProvider';
 export { Providers } from './providers/Providers';
 export { locales, productLocales, matchProductLocale, type Locale, type ProductLocale } from './i18n/locales';
 
 // Components
+export { ActiveToggle } from './components/active-toggle/ActiveToggle';
+export type { ActiveToggleProps } from './components/active-toggle/ActiveToggle';
 export { AlertDialog } from './components/alert-dialog/AlertDialog';
 export type { AlertDialogProps } from './components/alert-dialog/AlertDialog';
 export { AppShell } from './components/app-shell/AppShell';
 export type { NavEntry, AppShellProps } from './components/app-shell/AppShell';
+export { PhoneTopBar } from './components/app-shell/PhoneTopBar';
+export type { PhoneTopBarProps } from './components/app-shell/PhoneTopBar';
 export { AttentionInboxItem } from './components/attention-inbox-item/AttentionInboxItem';
 export type { AttentionInboxItemProps } from './components/attention-inbox-item/AttentionInboxItem';
 export { initials, Avatar } from './components/avatar/Avatar';
@@ -25,6 +29,8 @@ export { BrandMark } from './components/brand-mark/BrandMark';
 export type { BrandMarkProps } from './components/brand-mark/BrandMark';
 export { BrandHero } from './components/brand-hero/BrandHero';
 export type { BrandHeroProps } from './components/brand-hero/BrandHero';
+export { BottomTabBar } from './components/bottom-tab-bar/BottomTabBar';
+export type { BottomTab, BottomTabBarProps } from './components/bottom-tab-bar/BottomTabBar';
 export { Breadcrumb } from './components/breadcrumb/Breadcrumb';
 export type { BreadcrumbItem, BreadcrumbProps } from './components/breadcrumb/Breadcrumb';
 export { buttonVariants, Button } from './components/button/Button';
@@ -37,8 +43,12 @@ export { Combobox } from './components/combobox/Combobox';
 export type { ComboboxOption, ComboboxProps } from './components/combobox/Combobox';
 export { CommandPalette } from './components/command-palette/CommandPalette';
 export type { PaletteCommand, CommandPaletteProps } from './components/command-palette/CommandPalette';
+export { ComingSoon } from './components/coming-soon/ComingSoon';
+export type { ComingSoonProps } from './components/coming-soon/ComingSoon';
 export { ConnectorIcon } from './components/connector-icon/ConnectorIcon';
 export type { ConnectorIconProps } from './components/connector-icon/ConnectorIcon';
+export { CountTabs } from './components/count-tabs/CountTabs';
+export type { CountTab, CountTabsProps } from './components/count-tabs/CountTabs';
 export { DataTable } from './components/data-table/DataTable';
 export type { SortDirection, SortState, DataColumn, DataTableProps } from './components/data-table/DataTable';
 export { toDate, DateTime } from './components/date-time/DateTime';
@@ -55,6 +65,8 @@ export { ErrorFallback, ErrorBoundary } from './components/error-boundary/ErrorB
 export type { ErrorFallbackProps, ErrorBoundaryProps } from './components/error-boundary/ErrorBoundary';
 export { ErrorSummary } from './components/error-summary/ErrorSummary';
 export type { FieldError, ErrorSummaryProps } from './components/error-summary/ErrorSummary';
+export { FilterChip } from './components/filter-chip/FilterChip';
+export type { FilterChipProps } from './components/filter-chip/FilterChip';
 export { FormField } from './components/form-field/FormField';
 export type { FormFieldProps } from './components/form-field/FormField';
 export { FieldContext, useFieldControlProps, useField } from './components/form-field/field-context';
@@ -69,10 +81,14 @@ export { Link } from './components/link/Link';
 export type { LinkProps } from './components/link/Link';
 export { languageName, LocaleSwitcher } from './components/locale-switcher/LocaleSwitcher';
 export type { LocaleSwitcherProps } from './components/locale-switcher/LocaleSwitcher';
+export { ListRow } from './components/list-row/ListRow';
+export type { ListRowProps } from './components/list-row/ListRow';
 export { Mascot } from './components/mascot/Mascot';
 export type { MascotPose, MascotProps } from './components/mascot/Mascot';
 export { NavItem } from './components/nav-item/NavItem';
 export type { NavItemProps } from './components/nav-item/NavItem';
+export { OrgSwitcher } from './components/org-switcher/OrgSwitcher';
+export type { OrgSwitcherOrganization, OrgSwitcherProps } from './components/org-switcher/OrgSwitcher';
 export { NotificationBell } from './components/notification-bell/NotificationBell';
 export type { NotificationBellProps } from './components/notification-bell/NotificationBell';
 export { NumberFormat, formatDuration, Duration } from './components/number-format/NumberFormat';
@@ -99,6 +115,8 @@ export { Separator } from './components/separator/Separator';
 export type { SeparatorProps } from './components/separator/Separator';
 export { Sheet } from './components/sheet/Sheet';
 export type { SheetProps } from './components/sheet/Sheet';
+export { SidebarButton, SidebarLink, SidebarNav, useSidebarCollapsed } from './components/sidebar-nav/SidebarNav';
+export type { SidebarButtonProps, SidebarItem, SidebarLinkProps, SidebarNavProps, SidebarSection } from './components/sidebar-nav/SidebarNav';
 export { Skeleton } from './components/skeleton/Skeleton';
 export type { SkeletonProps } from './components/skeleton/Skeleton';
 export { Spinner } from './components/spinner/Spinner';
@@ -124,6 +142,8 @@ export { Tooltip } from './components/tooltip/Tooltip';
 export type { TooltipProps } from './components/tooltip/Tooltip';
 export { TopBar } from './components/top-bar/TopBar';
 export type { TopBarProps } from './components/top-bar/TopBar';
+export { UserMenu } from './components/user-menu/UserMenu';
+export type { UserMenuItem, UserMenuProps } from './components/user-menu/UserMenu';
 
 // Canvas (style A)
 export { CanvasNode, tileRadius } from './canvas/canvas-node/CanvasNode';

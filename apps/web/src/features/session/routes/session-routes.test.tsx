@@ -35,11 +35,11 @@ describe('the session area routes', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
-  it('lands a person with one organization on its projects', async () => {
+  it('lands a person with one organization on its home page', async () => {
     server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
     const { router } = renderRoute('/');
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/orgs/acme/projects');
+      expect(router.state.location.pathname).toBe('/orgs/acme/overview');
     });
   });
 
@@ -69,7 +69,7 @@ describe('the session area routes', () => {
     );
     const { queryClient } = renderRoute('/orgs');
     await screen.findByRole('heading', { level: 1, name: 'Choose an organization' });
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ana Ruiz Account menu' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
@@ -85,20 +85,41 @@ describe('the session area routes', () => {
       productApi.projects([]),
     );
     renderRoute('/orgs/acme');
-    const button = await screen.findByRole('button', { name: 'Account menu' });
-    expect(within(button).getByRole('img', { name: 'jftamayop' })).toBeVisible();
+    // The sidebar button and the avatar of the phone bar are both named after the person.
+    const [button] = await screen.findAllByRole('button', { name: /^jftamayop/ });
+    if (!button) throw new Error('The frame has no account button.');
     expect(button).toHaveTextContent('JF');
     await userEvent.click(button);
-    expect(await screen.findByText('jftamayop')).toBeVisible();
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByText('jftamayop')).toBeVisible();
     expect(screen.queryByText('Owner')).toBeNull();
   });
 
-  it('offers switching organization only to a person with more than one', async () => {
-    server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
-    renderRoute('/orgs/acme');
-    await screen.findByRole('button', { name: 'Account menu' });
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+  it('offers switching organization from the organization button of the sidebar', async () => {
+    server.use(signedIn.currentUser, signedIn.organizations([acme, globex]), productApi.projects([]));
+    const { router } = renderRoute('/orgs/acme/overview');
+    await userEvent.click(await screen.findByRole('button', { name: 'Acme Organization' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getAllByRole('menuitemcheckbox')).toHaveLength(2);
+    expect(within(menu).getByRole('menuitemcheckbox', { name: 'Acme' })).toBeChecked();
+    expect(within(menu).getByRole('menuitemcheckbox', { name: 'Globex' })).not.toBeChecked();
+    await userEvent.click(within(menu).getByRole('menuitemcheckbox', { name: 'Globex' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/orgs/globex/overview');
+    });
+  });
+
+  it('offers switching organization in the account menu only outside an organization and to a person with more than one', async () => {
+    server.use(signedIn.currentUser, signedIn.organizations([acme]));
+    const { unmount } = renderRoute('/orgs');
+    await userEvent.click(await screen.findByRole('button', { name: 'Ana Ruiz Account menu' }));
     expect(await screen.findByRole('menuitem', { name: 'Sign out' })).toBeVisible();
     expect(screen.queryByRole('menuitem', { name: 'Switch organization' })).toBeNull();
+    unmount();
+
+    server.use(signedIn.organizations([acme, globex]));
+    renderRoute('/orgs');
+    await userEvent.click(await screen.findByRole('button', { name: 'Ana Ruiz Account menu' }));
+    expect(await screen.findByRole('menuitem', { name: 'Switch organization' })).toBeVisible();
   });
 });

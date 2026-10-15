@@ -37,7 +37,7 @@ const chips: [string, NodeStatusChipProps][] = [
   ['Running', { status: 'RUNNING' }],
   ['Succeeded with errors', { status: 'SUCCEEDED_WITH_ERRORS' }],
   ['Failed', { status: 'FAILED', code: '401' }],
-  ['Uncertain', { status: 'UNCERTAIN' }],
+  ['Needs review', { status: 'UNCERTAIN' }],
   ['Uncertain items', { kind: 'uncertain-items', count: 3 }],
   ['Waiting', { status: 'WAITING' }],
   ['Needs action', { status: 'SUSPENDED' }],

@@ -3,7 +3,7 @@
 
 import { pair } from '../../lib/meta';
 
-export const states = ['default', 'hover', 'focus-visible', 'active', 'external'] as const;
+export const states = ['default', 'hover', 'focus-visible', 'active', 'external', 'prose'] as const;
 
 export const pairs = [
   pair('fg.link', 'bg.app'),

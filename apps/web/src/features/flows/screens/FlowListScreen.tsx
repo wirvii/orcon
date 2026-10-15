@@ -3,7 +3,7 @@
 
 import { Button, Link, Mascot, PageHeader, RelativeTime } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi, Link as RouterLink } from '@tanstack/react-router';
+import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
@@ -41,7 +41,14 @@ export function FlowListScreen() {
   const { organization, project } = route.useRouteContext();
   const { orgSlug, projectHandle } = route.useParams();
   const flows = useQuery(flowsQueryOptions(organization.id, project.id));
-  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
+  const { create } = route.useSearch();
+  // `?create` opens the dialog on arrival; closing it drops the parameter so a reload does not open it again.
+  const [creating, setCreating] = useState(create === true);
+  useEffect(() => {
+    // The address can ask for the dialog while the page is already open (the key N, the sidebar).
+    if (create === true) setCreating(true);
+  }, [create]);
 
   useEffect(() => {
     markFirstUsefulScreen('/orgs/$orgSlug/projects/$projectHandle/flows');
@@ -106,7 +113,17 @@ export function FlowListScreen() {
           </ul>
         )}
       </QueryState>
-      <CreateFlowDialog open={creating} onOpenChange={setCreating} orgId={organization.id} projectId={project.id} orgSlug={orgSlug} projectHandle={projectHandle} />
+      <CreateFlowDialog
+        open={creating}
+        onOpenChange={(open) => {
+          setCreating(open);
+          if (!open && create === true) void navigate({ to: '/orgs/$orgSlug/projects/$projectHandle/flows', params: { orgSlug, projectHandle }, search: {}, replace: true });
+        }}
+        orgId={organization.id}
+        projectId={project.id}
+        orgSlug={orgSlug}
+        projectHandle={projectHandle}
+      />
     </div>
   );
 }
