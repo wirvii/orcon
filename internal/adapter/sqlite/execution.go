@@ -672,11 +672,26 @@ func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.
 	}
 	var out []store.Claimed
 	err := s.write(ctx, "claim tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
-			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
-			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r), PageSize: clampPage(r.Limit),
-			ExecutionLimit: executionLimitOf(r),
-		})
+		var rows []claimedRow
+		var err error
+		if clampPage(r.Limit) == 1 {
+			// One token needs no count of the candidates ahead of it, which is quadratic for an execution at its cap.
+			var one []sqlcgen.ClaimOneTokenRow
+			one, err = q.ClaimOneToken(ctx, sqlcgen.ClaimOneTokenParams{
+				WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+				AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r),
+				ExecutionLimit: executionLimitOf(r),
+			})
+			for i := range one {
+				rows = append(rows, claimedRow(one[i]))
+			}
+		} else {
+			rows, err = q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
+				WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+				AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r), PageSize: clampPage(r.Limit),
+				ExecutionLimit: executionLimitOf(r),
+			})
+		}
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ sqlite:ReleaseAllLeases  # SPEC-001 C2: a standalone process releases every leas
 sqlite:MarkTokenAttemptsAbandoned  # SPEC-001 C2: the reaper function orcon_engine.release_expired_leases abandons the attempts itself on PostgreSQL
 postgres:LockExecution  # SPEC-001 C2: the single writer of SQLite already orders the events of an execution
 sqlite:ClaimTokens  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
+sqlite:ClaimOneToken  # SPEC-001 C2: the single-token claim of SQLite skips the in-claim count; PostgreSQL has one function
 sqlite:RenewLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
 sqlite:ReleaseExpiredLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)
 sqlite:ReleaseWorkerLeases  # SPEC-001 C2: PostgreSQL calls the orcon_engine function from a hand-written method (DA-8)

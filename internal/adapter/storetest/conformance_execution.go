@@ -98,6 +98,7 @@ func executionCases() []struct {
 		{"ClaimIsExclusive", claimCase},
 		{"ClaimOrderAndFilters", claimOrderCase},
 		{"ExecutionCapDoesNotStarveOthers", executionCapCase},
+		{"ClaimCostFlatBehindCappedExecution", claimCostFlatCase},
 		{"FencingStopsALostLease", fencingCase},
 		{"RenewAndReap", reapCase},
 		{"JoinArrivalIsAtomic", joinCase},
@@ -455,6 +456,48 @@ func executionCapCase(t *testing.T, newStore Factory) {
 	got, err = e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
 	if err != nil || len(got) != 1 || got[0].TokenID != thirdToken.ID {
 		t.Fatalf("claim of 1 behind two capped executions = %+v, %v; want the token of the third", got, err)
+	}
+}
+
+// claimCostFlatCase: a claim of one token behind an execution at its cap costs the same however many runnable tokens
+// that execution has (the bound is loose against run-to-run noise; counting the candidates ahead of each token took
+// seconds at this size).
+func claimCostFlatCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	first := e.token(capped, "first", 0, now.Add(-3*time.Hour))
+	mustTx(t, e.tx(capped.OrgID, func(ctx context.Context, tx store.Tx) error {
+		for i := range 2000 {
+			tok := store.Token{
+				ID: next[store.TokenID](e.ids), OrgID: capped.OrgID, ExecutionID: capped.ID, Status: "RUNNABLE", NodeID: "bulk", ScopePath: "",
+				ForkLineage: []byte(`[]`), FairnessKey: "flow/" + capped.FlowID.String(), EffectivePriority: 0,
+				AvailableAt: now.Add(-2*time.Hour + time.Duration(i)*time.Millisecond), CreatedAt: base, UpdatedAt: base,
+			}
+			if err := tx.InsertToken(ctx, &tok); err != nil {
+				return err
+			}
+		}
+		return nil
+	}), "insert bulk tokens")
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	request := store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now}
+	got, err := e.s.ClaimTokens(e.ctx(), request)
+	if err != nil || len(got) != 1 || got[0].TokenID != first.ID {
+		t.Fatalf("first claim = %+v, %v; want the oldest token of the capped execution", got, err)
+	}
+	start := time.Now()
+	got, err = e.s.ClaimTokens(e.ctx(), request)
+	elapsed := time.Since(start)
+	if err != nil || len(got) != 1 || got[0].TokenID != otherToken.ID {
+		t.Fatalf("claim behind a capped execution = %+v, %v; want the token of the other execution", got, err)
+	}
+	t.Logf("claim behind 2000 runnable tokens of a capped execution: %s", elapsed)
+	if elapsed > 100*time.Millisecond {
+		t.Fatalf("claim took %s behind 2000 runnable tokens of a capped execution; the cost must not grow with them", elapsed)
 	}
 }
 

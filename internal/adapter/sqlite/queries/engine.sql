@@ -32,6 +32,28 @@ WHERE id IN (
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
           lease_epoch, lease_expires_at;
 
+-- A claim of one token needs no count of the candidates ahead of it: the cap is only the leased tokens of the
+-- execution, and the executions at their cap are found once per claim from the leased tokens (few), so the cost does not grow with the
+-- runnable tokens of an execution already at its cap. ClaimTokens is for claims of more than one token.
+-- name: ClaimOneToken :many
+-- orcon:scope engine
+-- orcon:hot
+UPDATE token
+SET status = 'LEASED', lease_owner = sqlc.arg(worker_id), lease_epoch = lease_epoch + 1, lease_expires_at = sqlc.arg(lease_expires_at),
+    claim_count = claim_count + 1, updated_at = sqlc.arg(now)
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
+    AND (sqlc.arg(any_fairness_key) = 1 OR t.fairness_key IN (sqlc.slice(fairness_keys)))
+    AND t.abandoned_count < sqlc.arg(poison_threshold) - 1
+    AND (t.org_id, t.execution_id) NOT IN (
+      SELECT l.org_id, l.execution_id FROM token l WHERE l.status = 'LEASED'
+      GROUP BY l.org_id, l.execution_id HAVING count(*) >= CAST(sqlc.arg(execution_limit) AS INTEGER))
+  ORDER BY t.effective_priority, t.available_at, t.id
+  LIMIT 1)
+RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+          lease_epoch, lease_expires_at;
+
 -- The token one abandonment short of the poison threshold runs alone in its process (SPEC-001 Enmienda 12 section 12-1).
 -- name: ClaimLastChanceToken :many
 -- orcon:scope engine

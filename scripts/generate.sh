@@ -68,14 +68,13 @@ else
 fi
 
 # sqlc expands a slice parameter by rewriting the statement text at run time, so
-# the generated call is not a constant. Mark that one reviewed call (owner
+# the generated call is not a constant. Mark every reviewed call of that kind (owner
 # approval in dynamic_sql_allowlist.txt) every time sqlc rewrites the file.
 slice_file="$sqlite_out/engine.sql.go"
 if [ -f "$slice_file" ] && ! grep -q 'orcon:dynamic-sql' "$slice_file"; then
   awk '
-    /rows, err := q\.db\.QueryContext\(ctx, query, queryParams\.\.\.\)/ && !done {
+    /rows, err := q\.db\.QueryContext\(ctx, query, queryParams\.\.\.\)/ {
       print "\t//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text"
-      done = 1
     }
     { print }
   ' "$slice_file" >"$slice_file.tmp" && mv "$slice_file.tmp" "$slice_file"
