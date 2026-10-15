@@ -671,6 +671,18 @@ func (q *Queries) MarkSessionRevoked(ctx context.Context, revokedAt pgtype.Times
 	return result.RowsAffected(), nil
 }
 
+const markUserSessionsRevoked = `-- name: MarkUserSessionsRevoked :exec
+UPDATE session
+SET revoked_at = $1, updated_at = $1
+WHERE application_user_id = $2 AND revoked_at IS NULL
+`
+
+// orcon:scope instance
+func (q *Queries) MarkUserSessionsRevoked(ctx context.Context, revokedAt pgtype.Timestamptz, applicationUserID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markUserSessionsRevoked, revokedAt, applicationUserID)
+	return err
+}
+
 const updateApplicationUserPasswordHash = `-- name: UpdateApplicationUserPasswordHash :execrows
 UPDATE application_user
 SET password_hash = $1, updated_at = $2

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -56,6 +57,15 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"SetPasswordHash": caseSetPasswordHash,
 	// Sessions and the sign-in throttle (instance tables).
 	"CreateSession":          caseCreateSession,
+	"AppendInstanceEntry":    caseAppendInstanceEntry,
+	"CreateUserWithEntry":    caseCreateUserWithEntry,
+	"ChangePassword":         caseChangePassword,
+	"PendingChains":          caseAuditChain,
+	"ListPending":            caseAuditChain,
+	"Tail":                   caseAuditChain,
+	"CommitBlock":            caseAuditChain,
+	"ListSealed":             caseAuditChain,
+	"ListBlocks":             caseAuditChain,
 	"GetSession":             caseGetSession,
 	"GetSessionByTokenHash":  caseGetSessionByTokenHash,
 	"UpdateSessionActivity":  caseUpdateSessionActivity,
@@ -401,10 +411,10 @@ func caseCreateProject(ctx context.Context, tb testing.TB, env *Env) {
 		ID: fresh[identity.ProjectID](env), OrgID: identity.OrgID(env.B.UUID), Name: "Intruder", Slug: "intruder", Handle: "intruder",
 		IsProtected: true, CreatedAt: seededAt, UpdatedAt: seededAt,
 	}
-	wantErr(tb, "a project of B under A's scope", env.Stores.CreateProject(ctx, env.A.Scope, rec), identity.ErrScopeMismatch)
+	wantErr(tb, "a project of B under A's scope", env.Stores.CreateProject(ctx, env.A.Scope, rec, audittest.Org(tb, env.B.UUID, "project.created")), identity.ErrScopeMismatch)
 	// B's handle is taken for everyone. The store says so, and only that.
 	rec.OrgID, rec.Handle = identity.OrgID(env.A.UUID), env.B.Project.Handle
-	err := env.Stores.CreateProject(ctx, env.A.Scope, rec)
+	err := env.Stores.CreateProject(ctx, env.A.Scope, rec, audittest.Org(tb, env.A.UUID, "project.created"))
 	wantErr(tb, "A taking B's handle", err, identity.ErrHandleTaken)
 	AssertNoLeak(tb, "the refusal", errText(err), env.B.Sentinel("project-name"), env.B.Sentinel("flow-name"), env.B.Sentinel("org-name"))
 	intact(ctx, tb, env)

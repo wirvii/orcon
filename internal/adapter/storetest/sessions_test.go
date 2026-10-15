@@ -44,6 +44,7 @@ func sessionsWith(t *testing.T, f *fixture, clk *clock.Fake, cfg identity.Sessio
 	}
 	svc, err := identity.NewSessions(identity.SessionDeps{
 		Users: f.s, Sessions: f.s, Throttle: f.s, Hasher: testHasher(), Identify: identify, Clock: clk, IDs: f.ids,
+		Audit: f.s,
 	}, cfg)
 	if err != nil {
 		t.Fatalf("sessions: %v", err)

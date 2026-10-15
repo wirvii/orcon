@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -34,7 +35,7 @@ func TestSingleProcessLockReleasesLeases(t *testing.T) {
 		t.Fatal(err)
 	}
 	project := identity.ProjectID(ids.New())
-	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}, audittest.Org(t, id.UUID(org), "project.created")); err != nil {
 		t.Fatal(err)
 	}
 	rec := flow.Record{ID: flow.FlowID(ids.New()), OrgID: org, ProjectID: project, Name: "f", Draft: []byte(`{}`), CreatedAt: now, UpdatedAt: now}

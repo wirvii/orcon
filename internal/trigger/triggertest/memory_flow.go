@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -65,7 +66,7 @@ func (m *Memory) GetSystemPrincipal(context.Context) (identity.PrincipalRecord, 
 }
 
 // CreateProject implements [identity.ProjectStore].
-func (m *Memory) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+func (m *Memory) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord, _ audit.Entry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !p.OrgID.Matches(org) {

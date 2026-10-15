@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -48,7 +49,12 @@ func (m *memStore) GetUserCredentialsByEmail(_ context.Context, email string) (i
 	return c, nil
 }
 
-func (m *memStore) CreateSession(_ context.Context, rec identity.SessionRecord) error {
+// nopAuditLog discards the entries: these tests check the session rules, not the audit.
+type nopAuditLog struct{}
+
+func (nopAuditLog) AppendInstanceEntry(context.Context, audit.Entry) error { return nil }
+
+func (m *memStore) CreateSession(_ context.Context, rec identity.SessionRecord, _ audit.Entry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.sessions[string(rec.TokenHash)] = rec
@@ -120,7 +126,10 @@ func TestUnsafeRequestWithoutCsrfTokenRejected(t *testing.T) {
 		t.Fatalf("hash: %v", err)
 	}
 	store.creds["ada@example.test"] = identity.UserCredentials{
-		User:         identity.UserRecord{ID: identity.UserID(id.NewSequence().New()), EmailNormalized: "ada@example.test", Status: identity.UserActive},
+		User: identity.UserRecord{
+			ID: identity.UserID(id.NewSequence().New()), PrincipalID: identity.PrincipalID(id.NewSequence().New()),
+			EmailNormalized: "ada@example.test", Status: identity.UserActive,
+		},
 		PasswordHash: hash,
 	}
 	identify, err := identity.HMACIdentifier(bytes.Repeat([]byte{7}, 32))
@@ -130,6 +139,7 @@ func TestUnsafeRequestWithoutCsrfTokenRejected(t *testing.T) {
 	svc, err := identity.NewSessions(identity.SessionDeps{
 		Users: store, Sessions: store, Throttle: store, Hasher: hasher, Identify: identify,
 		Clock: clock.NewFake(time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)), IDs: id.NewSequence(),
+		Audit: nopAuditLog{},
 	}, identity.SessionConfig{PublicOrigin: csrfOrigin})
 	if err != nil {
 		t.Fatalf("sessions: %v", err)

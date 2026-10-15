@@ -676,6 +676,18 @@ func (q *Queries) MarkSessionRevoked(ctx context.Context, revokedAt sql.NullInt6
 	return result.RowsAffected()
 }
 
+const markUserSessionsRevoked = `-- name: MarkUserSessionsRevoked :exec
+UPDATE session
+SET revoked_at = ?1, updated_at = ?1
+WHERE application_user_id = ?2 AND revoked_at IS NULL
+`
+
+// orcon:scope instance
+func (q *Queries) MarkUserSessionsRevoked(ctx context.Context, revokedAt sql.NullInt64, applicationUserID []byte) error {
+	_, err := q.db.ExecContext(ctx, markUserSessionsRevoked, revokedAt, applicationUserID)
+	return err
+}
+
 const resolveUserOrganizations = `-- name: ResolveUserOrganizations :many
 SELECT org.id, org.slug, org.name
 FROM membership

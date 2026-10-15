@@ -12,3 +12,7 @@ nondeterminism_record  # recorded results used for replay
 execution_event  # ordered event stream of an execution
 schema_migration  # one row per applied migration, written once by the migration runner (orcon_owner); never updated or deleted (ADR-0015 §4, MG-4)
 trigger_event  # append-only stream of trigger events, kept 30 days (ADR-0020 section 7)
+audit_event  # SPEC-004 R-AUD-03: sealed events of an organization chain; the application role inserts and reads, never updates or deletes
+audit_block  # SPEC-004 R-AUD-03: blocks of an organization chain; append-only
+instance_audit_event  # SPEC-004 R-AUD-03: sealed events of the instance chain; append-only
+instance_audit_block  # SPEC-004 R-AUD-03: blocks of the instance chain; append-only

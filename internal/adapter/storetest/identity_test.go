@@ -16,8 +16,10 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 func wantIs(t *testing.T, what string, got, want error) {
@@ -342,7 +344,7 @@ func TestProjectHandleUniqueAcrossOrganizations(t *testing.T) {
 		mk := func(org identity.OrgID, slug, handle string) error {
 			return f.s.CreateProject(ctx, scopeOf(org), identity.ProjectRecord{
 				ID: next[identity.ProjectID](f), OrgID: org, Name: slug, Slug: slug, Handle: handle, IsProtected: true, CreatedAt: base, UpdatedAt: base,
-			})
+			}, audittest.Org(t, id.UUID(org), "project.created"))
 		}
 		if err := mk(f.orgA, "payments", "payments"); err != nil {
 			t.Fatal(err)

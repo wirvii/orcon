@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -17,8 +18,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 // SessionPolicy bounds a login session (SPEC-004 R-ID-06): the maximum age, whatever
@@ -152,6 +155,8 @@ type SessionDeps struct {
 	Identify Identifier
 	Clock    clock.Clock
 	IDs      id.Generator
+	// Audit receives the entries of the attempts that have no transaction of their own.
+	Audit AuditLog
 	// Random supplies the session tokens; nil means crypto/rand.
 	Random io.Reader
 }
@@ -175,6 +180,7 @@ type Sessions struct {
 	identify Identifier
 	clock    clock.Clock
 	ids      id.Generator
+	audit    AuditLog
 	random   io.Reader
 	origin   string
 	policy   SessionPolicy
@@ -199,15 +205,45 @@ func NewSessions(deps SessionDeps, cfg SessionConfig) (*Sessions, error) {
 	if random == nil {
 		random = rand.Reader
 	}
+	if deps.Audit == nil {
+		return nil, errors.New("sessions: the audit log is required (SPEC-004 R-AUD-02)")
+	}
 	dummy, err := deps.Hasher.Hash("no account has this password")
 	if err != nil {
 		return nil, fmt.Errorf("sessions: dummy hash: %w", err)
 	}
 	return &Sessions{
 		users: deps.Users, sessions: deps.Sessions, throttle: deps.Throttle, hasher: deps.Hasher,
-		identify: deps.Identify, clock: deps.Clock, ids: deps.IDs, random: random,
+		identify: deps.Identify, clock: deps.Clock, ids: deps.IDs, audit: deps.Audit, random: random,
 		origin: cfg.PublicOrigin, policy: cfg.Session, attempts: cfg.Attempts, dummy: dummy,
 	}, nil
+}
+
+// entry builds the audit entry of an action of the session service, stamped with
+// the clock at the precision the database keeps.
+func (s *Sessions) entry(actor audit.Actor, action string, outcome audit.Outcome, details jsonvalue.Value) (audit.Entry, error) {
+	e, err := audit.NewEntry(audit.EntryParams{
+		ID: s.ids.New(), Chain: audit.InstanceChain(), OccurredAt: s.instant(), Actor: actor,
+		Action: action, Outcome: outcome, Details: details,
+	})
+	if err != nil {
+		return audit.Entry{}, fmt.Errorf("audit %s: %w", action, err)
+	}
+	return e, nil
+}
+
+// userActor is the actor of a user principal.
+func userActor(p PrincipalID) audit.Actor {
+	return audit.Actor{PrincipalID: id.UUID(p), Kind: audit.ActorUser}
+}
+
+// failureDetails are the fields of a failed or refused attempt: the reason and the
+// identifier, already an HMAC of the address (R-AUD-08), never the address itself.
+func failureDetails(reason SignInReason, identifier []byte) (jsonvalue.Value, error) {
+	return jsonvalue.Object(
+		jsonvalue.Member{Key: "reason", Value: jsonvalue.String(string(reason))},
+		jsonvalue.Member{Key: "identifier", Value: jsonvalue.String(hex.EncodeToString(identifier))},
+	)
 }
 
 // SignIn is the input of [Sessions.SignIn].
@@ -241,6 +277,9 @@ func (s *Sessions) SignIn(ctx context.Context, in SignIn) (SignedIn, error) {
 	known := err == nil
 	switch {
 	case known && now.Before(state.LockedUntil):
+		if err := s.auditAttempt(ctx, audit.Actor{}, audit.OutcomeDenied, ReasonThrottled, key); err != nil {
+			return SignedIn{}, err
+		}
 		return SignedIn{}, &SignInError{Reason: ReasonThrottled, RetryAfter: state.LockedUntil.Sub(now)}
 	case err != nil && !errors.Is(err, ErrNotFound):
 		return SignedIn{}, fmt.Errorf("sign in: %w", err)
@@ -276,9 +315,33 @@ func (s *Sessions) SignIn(ctx context.Context, in SignIn) (SignedIn, error) {
 		if err := s.recordFailure(ctx, key, now); err != nil {
 			return SignedIn{}, err
 		}
+		var actor audit.Actor
+		if found {
+			actor = userActor(creds.User.PrincipalID)
+		}
+		if err := s.auditAttempt(ctx, actor, audit.OutcomeFailure, reason, key); err != nil {
+			return SignedIn{}, err
+		}
 		return SignedIn{}, &SignInError{Reason: reason}
 	}
 	return s.start(ctx, in, key, now, creds)
+}
+
+// auditAttempt appends the login.failed entry of a refused or failed sign-in in its own
+// transaction (R-AUD-02: a denied action is audited in its own transaction).
+func (s *Sessions) auditAttempt(ctx context.Context, actor audit.Actor, outcome audit.Outcome, reason SignInReason, identifier []byte) error {
+	details, err := failureDetails(reason, identifier)
+	if err != nil {
+		return fmt.Errorf("sign in: audit details: %w", err)
+	}
+	e, err := s.entry(actor, "login.failed", outcome, details)
+	if err != nil {
+		return fmt.Errorf("sign in: %w", err)
+	}
+	if err := s.audit.AppendInstanceEntry(ctx, e); err != nil {
+		return fmt.Errorf("sign in: audit: %w", err)
+	}
+	return nil
 }
 
 // start opens the session of a user whose password checked out.
@@ -295,8 +358,9 @@ func (s *Sessions) start(ctx context.Context, in SignIn, key []byte, now time.Ti
 			return SignedIn{}, fmt.Errorf("sign in: store rehash: %w", err)
 		}
 	}
+	actor := userActor(creds.User.PrincipalID)
 	if in.PriorToken != "" {
-		if err := s.revokePrior(ctx, in.PriorToken, now); err != nil {
+		if err := s.revokePrior(ctx, in.PriorToken, now, actor); err != nil {
 			return SignedIn{}, err
 		}
 	}
@@ -314,7 +378,11 @@ func (s *Sessions) start(ctx context.Context, in SignIn, key []byte, now time.Ti
 		IdleExpiresAt:  idleDeadline(now, now.Add(s.policy.MaxAge), s.policy.IdleTimeout),
 		LastSeenAt:     now,
 	}
-	if err := s.sessions.CreateSession(ctx, rec); err != nil {
+	e, err := s.entry(actor, "login.succeeded", audit.OutcomeSuccess, jsonvalue.Value{})
+	if err != nil {
+		return SignedIn{}, fmt.Errorf("sign in: %w", err)
+	}
+	if err := s.sessions.CreateSession(ctx, rec, e); err != nil {
 		return SignedIn{}, fmt.Errorf("sign in: %w", err)
 	}
 	return SignedIn{Token: token, CSRFToken: CSRFTokenFor(token), Session: rec, User: creds.User}, nil
@@ -336,7 +404,7 @@ func (s *Sessions) recordFailure(ctx context.Context, key []byte, now time.Time)
 }
 
 // revokePrior revokes the session the request already carried, when it is still live.
-func (s *Sessions) revokePrior(ctx context.Context, token string, now time.Time) error {
+func (s *Sessions) revokePrior(ctx context.Context, token string, now time.Time, actor audit.Actor) error {
 	view, err := s.sessions.GetSessionByTokenHash(ctx, tokenHash(token))
 	if errors.Is(err, ErrNotFound) {
 		return nil
@@ -347,7 +415,11 @@ func (s *Sessions) revokePrior(ctx context.Context, token string, now time.Time)
 	if !view.Session.RevokedAt.IsZero() {
 		return nil
 	}
-	if err := s.sessions.MarkSessionRevoked(ctx, view.Session.UserID, view.Session.ID, now); err != nil && !errors.Is(err, ErrNotFound) {
+	e, err := s.entry(actor, "session.revoked", audit.OutcomeSuccess, jsonvalue.Value{})
+	if err != nil {
+		return fmt.Errorf("sign in: %w", err)
+	}
+	if err := s.sessions.MarkSessionRevoked(ctx, view.Session.UserID, view.Session.ID, now, e); err != nil && !errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("sign in: revoke previous session: %w", err)
 	}
 	return nil
@@ -420,8 +492,14 @@ func (s *Sessions) Current(ctx context.Context, principal Principal) (CurrentUse
 
 // Revoke ends one session of the user, the sign-out of SPEC-016 R-SH-SES-04. An
 // unknown or already revoked session is [ErrNotFound].
-func (s *Sessions) Revoke(ctx context.Context, user UserID, session SessionID) error {
-	if err := s.sessions.MarkSessionRevoked(ctx, user, session, s.instant()); err != nil {
+// Revoke ends one session of the user who acts; the logout entry records the principal
+// that asked for it (Annex B, auth).
+func (s *Sessions) Revoke(ctx context.Context, actor Principal, session SessionID) error {
+	e, err := s.entry(userActor(actor.ID), "logout", audit.OutcomeSuccess, jsonvalue.Value{})
+	if err != nil {
+		return fmt.Errorf("revoke session: %w", err)
+	}
+	if err := s.sessions.MarkSessionRevoked(ctx, actor.UserID, session, s.instant(), e); err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
 	return nil

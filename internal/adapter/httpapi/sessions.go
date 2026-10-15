@@ -21,7 +21,7 @@ import (
 type SessionService interface {
 	SignIn(ctx context.Context, in identity.SignIn) (identity.SignedIn, error)
 	Current(ctx context.Context, principal identity.Principal) (identity.CurrentUser, error)
-	Revoke(ctx context.Context, user identity.UserID, session identity.SessionID) error
+	Revoke(ctx context.Context, actor identity.Principal, session identity.SessionID) error
 }
 
 // Sessions serves createSession, revokeSession and getCurrentUser (SPEC-016
@@ -78,7 +78,7 @@ func (s *Sessions) RevokeSession(ctx context.Context, req apigen.RevokeSessionRe
 	if session.String() != principal.CredentialID {
 		return nil, identity.ErrNotFound
 	}
-	if err := s.svc.Revoke(ctx, principal.UserID, session); err != nil {
+	if err := s.svc.Revoke(ctx, principal, session); err != nil {
 		return nil, err
 	}
 	return clearedSession{cookies: s.cookie}, nil

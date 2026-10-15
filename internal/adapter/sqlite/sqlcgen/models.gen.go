@@ -71,6 +71,47 @@ type AttentionRouting struct {
 	UpdatedAt                  int64
 }
 
+type AuditBlock struct {
+	ID                  []byte
+	OrgID               []byte
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           int64
+}
+
+type AuditEvent struct {
+	ID                 []byte
+	OrgID              []byte
+	SequenceNumber     int64
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          int64
+}
+
+type AuditPending struct {
+	ID                 []byte
+	OrgID              []byte
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
 type Blob struct {
 	ID          []byte
 	OrgID       []byte
@@ -356,6 +397,44 @@ type InstanceAlert struct {
 	ClosedReason                    sql.NullString
 	CreatedAt                       int64
 	UpdatedAt                       int64
+}
+
+type InstanceAuditBlock struct {
+	ID                  []byte
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           int64
+}
+
+type InstanceAuditEvent struct {
+	ID                 []byte
+	SequenceNumber     int64
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          int64
+}
+
+type InstanceAuditPending struct {
+	ID                 []byte
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type InstanceKey struct {

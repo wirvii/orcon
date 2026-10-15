@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 )
 
@@ -35,6 +36,24 @@ func (s *Store) GetUserCredentialsByEmail(ctx context.Context, emailNormalized s
 	return out, err
 }
 
+// ChangePassword implements [identity.UserStore]: the new hash, the revocation of every live
+// session of the user and the audit entry are written in one transaction.
+func (s *Store) ChangePassword(ctx context.Context, user identity.UserID, hash string, now time.Time, entry audit.Entry) error {
+	return s.instanceTx(ctx, "change password", func(ctx context.Context, q *sqlcgen.Queries) error {
+		n, err := q.UpdateApplicationUserPasswordHash(ctx, pgtype.Text{String: hash, Valid: true}, timestamp(now), pgUUID(user))
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("user %s: %w", user, identity.ErrNotFound)
+		}
+		if err := q.MarkUserSessionsRevoked(ctx, timestamp(now), pgUUID(user)); err != nil {
+			return err
+		}
+		return insertPendingInstance(ctx, q, entry)
+	})
+}
+
 // SetPasswordHash implements [identity.UserStore].
 func (s *Store) SetPasswordHash(ctx context.Context, user identity.UserID, hash string, now time.Time) error {
 	return s.instanceTx(ctx, "set password hash", func(ctx context.Context, q *sqlcgen.Queries) error {
@@ -49,14 +68,18 @@ func (s *Store) SetPasswordHash(ctx context.Context, user identity.UserID, hash 
 	})
 }
 
-// CreateSession implements [identity.SessionStore].
-func (s *Store) CreateSession(ctx context.Context, rec identity.SessionRecord) error {
+// CreateSession implements [identity.SessionStore]. The sign-in entry is inserted in the
+// same transaction as the session (R-AUD-02).
+func (s *Store) CreateSession(ctx context.Context, rec identity.SessionRecord, entry audit.Entry) error {
 	return s.instanceTx(ctx, "create session", func(ctx context.Context, q *sqlcgen.Queries) error {
-		return q.InsertSession(ctx, sqlcgen.InsertSessionParams{
+		if err := q.InsertSession(ctx, sqlcgen.InsertSessionParams{
 			ID: pgUUID(rec.ID), ApplicationUserID: pgUUID(rec.UserID), TokenHash: rec.TokenHash,
 			AssuranceLevel: rec.AssuranceLevel, CreatedAt: timestamp(rec.CreatedAt), ExpiresAt: timestamp(rec.ExpiresAt),
 			IdleExpiresAt: timestamp(rec.IdleExpiresAt), LastSeenAt: timestamp(rec.LastSeenAt),
-		})
+		}); err != nil {
+			return err
+		}
+		return insertPendingInstance(ctx, q, entry)
 	})
 }
 
@@ -109,7 +132,7 @@ func (s *Store) UpdateSessionActivity(ctx context.Context, session identity.Sess
 }
 
 // MarkSessionRevoked implements [identity.SessionStore].
-func (s *Store) MarkSessionRevoked(ctx context.Context, user identity.UserID, session identity.SessionID, at time.Time) error {
+func (s *Store) MarkSessionRevoked(ctx context.Context, user identity.UserID, session identity.SessionID, at time.Time, entry audit.Entry) error {
 	return s.instanceTx(ctx, "revoke session", func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.MarkSessionRevoked(ctx, timestamp(at), pgUUID(session), pgUUID(user))
 		if err != nil {
@@ -118,7 +141,7 @@ func (s *Store) MarkSessionRevoked(ctx context.Context, user identity.UserID, se
 		if n == 0 {
 			return fmt.Errorf("session %s: %w", session, identity.ErrNotFound)
 		}
-		return nil
+		return insertPendingInstance(ctx, q, entry)
 	})
 }
 
