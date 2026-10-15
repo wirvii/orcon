@@ -5,9 +5,9 @@ package execution
 
 import (
 	"context"
-	"github.com/wirvii/orcon/internal/identity"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // The interfaces below are the ports the interpreter consumes (go-style.md
