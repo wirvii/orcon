@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/identity"
 )
 
@@ -36,11 +37,11 @@ func sessionOf(user identity.UserRecord, session identity.SessionID, token strin
 func caseCreateSession(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-create")
-	if err := env.Stores.CreateSession(ctx, rec); err != nil {
+	if err := env.Stores.CreateSession(ctx, rec, audittest.Instance(tb, "login.succeeded")); err != nil {
 		tb.Fatalf("create a session of B: %v", err)
 	}
 	again := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-create")
-	wantErr(tb, "a second session with the same token", env.Stores.CreateSession(ctx, again), identity.ErrConflict)
+	wantErr(tb, "a second session with the same token", env.Stores.CreateSession(ctx, again, audittest.Instance(tb, "login.succeeded")), identity.ErrConflict)
 	if _, err := env.Stores.GetSession(ctx, env.A.User.ID, rec.ID); !errors.Is(err, identity.ErrNotFound) {
 		tb.Fatalf("A reads the session of B: %v; want not found", err)
 	}
@@ -50,7 +51,7 @@ func caseCreateSession(ctx context.Context, tb testing.TB, env *Env) {
 func caseGetSession(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-get")
-	if err := env.Stores.CreateSession(ctx, rec); err != nil {
+	if err := env.Stores.CreateSession(ctx, rec, audittest.Instance(tb, "login.succeeded")); err != nil {
 		tb.Fatalf("create a session of B: %v", err)
 	}
 	got, err := env.Stores.GetSession(ctx, env.B.User.ID, rec.ID)
@@ -66,7 +67,7 @@ func caseGetSession(ctx context.Context, tb testing.TB, env *Env) {
 func caseGetSessionByTokenHash(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-hash")
-	if err := env.Stores.CreateSession(ctx, rec); err != nil {
+	if err := env.Stores.CreateSession(ctx, rec, audittest.Instance(tb, "login.succeeded")); err != nil {
 		tb.Fatalf("create a session of B: %v", err)
 	}
 	view, err := env.Stores.GetSessionByTokenHash(ctx, tokenDigest("b-token-hash"))
@@ -82,14 +83,14 @@ func caseGetSessionByTokenHash(ctx context.Context, tb testing.TB, env *Env) {
 func caseUpdateSessionActivity(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-activity")
-	if err := env.Stores.CreateSession(ctx, rec); err != nil {
+	if err := env.Stores.CreateSession(ctx, rec, audittest.Instance(tb, "login.succeeded")); err != nil {
 		tb.Fatalf("create a session of B: %v", err)
 	}
 	later := seededAt.Add(time.Minute)
 	if err := env.Stores.UpdateSessionActivity(ctx, rec.ID, later, later.Add(8*time.Hour)); err != nil {
 		tb.Fatalf("update the activity of a live session: %v", err)
 	}
-	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, later); err != nil {
+	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, later, audittest.Instance(tb, "logout")); err != nil {
 		tb.Fatalf("revoke the session of B: %v", err)
 	}
 	if err := env.Stores.UpdateSessionActivity(ctx, rec.ID, later.Add(time.Minute), later.Add(9*time.Hour)); !errors.Is(err, identity.ErrNotFound) {
@@ -101,16 +102,16 @@ func caseUpdateSessionActivity(ctx context.Context, tb testing.TB, env *Env) {
 func caseMarkSessionRevoked(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-revoke")
-	if err := env.Stores.CreateSession(ctx, rec); err != nil {
+	if err := env.Stores.CreateSession(ctx, rec, audittest.Instance(tb, "login.succeeded")); err != nil {
 		tb.Fatalf("create a session of B: %v", err)
 	}
-	if err := env.Stores.MarkSessionRevoked(ctx, env.A.User.ID, rec.ID, seededAt); !errors.Is(err, identity.ErrNotFound) {
+	if err := env.Stores.MarkSessionRevoked(ctx, env.A.User.ID, rec.ID, seededAt, audittest.Instance(tb, "logout")); !errors.Is(err, identity.ErrNotFound) {
 		tb.Fatalf("A revokes the session of B: %v; want not found", err)
 	}
-	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, seededAt); err != nil {
+	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, seededAt, audittest.Instance(tb, "logout")); err != nil {
 		tb.Fatalf("B revokes its own session: %v", err)
 	}
-	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, seededAt); !errors.Is(err, identity.ErrNotFound) {
+	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, rec.ID, seededAt, audittest.Instance(tb, "logout")); !errors.Is(err, identity.ErrNotFound) {
 		tb.Fatalf("a second revocation: %v; want not found", err)
 	}
 }

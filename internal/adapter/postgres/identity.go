@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
@@ -122,15 +123,34 @@ func userFrom(id, principal pgtype.UUID, email, displayName, status string, crea
 // CreateUser implements [identity.UserStore]: the principal and the user in one transaction.
 func (s *Store) CreateUser(ctx context.Context, u identity.UserRecord) error {
 	return s.instanceTx(ctx, "create user", func(ctx context.Context, q *sqlcgen.Queries) error {
-		if err := q.InsertPrincipal(ctx, sqlcgen.InsertPrincipalParams{
-			ID: pgUUID(u.PrincipalID), Kind: string(identity.PrincipalUser), CreatedAt: timestamp(u.CreatedAt), UpdatedAt: timestamp(u.UpdatedAt),
-		}); err != nil {
+		return insertUser(ctx, q, u)
+	})
+}
+
+// CreateUserWithEntry implements [identity.UserStore]: the principal, the user and the audit
+// entry of the creation in one transaction.
+func (s *Store) CreateUserWithEntry(ctx context.Context, u identity.UserRecord, passwordHash string, entry audit.Entry) error {
+	return s.instanceTx(ctx, "create user", func(ctx context.Context, q *sqlcgen.Queries) error {
+		if err := insertUser(ctx, q, u); err != nil {
 			return err
 		}
-		return q.InsertApplicationUser(ctx, sqlcgen.InsertApplicationUserParams{
-			ID: pgUUID(u.ID), PrincipalID: pgUUID(u.PrincipalID), EmailNormalized: u.EmailNormalized,
-			DisplayName: u.DisplayName, Status: u.Status, CreatedAt: timestamp(u.CreatedAt), UpdatedAt: timestamp(u.UpdatedAt),
-		})
+		if _, err := q.UpdateApplicationUserPasswordHash(ctx, pgtype.Text{String: passwordHash, Valid: true}, timestamp(u.CreatedAt), pgUUID(u.ID)); err != nil {
+			return err
+		}
+		return insertPendingInstance(ctx, q, entry)
+	})
+}
+
+// insertUser writes the principal row and the user row of a new user.
+func insertUser(ctx context.Context, q *sqlcgen.Queries, u identity.UserRecord) error {
+	if err := q.InsertPrincipal(ctx, sqlcgen.InsertPrincipalParams{
+		ID: pgUUID(u.PrincipalID), Kind: string(identity.PrincipalUser), CreatedAt: timestamp(u.CreatedAt), UpdatedAt: timestamp(u.UpdatedAt),
+	}); err != nil {
+		return err
+	}
+	return q.InsertApplicationUser(ctx, sqlcgen.InsertApplicationUserParams{
+		ID: pgUUID(u.ID), PrincipalID: pgUUID(u.PrincipalID), EmailNormalized: u.EmailNormalized,
+		DisplayName: u.DisplayName, Status: u.Status, CreatedAt: timestamp(u.CreatedAt), UpdatedAt: timestamp(u.UpdatedAt),
 	})
 }
 
@@ -242,14 +262,18 @@ func (s *Store) UpdateMembershipStatus(ctx context.Context, org orgscope.Org, me
 	})
 }
 
-// CreateProject implements [identity.ProjectStore].
-func (s *Store) CreateProject(ctx context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+// CreateProject implements [identity.ProjectStore]. The creation entry joins the
+// organization chain in the same transaction (R-AUD-02).
+func (s *Store) CreateProject(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, entry audit.Entry) error {
 	return s.inScopeRecord(ctx, "create project", org, p.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
-		return q.InsertProject(ctx, sqlcgen.InsertProjectParams{
+		if err := q.InsertProject(ctx, sqlcgen.InsertProjectParams{
 			ID: pgUUID(p.ID), OrgID: pgUUID(org.UUID()), Name: p.Name, Slug: p.Slug, Handle: nullText(p.Handle),
 			Environment: nullText(p.Environment), IsProtected: p.IsProtected,
 			CreatedAt: timestamp(p.CreatedAt), UpdatedAt: timestamp(p.UpdatedAt),
-		})
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 }
 

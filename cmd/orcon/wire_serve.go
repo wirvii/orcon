@@ -152,12 +152,30 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer, deps
 	defer stopWork()
 	startReloadWatchers(workCtx, &wg, cfg.Value("dataDir").Text(), deps.reloadPoll, reloader, logger)
 
+	// The roles that serve the API open the store, check the keys and wire the identity
+	// services first: a failure refuses to start, before anything is listened on.
+	var sec *security
+	if selected == config.RoleStandalone || selected == config.RoleAPI {
+		opened, err := openSecurity(ctx, cfg, logger, version)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
+			return exitValidation
+		}
+		sec = opened
+		defer func() {
+			if err := sec.close(); err != nil {
+				logger.ErrorContext(ctx, "close the store", "error", err)
+			}
+		}()
+	}
+
 	return serveWithSandbox(ctx, logger, serveSettings{
 		role:            selected,
 		addr:            cfg.Value("http.address").Text(),
 		shutdownTimeout: cfg.Value("http.shutdownTimeout").Duration(),
 		maxAbandoned:    maxAbandoned,
 		slots:           slots,
+		sec:             sec,
 	}, deps.newSandbox)
 }
 
@@ -245,6 +263,8 @@ type serveSettings struct {
 	shutdownTimeout time.Duration
 	maxAbandoned    int
 	slots           int
+	// sec is the security wiring of the API roles; nil for the roles without an API.
+	sec *security
 }
 
 // serveWithSandbox runs the HTTP server with the expression sandbox beside it.
@@ -278,7 +298,7 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 		}
 	}()
 
-	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout)
+	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout, s.sec)
 	cancel()
 	<-watched
 	switch {
@@ -292,15 +312,21 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 	}
 }
 
-// newHandler assembles the HTTP routes served by the standalone and api roles.
+// newHandler assembles the HTTP routes served by the standalone and api roles, with the
+// refusing identity and authorization implementations.
 func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
+	return newHandlerWith(role, logger, nil)
+}
+
+// newHandlerWith assembles the HTTP routes over the security wiring of the process.
+func newHandlerWith(role config.Role, logger *slog.Logger, sec *security) (http.Handler, error) {
 	assets, err := webui.Assets()
 	if err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux := http.NewServeMux()
 	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
-	if err := mountAPI(mux, role, logger); err != nil {
+	if err := mountAPIWith(mux, role, logger, sec); err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux.Handle("/", webui.Handler(assets))
@@ -308,11 +334,24 @@ func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
 }
 
 // serve listens on addr and serves HTTP until ctx is canceled, then drains
-// in-flight requests for at most shutdownTimeout.
-func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration) error {
-	handler, err := newHandler(role, logger)
+// in-flight requests for at most shutdownTimeout. With a security wiring, the audit
+// sealer runs beside the server and stops with it.
+func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration, sec *security) error {
+	handler, err := newHandlerWith(role, logger, sec)
 	if err != nil {
 		return err
+	}
+	if sec != nil {
+		// The sealer stops when serve returns for any reason, including a failed listener:
+		// stopSealer runs before the wait, which is registered first and so runs last.
+		sealCtx, stopSealer := context.WithCancel(ctx)
+		sealed := make(chan struct{})
+		go func() {
+			defer close(sealed)
+			sec.runSealer(sealCtx, logger)
+		}()
+		defer func() { <-sealed }()
+		defer stopSealer()
 	}
 
 	var lc net.ListenConfig

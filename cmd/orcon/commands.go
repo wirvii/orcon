@@ -26,6 +26,7 @@ type command struct {
 // allowed: architecture-layers.md AL-8.3). TestCommandsSortedAndUnique keeps it honest.
 func commands() []command {
 	return []command{
+		accountsCommand(),
 		configCommand(),
 		docsCommand(),
 		n8nCommand(),

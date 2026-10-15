@@ -44,7 +44,7 @@ func (f *fakeSessions) Current(context.Context, identity.Principal) (identity.Cu
 	return f.current, f.err
 }
 
-func (f *fakeSessions) Revoke(_ context.Context, _ identity.UserID, session identity.SessionID) error {
+func (f *fakeSessions) Revoke(_ context.Context, _ identity.Principal, session identity.SessionID) error {
 	f.revoked = append(f.revoked, session)
 	return f.err
 }

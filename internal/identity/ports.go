@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
@@ -57,7 +58,7 @@ type PrincipalStore interface {
 }
 
 // UserStore persists users.
-type UserStore interface {
+type UserStore interface { //nolint:interfacebloat // the account and sign-in paths each need their own write, and the adapters implement them together
 	// CreateUser inserts the user together with its principal row (kind USER),
 	// in one transaction. A repeated address fails with [ErrConflict].
 	//
@@ -81,15 +82,36 @@ type UserStore interface {
 	//
 	//orcon:scope instance application_user is an instance table
 	SetPasswordHash(ctx context.Context, user UserID, hash string, now time.Time) error
+	// CreateUserWithEntry is [UserStore.CreateUser] with its password hash and the audit entry of
+	// the creation, all in one transaction (R-AUD-02). The entry joins the instance chain.
+	//
+	//orcon:scope instance application_user is an instance table
+	CreateUserWithEntry(ctx context.Context, u UserRecord, passwordHash string, entry audit.Entry) error
+	// ChangePassword stores a new password hash, revokes every live session of the user and
+	// stores the audit entry of the change, all in one transaction. An unknown user fails with
+	// [ErrNotFound].
+	//
+	//orcon:scope instance application_user is an instance table
+	ChangePassword(ctx context.Context, user UserID, hash string, now time.Time, entry audit.Entry) error
+}
+
+// AuditLog appends the audit entries of actions that have no transaction of their own
+// (a denied or failed attempt, R-AUD-02). The entry joins the instance chain.
+type AuditLog interface {
+	// AppendInstanceEntry stores one pending entry of the instance chain in its own transaction.
+	//
+	//orcon:scope instance the instance chain is not owned by any organization
+	AppendInstanceEntry(ctx context.Context, entry audit.Entry) error
 }
 
 // SessionStore persists login sessions.
 type SessionStore interface {
-	// CreateSession inserts a session. A repeated token hash fails with [ErrConflict];
-	// an unknown user with [ErrReference].
+	// CreateSession inserts a session and the pending audit entry of the sign-in in one
+	// transaction. A repeated token hash fails with [ErrConflict]; an unknown user with
+	// [ErrReference].
 	//
 	//orcon:scope instance session is an instance table
-	CreateSession(ctx context.Context, s SessionRecord) error
+	CreateSession(ctx context.Context, s SessionRecord, entry audit.Entry) error
 	// GetSessionByTokenHash returns the session with that token hash and its user,
 	// revoked or not, or [ErrNotFound].
 	//
@@ -104,11 +126,11 @@ type SessionStore interface {
 	//
 	//orcon:scope instance session is an instance table
 	UpdateSessionActivity(ctx context.Context, session SessionID, lastSeen, idleExpiresAt time.Time) error
-	// MarkSessionRevoked sets the revocation instant of a live session of the user,
-	// or fails with [ErrNotFound].
+	// MarkSessionRevoked sets the revocation instant of a live session of the user and
+	// stores the audit entry of the revocation in the same transaction, or fails with [ErrNotFound].
 	//
 	//orcon:scope instance session is an instance table
-	MarkSessionRevoked(ctx context.Context, user UserID, session SessionID, at time.Time) error
+	MarkSessionRevoked(ctx context.Context, user UserID, session SessionID, at time.Time, entry audit.Entry) error
 }
 
 // LoginThrottleStore persists the failed sign-in attempts per keyed identifier.
@@ -156,11 +178,12 @@ type MembershipStore interface {
 
 // ProjectStore persists projects.
 type ProjectStore interface {
-	// CreateProject inserts a project. A second project with the same slug in the
+	// CreateProject inserts a project and the audit entry of its creation in one
+	// transaction (SPEC-004 R-AUD-02). A second project with the same slug in the
 	// organization fails with [ErrConflict]; a handle held by any project of the
 	// instance fails with [ErrHandleTaken]; an unknown organization with
-	// [ErrReference].
-	CreateProject(ctx context.Context, org orgscope.Org, p ProjectRecord) error
+	// [ErrReference]. The entry belongs to the organization chain of the scope.
+	CreateProject(ctx context.Context, org orgscope.Org, p ProjectRecord, entry audit.Entry) error
 	// GetProject returns one project of the organization, or [ErrNotFound].
 	GetProject(ctx context.Context, org orgscope.Org, project ProjectID) (ProjectRecord, error)
 	// ListProjects returns at most limit projects of the organization with an

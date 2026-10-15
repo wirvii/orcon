@@ -217,6 +217,12 @@ UPDATE session
 SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(revoked_at)
 WHERE id = sqlc.arg(id) AND application_user_id = sqlc.arg(application_user_id) AND revoked_at IS NULL;
 
+-- name: MarkUserSessionsRevoked :exec
+-- orcon:scope instance
+UPDATE session
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(revoked_at)
+WHERE application_user_id = sqlc.arg(application_user_id) AND revoked_at IS NULL;
+
 -- name: GetLoginThrottle :one
 -- orcon:scope instance
 SELECT id, failures, locked_until_at, created_at, updated_at

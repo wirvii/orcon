@@ -71,6 +71,47 @@ type AttentionRouting struct {
 	UpdatedAt                  pgtype.Timestamptz
 }
 
+type AuditBlock struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           pgtype.Timestamptz
+}
+
+type AuditEvent struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	SequenceNumber     int64
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          pgtype.Timestamptz
+}
+
+type AuditPending struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
 type Blob struct {
 	ID          pgtype.UUID
 	OrgID       pgtype.UUID
@@ -356,6 +397,44 @@ type InstanceAlert struct {
 	ClosedReason                    pgtype.Text
 	CreatedAt                       pgtype.Timestamptz
 	UpdatedAt                       pgtype.Timestamptz
+}
+
+type InstanceAuditBlock struct {
+	ID                  pgtype.UUID
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           pgtype.Timestamptz
+}
+
+type InstanceAuditEvent struct {
+	ID                 pgtype.UUID
+	SequenceNumber     int64
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          pgtype.Timestamptz
+}
+
+type InstanceAuditPending struct {
+	ID                 pgtype.UUID
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 type InstanceKey struct {

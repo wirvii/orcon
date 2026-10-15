@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
@@ -31,6 +33,8 @@ type NewProject struct {
 	Slug string
 	// Environment is an optional free label.
 	Environment string
+	// By is the principal that creates the project; it is the actor of the audit entry.
+	By audit.Actor
 }
 
 // Projects creates projects and assigns their handles.
@@ -66,7 +70,15 @@ func (p *Projects) Create(ctx context.Context, org orgscope.Org, in NewProject) 
 	}
 	for _, handle := range handleCandidates(orgRecord.Slug, in.Slug) {
 		rec.Handle = handle
-		err := p.store.CreateProject(ctx, org, rec)
+		entry, err := audit.NewEntry(audit.EntryParams{
+			ID: p.ids.New(), Chain: audit.OrganizationChain(id.UUID(rec.OrgID)), OccurredAt: now,
+			Actor: in.By, Action: "project.created", Outcome: audit.OutcomeSuccess,
+			Details: projectDetails(rec),
+		})
+		if err != nil {
+			return ProjectRecord{}, fmt.Errorf("create project: audit: %w", err)
+		}
+		err = p.store.CreateProject(ctx, org, rec, entry)
 		if err == nil {
 			return rec, nil
 		}
@@ -76,6 +88,19 @@ func (p *Projects) Create(ctx context.Context, org orgscope.Org, in NewProject) 
 	}
 	// The cause is dropped on purpose: a driver error would quote the handle.
 	return ProjectRecord{}, ErrHandleUnavailable
+}
+
+// projectDetails are the fields of the project.created entry: the identity and the
+// handle of the project, never anything the operator typed as free text (R-AUD-08).
+func projectDetails(p ProjectRecord) jsonvalue.Value {
+	v, err := jsonvalue.Object(
+		jsonvalue.Member{Key: "projectId", Value: jsonvalue.String(p.ID.String())},
+		jsonvalue.Member{Key: "handle", Value: jsonvalue.String(p.Handle)},
+	)
+	if err != nil {
+		return jsonvalue.Value{}
+	}
+	return v
 }
 
 // handleCandidates lists the handles to try, in order: the slug, then the slug
