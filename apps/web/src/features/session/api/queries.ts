@@ -16,11 +16,14 @@ export const sessionKeys = {
   organizationList: (slug: string | undefined) => [...sessionKeys.organizations(), { slug: slug ?? null }] as const,
 };
 
+/**
+ * The signed-in person. It keeps the default freshness, so a session that ended on the server is noticed
+ * by the next request, and a 401 from any request sends the person to sign-in (see `onUnauthenticated`).
+ */
 export function currentUserQueryOptions() {
   return queryOptions({
     queryKey: sessionKeys.currentUser(),
     queryFn: getCurrentUser,
-    staleTime: 5 * 60_000,
   });
 }
 

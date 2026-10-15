@@ -18,6 +18,15 @@ describe('the session area routes', () => {
     expect(decodeURIComponent(router.state.location.href)).toContain('redirect=/orgs');
   });
 
+  it('sends a person to sign-in when a later request answers 401, not only at the first load', async () => {
+    server.use(signedIn.currentUser, http.get('/api/v1/orgs', () => problem(401, 'unauthenticated', 'unauthenticated')));
+    const { router } = renderRoute('/orgs');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/login');
+    });
+    expect(decodeURIComponent(router.state.location.href)).toContain('redirect=/orgs');
+  });
+
   it('lands a person with no organization on the explanation', async () => {
     server.use(signedIn.currentUser, signedIn.organizations([]));
     const { router } = renderRoute('/');

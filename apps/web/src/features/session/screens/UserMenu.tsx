@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Avatar, Button, DropdownMenu, type MenuEntry } from '@orcon/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { defineMessages, useIntl } from 'react-intl';
 
+import { clearCacheForOrganizationSwitch } from '../../../app/query-client';
 import { useSignOut } from '../api/mutations';
 import { currentUserQueryOptions, organizationsQueryOptions } from '../api/queries';
 
@@ -34,6 +35,7 @@ const messages = defineMessages({
 export function UserMenu() {
   const intl = useIntl();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useQuery(currentUserQueryOptions());
   const organizations = useQuery(organizationsQueryOptions());
   const signOut = useSignOut();
@@ -46,7 +48,17 @@ export function UserMenu() {
     { type: 'label', label: current.email },
     { type: 'separator' },
     ...((organizations.data?.length ?? 0) > 1
-      ? [{ type: 'item' as const, label: intl.formatMessage(messages.switchOrganization), onSelect: () => void navigate({ to: '/orgs' }) }]
+      ? [
+          {
+            type: 'item' as const,
+            label: intl.formatMessage(messages.switchOrganization),
+            onSelect: () => {
+              // Everything read for the organization being left is dropped before the picker opens (orcon-web DT-4).
+              clearCacheForOrganizationSwitch(queryClient);
+              void navigate({ to: '/orgs' });
+            },
+          },
+        ]
       : []),
     { type: 'item', label: intl.formatMessage(messages.signOut), onSelect: () => void signOut(current.currentSession.id) },
   ];

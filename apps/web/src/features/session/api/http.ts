@@ -90,8 +90,8 @@ export async function apiRequest<T>({ method, path, query, body, schema, source 
     if (token !== undefined) headers[CSRF_HEADER] = token;
   }
 
-  // The one exception to DT-1 until `@orcon/sdk` exists: this transport is replaced by the SDK when
-  // SPEC-016 SH1 lands, and the rule applies again from then on.
+  // The one exception to DT-1 until `@orcon/sdk` exists (tracked as BL-108). The contract change of SPEC-016
+  // SH1 does not ship that SDK; when it does, this call is replaced and the rule applies again.
   // eslint-disable-next-line no-restricted-globals -- temporary transport, see the comment above the function
   const response = await fetch(url, {
     method,

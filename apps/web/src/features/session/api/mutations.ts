@@ -16,19 +16,21 @@ export function signInMutationOptions() {
     mutationKey: [...sessionKeys.all, 'create'],
     mutationFn: createSession,
     retry: false,
+    // The password is in the mutation's variables only while the request runs: nothing keeps it afterwards.
+    gcTime: 0,
   });
 }
 
 /**
- * Signs in and forgets what was read before, so the next read is made with the new session. The
- * caller decides where to go next (the landing reads the organizations of the new session).
+ * Signs in and clears everything read before (orcon-web DT-4): what was read belongs to the session that
+ * just ended. The caller decides where to go next (the landing reads the organizations of the new session).
  */
 export function useSignIn() {
   const queryClient = useQueryClient();
   return useMutation({
     ...signInMutationOptions(),
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: sessionKeys.all });
+      queryClient.clear();
     },
   });
 }

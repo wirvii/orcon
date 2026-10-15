@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BrandHero, Button, ErrorSummary, FormField, Input, Link, Mascot, ProblemAlert, fieldIdForName, type ProblemDetails } from '@orcon/ui';
 import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { defineMessages, useIntl } from 'react-intl';
 import { z } from 'zod';
@@ -171,14 +171,26 @@ export function SignInScreen() {
   );
 }
 
+/** The reason a sign-in failed. It takes the focus when it appears, so a screen reader announces it (WCAG focus on error). */
 function FailureAlert({ failure }: { failure: Failure }) {
   const intl = useIntl();
+  const region = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    region.current?.focus();
+  }, [failure]);
+
+  let alert: ReactNode;
   if (failure.kind === 'invalid') {
-    return <ProblemAlert problem={{ status: 401, title: intl.formatMessage(messages.invalid) }} />;
-  }
-  if (failure.kind === 'throttled') {
+    alert = <ProblemAlert problem={{ status: 401, title: intl.formatMessage(messages.invalid) }} />;
+  } else if (failure.kind === 'throttled') {
     const minutes = Math.max(1, Math.ceil(failure.seconds / 60));
-    return <ProblemAlert problem={{ status: 429, title: intl.formatMessage(messages.throttled, { minutes }) }} />;
+    alert = <ProblemAlert problem={{ status: 429, title: intl.formatMessage(messages.throttled, { minutes }) }} />;
+  } else {
+    alert = <ProblemAlert problem={failure.problem} />;
   }
-  return <ProblemAlert problem={failure.problem} />;
+  return (
+    <div ref={region} tabIndex={-1} className="outline-none">
+      {alert}
+    </div>
+  );
 }
