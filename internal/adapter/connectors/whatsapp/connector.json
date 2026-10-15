@@ -1,0 +1,162 @@
+{
+  "format": "orcon/declarative@1",
+  "http": {
+    "baseUrl": "https://graph.facebook.com/v25.0",
+    "timeout": "30s",
+    "auth": { "type": "BEARER" }
+  },
+  "operations": {
+    "message.send": {
+      "purity": "EFFECT",
+      "safety": "UNSAFE",
+      "request": {
+        "method": "POST",
+        "path": "/{{ $parameter.phoneNumberId }}/messages",
+        "body": {
+          "type": "JSON",
+          "fields": {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": "{{ $parameter.to }}",
+            "type": "text",
+            "text": "{{ $parameter.text }}"
+          }
+        }
+      },
+      "response": {
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    },
+    "templateMessage.send": {
+      "purity": "EFFECT",
+      "safety": "UNSAFE",
+      "request": {
+        "method": "POST",
+        "path": "/{{ $parameter.phoneNumberId }}/messages",
+        "body": {
+          "type": "JSON",
+          "fields": {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": "{{ $parameter.to }}",
+            "type": "template",
+            "template": "{{ $parameter.template }}"
+          }
+        }
+      },
+      "response": {
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    },
+    "imageMessage.send": {
+      "purity": "EFFECT",
+      "safety": "UNSAFE",
+      "request": {
+        "method": "POST",
+        "path": "/{{ $parameter.phoneNumberId }}/messages",
+        "body": {
+          "type": "JSON",
+          "fields": {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": "{{ $parameter.to }}",
+            "type": "image",
+            "image": "{{ $parameter.image }}"
+          }
+        }
+      },
+      "response": {
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    },
+    "documentMessage.send": {
+      "purity": "EFFECT",
+      "safety": "UNSAFE",
+      "request": {
+        "method": "POST",
+        "path": "/{{ $parameter.phoneNumberId }}/messages",
+        "body": {
+          "type": "JSON",
+          "fields": {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": "{{ $parameter.to }}",
+            "type": "document",
+            "document": "{{ $parameter.document }}"
+          }
+        }
+      },
+      "response": {
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    },
+    "message.update": {
+      "purity": "EFFECT",
+      "safety": "UNSAFE",
+      "request": {
+        "method": "POST",
+        "path": "/{{ $parameter.phoneNumberId }}/messages",
+        "body": {
+          "type": "JSON",
+          "fields": {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": "{{ $parameter.messageId }}"
+          }
+        }
+      },
+      "response": {
+        "empty": "ONE_EMPTY_ITEM",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    },
+    "phoneNumber.get": {
+      "purity": "READ",
+      "safety": "READ_ONLY",
+      "request": {
+        "method": "GET",
+        "path": "/{{ $parameter.phoneNumberId }}",
+        "query": { "fields": "id,display_phone_number,verified_name,quality_rating" }
+      },
+      "response": {
+        "empty": "NO_ITEMS",
+        "errors": [
+          { "status": [400], "class": "PERMANENT", "code": "ValidationFailed" },
+          { "status": [401], "class": "PERMANENT", "code": "AuthInvalid" },
+          { "status": [403], "class": "PERMANENT", "code": "PermissionDenied" },
+          { "status": [404], "class": "PERMANENT", "code": "NotFound" },
+          { "status": [429], "class": "TRANSIENT", "code": "RateLimited" }
+        ]
+      }
+    }
+  }
+}
