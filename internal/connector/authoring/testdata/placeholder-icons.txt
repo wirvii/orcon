@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+# Generic placeholder marks that must not ship as a connector icon (SPEC-019 R-UX-ICO-08).
+# One SHA-256 digest of the icon bytes per line, then a note.
+f77ec7f3e951c017d3e2ac9cec54925944f7446cd7a0ff7b047576faf6f8a7ec orcon-connector template icons/icon.svg (native and declarative)
+259d2738a1a5209e3bcbfc2c9460d7e8d516006e38a62c0ae1f4188b4895efcb generic chat-bubble marker of the WhatsApp connector in PR #111
