@@ -93,3 +93,9 @@
 - dialect: sqlite
   query: GetProjectOrganization
   reason: resolves the organization of a project across organizations so a project of another organization is hidden (ADR-0041 section 6); PostgreSQL uses orcon_engine.project_organization
+- dialect: sqlite
+  query: ListAuditPendingOrgs
+  reason: "the audit sealer finds the organizations with pending entries; returns org_id only (SPEC-004 R-AUD-03); PostgreSQL uses orcon_engine.list_audit_pending_orgs; owner approved 2026-10-15"
+- dialect: sqlite
+  query: ListActiveOrgKeys
+  reason: "startup check of every active organization key (SPEC-004 R-KEY-05); returns keys only in their encrypted form, in pages; PostgreSQL uses orcon_engine.list_active_org_keys; owner approved 2026-10-15"
