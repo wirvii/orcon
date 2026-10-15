@@ -261,7 +261,8 @@ func (e *Engine) change(ctx context.Context, tx store.Tx, a *applyInput, c *exec
 		if c.Row.State == execution.TokenLeased {
 			return false, tx.AdvanceToken(ctx, a.fence, upd, now)
 		}
-		return c.Row.State == execution.TokenRunnable, tx.MoveHeldToken(ctx, a.fence, upd, now)
+		// A delayed token is claimable later, so it wakes nobody now.
+		return c.Row.State == execution.TokenRunnable && c.Row.AvailableAt.IsZero(), tx.MoveHeldToken(ctx, a.fence, upd, now)
 	case c.Row.State == execution.TokenCanceled:
 		if _, err := tx.CancelToken(ctx, org, tid, now); err != nil {
 			return false, fmt.Errorf("cancel token %s: %w", c.Row.ID, err)
@@ -282,6 +283,7 @@ func tokenUpdate(org identity.OrgID, tid store.TokenID, row *execution.TokenRow,
 	return store.TokenUpdate{
 		OrgID: org, Token: tid, Status: string(row.State), NodeID: string(row.Node), EdgeID: string(row.InEdge),
 		ScopePath: string(row.Scope), ForkLineage: doc, PayloadReference: string(row.Payload), QueueOrder: queueOrder,
+		AvailableAt: row.AvailableAt,
 	}, nil
 }
 
@@ -318,7 +320,7 @@ func (e *Engine) writeNodeExecutions(ctx context.Context, tx store.Tx, a *applyI
 			ID: neID, OrgID: a.exec.OrgID, ExecutionID: a.exec.ID, TokenID: tid, NodeID: string(ne.Node), ScopePath: string(ne.Scope),
 			Status: string(ne.State), StartedAt: now, CreatedAt: now, UpdatedAt: now,
 		}
-		if ne.State != execution.NodeRunning {
+		if ne.State != execution.NodeRunning && ne.State != execution.NodeSuspended {
 			rec.FinishedAt = now
 		}
 		if err := tx.UpsertNodeExecution(ctx, rec); err != nil {

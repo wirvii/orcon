@@ -89,9 +89,55 @@ func (r *run) stepNode(ctx context.Context, t *token, n *planNode) (*token, erro
 	return r.route(t, n, ne.id, t.scope, arrival, true, ems)
 }
 
+// holdOf reads a delay or a suspension out of the error of a node runner. Only a
+// session that persists can park a token, so an in-memory run fails the node.
+func (r *run) holdOf(err error) (hold, bool) {
+	if r.rec == nil {
+		return hold{}, false
+	}
+	var de *DelayError
+	if errors.As(err, &de) {
+		return hold{until: de.Until, reason: de.Reason}, true
+	}
+	var se *SuspendError
+	if errors.As(err, &se) {
+		return hold{reason: se.Reason}, true
+	}
+	return hold{}, false
+}
+
+// parkToken applies a hold to the token that raised it. A delay returns the
+// token to RUNNABLE, claimable from the instant on, at the node it stopped at;
+// the node execution stays RUNNING because the same activation runs again. A
+// suspension parks the node execution, the token and the execution for a
+// person.
+func (r *run) parkToken(t *token, ne *nodeExec, h hold) error {
+	if !h.until.IsZero() {
+		t.availableAt = h.until
+		return r.setToken(t, TokenRunnable)
+	}
+	next, err := ne.state.Transition(NodeSuspended)
+	if err != nil {
+		return err
+	}
+	ne.state = next
+	if err := r.setToken(t, TokenSuspended); err != nil {
+		return err
+	}
+	if r.state == ExecRunning {
+		return r.setExec(ExecSuspended)
+	}
+	return nil
+}
+
 // activationError turns the failure of an activation into a failed execution,
-// and lets every other error abort the run.
+// parks the token of a delay or a suspension, and lets every other error abort
+// the run.
 func (r *run) activationError(t *token, ne *nodeExec, n *planNode, err error) error {
+	var he *holdError
+	if errors.As(err, &he) {
+		return r.parkToken(t, ne, he.hold)
+	}
 	var fe *failureError
 	if !errors.As(err, &fe) {
 		return err
@@ -189,6 +235,9 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {
+		if h, ok := r.holdOf(err); ok {
+			return nil, &holdError{hold: h}
+		}
 		return nil, r.portFailure(ctx, "", n, "node failed", err)
 	}
 	return r.emitPorts(ctx, n, ne, out.Ports)

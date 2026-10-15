@@ -12,11 +12,21 @@ UPDATE token
 SET status = 'LEASED', lease_owner = sqlc.arg(worker_id), lease_epoch = lease_epoch + 1, lease_expires_at = sqlc.arg(lease_expires_at),
     claim_count = claim_count + 1, updated_at = sqlc.arg(now)
 WHERE id IN (
+  -- The execution cap applies inside the selection, before the page limit: a token is a candidate only while its
+  -- execution has room for it, counting the tokens already leased and the candidates ahead of it in the same claim
+  -- (all the tokens of an execution share one fairness key, so the key filter needs no repeat in the inner count).
   SELECT t.id FROM token t
   WHERE t.status = 'RUNNABLE' AND t.available_at <= sqlc.arg(now)
     AND (sqlc.arg(any_fairness_key) = 1 OR t.fairness_key IN (sqlc.slice(fairness_keys)))
     AND t.abandoned_count < sqlc.arg(poison_threshold) - 1
-    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED') < CAST(sqlc.arg(execution_limit) AS INTEGER)
+    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED')
+      + (SELECT count(*) FROM token a
+         WHERE a.execution_id = t.execution_id AND a.status = 'RUNNABLE' AND a.available_at <= sqlc.arg(now)
+           AND a.abandoned_count < sqlc.arg(poison_threshold) - 1
+           AND (a.effective_priority < t.effective_priority
+                OR (a.effective_priority = t.effective_priority
+                    AND (a.available_at < t.available_at OR (a.available_at = t.available_at AND a.id < t.id)))))
+      < CAST(sqlc.arg(execution_limit) AS INTEGER)
   ORDER BY t.effective_priority, t.available_at, t.id
   LIMIT sqlc.arg(page_size))
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,

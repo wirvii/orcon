@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
 )
@@ -56,6 +57,9 @@ type token struct {
 	// roundHeld is set until the token reaches a terminal state; it keeps the
 	// rounds of its split instances open.
 	roundHeld bool
+	// availableAt is the instant a delayed token may be claimed again; zero when
+	// the token was not delayed.
+	availableAt time.Time
 }
 
 // nodeState is the completion tracker of a node in a scope (ADR-0010

@@ -43,12 +43,16 @@ const HTTPNodeType = "orcon.http@1"
 // IdempotencyHeader carries the key of an idempotent effect (ADR-0079 §4).
 const IdempotencyHeader = "Idempotency-Key"
 
-// ErrThrottled means a rate bucket refused the permits. Nothing was sent; the
-// caller retries the activation later.
+// ErrThrottled means a rate bucket refused the permits. Nothing was sent. The
+// node answers it with an [execution.DelayError] that wraps this error, so the
+// engine runs the activation again at the instant the bucket names (ADR-0014
+// section 2.4) instead of failing it.
 var ErrThrottled = errors.New("dispatch: throttled by a rate bucket")
 
 // ErrUnknownOutcome means an effect's outcome is not known and must be settled
-// by a person (UNCERTAIN, ADR-0012 section 7). Nothing is sent again.
+// by a person (UNCERTAIN, ADR-0012 section 7). Nothing is sent again. An effect
+// answers it with an [execution.SuspendError] that wraps this error, so the
+// engine parks the node, the token and the execution until a person decides.
 var ErrUnknownOutcome = errors.New("dispatch: outcome of an effect is unknown")
 
 // Credential is the credential a node runs under, resolved by the caller: the
@@ -249,12 +253,12 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 	if count == 0 {
 		return execution.NodeOutput{}, nil
 	}
-	if err := n.takePermits(ctx, call.Org, bucketKey, int64(count)); err != nil {
-		return execution.NodeOutput{}, err
-	}
 
 	var results []jsonvalue.Value
 	if req.isRead() {
+		if err := n.takeReadPermits(ctx, call.Org, bucketKey, int64(count)); err != nil {
+			return execution.NodeOutput{}, err
+		}
 		results, err = n.reads(ctx, req, cred, count)
 	} else {
 		results, err = n.effects(ctx, req, cred, call)
@@ -283,24 +287,64 @@ func bucketKeyOf(credential, host string) string {
 	return "http:" + credential + ":" + host
 }
 
-// takePermits takes count permits from the bucket, in groups the bucket can hold.
-// A refusal returns ErrThrottled and leaves the activation to be retried.
-func (n *HTTPNode) takePermits(ctx context.Context, org identity.OrgID, key string, count int64) error {
-	now := n.cfg.Clock.Now()
-	for count > 0 {
+// takeChunk takes up to one bucket of permits. When the bucket refuses, nothing
+// was taken and the instant of the next permit comes back with granted false.
+func (n *HTTPNode) takeChunk(ctx context.Context, org identity.OrgID, key string, permits int64) (granted bool, retryAt time.Time, err error) {
+	v, err := n.cfg.Buckets.TakeBucketPermits(ctx, org, store.BucketRequest{
+		Key: key, Capacity: n.cfg.Bucket.Capacity, RefillPerSecond: n.cfg.Bucket.RefillPerSecond, Permits: permits, Now: n.cfg.Clock.Now(),
+	})
+	if err != nil {
+		return false, time.Time{}, err
+	}
+	return v.Granted, v.RetryAt, nil
+}
+
+// throttled is the answer of a refused bucket: the activation runs again at the
+// instant the bucket offers, and nothing is failed.
+func throttled(retryAt time.Time) error {
+	return &execution.DelayError{Until: retryAt, Reason: "rate bucket refused the permits", Err: ErrThrottled}
+}
+
+// takeReadPermits takes count permits from the bucket, in groups the bucket can
+// hold. A refusal of the first group delays the activation: nothing was taken.
+// A later group can only be refused when the activation needs more permits than
+// the bucket holds, which no repetition of the activation would ever get at
+// once, so the activation waits for it in place.
+func (n *HTTPNode) takeReadPermits(ctx context.Context, org identity.OrgID, key string, count int64) error {
+	for first := true; count > 0; first = false {
 		chunk := min(count, n.cfg.Bucket.Capacity)
-		v, err := n.cfg.Buckets.TakeBucketPermits(ctx, org, store.BucketRequest{
-			Key: key, Capacity: n.cfg.Bucket.Capacity, RefillPerSecond: n.cfg.Bucket.RefillPerSecond, Permits: chunk, Now: now,
-		})
+		granted, retryAt, err := n.takeChunk(ctx, org, key, chunk)
 		if err != nil {
 			return err
 		}
-		if !v.Granted {
-			return fmt.Errorf("%w until %s", ErrThrottled, v.RetryAt.Format(time.RFC3339))
+		if granted {
+			count -= chunk
+			continue
 		}
-		count -= chunk
+		if first {
+			return throttled(retryAt)
+		}
+		if err := n.waitUntil(ctx, retryAt); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// waitUntil blocks until the instant or the end of ctx.
+func (n *HTTPNode) waitUntil(ctx context.Context, at time.Time) error {
+	d := at.Sub(n.cfg.Clock.Now())
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("dispatch: waiting for the rate bucket: %w", ctx.Err())
+	case <-t.C:
+		return nil
+	}
 }
 
 // reads sends the request once per input item. A read repeats freely, so it
@@ -432,8 +476,20 @@ func (n *HTTPNode) effects(ctx context.Context, req request, cred Credential, ca
 			recovering = true
 		}
 	}
-	if len(prepared) > 0 {
-		if _, err := j.Dispatch(ctx, scope, prepared, contract); err != nil {
+	// Each group of the dispatch takes its permits first. A refusal delays the
+	// activation: the groups already sent are SUCCEEDED in the journal, and the
+	// run that follows sends only what is still PREPARED.
+	for len(prepared) > 0 {
+		chunk := prepared[:min(int64(len(prepared)), n.cfg.Bucket.Capacity)]
+		prepared = prepared[len(chunk):]
+		granted, retryAt, err := n.takeChunk(ctx, call.Org, req.bucket, int64(len(chunk)))
+		if err != nil {
+			return nil, err
+		}
+		if !granted {
+			return nil, throttled(retryAt)
+		}
+		if _, err := j.Dispatch(ctx, scope, chunk, contract); err != nil {
 			return nil, err
 		}
 	}
@@ -446,8 +502,47 @@ func (n *HTTPNode) effects(ctx context.Context, req request, cred Credential, ca
 	if err != nil {
 		return nil, err
 	}
+	if at, waiting := n.recoveryInstant(final); waiting {
+		return nil, &execution.DelayError{Until: at, Reason: "an effect awaits its recovery window", Err: errRecoveryPending}
+	}
 	return outputsOf(final, p.results)
 }
+
+// errRecoveryPending is the cause of the delay of an activation that found items
+// still DISPATCHING: the worker that sent them may be alive until the dispatch
+// deadline plus the grace has passed (ADR-0012 section 6).
+var errRecoveryPending = errors.New("dispatch: effect items are still DISPATCHING")
+
+// recoveryInstant reports whether items are left DISPATCHING after the recovery
+// and the instant to try it again: the end of the earliest recovery window, or
+// one grace from now for an item whose window is over but whose resend did not
+// settle (a transport error keeps it DISPATCHING for the next recovery).
+func (n *HTTPNode) recoveryInstant(rows []store.ExternalOperation) (time.Time, bool) {
+	grace := n.cfg.JournalCfg.Grace
+	if grace <= 0 {
+		grace = defaultGrace
+	}
+	now := n.cfg.Clock.Now()
+	var at time.Time
+	waiting := false
+	for i := range rows {
+		if rows[i].State != journal.StateDispatching {
+			continue
+		}
+		due := rows[i].DispatchDeadlineAt.Add(grace)
+		if !due.After(now) {
+			due = now.Add(grace)
+		}
+		if !waiting || due.Before(at) {
+			at = due
+		}
+		waiting = true
+	}
+	return at, waiting
+}
+
+// defaultGrace is the grace the journal assumes when its configuration gives none.
+const defaultGrace = 5 * time.Second
 
 // operationsOf returns the rows of a node execution for the given correlation keys,
 // in key order. A missing row is an error: the checkpoint writes every intent.
@@ -508,7 +603,10 @@ func outputsOf(rows []store.ExternalOperation, results []*jsonvalue.Value) ([]js
 		}
 	}
 	if uncertain > 0 {
-		return nil, fmt.Errorf("%w: %d item(s)", ErrUnknownOutcome, uncertain)
+		return nil, &execution.SuspendError{
+			Reason: fmt.Sprintf("%d item(s) of the effect have an unknown outcome", uncertain),
+			Err:    fmt.Errorf("%w: %d item(s)", ErrUnknownOutcome, uncertain),
+		}
 	}
 	return out, nil
 }

@@ -5,8 +5,10 @@
 
 -- The execution level of the concurrency limits (SPEC-001 C11, ADR-0014 section 2.2): a claim leases at most
 -- p_execution_limit tokens per execution. The execution row is locked before its leased tokens are counted, so two
--- workers claiming for one execution serialize and cannot both pass the check. The SQLite counterpart is the
--- ClaimTokens query, which runs under the single writer and needs no migration.
+-- workers claiming for one execution serialize and cannot both pass the check. The runnable tokens are read in index
+-- order and the claim stops after p_limit tokens, not after p_limit candidates: a token whose execution is at its cap
+-- is passed over without using up the claim, so a capped execution cannot starve the others (BL-120). The SQLite
+-- counterpart is the ClaimTokens query, which runs under the single writer and needs no migration.
 DROP FUNCTION orcon_engine.claim_tokens(uuid, text[], integer, bigint, timestamptz, bigint);
 CREATE FUNCTION orcon_engine.claim_tokens(p_worker_id uuid, p_fairness_keys text[], p_limit integer, p_lease_milliseconds bigint,
                                           p_now timestamptz, p_poison_threshold bigint, p_execution_limit integer)
@@ -19,6 +21,9 @@ DECLARE
   r record;
   claimed record;
   leased bigint;
+  taken integer := 0;
+  -- The executions found at their cap during this claim, so that their other tokens cost no further count.
+  full_executions uuid[] := ARRAY[]::uuid[];
 BEGIN
   -- Lock the executions of the candidates first, in one fixed order, and only then the tokens (which are skipped
   -- when locked, never waited for). Every claim takes the locks in this order, so two claims cannot deadlock.
@@ -39,12 +44,18 @@ BEGIN
       AND (p_fairness_keys IS NULL OR t.fairness_key = ANY (p_fairness_keys))
       AND t.abandoned_count < p_poison_threshold - 1
     ORDER BY t.effective_priority, t.available_at, t.id
-    LIMIT p_limit
-    FOR UPDATE SKIP LOCKED
   LOOP
+    EXIT WHEN taken >= p_limit;
+    CONTINUE WHEN r.execution_id = ANY (full_executions);
     SELECT count(*) INTO leased FROM token l
       WHERE l.org_id = r.org_id AND l.execution_id = r.execution_id AND l.status = 'LEASED';
-    CONTINUE WHEN leased >= p_execution_limit;
+    IF leased >= p_execution_limit THEN
+      full_executions := full_executions || r.execution_id;
+      CONTINUE;
+    END IF;
+    -- A token another transaction holds is skipped, never waited for.
+    PERFORM 1 FROM token k WHERE k.org_id = r.org_id AND k.id = r.id AND k.status = 'RUNNABLE' FOR UPDATE SKIP LOCKED;
+    CONTINUE WHEN NOT FOUND;
 
     UPDATE token AS t
     SET status = 'LEASED',
@@ -59,6 +70,7 @@ BEGIN
       CONTINUE;
     END IF;
 
+    taken := taken + 1;
     PERFORM orcon_engine.start_claimed_execution(claimed.org_id, claimed.execution_id, p_now);
     org_id := claimed.org_id;
     id := claimed.id;

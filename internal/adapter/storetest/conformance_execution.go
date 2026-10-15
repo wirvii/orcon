@@ -97,6 +97,7 @@ func executionCases() []struct {
 		{"TransactionRollsBack", rollbackCase},
 		{"ClaimIsExclusive", claimCase},
 		{"ClaimOrderAndFilters", claimOrderCase},
+		{"ExecutionCapDoesNotStarveOthers", executionCapCase},
 		{"FencingStopsALostLease", fencingCase},
 		{"RenewAndReap", reapCase},
 		{"JoinArrivalIsAtomic", joinCase},
@@ -415,6 +416,55 @@ func claimOrderCase(t *testing.T, newStore Factory) {
 			t.Fatalf("claimed fields = %+v", c)
 		}
 	}
+}
+
+// executionCapCase: the per-execution cap holds inside one claim, and an execution at its
+// cap never crowds the other executions out of a claim (ADR-0014 section 2.2, SPEC-001
+// E-FAIR-2). The capped execution has the oldest tokens, so a claim that chose its page
+// before applying the cap would fill it with tokens it then has to refuse.
+func executionCapCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	for i := range 4 {
+		e.token(capped, "capped", 0, now.Add(-2*time.Hour+time.Duration(i)*time.Second))
+	}
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	// One claim of eight, a cap of one per execution: one token of each execution, not four of the first.
+	got, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 8, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("claim of 8 with a cap of 1 = %d tokens, %v; want one per execution", len(got), err)
+	}
+	seen := map[store.ExecutionID]int{}
+	for i := range got {
+		seen[got[i].ExecutionID]++
+	}
+	if seen[capped.ID] != 1 || seen[other.ID] != 1 {
+		t.Fatalf("tokens per execution = %v, want exactly one of each", seen)
+	}
+	if !slicesContainsToken(got, otherToken.ID) {
+		t.Fatal("the token of the second execution was not claimed")
+	}
+
+	// Both executions are at their cap now. A claim of one must reach a third execution behind them.
+	third := e.execution()
+	thirdToken := e.token(third, "third", 0, now.Add(-30*time.Minute))
+	got, err = e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 1 || got[0].TokenID != thirdToken.ID {
+		t.Fatalf("claim of 1 behind two capped executions = %+v, %v; want the token of the third", got, err)
+	}
+}
+
+func slicesContainsToken(rows []store.Claimed, id store.TokenID) bool {
+	for i := range rows {
+		if rows[i].TokenID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func fencingCase(t *testing.T, newStore Factory) {

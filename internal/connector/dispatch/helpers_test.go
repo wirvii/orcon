@@ -54,8 +54,10 @@ func TestOutputsOfReusesOrRefusesSettledItems(t *testing.T) {
 	}
 
 	uncertain := []store.ExternalOperation{{ItemIndex: 0, State: journal.StateUncertain}}
-	if _, err := outputsOf(uncertain, []*jsonvalue.Value{nil}); !errors.Is(err, ErrUnknownOutcome) {
-		t.Fatalf("an uncertain item = %v, want ErrUnknownOutcome", err)
+	_, err = outputsOf(uncertain, []*jsonvalue.Value{nil})
+	var suspend *execution.SuspendError
+	if !errors.Is(err, ErrUnknownOutcome) || !errors.As(err, &suspend) {
+		t.Fatalf("an uncertain item = %v, want a suspension that wraps ErrUnknownOutcome", err)
 	}
 	failed := []store.ExternalOperation{{ItemIndex: 0, State: journal.StateFailed}}
 	if _, err := outputsOf(failed, []*jsonvalue.Value{nil}); err == nil {

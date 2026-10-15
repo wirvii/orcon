@@ -300,8 +300,12 @@ func TestThrottledBeforeAnySend(t *testing.T) {
 	if !errors.Is(err, ErrThrottled) {
 		t.Fatalf("err = %v, want ErrThrottled", err)
 	}
-	if sender.count() != 0 || j.transactions() != 0 {
-		t.Fatalf("sends=%d journal=%d after a refusal", sender.count(), j.transactions())
+	var delay *execution.DelayError
+	if !errors.As(err, &delay) || delay.Until.Second() != 1 {
+		t.Fatalf("err = %v, want a delay to the instant of the bucket", err)
+	}
+	if sender.count() != 0 {
+		t.Fatalf("sends=%d after a refusal", sender.count())
 	}
 }
 

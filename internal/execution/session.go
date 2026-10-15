@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -39,11 +40,14 @@ type TokenRow struct {
 	// Merged marks the token that starts the next iteration of a loop whose
 	// returns were merged.
 	Merged bool
+	// AvailableAt is the instant a token the session delayed may be claimed
+	// again; zero for any other token.
+	AvailableAt time.Time
 }
 
 func (a TokenRow) equal(b TokenRow) bool {
 	return a.ID == b.ID && a.State == b.State && a.Node == b.Node && a.InEdge == b.InEdge && a.Scope == b.Scope &&
-		a.Payload == b.Payload && a.Passed == b.Passed && a.Merged == b.Merged && slices.Equal(a.Lineage, b.Lineage)
+		a.Payload == b.Payload && a.Passed == b.Passed && a.Merged == b.Merged && a.AvailableAt.Equal(b.AvailableAt) && slices.Equal(a.Lineage, b.Lineage)
 }
 
 // Snapshot is what the store knows of an execution when a worker opens a
@@ -229,7 +233,7 @@ func (r *run) tokenOf(row TokenRow) (*token, error) {
 func (r *run) rowOf(t *token) TokenRow {
 	row := TokenRow{
 		ID: t.id, State: t.state, Node: r.nodeID(t.node), Scope: t.scope, Lineage: slices.Clone(t.lineage),
-		Payload: t.payload, Passed: t.passed, Merged: t.merged,
+		Payload: t.payload, Passed: t.passed, Merged: t.merged, AvailableAt: t.availableAt,
 	}
 	if t.inEdge >= 0 {
 		row.InEdge = r.plan.edges[t.inEdge].edge.ID
