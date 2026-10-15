@@ -5,10 +5,12 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
@@ -170,33 +172,52 @@ func (s *Store) DeletePrincipal(ctx context.Context, principal identity.Principa
 	})
 }
 
-func userFrom(row *sqlcgen.ApplicationUser) (identity.UserRecord, error) {
-	uid, err := uuidOf[identity.UserID](row.ID)
+func userFrom(id, principal []byte, email, displayName, status string, created, updated int64) (identity.UserRecord, error) {
+	uid, err := uuidOf[identity.UserID](id)
 	if err != nil {
 		return identity.UserRecord{}, fmt.Errorf("user id: %w", err)
 	}
-	pid, err := uuidOf[identity.PrincipalID](row.PrincipalID)
+	pid, err := uuidOf[identity.PrincipalID](principal)
 	if err != nil {
 		return identity.UserRecord{}, fmt.Errorf("user principal id: %w", err)
 	}
 	return identity.UserRecord{
-		ID: uid, PrincipalID: pid, EmailNormalized: row.EmailNormalized, DisplayName: row.DisplayName, Status: row.Status,
-		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		ID: uid, PrincipalID: pid, EmailNormalized: email, DisplayName: displayName, Status: status,
+		CreatedAt: instant(created), UpdatedAt: instant(updated),
 	}, nil
 }
 
 // CreateUser implements [identity.UserStore]: the principal and the user in one transaction.
 func (s *Store) CreateUser(ctx context.Context, u identity.UserRecord) error {
 	return s.write(ctx, "create user", func(ctx context.Context, q *sqlcgen.Queries) error {
-		if err := q.InsertPrincipal(ctx, sqlcgen.InsertPrincipalParams{
-			ID: uuidBytes(u.PrincipalID), Kind: string(identity.PrincipalUser), CreatedAt: micros(u.CreatedAt), UpdatedAt: micros(u.UpdatedAt),
-		}); err != nil {
+		return insertUser(ctx, q, u)
+	})
+}
+
+// CreateUserWithEntry implements [identity.UserStore]: the principal, the user and the audit
+// entry of the creation in one transaction.
+func (s *Store) CreateUserWithEntry(ctx context.Context, u identity.UserRecord, passwordHash string, entry audit.Entry) error {
+	return s.write(ctx, "create user", func(ctx context.Context, q *sqlcgen.Queries) error {
+		if err := insertUser(ctx, q, u); err != nil {
 			return err
 		}
-		return q.InsertApplicationUser(ctx, sqlcgen.InsertApplicationUserParams{
-			ID: uuidBytes(u.ID), PrincipalID: uuidBytes(u.PrincipalID), EmailNormalized: u.EmailNormalized,
-			DisplayName: u.DisplayName, Status: u.Status, CreatedAt: micros(u.CreatedAt), UpdatedAt: micros(u.UpdatedAt),
-		})
+		if _, err := q.UpdateApplicationUserPasswordHash(ctx, sql.NullString{String: passwordHash, Valid: true}, micros(u.CreatedAt), uuidBytes(u.ID)); err != nil {
+			return err
+		}
+		return insertPendingInstance(ctx, q, entry)
+	})
+}
+
+// insertUser writes the principal row and the user row of a new user.
+func insertUser(ctx context.Context, q *sqlcgen.Queries, u identity.UserRecord) error {
+	if err := q.InsertPrincipal(ctx, sqlcgen.InsertPrincipalParams{
+		ID: uuidBytes(u.PrincipalID), Kind: string(identity.PrincipalUser), CreatedAt: micros(u.CreatedAt), UpdatedAt: micros(u.UpdatedAt),
+	}); err != nil {
+		return err
+	}
+	return q.InsertApplicationUser(ctx, sqlcgen.InsertApplicationUserParams{
+		ID: uuidBytes(u.ID), PrincipalID: uuidBytes(u.PrincipalID), EmailNormalized: u.EmailNormalized,
+		DisplayName: u.DisplayName, Status: u.Status, CreatedAt: micros(u.CreatedAt), UpdatedAt: micros(u.UpdatedAt),
 	})
 }
 
@@ -208,7 +229,7 @@ func (s *Store) GetUser(ctx context.Context, user identity.UserID) (identity.Use
 		if err != nil {
 			return err
 		}
-		out, err = userFrom(&row)
+		out, err = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return err
 	})
 	return out, err
@@ -222,7 +243,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, emailNormalized string) (ide
 		if err != nil {
 			return err
 		}
-		out, err = userFrom(&row)
+		out, err = userFrom(row.ID, row.PrincipalID, row.EmailNormalized, row.DisplayName, row.Status, row.CreatedAt, row.UpdatedAt)
 		return err
 	})
 	return out, err
@@ -344,18 +365,22 @@ func (s *Store) UpdateMembershipStatus(ctx context.Context, org orgscope.Org, me
 	})
 }
 
-// CreateProject implements [identity.ProjectStore].
-func (s *Store) CreateProject(ctx context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+// CreateProject implements [identity.ProjectStore]. The creation entry joins the
+// organization chain in the same transaction (R-AUD-02).
+func (s *Store) CreateProject(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, entry audit.Entry) error {
 	return s.write(ctx, "create project", func(ctx context.Context, q *sqlcgen.Queries) error {
 		scope, err := scopedRecord(org, p.OrgID)
 		if err != nil {
 			return err
 		}
-		return q.InsertProject(ctx, sqlcgen.InsertProjectParams{
+		if err := q.InsertProject(ctx, sqlcgen.InsertProjectParams{
 			ID: uuidBytes(p.ID), OrgID: scope, Name: p.Name, Slug: p.Slug, Handle: nullText(p.Handle),
 			Environment: nullText(p.Environment), IsProtected: boolInt(p.IsProtected),
 			CreatedAt: micros(p.CreatedAt), UpdatedAt: micros(p.UpdatedAt),
-		})
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 }
 

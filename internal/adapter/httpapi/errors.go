@@ -16,6 +16,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // unavailableRetry is the Retry-After of an operation that has no handler yet.
@@ -76,9 +77,28 @@ func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error
 	if answered := knownError(w, r, err); answered {
 		return
 	}
-	h.logger.ErrorContext(r.Context(), "request failed",
-		"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
-	problem.Write(w, r, problem.InternalError)
+	var refused *identity.SignInError
+	switch {
+	case errors.As(err, &refused) && refused.Reason == identity.ReasonThrottled:
+		// The wait is the same whether or not the account exists (SPEC-004 R-AUTH-02).
+		problem.Write(w, r, problem.RateLimited, problem.RetryAfter(refused.RetryAfter))
+	case errors.Is(err, identity.ErrSignInError), errors.Is(err, identity.ErrUnauthenticated):
+		// Every other refusal of a sign-in looks like this one: no reason reaches the client.
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		problem.Write(w, r, problem.Unauthenticated)
+	case errors.Is(err, identity.ErrCSRFCheckFailed):
+		problem.Write(w, r, problem.CSRFCheckFailed)
+	case errors.Is(err, identity.ErrNotFound):
+		problem.Write(w, r, problem.NotFound)
+	case errors.Is(err, identity.ErrInvalidInput):
+		problem.Write(w, r, problem.ValidationFailed)
+	case errors.Is(err, errInvalidPageToken):
+		problem.Write(w, r, problem.InvalidPageToken)
+	default:
+		h.logger.ErrorContext(r.Context(), "request failed",
+			"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
+		problem.Write(w, r, problem.InternalError)
+	}
 }
 
 // knownError answers the errors that handlers share: an operation without a

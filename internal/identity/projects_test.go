@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -48,7 +49,7 @@ func (f *fakeStore) GetOrganization(_ context.Context, org orgscope.Org) (identi
 	return o, nil
 }
 
-func (f *fakeStore) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+func (f *fakeStore) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord, _ audit.Entry) error {
 	if f.failWith != nil {
 		return f.failWith
 	}

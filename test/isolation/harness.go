@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -71,6 +74,13 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	identity.OrgStore
 	identity.PrincipalStore
 	identity.UserStore
+	identity.SessionStore
+	identity.AuditLog
+	audit.Store
+	identity.LoginThrottleStore
+	identity.OrganizationResolver
+	envelope.KeyStore
+	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore
 	flow.Store

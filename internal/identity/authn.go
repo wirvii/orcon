@@ -44,6 +44,8 @@ type Principal struct {
 	ID PrincipalID
 	// Kind says what the actor is.
 	Kind PrincipalKind
+	// UserID is the user of a user principal; zero for the other kinds.
+	UserID UserID
 	// OrgID is the organization context of the request. For key and token
 	// principals it is fixed to the organization of the credential.
 	OrgID OrgID
@@ -65,10 +67,16 @@ type Credentials struct {
 	Bearer string
 	// Session is the value of the session cookie.
 	Session string
-	// CSRFToken is the anti-forgery token sent with a cookie session.
+	// CSRFToken is the anti-forgery token sent with a cookie session, in the
+	// Orcon-Csrf-Token header.
 	CSRFToken string
+	// CSRFCookie is the value of the readable CSRF cookie; it must equal
+	// CSRFToken and be the one derived from the session.
+	CSRFCookie string
+	// Origin is the Origin header of the request, empty when it has none.
+	Origin string
 	// UnsafeMethod is true for methods that change state; a cookie session
-	// then needs a valid CSRFToken.
+	// then needs the Origin of the installation and a valid CSRF token.
 	UnsafeMethod bool
 	// OrgHint is the organization the client asked for with Orcon-Org.
 	OrgHint string
@@ -89,6 +97,11 @@ func (Credentials) LogValue() slog.Value { return slog.StringValue("[REDACTED]")
 // ErrUnauthenticated means no valid credential was presented. The edge turns it
 // into a 401 answer.
 var ErrUnauthenticated = errors.New("unauthenticated")
+
+// ErrCSRFCheckFailed means a state-changing request authenticated by a cookie
+// session did not carry the Origin of the installation and a matching CSRF token.
+// The edge turns it into a 403 csrf-check-failed answer.
+var ErrCSRFCheckFailed = errors.New("csrf check failed")
 
 // Authenticator resolves the credentials of a request into a principal
 // (ADR-0038 section 6, ADR-0056). A failure to authenticate is

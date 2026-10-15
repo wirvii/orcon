@@ -17,6 +17,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/postgres"
 	"github.com/wirvii/orcon/internal/adapter/storetest/dbrules"
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
@@ -151,7 +152,7 @@ func TestNonSuperuserLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Handle: "p", Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Handle: "p", Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}, audittest.Org(t, id.UUID(org), "project.created")); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
 	if _, err := s.GetProject(ctx, scope, project); err != nil {
