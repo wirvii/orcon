@@ -107,6 +107,17 @@ func (o object) str(key string) string {
 	return s
 }
 
+// nodeMap reads an object whose members are body templates of any JSON type.
+func (o object) nodeMap(key string) map[string]declarative.Node {
+	out := map[string]declarative.Node{}
+	if v, ok := o.value(key); ok {
+		for _, m := range v.Members() {
+			out[m.Key] = declarative.Node{Value: m.Value}
+		}
+	}
+	return out
+}
+
 func (o object) child(key string, allowed ...string) object {
 	v, ok := o.value(key)
 	if !ok {
@@ -154,23 +165,34 @@ func decodeBody(t *testing.T, data []byte) declarative.Definition {
 		req := o.child("request", "method", "path", "query", "headers", "body")
 		op.Request = declarative.Request{Method: req.str("method"), Path: req.str("path"), Query: req.strMap("query"), Headers: req.strMap("headers")}
 		if body := req.child("body", "type", "fields"); len(body.members) > 0 {
-			op.Request.Body = &declarative.Body{Type: body.str("type"), Fields: body.strMap("fields")}
+			op.Request.Body = &declarative.Body{Type: body.str("type"), Fields: body.nodeMap("fields")}
 		}
-		resp := o.child("response", "select", "empty", "errors")
-		op.Response = declarative.ResponseSpec{Select: resp.str("select"), Empty: resp.str("empty")}
+		resp := o.child("response", "select", "map", "empty", "errors")
+		op.Response = declarative.ResponseSpec{Select: resp.str("select"), Map: resp.strMap("map"), Empty: resp.str("empty")}
 		if errs, ok := resp.value("errors"); ok {
 			for i := range errs.Len() {
 				item, _ := errs.At(i)
-				r := objectOf(t, item, fmt.Sprintf("errors/%d", i), "status", "class", "code")
+				r := objectOf(t, item, fmt.Sprintf("errors/%d", i), "status", "body", "class", "code")
 				rule := declarative.ErrorRule{Class: r.str("class"), Code: r.str("code")}
-				statuses, _ := r.value("status")
-				for j := range statuses.Len() {
-					s, _ := statuses.At(j)
-					n, ok := s.Int64()
-					if !ok {
-						t.Fatalf("errors/%d/status must be integers", i)
+				if statuses, ok := r.value("status"); ok {
+					for j := range statuses.Len() {
+						s, _ := statuses.At(j)
+						n, ok := s.Int64()
+						if !ok {
+							t.Fatalf("errors/%d/status must be integers", i)
+						}
+						rule.Status = append(rule.Status, int(n))
 					}
-					rule.Status = append(rule.Status, int(n))
+				}
+				if b, ok := r.value("body"); ok {
+					bm := objectOf(t, b, fmt.Sprintf("errors/%d/body", i), "path", "in")
+					match := &declarative.BodyMatch{Path: bm.str("path")}
+					in, _ := bm.value("in")
+					for j := range in.Len() {
+						s, _ := in.At(j)
+						match.In = append(match.In, declarative.Node{Value: s})
+					}
+					rule.Body = match
 				}
 				op.Response.Errors = append(op.Response.Errors, rule)
 			}
@@ -329,8 +351,10 @@ type callCase struct {
 	wantPath   string
 	// wantBody is the canonical body of the request, when the operation has one.
 	wantBody string
-	// wantItems is the number of items of a successful call.
+	// wantItems is the number of items of a successful call. wantItem, when set,
+	// is the canonical first item.
 	wantItems int
+	wantItem  string
 	// wantClass and wantCode are the failure of the call; empty means success.
 	wantClass declarative.Class
 	wantCode  string
@@ -347,13 +371,18 @@ const (
 	documentBody = `{"messaging_product":"whatsapp","recipient_type":"individual","to":"573001234567","type":"document","document":{"link":"https://cdn.example.com/a.pdf","filename":"cotizacion.pdf"}}`
 	readBody     = `{"messaging_product":"whatsapp","status":"read","message_id":"wamid.HBgLMTIzNDU2"}`
 	messagesPath = "/v25.0/" + phoneNumberID + "/messages"
+	// The sentItem constant is the output of a send: the message id and the
+	// recipient the provider resolved, as the mock provider answers them.
+	sentItem = `{"contacts":[{"input":"` + mockprovider.MockContact + `","wa_id":"` + mockprovider.MockContact + `"}],` +
+		`"id":"wamid.mock-1","messages":[{"id":"wamid.mock-1"}],"messaging_product":"whatsapp",` +
+		`"recipient":"` + mockprovider.MockContact + `"}`
 )
 
 var callCases = []callCase{
 	{
 		name: "text message is posted to the messages endpoint", operation: "message.send",
 		params:     map[string]string{"phoneNumberId": phoneNumberID, "to": "573001234567", "text": `{"body":"Hola"}`},
-		wantMethod: "POST", wantPath: messagesPath, wantBody: textBody, wantItems: 1, wantSent: 1, wantApplied: 1,
+		wantMethod: "POST", wantPath: messagesPath, wantBody: textBody, wantItems: 1, wantItem: sentItem, wantSent: 1, wantApplied: 1,
 	},
 	{
 		name: "template message carries the template object", operation: "templateMessage.send",
@@ -397,6 +426,12 @@ var callCases = []callCase{
 		params:     map[string]string{"phoneNumberId": phoneNumberID, "to": "573001234567", "text": `{"body":"Hola"}`},
 		fault:      "400",
 		wantMethod: "POST", wantPath: messagesPath, wantClass: declarative.ClassPermanent, wantCode: "ValidationFailed", wantSent: 1,
+	},
+	{
+		name: "a throughput limit carried in the body is transient, not a validation error", operation: "message.send",
+		params:     map[string]string{"phoneNumberId": phoneNumberID, "to": "573001234567", "text": `{"body":"Hola"}`},
+		fault:      "throttle",
+		wantMethod: "POST", wantPath: messagesPath, wantClass: declarative.ClassTransient, wantCode: "RateLimited", wantSent: 1,
 	},
 	{
 		name: "a server error after a send is uncertain and never resent", operation: "message.send",
@@ -490,6 +525,9 @@ func TestOperationsAgainstMockProvider(t *testing.T) {
 				text, err := jsonvalue.Canonical(item)
 				if err != nil {
 					t.Fatalf("item %d is not encodable: %v", i, err)
+				}
+				if i == 0 && c.wantItem != "" && string(text) != canonical(t, c.wantItem) {
+					t.Errorf("first item is %s, want %s", text, canonical(t, c.wantItem))
 				}
 				if strings.Contains(string(text), token) {
 					t.Errorf("item %d carries the credential value", i)

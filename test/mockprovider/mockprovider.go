@@ -166,7 +166,8 @@ func (p *Provider) graph(w http.ResponseWriter, r *http.Request) {
 // write applies a write unless the request asks for a fault. The fault comes
 // from the X-Mock-Fault header: "5xx" applies the write and answers 503,
 // "429" answers rate limited without applying, "400" answers a validation error
-// without applying, and "hangup" applies the write and drops the connection
+// without applying, "throttle" answers a throughput limit carried in the body
+// (HTTP 400) without applying, and "hangup" applies the write and drops the connection
 // before any answer. The reply function builds the success answer from the
 // number of the applied write.
 func (p *Provider) write(w http.ResponseWriter, r *http.Request, reply func(seq int) (int, string)) {
@@ -210,6 +211,11 @@ func refuseFault(w http.ResponseWriter, fault string) bool {
 		return true
 	case "400":
 		writeJSON(w, http.StatusBadRequest, `{"error":{"message":"(#100) Invalid parameter","type":"OAuthException","code":100}}`)
+		return true
+	case "throttle":
+		// Graph answers a throughput limit as HTTP 400 with the throttling code in
+		// the body, so only the body tells it apart from a validation error.
+		writeJSON(w, http.StatusBadRequest, `{"error":{"message":"(#130429) Throughput level is reached","type":"OAuthException","code":130429,"error_subcode":2494055,"is_transient":true,"error_user_title":"Too many messages","error_user_msg":"Throughput level is reached","fbtrace_id":"AbCdEf1234"}}`)
 		return true
 	}
 	return false
