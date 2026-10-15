@@ -172,6 +172,7 @@ func (r *run) emitPorts(ctx context.Context, n *planNode, ne *nodeExec, ports []
 // emitActivity runs the node through the NodeRunner port.
 func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeExec, input Batch) ([]emission, error) {
 	call := NodeCall{
+		Org:           r.req.Org,
 		Execution:     r.req.Execution,
 		Token:         t.id,
 		NodeExecution: ne.id,

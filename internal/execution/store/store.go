@@ -657,6 +657,30 @@ const (
 	PriorityLow    int64 = 2
 )
 
+// BucketRequest asks the bucket of one credential and service for permits.
+// Key names the bucket within the organization (the credential and the service).
+type BucketRequest struct {
+	Key             string
+	Capacity        int64
+	RefillPerSecond int64
+	Permits         int64
+	Now             time.Time
+}
+
+// BucketVerdict is the answer of a take: granted, or the instant of the retry.
+type BucketVerdict struct {
+	Granted bool
+	RetryAt time.Time
+}
+
+// LimitBuckets is the store of the shared rate buckets (ADR-0014 section 2.4).
+// Each call is one transaction: the bucket row is locked, its state is computed
+// with the arithmetic of internal/connector/limit and written back.
+type LimitBuckets interface {
+	TakeBucketPermits(ctx context.Context, org identity.OrgID, req BucketRequest) (BucketVerdict, error)
+	BlockBucket(ctx context.Context, org identity.OrgID, key string, until, now time.Time) error
+}
+
 // MaxRunnableRows bounds the claim snapshot: fairness keys times three classes.
 const MaxRunnableRows = 10000
 

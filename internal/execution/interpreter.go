@@ -6,6 +6,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"github.com/wirvii/orcon/internal/identity"
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -60,6 +61,9 @@ type Request struct {
 	// Execution identifies the execution. Every id the run derives (tokens,
 	// node executions, payloads) is a function of it, so it must be unique.
 	Execution ID
+	// Org is the organization the execution belongs to; nodes that act on
+	// external systems use it for their journal and their rate buckets.
+	Org identity.OrgID
 	// Start is the start event to begin at. It may be empty when the flow has
 	// exactly one start event.
 	Start flow.NodeID

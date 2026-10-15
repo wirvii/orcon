@@ -48,6 +48,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	store.LeaseRecovery
 	store.Deliveries
 	store.WaitResolver
+	store.LimitBuckets
 	io.Closer
 }
 

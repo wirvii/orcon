@@ -90,8 +90,10 @@ type Request struct {
 // Body is a JSON object or a form whose field values are templates. A value
 // that is exactly one placeholder keeps the parameter's JSON type.
 type Body struct {
+	// Type is JSON, FORM or RAW. A RAW body is the text of Raw, a template.
 	Type   string            `json:"type"`
-	Fields map[string]string `json:"fields"`
+	Fields map[string]string `json:"fields,omitempty"`
+	Raw    string            `json:"raw,omitempty"`
 }
 
 // ResponseSpec maps a response to items (ADR-0030 §5).

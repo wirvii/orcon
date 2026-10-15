@@ -5,6 +5,7 @@ package execution
 
 import (
 	"context"
+	"github.com/wirvii/orcon/internal/identity"
 
 	"github.com/wirvii/orcon/internal/flow"
 )
@@ -70,6 +71,7 @@ type ItemRouter interface {
 
 // NodeCall is what a [NodeRunner] receives for one activation.
 type NodeCall struct {
+	Org           identity.OrgID
 	Execution     ID
 	Token         TokenID
 	NodeExecution NodeExecutionID

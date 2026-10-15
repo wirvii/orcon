@@ -21,7 +21,7 @@ var (
 	validMethods      = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
 	validAuthTypes    = []string{AuthNone, AuthAPIKey, AuthBasic, AuthBearer, AuthOAuth2, AuthCustomHeaders, AuthAWSSigV4, AuthSessionToken}
 	validPlacements   = []string{"HEADER", "QUERY", "COOKIE"}
-	validBodyTypes    = []string{"JSON", "FORM"}
+	validBodyTypes    = []string{"JSON", "FORM", "RAW"}
 	validEmpty        = []string{"", "NO_ITEMS", "ONE_EMPTY_ITEM"}
 	validStrategies   = []string{"OFFSET", "PAGE", "CURSOR", "LINK_HEADER", "NEXT_URL"}
 	validSafetyLevels = []string{SafetyReadOnly, SafetyIdempotencyKey, SafetyReconcile, SafetyUnsafe}
@@ -153,7 +153,10 @@ func (v *validator) request(base string, op Operation) {
 	}
 	if r.Body != nil {
 		if !slices.Contains(validBodyTypes, r.Body.Type) {
-			v.addf(base+"/body/type", "must be JSON or FORM")
+			v.addf(base+"/body/type", "must be JSON, FORM or RAW")
+		}
+		if r.Body.Type == "RAW" && r.Body.Raw == "" {
+			v.addf(base+"/body/raw", "a RAW body needs its text")
 		}
 		for _, val := range r.Body.Fields {
 			templates = append(templates, val)

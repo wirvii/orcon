@@ -457,6 +457,14 @@ func (in *Interpreter) addBody(op Operation, params scope, req *HTTPRequest) err
 	if b == nil {
 		return nil
 	}
+	if b.Type == "RAW" {
+		text, err := params.render(b.Raw)
+		if err != nil {
+			return err
+		}
+		req.Body = []byte(text)
+		return nil
+	}
 	if b.Type == "FORM" {
 		form := url.Values{}
 		for k, tpl := range b.Fields {
