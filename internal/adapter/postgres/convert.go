@@ -74,6 +74,12 @@ const (
 	codeCheck      = "23514"
 )
 
+// Concurrency aborts of SQLSTATE class 40: the database rolled the whole statement back.
+const (
+	codeSerializationFailure = "40001"
+	codeDeadlockDetected     = "40P01"
+)
+
 // mapError turns a driver error into an area error. Constraint violations map
 // by SQLSTATE class to the errors of the flow area (orcon-db IN-8); the
 // original error stays in the chain for diagnosis.
