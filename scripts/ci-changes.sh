@@ -38,7 +38,7 @@ if [ "$all" = false ]; then
 			apps/web/* | packages/js/*) web=true ;;
 			.agents/skills/orcon-ui/* | .agents/skills/orcon-web/*) web=true skills=true ;;
 			packages/openapi/*) api=true ;;
-			.agents/* | .claude/skills/*) skills=true ;;
+			.agents/* | .*/skills/*) skills=true ;;
 			docs/* | *.md | LICENSE | NOTICE) docs=true ;;
 			*) all=true ;;
 			esac
