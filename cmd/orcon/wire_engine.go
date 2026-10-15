@@ -10,13 +10,10 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/exprflow"
-	"github.com/wirvii/orcon/internal/adapter/postgres"
-	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/connector/limit"
@@ -176,38 +173,6 @@ func (e *engine) run(ctx context.Context) error {
 
 // ingress is the public ingress of the engine: the trigger service.
 func (e *engine) ingress() *trigger.Service { return e.trigger }
-
-// semanticVersion matches the binary versions the database records (MAJOR.MINOR.PATCH,
-// with an optional pre-release tag).
-var semanticVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
-
-// binaryVersion is the version the database records for this build. A build
-// without a release version (the default "dev") records 0.0.0.
-func binaryVersion(v string) string {
-	if semanticVersion.MatchString(v) {
-		return v
-	}
-	return "0.0.0"
-}
-
-// openStore opens the database the configuration names, the way the server does.
-//
-//nolint:ireturn // the engine runs over either adapter through the one port
-func openStore(ctx context.Context, cfg *config.Config, version string) (engineStore, func() error, error) {
-	version = binaryVersion(version)
-	if cfg.Value("store.driver").Text() == "postgres" {
-		s, err := postgres.Open(ctx, postgres.Options{DSN: cfg.Secret("store.postgres.dsn").Reveal(), BinaryVersion: version})
-		if err != nil {
-			return nil, nil, fmt.Errorf("open postgres: %w", err)
-		}
-		return s, s.Close, nil
-	}
-	s, err := sqlite.Open(ctx, sqlite.Options{Path: cfg.Value("store.sqlite.path").Text(), BinaryVersion: version})
-	if err != nil {
-		return nil, nil, fmt.Errorf("open sqlite: %w", err)
-	}
-	return s, s.Close, nil
-}
 
 // triggerStarter starts the executions the trigger service accepts. It is the
 // adapter between the trigger area and the durable engine.

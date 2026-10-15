@@ -17,7 +17,7 @@ import (
 
 // ResolveRoute implements [trigger.Store]: the engine plane reads the one
 // address that answers the request, without an organization context (migration
-// 0016, function orcon_engine.resolve_trigger_route).
+// 0023, function orcon_engine.resolve_trigger_route).
 func (s *Store) ResolveRoute(ctx context.Context, method, path string) (trigger.Resolved, error) {
 	var out trigger.Resolved
 	found := false

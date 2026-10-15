@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Permission is a catalog name in the form resource:action, for example
@@ -174,9 +175,12 @@ const (
 	DecisionAllow
 )
 
-// Authorizer decides whether a principal may do what a request asks.
+// Authorizer decides whether a principal may do what a request asks. When the decision is
+// [DecisionAllow] it also returns the organization the request was authorized in: that scope
+// is the only one a handler may use (ADR-0046 section 2), so the scope is never built from a
+// request value. Otherwise the scope is the zero value.
 type Authorizer interface {
-	Authorize(ctx context.Context, req Request) (Decision, error)
+	Authorize(ctx context.Context, req Request) (Decision, orgscope.Org, error)
 }
 
 // DenyAll is the authorizer that forbids every question. The composition root
@@ -185,6 +189,30 @@ type Authorizer interface {
 type DenyAll struct{}
 
 // Authorize implements [Authorizer].
-func (DenyAll) Authorize(context.Context, Request) (Decision, error) {
-	return DecisionForbidden, nil
+func (DenyAll) Authorize(context.Context, Request) (Decision, orgscope.Org, error) {
+	return DecisionForbidden, orgscope.Org{}, nil
+}
+
+// SelectOrganization implements [OrgSelector]: no membership is ever known, so every
+// organization named in a header is refused.
+func (DenyAll) SelectOrganization(context.Context, identity.UserID, identity.OrgID) (bool, error) {
+	return false, nil
+}
+
+var _ OrgSelector = DenyAll{}
+
+type scopeKey struct{}
+
+// WithOrgScope returns a context that carries the organization a request was authorized in.
+// The authorization middleware sets it after an allow decision; only the authorizer can
+// issue the scope it carries.
+func WithOrgScope(ctx context.Context, org orgscope.Org) context.Context {
+	return context.WithValue(ctx, scopeKey{}, org)
+}
+
+// OrgScopeFrom returns the organization scope the request was authorized in, when the
+// authorization step allowed it.
+func OrgScopeFrom(ctx context.Context) (orgscope.Org, bool) {
+	org, ok := ctx.Value(scopeKey{}).(orgscope.Org)
+	return org, ok
 }

@@ -37,7 +37,10 @@ import (
 // is the production wiring.
 func TestServeStandaloneRunsWebhookExecution(t *testing.T) {
 	ctx := t.Context()
-	t.Setenv("ORCON_DATA_DIR", t.TempDir())
+	dataDir := t.TempDir()
+	t.Setenv("ORCON_DATA_DIR", dataDir)
+	// The serving role verifies a master key before it starts (the security wiring).
+	provisionMasterKey(t, dataDir)
 	dbPath := filepath.Join(t.TempDir(), "orcon.db")
 	provider := mockprovider.New()
 	providerSrv := httptest.NewServer(provider)
@@ -139,20 +142,11 @@ func publishOnDisk(t *testing.T, dbPath, providerURL string) (identity.OrgID, id
 
 // loopbackEngine is the engine opener of the test: the production opener with a
 // network policy that admits the loopback provider and the test credentials.
-func loopbackEngine(ctx context.Context, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, func() error, error) {
-	st, closeStore, err := openStore(ctx, cfg, "test")
-	if err != nil {
-		return nil, nil, err
-	}
-	eng, err := newEngine(st, engineOptions{
+func loopbackEngine(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
+	return newEngine(st, engineOptions{
 		role: cfg.Role(), logger: logger, version: "test", sandbox: sandbox,
 		senderPolicy: loopbackPolicy, credentials: testCredentials,
 	})
-	if err != nil {
-		_ = closeStore()
-		return nil, nil, err
-	}
-	return eng, closeStore, nil
 }
 
 // loopbackPolicy grants the host of a destination over plain http, private

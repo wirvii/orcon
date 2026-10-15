@@ -68,23 +68,14 @@ type serveDeps struct {
 	openEngine engineOpener
 }
 
-// engineOpener opens the execution engine of the process. The returned function
-// closes the database and runs after the engine has stopped.
-type engineOpener func(ctx context.Context, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, func() error, error)
+// engineOpener builds the execution engine of the process over the store that the
+// security wiring already opened. The store is closed by that wiring, not here.
+type engineOpener func(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error)
 
-// productionEngine is the engine opener of the server: the database the
-// configuration names, the engine over it, and the process version.
-func productionEngine(ctx context.Context, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, func() error, error) {
-	st, closeStore, err := openStore(ctx, cfg, version)
-	if err != nil {
-		return nil, nil, err
-	}
-	eng, err := newEngine(st, engineOptions{role: cfg.Role(), logger: logger, version: version, sandbox: sandbox})
-	if err != nil {
-		_ = closeStore()
-		return nil, nil, err
-	}
-	return eng, closeStore, nil
+// productionEngine is the engine opener of the server: the engine over the open store,
+// with the process version.
+func productionEngine(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
+	return newEngine(st, engineOptions{role: cfg.Role(), logger: logger, version: version, sandbox: sandbox})
 }
 
 // servesEngine reports whether a role opens the engine. Only standalone does for
@@ -183,6 +174,23 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer, deps
 	defer stopWork()
 	startReloadWatchers(workCtx, &wg, cfg.Value("dataDir").Text(), deps.reloadPoll, reloader, logger)
 
+	// The roles that serve the API open the store, check the keys and wire the identity
+	// services first: a failure refuses to start, before anything is listened on.
+	var sec *security
+	if selected == config.RoleStandalone || selected == config.RoleAPI {
+		opened, err := openSecurity(ctx, cfg, logger, version)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
+			return exitValidation
+		}
+		sec = opened
+		defer func() {
+			if err := sec.close(); err != nil {
+				logger.ErrorContext(ctx, "close the store", "error", err)
+			}
+		}()
+	}
+
 	return serveWithSandbox(ctx, logger, serveSettings{
 		role:            selected,
 		addr:            cfg.Value("http.address").Text(),
@@ -191,6 +199,7 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer, deps
 		slots:           slots,
 		cfg:             cfg,
 		openEngine:      deps.openEngine,
+		sec:             sec,
 	}, deps.newSandbox)
 }
 
@@ -280,6 +289,9 @@ type serveSettings struct {
 	slots           int
 	cfg             *config.Config
 	openEngine      engineOpener
+	// sec is the security wiring of the API roles; nil for the roles without an API.
+	// The engine runs over its store, so the process holds one database handle.
+	sec *security
 }
 
 // serveWithSandbox runs the HTTP server with the expression sandbox beside it.
@@ -291,24 +303,19 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 	effective := min(s.maxAbandoned, s.slots)
 	defer func() { _ = sb.Close(context.WithoutCancel(ctx)) }()
 
+	// The engine runs over the store the security wiring opened; that wiring closes it.
 	var eng *engine
-	if s.openEngine != nil && servesEngine(s.role) {
-		var closeStore func() error
-		var err error
+	if s.openEngine != nil && servesEngine(s.role) && s.sec != nil {
 		var exprSB expr.Sandbox
 		if es, ok := sb.(expr.Sandbox); ok {
 			exprSB = es
 		}
-		eng, closeStore, err = s.openEngine(ctx, s.cfg, exprSB, logger)
+		var err error
+		eng, err = s.openEngine(s.sec.store, s.cfg, exprSB, logger)
 		if err != nil {
 			logger.ErrorContext(ctx, "the execution engine could not start", "error", err)
 			return exitError
 		}
-		defer func() {
-			if err := closeStore(); err != nil {
-				logger.ErrorContext(ctx, "closing the database failed", "error", err)
-			}
-		}()
 	}
 	// The abandoned evaluations of a process can hold this much memory at most.
 	logger.InfoContext(ctx, "expression sandbox limits",
@@ -347,7 +354,7 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 		}()
 	}
 
-	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout, ingress)
+	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout, s.sec, ingress)
 	cancel()
 	<-watched
 	if engineErr != nil {
@@ -367,20 +374,22 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 	}
 }
 
-// newHandler assembles the HTTP routes served by the standalone and api roles.
+// newHandler assembles the HTTP routes served by the standalone and api roles, with the
+// refusing identity and authorization implementations.
 func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
-	return newHandlerWith(role, logger, nil)
+	return newHandlerWith(role, logger, nil, nil)
 }
 
-// newHandlerWith is newHandler with the public trigger addresses served by webhooks.
-func newHandlerWith(role config.Role, logger *slog.Logger, webhooks httpapi.WebhookIngress) (http.Handler, error) {
+// newHandlerWith assembles the HTTP routes over the security wiring of the process. The public
+// trigger addresses are served by webhooks when it is not nil.
+func newHandlerWith(role config.Role, logger *slog.Logger, sec *security, webhooks httpapi.WebhookIngress) (http.Handler, error) {
 	assets, err := webui.Assets()
 	if err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux := http.NewServeMux()
 	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
-	if err := mountAPIWith(mux, role, logger, webhooks); err != nil {
+	if err := mountAPIWith(mux, role, logger, sec, webhooks); err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux.Handle("/", webui.Handler(assets))
@@ -388,11 +397,24 @@ func newHandlerWith(role config.Role, logger *slog.Logger, webhooks httpapi.Webh
 }
 
 // serve listens on addr and serves HTTP until ctx is canceled, then drains
-// in-flight requests for at most shutdownTimeout.
-func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration, webhooks httpapi.WebhookIngress) error {
-	handler, err := newHandlerWith(role, logger, webhooks)
+// in-flight requests for at most shutdownTimeout. With a security wiring, the audit
+// sealer runs beside the server and stops with it.
+func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration, sec *security, webhooks httpapi.WebhookIngress) error {
+	handler, err := newHandlerWith(role, logger, sec, webhooks)
 	if err != nil {
 		return err
+	}
+	if sec != nil {
+		// The sealer stops when serve returns for any reason, including a failed listener:
+		// stopSealer runs before the wait, which is registered first and so runs last.
+		sealCtx, stopSealer := context.WithCancel(ctx)
+		sealed := make(chan struct{})
+		go func() {
+			defer close(sealed)
+			sec.runSealer(sealCtx, logger)
+		}()
+		defer func() { <-sealed }()
+		defer stopSealer()
 	}
 
 	var lc net.ListenConfig

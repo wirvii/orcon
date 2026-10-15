@@ -25,7 +25,7 @@ sqlite:GetOldestLastChance  # SPEC-001 C4a: PostgreSQL reads it from a hand-writ
 postgres:LockTriggerRoute  # SPEC-002 T1: claims of one web path serialize on an advisory lock across organizations; SQLite has a single writer
 postgres:MarkTriggerRoutesChanged  # SPEC-002 T1: pg_notify tells the api processes to rebuild the route index; SQLite has no signal yet (T2 adds the in-process one)
 sqlite:CountRunnableTokens  # SPEC-001 C11: PostgreSQL reads the snapshot through the orcon_engine function runnable_counts (DA-8)
-sqlite:ResolveTriggerRoute  # SPEC-002 T2: PostgreSQL calls the orcon_engine.resolve_trigger_route function from ResolveRoute (migration 0016)
+sqlite:ResolveTriggerRoute  # SPEC-002 T2: PostgreSQL calls the orcon_engine.resolve_trigger_route function from ResolveRoute (migration 0023)
 sqlite:UpdateFlowDeletedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateFlowVersionPublishedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateMembershipInvitedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
@@ -38,3 +38,8 @@ sqlite:UpdateAttentionRequestResolvedByPrincipalToNull  # PostgreSQL clears the 
 sqlite:UpdateOperationalAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorPackageInstalledByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorGrantGrantedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:ResolveUserOrganizations  # PostgreSQL reads the same rows through orcon_engine.resolve_user_organizations (migration 0015) in a hand-written method (DA-8); SQLite has no engine functions
+sqlite:ListActiveOrgKeys  # PostgreSQL lists the same keys through the engine function orcon_engine.list_active_org_keys (migration 0016); SQLite reads them in batches
+sqlite:GetProjectOrganization  # PostgreSQL resolves a project's organization through orcon_engine.project_organization (migration 0017); SQLite has no engine functions
+sqlite:ListAuditPendingOrgs  # SPEC-004 R-AUD-03: PostgreSQL reads the organizations with pending rows through the engine function orcon_engine.list_audit_pending_orgs (the application role sees one organization at a time)
+sqlite:ListOrgsWithoutActiveKey  # SPEC-004 R-KEY-05: PostgreSQL reads the organizations without an active key through the engine function orcon_engine.list_orgs_without_active_key (migration 0021; the application role sees one organization at a time)

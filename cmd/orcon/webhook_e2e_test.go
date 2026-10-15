@@ -87,7 +87,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 
 	publishWebhookFlow(t, env, eng, srv.URL)
 
-	handler, err := newAPIRouter(config.RoleStandalone, slog.New(slog.DiscardHandler), eng.ingress())
+	handler, err := newAPIRouterWith(config.RoleStandalone, slog.New(slog.DiscardHandler), nil, eng.ingress())
 	if err != nil {
 		t.Fatalf("build the router: %v", err)
 	}

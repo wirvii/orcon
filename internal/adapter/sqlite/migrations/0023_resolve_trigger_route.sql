@@ -5,4 +5,4 @@
 
 -- The ingress lookup of a public request (SPEC-002 R-ADDR-08). The lookup is the ResolveTriggerRoute query, which SQLite
 -- runs under its single writer over the tables that already exist; the schema does not change. The PostgreSQL
--- counterpart is the resolve_trigger_route function of the same number.
+-- counterpart is the resolve_trigger_route function of the same number (0023).

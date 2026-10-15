@@ -173,3 +173,95 @@ WHERE id IN (SELECT target.id FROM connector_package AS target WHERE target.inst
 UPDATE connector_grant
 SET granted_by_principal_id = NULL
 WHERE id IN (SELECT target.id FROM connector_grant AS target WHERE target.granted_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: GetApplicationUserCredentialsByEmail :one
+-- orcon:scope instance
+SELECT id, principal_id, email_normalized, display_name, status, password_hash, created_at, updated_at
+FROM application_user
+WHERE email_normalized = sqlc.arg(email_normalized);
+
+-- name: UpdateApplicationUserPasswordHash :execrows
+-- orcon:scope instance
+UPDATE application_user
+SET password_hash = sqlc.arg(password_hash), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id);
+
+-- name: InsertSession :exec
+-- orcon:scope instance
+INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(application_user_id), sqlc.arg(token_hash), sqlc.arg(assurance_level), sqlc.arg(created_at), sqlc.arg(expires_at), sqlc.arg(idle_expires_at), sqlc.arg(last_seen_at), NULL, sqlc.arg(created_at));
+
+-- name: GetSessionByTokenHash :one
+-- orcon:scope instance
+SELECT s.id, s.application_user_id, s.assurance_level, s.created_at, s.expires_at, s.idle_expires_at, s.last_seen_at, s.revoked_at,
+       u.principal_id, u.status AS user_status, u.email_normalized, u.display_name
+FROM session AS s
+JOIN application_user AS u ON u.id = s.application_user_id
+WHERE s.token_hash = sqlc.arg(token_hash);
+
+-- name: GetSession :one
+-- orcon:scope instance
+SELECT id, application_user_id, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at
+FROM session
+WHERE application_user_id = sqlc.arg(application_user_id) AND id = sqlc.arg(id);
+
+-- name: UpdateSessionActivity :execrows
+-- orcon:scope instance
+UPDATE session
+SET last_seen_at = sqlc.arg(last_seen_at), idle_expires_at = sqlc.arg(idle_expires_at), updated_at = sqlc.arg(last_seen_at)
+WHERE id = sqlc.arg(id) AND revoked_at IS NULL;
+
+-- name: MarkSessionRevoked :execrows
+-- orcon:scope instance
+UPDATE session
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(revoked_at)
+WHERE id = sqlc.arg(id) AND application_user_id = sqlc.arg(application_user_id) AND revoked_at IS NULL;
+
+-- name: MarkUserSessionsRevoked :exec
+-- orcon:scope instance
+UPDATE session
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(revoked_at)
+WHERE application_user_id = sqlc.arg(application_user_id) AND revoked_at IS NULL;
+
+-- name: GetLoginThrottle :one
+-- orcon:scope instance
+SELECT id, failures, locked_until_at, created_at, updated_at
+FROM login_throttle
+WHERE id = sqlc.arg(id);
+
+-- name: UpsertLoginThrottle :exec
+-- orcon:scope instance
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(failures), sqlc.arg(locked_until_at), sqlc.arg(created_at), sqlc.arg(updated_at))
+ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until_at = excluded.locked_until_at, updated_at = excluded.updated_at;
+
+-- name: DeleteLoginThrottle :execrows
+-- orcon:scope instance
+-- orcon:delete bookkeeping:the throttle record of an identifier ends when that identifier signs in
+DELETE FROM login_throttle
+WHERE id = sqlc.arg(id);
+
+-- The failure count moves in one statement: concurrent failed attempts never lose a count (SPEC-004 R-AUTH-02).
+-- name: UpsertLoginThrottleFailure :one
+-- orcon:scope instance
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
+VALUES (sqlc.arg(id), 1, sqlc.arg(created_at), sqlc.arg(created_at), sqlc.arg(created_at))
+ON CONFLICT (id) DO UPDATE SET failures = login_throttle.failures + 1, updated_at = excluded.updated_at
+RETURNING failures;
+
+-- name: MarkLoginThrottleLocked :execrows
+-- orcon:scope instance
+UPDATE login_throttle
+SET locked_until_at = sqlc.arg(locked_until_at), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id);
+
+-- name: ResolveUserOrganizations :many
+-- orcon:scope engine
+SELECT org.id, org.slug, org.name
+FROM membership
+JOIN org ON org.id = membership.org_id
+WHERE membership.application_user_id = sqlc.arg(application_user_id)
+  AND membership.status = 'ACTIVE'
+  AND org.status = 'ACTIVE'
+ORDER BY org.name, org.id
+LIMIT sqlc.arg(row_limit);
