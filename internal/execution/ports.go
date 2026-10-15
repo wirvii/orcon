@@ -31,6 +31,8 @@ type EvalEnv struct {
 	// Items is the batch the token carries. Conditions of exclusive and
 	// inclusive gateways are token-level: they see the whole batch.
 	Items Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
 }
 
 // ConditionEvaluator decides edge conditions (ADR-0010 section 4). The
@@ -50,6 +52,8 @@ type RouteCall struct {
 	Node  *flow.Node
 	Scope ScopePath
 	Items Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
 }
 
 // ItemRouter tells which output ports each item of a batch matches (ADR-0010
@@ -74,6 +78,8 @@ type NodeCall struct {
 	Scope ScopePath
 	// Input is the batch the token carries.
 	Input Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
 }
 
 // PortBatch is the batch a node emitted on one output port.

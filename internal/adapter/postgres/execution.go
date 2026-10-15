@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	_ store.Reader       = (*Store)(nil)
-	_ store.Inbox        = (*Store)(nil)
-	_ store.Transactor   = (*Store)(nil)
-	_ store.WorkQueue    = (*Store)(nil)
-	_ store.Deliveries   = (*Store)(nil)
-	_ store.WaitResolver = (*Store)(nil)
+	_ store.Reader        = (*Store)(nil)
+	_ store.Inbox         = (*Store)(nil)
+	_ store.Transactor    = (*Store)(nil)
+	_ store.WorkQueue     = (*Store)(nil)
+	_ store.LeaseRecovery = (*Store)(nil)
+	_ store.Deliveries    = (*Store)(nil)
+	_ store.WaitResolver  = (*Store)(nil)
 )
 
 // beforeCursor is the position of a newest-first list; the zero cursor is after everything.
@@ -202,10 +203,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, oper
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
 	err := s.inScope(ctx, "list external operations", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, FromID: pgUUID(fromID), PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -357,8 +358,9 @@ func (t *pgTx) InsertToken(ctx context.Context, tok *store.Token) error {
 		ID: pgUUID(tok.ID), OrgID: pgUUID(tok.OrgID), ExecutionID: pgUUID(tok.ExecutionID), Status: tok.Status,
 		NodeID: tok.NodeID, EdgeID: nullText(tok.EdgeID), ScopePath: tok.ScopePath, ForkLineageDocument: tok.ForkLineage,
 		PayloadReference: nullText(tok.PayloadReference), FairnessKey: tok.FairnessKey, EffectivePriority: tok.EffectivePriority,
-		AvailableAt: timestamp(tok.AvailableAt), LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
-		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
+		AvailableAt: nullTimestamp(tok.AvailableAt), QueueOrder: tok.QueueOrder, LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
+		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), LeaseMilliseconds: tok.LeaseTTL.Milliseconds(),
+		CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
 	})
 }
 
@@ -368,7 +370,7 @@ func (t *pgTx) InsertNodeExecution(ctx context.Context, n store.NodeExecution) e
 	}
 	return t.q.InsertNodeExecution(ctx, sqlcgen.InsertNodeExecutionParams{
 		ID: pgUUID(n.ID), OrgID: pgUUID(n.OrgID), ExecutionID: pgUUID(n.ExecutionID), TokenID: pgUUID(n.TokenID),
-		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt), FinishedAt: nullTimestamp(n.FinishedAt),
 		CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
 	})
 }
@@ -413,11 +415,17 @@ func (t *pgTx) AppendJournal(ctx context.Context, operations []store.ExternalOpe
 	return nil
 }
 
-func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
+	// The deadline is the database clock of this transaction plus the attempt timeout (ADR-0012 section 5).
+	now, err := t.DatabaseNow(ctx)
+	if err != nil {
+		return 0, err
+	}
+	deadline := now.Add(attemptTimeout)
 	var moved int64
 	for _, op := range operations {
 		n, err := t.q.MarkExternalOperationDispatching(ctx, sqlcgen.MarkExternalOperationDispatchingParams{
-			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: nullTimestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
+			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: timestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
 		})
 		if err != nil {
 			return moved, err
@@ -425,6 +433,16 @@ func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalO
 		moved += n
 	}
 	return moved, nil
+}
+
+// DatabaseNow implements [store.Tx] with the PostgreSQL clock_timestamp(), so
+// that every process decides recovery windows with one clock (ADR-0013 section 4).
+func (t *pgTx) DatabaseNow(ctx context.Context) (time.Time, error) {
+	ts, err := t.q.GetDatabaseTime(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.Time.UTC(), nil
 }
 
 func (t *pgTx) ResolveOperation(ctx context.Context, operation store.ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error) {

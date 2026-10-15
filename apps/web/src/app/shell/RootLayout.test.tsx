@@ -17,55 +17,18 @@ afterEach(() => {
 /** The links the shell shows for a section: a sidebar, a bottom bar and a drawer each carry one. */
 const sectionLinks = (name: string) => screen.getAllByRole('link', { name, hidden: true });
 
-describe('the shell', () => {
-  it('lists the sections and marks the one being shown', async () => {
-    renderRoute('/');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' })).toBeVisible();
-    expect(sectionLinks('Start').length).toBeGreaterThan(0);
-    expect(sectionLinks('Settings').length).toBeGreaterThan(0);
-    for (const link of sectionLinks('Start')) expect(link).toHaveAttribute('aria-current', 'page');
-    for (const link of sectionLinks('Settings')) expect(link).not.toHaveAttribute('aria-current');
-    expect(sectionLinks('Settings')[0]).toHaveAttribute('href', '/settings/appearance');
-  });
-
-  it('goes to another section without reloading the page', async () => {
-    const { router } = renderRoute('/');
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
-    const marker = document.createElement('meta');
-    document.head.append(marker);
-    const settings = sectionLinks('Settings')[0];
-    if (!settings) throw new Error('The shell has no Settings link.');
-    await userEvent.click(settings);
-
+describe('the page frame', () => {
+  it('lists the settings and the API reference, and marks the section being shown', async () => {
+    renderRoute('/settings/appearance');
     expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
-    expect(router.state.location.pathname).toBe('/settings/appearance');
-    expect(marker.isConnected).toBe(true);
     for (const link of sectionLinks('Settings')) expect(link).toHaveAttribute('aria-current', 'page');
-    marker.remove();
-  });
-
-  it('opens the flow editor from the navigation, at its own address, and marks it as the section being shown', async () => {
-    const { router } = renderRoute('/');
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
-    const editor = sectionLinks('Flow editor')[0];
-    if (!editor) throw new Error('The shell has no Flow editor link.');
-    expect(editor).toHaveAttribute('href', '/flows/01930000-0000-7000-8000-00000000ed5a');
-    await userEvent.click(editor);
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
-    expect(router.state.location.pathname).toBe('/flows/01930000-0000-7000-8000-00000000ed5a');
-    for (const link of sectionLinks('Flow editor')) expect(link).toHaveAttribute('aria-current', 'page');
-    for (const link of sectionLinks('Start')) expect(link).not.toHaveAttribute('aria-current');
-  });
-
-  it('says a page that is not a flow id does not exist', async () => {
-    renderRoute('/flows/not-a-flow');
-    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeVisible();
+    expect(sectionLinks('API reference')[0]).toHaveAttribute('href', '/api/reference/');
+    expect(sectionLinks('API reference')[0]).not.toHaveAttribute('target', '_blank');
   });
 
   it('leaves a click with a modifier key to the browser', async () => {
-    const { router } = renderRoute('/');
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
+    const { router } = renderRoute('/settings/appearance');
+    await screen.findByRole('heading', { level: 1, name: 'Appearance and language' });
     const settings = sectionLinks('Settings')[0];
     if (!settings) throw new Error('The shell has no Settings link.');
     // The browser would open a new tab; the router must not navigate.
@@ -75,27 +38,26 @@ describe('the shell', () => {
     await userEvent.keyboard('{Control>}');
     await userEvent.click(settings);
     await userEvent.keyboard('{/Control}');
-    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.location.pathname).toBe('/settings/appearance');
   });
 
-  it('marks the first useful screen of the start page', async () => {
-    const mark = vi.spyOn(performance, 'mark');
-    renderRoute('/');
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
-    expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/' } });
-    mark.mockRestore();
-  });
-
-  it('shows the not-found page for an address that is no route, inside the shell', async () => {
+  it('shows the not-found page for an address that is no route', async () => {
     renderRoute('/no/such/page');
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Go to the start page' })).toHaveAttribute('href', '/');
-    expect(sectionLinks('Settings').length).toBeGreaterThan(0);
+  });
+
+  it('marks the first useful screen of the sign-in page', async () => {
+    const mark = vi.spyOn(performance, 'mark');
+    renderRoute('/login');
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' });
+    expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/login' } });
+    mark.mockRestore();
   });
 
   it('says when the browser is offline and stops saying it when the connection returns', async () => {
-    renderRoute('/');
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
+    renderRoute('/login');
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' });
     expect(screen.queryByText('You are offline')).toBeNull();
     act(() => {
       onlineManager.setOnline(false);
@@ -117,8 +79,8 @@ describe('the shell', () => {
         return () => undefined;
       },
     };
-    renderRoute('/', { source });
-    await screen.findByRole('heading', { level: 1, name: 'Welcome to Orcon' });
+    renderRoute('/settings/appearance', { source });
+    await screen.findByRole('heading', { level: 1, name: 'Appearance and language' });
     expect(screen.queryByText('Live updates are paused')).toBeNull();
     act(() => {
       report?.('paused');

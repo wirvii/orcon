@@ -205,40 +205,43 @@ type CustomRolePermission struct {
 }
 
 type Execution struct {
-	ID                      []byte
-	OrgID                   []byte
-	ProjectID               []byte
-	FlowID                  []byte
-	FlowVersionID           []byte
-	FlowSnapshotID          []byte
-	Status                  string
-	Mode                    string
-	Priority                int64
-	ParentExecutionID       []byte
-	ParentTokenID           []byte
-	RootExecutionID         []byte
-	CallDepth               int64
-	CallChainDocument       []byte
-	CallChainDocumentFormat sql.NullString
-	RetriedExecutionID      []byte
-	RunGeneration           int64
-	CancelRequestedAt       sql.NullInt64
-	UndoRequestedAt         sql.NullInt64
-	RunnableCount           int64
-	LeasedCount             int64
-	WaitingCount            int64
-	SuspendedCount          int64
-	ActiveMilliseconds      int64
-	ThrottleKind            sql.NullString
-	ErrorDocument           []byte
-	ErrorDocumentFormat     sql.NullString
-	SummaryDocument         []byte
-	SummaryDocumentFormat   sql.NullString
-	DataKeyWrapped          []byte
-	StartedAt               sql.NullInt64
-	FinishedAt              sql.NullInt64
-	CreatedAt               int64
-	UpdatedAt               int64
+	ID                        []byte
+	OrgID                     []byte
+	ProjectID                 []byte
+	FlowID                    []byte
+	FlowVersionID             []byte
+	FlowSnapshotID            []byte
+	Status                    string
+	Mode                      string
+	Priority                  int64
+	ParentExecutionID         []byte
+	ParentTokenID             []byte
+	RootExecutionID           []byte
+	CallDepth                 int64
+	CallChainDocument         []byte
+	CallChainDocumentFormat   sql.NullString
+	RetriedExecutionID        []byte
+	RunGeneration             int64
+	CancelRequestedAt         sql.NullInt64
+	UndoRequestedAt           sql.NullInt64
+	RunnableCount             int64
+	LeasedCount               int64
+	WaitingCount              int64
+	SuspendedCount            int64
+	ActiveMilliseconds        int64
+	ThrottleKind              sql.NullString
+	ErrorDocument             []byte
+	ErrorDocumentFormat       sql.NullString
+	SummaryDocument           []byte
+	SummaryDocumentFormat     sql.NullString
+	DataKeyWrapped            []byte
+	StartedAt                 sql.NullInt64
+	FinishedAt                sql.NullInt64
+	CreatedAt                 int64
+	UpdatedAt                 int64
+	EngineStateDocument       []byte
+	EngineStateDocumentFormat sql.NullString
+	EngineStateRevision       int64
 }
 
 type ExecutionEvent struct {
@@ -788,6 +791,18 @@ type Token struct {
 	SuspendReason             sql.NullString
 	CreatedAt                 int64
 	UpdatedAt                 int64
+}
+
+type TokenInput struct {
+	ID                   []byte
+	OrgID                []byte
+	ExecutionID          []byte
+	ItemCount            int64
+	Encoding             string
+	InlineDocument       []byte
+	InlineDocumentFormat string
+	CreatedAt            int64
+	UpdatedAt            int64
 }
 
 type TriggerAddress struct {
