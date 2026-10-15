@@ -24,7 +24,8 @@ import (
 // its authorization cut provides the evaluator, the process wires the
 // implementations that refuse: every protected route answers 401 and nothing is
 // ever allowed (identity.RejectAll, authz.DenyAll).
-func newAPIRouter(role config.Role, logger *slog.Logger) (*httpapi.Router, error) {
+// The public trigger addresses under /hooks/ are served by webhooks; nil serves none.
+func newAPIRouter(role config.Role, logger *slog.Logger, webhooks httpapi.WebhookIngress) (*httpapi.Router, error) {
 	catalog, err := permissionsyaml.Parse(authz.CatalogSource())
 	if err != nil {
 		return nil, fmt.Errorf("load the permission catalog: %w", err)
@@ -35,6 +36,7 @@ func newAPIRouter(role config.Role, logger *slog.Logger) (*httpapi.Router, error
 		Catalog:       catalog,
 		Authenticator: identity.RejectAll{},
 		Authorizer:    authz.DenyAll{},
+		Webhooks:      webhooks,
 		// No durable store exists yet; operations that take an Idempotency-Key answer 503
 		// until the first API2-core pull request wires it.
 		Idempotency: idempotency.UnavailableStore{},
@@ -47,10 +49,19 @@ func newAPIRouter(role config.Role, logger *slog.Logger) (*httpapi.Router, error
 
 // mountAPI registers the public API on mux under /api/.
 func mountAPI(mux *http.ServeMux, role config.Role, logger *slog.Logger) error {
-	router, err := newAPIRouter(role, logger)
+	return mountAPIWith(mux, role, logger, nil)
+}
+
+// mountAPIWith is mountAPI that also serves the public trigger addresses under
+// /hooks/ through the same router, so they share its request pipeline.
+func mountAPIWith(mux *http.ServeMux, role config.Role, logger *slog.Logger, webhooks httpapi.WebhookIngress) error {
+	router, err := newAPIRouter(role, logger, webhooks)
 	if err != nil {
 		return err
 	}
 	mux.Handle("/api/", router)
+	if webhooks != nil {
+		mux.Handle(httpapi.WebhookPrefix, router)
+	}
 	return nil
 }

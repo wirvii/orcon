@@ -31,6 +31,12 @@ var (
 	// ErrNoStartNode means a manual run found no start event, or several and
 	// no choice.
 	ErrNoStartNode = errors.New("flow has no single start event to run")
+	// ErrNoRoute means no active address answers the request: the path is
+	// unknown, the method is not allowed, or the address is retired.
+	ErrNoRoute = errors.New("no active address answers this request")
+	// ErrNoStarter means the service was asked to start an execution and has
+	// no engine to start it with.
+	ErrNoStarter = errors.New("no engine is wired to start executions")
 	// ErrRouteUnavailable is the generic problem for a path that belongs to
 	// another organization. It carries no detail about that organization
 	// (ADR-0022 section 3).
