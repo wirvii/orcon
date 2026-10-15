@@ -462,9 +462,24 @@ func (s *Sessions) Authenticate(ctx context.Context, creds Credentials) (Princip
 		}
 	}
 	return Principal{
-		ID: view.PrincipalID, Kind: PrincipalUser, UserID: sess.UserID,
+		ID: view.PrincipalID, Kind: PrincipalUser, UserID: sess.UserID, OrgID: orgHint(creds.OrgHint),
 		CredentialType: CredentialSession, CredentialID: sess.ID.String(),
 	}, nil
+}
+
+// orgHint reads the organization a client named with Orcon-Org (ADR-0038 section 6). The
+// organization is only a context: the authorization evaluator refuses it unless the user
+// holds an active membership there, and a value that is not an identifier leaves the
+// context empty, so every protected operation is refused.
+func orgHint(hint string) OrgID {
+	if hint == "" {
+		return OrgID{}
+	}
+	u, err := id.Parse(hint)
+	if err != nil {
+		return OrgID{}
+	}
+	return OrgID(u)
 }
 
 // CurrentUser is the signed-in user and the session a request carries.

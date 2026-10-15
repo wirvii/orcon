@@ -40,10 +40,31 @@ type Store interface {
 // kept while the organization's epoch does not move, so a change of roles takes effect on
 // the next request.
 type Evaluator struct {
-	store Store
-	cat   *Catalog
-	mu    sync.Mutex
-	cache map[string]cachedGrant
+	store  Store
+	cat    *Catalog
+	owners map[string]OwnerResolver
+	mu     sync.Mutex
+	cache  map[string]cachedGrant
+}
+
+// OwnerResolver names the project that owns a resource of one kind, so the evaluator can decide a request
+// about that resource with the grant of the project (SPEC-004 R-AZ-07, SE6-http). It returns
+// [identity.ErrNotFound] when the organization holds no resource with that identifier; the resolver never
+// answers for another organization, because the scope it receives is the principal's.
+type OwnerResolver interface {
+	OwnerProject(ctx context.Context, org orgscope.Org, id string) (identity.ProjectID, error)
+}
+
+// WithOwner returns the evaluator with the owner resolver of kind (the first path parameter names it, for
+// example credential for {credentialId}). Kinds without a resolver are denied, as before.
+func (e *Evaluator) WithOwner(kind string, r OwnerResolver) *Evaluator {
+	next := make(map[string]OwnerResolver, len(e.owners)+1)
+	for k, v := range e.owners {
+		next[k] = v
+	}
+	next[kind] = r
+	e.owners = next
+	return e
 }
 
 type cachedGrant struct {
@@ -74,6 +95,10 @@ func (e *Evaluator) Authorize(ctx context.Context, req Request) (Decision, error
 	if user.IsZero() || org.IsZero() {
 		return DecisionForbidden, nil
 	}
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		return DecisionForbidden, fmt.Errorf("authorize: organization scope: %w", err)
+	}
 	project := ""
 	visible := Permission("org:read")
 	switch req.Resource.Kind {
@@ -89,11 +114,19 @@ func (e *Evaluator) Authorize(ctx context.Context, req Request) (Decision, error
 		project = req.Resource.ID
 		visible = "project:read"
 	default:
-		return DecisionForbidden, nil
-	}
-	scope, err := issue.New(id.UUID(org))
-	if err != nil {
-		return DecisionForbidden, fmt.Errorf("authorize: organization scope: %w", err)
+		r, ok := e.owners[req.Resource.Kind]
+		if !ok {
+			return DecisionForbidden, nil
+		}
+		owner, err := r.OwnerProject(ctx, scope, req.Resource.ID)
+		if errors.Is(err, identity.ErrNotFound) {
+			return DecisionHidden, nil
+		}
+		if err != nil {
+			return DecisionForbidden, fmt.Errorf("authorize: %s owner: %w", req.Resource.Kind, err)
+		}
+		project = owner.String()
+		visible = Permission(req.Resource.Kind + ":read")
 	}
 	active, err := e.store.ActiveMember(ctx, user, scope)
 	if err != nil {
