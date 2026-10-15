@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
@@ -89,6 +90,10 @@ type Store interface {
 	// CreateFlow inserts a flow with draft revision 0. A second non-deleted
 	// flow with the same name in the project fails with [ErrConflict].
 	CreateFlow(ctx context.Context, org orgscope.Org, f Record) error
+	// CreateFlowWithEntry is [Store.CreateFlow] with the audit entry of the creation in the same
+	// transaction (SPEC-004 R-AUD-02). When the context carries an idempotency claim, the record
+	// of the claim is written in that transaction too (see internal/platform/idempotencyclaim).
+	CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f Record, entry audit.Entry) error
 	// GetFlow returns a non-deleted flow, or [ErrNotFound].
 	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
 	// GetFlowByName returns the non-deleted flow of the project with that name.

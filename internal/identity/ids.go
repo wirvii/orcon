@@ -66,3 +66,12 @@ func (i MembershipID) String() string { return id.UUID(i).String() }
 
 // IsZero reports whether i is the nil identity.
 func (i MembershipID) IsZero() bool { return id.UUID(i).IsZero() }
+
+// SessionID identifies a login session of a browser.
+type SessionID id.UUID
+
+// String returns the lowercase hyphenated form.
+func (i SessionID) String() string { return id.UUID(i).String() }
+
+// IsZero reports whether i is the nil identity.
+func (i SessionID) IsZero() bool { return id.UUID(i).IsZero() }
