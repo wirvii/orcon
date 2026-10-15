@@ -30,6 +30,7 @@ const messages = defineMessages({
   columnUpdated: { id: 'flows.list.column.updated', defaultMessage: 'Last change', description: 'Column heading of when the flow last changed.' },
   active: { id: 'flows.list.state.active', defaultMessage: 'Active', description: 'State of a flow that runs when its triggers fire, shown as text.' },
   inactive: { id: 'flows.list.state.inactive', defaultMessage: 'Inactive', description: 'State of a flow that does not run, shown as text.' },
+  runs: { id: 'flows.list.runs', defaultMessage: 'Runs', description: 'Link from a flow to the runs of that flow.' },
 });
 
 const route = getRouteApi('/_session/orgs/$orgSlug/projects/$projectHandle/flows');
@@ -38,6 +39,7 @@ const route = getRouteApi('/_session/orgs/$orgSlug/projects/$projectHandle/flows
 export function FlowListScreen() {
   const intl = useIntl();
   const { organization, project } = route.useRouteContext();
+  const { orgSlug, projectHandle } = route.useParams();
   const flows = useQuery(flowsQueryOptions(organization.id, project.id));
   const [creating, setCreating] = useState(false);
 
@@ -72,7 +74,7 @@ export function FlowListScreen() {
           // columns show only on a phone, where the card has no column heads.
           <ul className="border-border flex flex-col rounded-lg border">
             {items.map((flow) => (
-              <li key={flow.id} className="border-border flex flex-col gap-1 border-b p-4 last:border-b-0 md:grid md:grid-cols-3 md:items-center md:gap-4">
+              <li key={flow.id} className="border-border flex flex-col gap-1 border-b p-4 last:border-b-0 md:grid md:grid-cols-4 md:items-center md:gap-4">
                 <span className="font-medium wrap-anywhere">
                   <Link asChild>
                     <RouterLink to="/flows/$flowId" params={{ flowId: flow.id }}>
@@ -87,6 +89,17 @@ export function FlowListScreen() {
                 <span className="text-fg-muted">
                   <span className="md:hidden">{intl.formatMessage(messages.columnUpdated)}: </span>
                   <RelativeTime value={flow.updatedAt} />
+                </span>
+                <span>
+                  <Link asChild>
+                    <RouterLink
+                      to="/orgs/$orgSlug/projects/$projectHandle/executions"
+                      params={{ orgSlug, projectHandle }}
+                      search={{ flowId: flow.id }}
+                    >
+                      {intl.formatMessage(messages.runs)}
+                    </RouterLink>
+                  </Link>
                 </span>
               </li>
             ))}
