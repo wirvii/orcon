@@ -61,6 +61,33 @@ func NewEvaluator(store Store, cat *Catalog) *Evaluator {
 
 var _ Authorizer = (*Evaluator)(nil)
 
+// OrgSelector decides whether a session principal may work in the organization it named
+// with the Orcon-Org header (ADR-0038 section 6, SPEC-004 SE6-http).
+type OrgSelector interface {
+	// SelectOrganization reports whether user holds an ACTIVE membership of org. It returns
+	// false, not an error, for a membership that does not exist.
+	SelectOrganization(ctx context.Context, user identity.UserID, org identity.OrgID) (bool, error)
+}
+
+var _ OrgSelector = (*Evaluator)(nil)
+
+// SelectOrganization implements [OrgSelector]: one lookup of (organization, user) in the
+// request plane. A zero user or organization is never a member.
+func (e *Evaluator) SelectOrganization(ctx context.Context, user identity.UserID, org identity.OrgID) (bool, error) {
+	if user.IsZero() || org.IsZero() {
+		return false, nil
+	}
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		return false, fmt.Errorf("select organization: scope: %w", err)
+	}
+	active, err := e.store.ActiveMember(ctx, user, scope)
+	if err != nil {
+		return false, fmt.Errorf("select organization: membership: %w", err)
+	}
+	return active, nil
+}
+
 // Authorize implements [Authorizer]. The visibility of a resource is the permission to
 // read it (project:read, org:read): without it the resource is hidden (404); with it, a
 // missing action is forbidden (403). A resource of another organization is hidden.

@@ -45,6 +45,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security) (*ht
 	if sec != nil {
 		deps.Authenticator = sec.sessions
 		deps.Authorizer = sec.evaluator
+		deps.OrgSelector = sec.evaluator
 		deps.Idempotency = sec.store
 		projects := httpapi.NewProjects(
 			identity.NewProjects(sec.store, sec.store, sec.clock, sec.ids), sec.store,

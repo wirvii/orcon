@@ -199,6 +199,31 @@ func TestForeignAndNonMembersAreHidden(t *testing.T) {
 	}
 }
 
+// TestSelectOrganizationNeedsAnActiveMembership (ADR-0038 section 6, SPEC-004 SE6-http): a user
+// is a member of the organization named in the header only with an ACTIVE membership there, and
+// a zero user or organization is never a member.
+func TestSelectOrganizationNeedsAnActiveMembership(t *testing.T) {
+	st := baseStore()
+	ev := authz.NewEvaluator(st, testCatalog(t))
+	if ok, err := ev.SelectOrganization(t.Context(), testUser, testOrg); err != nil || !ok {
+		t.Errorf("active member: %v, %v; want true, nil", ok, err)
+	}
+	st.active = false
+	if ok, err := ev.SelectOrganization(t.Context(), testUser, testOrg); err != nil || ok {
+		t.Errorf("inactive membership: %v, %v; want false, nil", ok, err)
+	}
+	st.active = true
+	if ok, _ := ev.SelectOrganization(t.Context(), identity.UserID{}, testOrg); ok {
+		t.Error("a zero user is a member")
+	}
+	if ok, _ := ev.SelectOrganization(t.Context(), testUser, identity.OrgID{}); ok {
+		t.Error("a zero organization is a member")
+	}
+	if ok, err := (authz.DenyAll{}).SelectOrganization(t.Context(), testUser, testOrg); err != nil || ok {
+		t.Errorf("DenyAll: %v, %v; want false, nil", ok, err)
+	}
+}
+
 // TestUnknownProjectIsHidden: an identifier that names no project is hidden, not an error.
 func TestUnknownProjectIsHidden(t *testing.T) {
 	st := baseStore()

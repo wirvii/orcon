@@ -193,6 +193,14 @@ func (DenyAll) Authorize(context.Context, Request) (Decision, orgscope.Org, erro
 	return DecisionForbidden, orgscope.Org{}, nil
 }
 
+// SelectOrganization implements [OrgSelector]: no membership is ever known, so every
+// organization named in a header is refused.
+func (DenyAll) SelectOrganization(context.Context, identity.UserID, identity.OrgID) (bool, error) {
+	return false, nil
+}
+
+var _ OrgSelector = DenyAll{}
+
 type scopeKey struct{}
 
 // WithOrgScope returns a context that carries the organization a request was authorized in.

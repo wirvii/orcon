@@ -13,6 +13,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 // AuthConfig names the places a request carries its credentials.
@@ -98,6 +99,58 @@ func Authenticate(a identity.Authenticator, logger *slog.Logger, cfg AuthConfig)
 				problem.Write(w, r, problem.InternalError)
 				return
 			}
+			next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), principal)))
+		})
+	}
+}
+
+// SelectOrganization binds the organization the client named with the Orcon-Org header to
+// the principal (ADR-0038 section 6, SPEC-004 SE6-http). A session principal gets the
+// organization only when it holds an ACTIVE membership there. Any other answer is 404
+// identical to a missing organization, so the header never reveals whether an
+// organization exists. A principal fixed to an organization (an API key) accepts only that
+// organization and refuses another with the same 404. A request without the header, or
+// without a principal, passes unchanged: the route then decides, and a route with no
+// organization in its path has no organization and is refused by the authorizer.
+func SelectOrganization(sel authz.OrgSelector, logger *slog.Logger, cfg AuthConfig) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			raw := r.Header.Get(cfg.OrgHeader)
+			principal, ok := PrincipalFrom(r.Context())
+			if raw == "" || !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			org, err := id.Parse(raw)
+			if err != nil {
+				problem.Write(w, r, problem.NotFound)
+				return
+			}
+			orgID := identity.OrgID(org)
+			if !principal.OrgID.IsZero() {
+				if principal.OrgID != orgID {
+					problem.Write(w, r, problem.NotFound)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			if principal.Kind != identity.PrincipalUser {
+				problem.Write(w, r, problem.NotFound)
+				return
+			}
+			member, err := sel.SelectOrganization(r.Context(), principal.UserID, orgID)
+			if err != nil {
+				logger.ErrorContext(r.Context(), "organization selection failed",
+					"request_id", RequestIDFrom(r.Context()), "error", err)
+				problem.Write(w, r, problem.InternalError)
+				return
+			}
+			if !member {
+				problem.Write(w, r, problem.NotFound)
+				return
+			}
+			principal.OrgID = orgID
 			next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), principal)))
 		})
 	}
