@@ -45,6 +45,10 @@ func (c *converter) convertCore(n *Node, row CoreNode) convResult {
 		return c.convertWebhook(n)
 	case basePrefix + "scheduleTrigger":
 		return c.convertSchedule(n)
+	case basePrefix + "noOp":
+		return c.convertNoOp(n)
+	case basePrefix + "set":
+		return c.convertSet(n)
 	}
 	element := flow.ElementTask
 	if row.Disposition == DispTrigger {

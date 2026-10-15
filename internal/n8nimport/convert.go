@@ -333,13 +333,13 @@ type convResult struct {
 // unsupported keeps the node as orcon.unsupported@1 with the original n8n
 // node in its ext. Its findings say why.
 func (c *converter) unsupported(n *Node, findings []Finding, element flow.Element) convResult {
-	if len(findings) == 0 {
-		findings = []Finding{{Code: FindUnmappedType, NodeID: n.ID, Node: n.Name, Field: "type",
-			Message: "no Orcon counterpart is available for " + n.Type}}
-	}
 	// The original node is kept without its secrets; each replaced field is a
 	// finding of its own.
 	clean, secretFindings := redactNode(n)
+	if len(findings) == 0 && len(secretFindings) == 0 {
+		findings = []Finding{{Code: FindUnmappedType, NodeID: n.ID, Node: n.Name, Field: "type",
+			Message: "no Orcon counterpart is available for " + n.Type}}
+	}
 	ext := importMembers(n)
 	if !clean.IsZero() {
 		inner, _ := ext.Get(flow.ImportExtKey)
