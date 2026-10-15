@@ -19,6 +19,7 @@ export const routes = rootRoute('shell/RootLayout.tsx', [
       route('/projects/$projectHandle', '../features/projects/routes/project.tsx', [
         index('../features/projects/routes/project-index.tsx'),
         route('/flows', '../features/flows/routes/flows.tsx'),
+        route('/credentials', '../features/credentials/routes/credentials.tsx'),
         route('/executions', '../features/executions/routes/executions.tsx'),
         route('/executions/$executionId', '../features/executions/routes/execution.tsx'),
       ]),

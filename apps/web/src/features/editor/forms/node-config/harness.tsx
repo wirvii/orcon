@@ -8,6 +8,7 @@ import { vi } from 'vitest';
 import { renderInApp } from '../../../../../test/screen-harness';
 import { createQueryClient } from '../../../../app/query-client';
 import type { RouterContext } from '../../../../app/router-context';
+import { createLocalCredentialStore } from '../../../../app/credential-store/store';
 import { createLocalCredentialSource } from '../../api/local-credential-source';
 import { createLocalFlowTargetSource } from '../../api/local-flow-target-source';
 import { credentialSource, flowTargetSource } from '../../api/queries';
@@ -28,7 +29,7 @@ export interface Harness {
  * come from fresh in-memory sources, so no test sees what another created.
  */
 export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument()): Harness & ReturnType<typeof renderInApp> {
-  const fresh = createLocalCredentialSource();
+  const fresh = createLocalCredentialSource(createLocalCredentialStore());
   vi.spyOn(credentialSource, 'list').mockImplementation(fresh.list);
   vi.spyOn(credentialSource, 'create').mockImplementation(fresh.create);
   const flows = createLocalFlowTargetSource();

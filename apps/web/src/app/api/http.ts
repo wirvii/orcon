@@ -59,7 +59,7 @@ export class ApiProblem extends Error {
 }
 
 export interface ApiRequest<T> {
-  method: 'GET' | 'POST' | 'PUT';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** The path below `/api/v1`, starting with `/`. */
   path: string;
   query?: Record<string, string | number | undefined> | undefined;

@@ -1,29 +1,20 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { CredentialNameTaken, type CredentialSource, type CredentialSummary } from './credential-source';
+import { type CredentialStore, localCredentialStore } from '../../../app/credential-store/store';
 
-const SEED: readonly CredentialSummary[] = [
-  { id: 'cred-slack', name: 'Slack incoming webhook', type: 'httpHeaderAuth', updatedAt: '2026-10-09T14:20:00Z' },
-  { id: 'cred-inventory', name: 'Inventory API key', type: 'httpHeaderAuth', updatedAt: '2026-09-28T08:05:00Z' },
-];
+import type { CredentialSource } from './credential-source';
+
+/** The project the preview's credential list is read for: the local store keeps one list for all of them. */
+const PREVIEW_PROJECT = 'preview';
 
 /**
- * A credential source that keeps the list in memory and makes no request. The preview of the editor
- * uses it: creating a credential adds a name to the list, but the secret values are dropped on the
- * spot (nothing here could keep them safely), and a credential cannot be tested.
+ * The editor's credential widget over a store. The preview uses the shared local store, so a credential
+ * created on the credentials screen is offered to a node too; tests pass their own store to start empty.
  */
-export function createLocalCredentialSource(seed: readonly CredentialSummary[] = SEED): CredentialSource {
-  const held = [...seed];
-  let counter = 0;
+export function createLocalCredentialSource(store: CredentialStore = localCredentialStore): CredentialSource {
   return {
-    list: () => Promise.resolve([...held]),
-    create: ({ name, type }) => {
-      if (held.some((credential) => credential.name === name)) return Promise.reject(new CredentialNameTaken(name));
-      counter += 1;
-      const created: CredentialSummary = { id: `cred-local-${String(counter)}`, name, type, updatedAt: new Date().toISOString() };
-      held.push(created);
-      return Promise.resolve(created);
-    },
+    list: () => store.list(PREVIEW_PROJECT),
+    create: (input) => store.create(PREVIEW_PROJECT, input),
   };
 }

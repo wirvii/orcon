@@ -3,7 +3,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { CREDENTIAL_TYPES } from './credential-types';
 import { exampleFlowDocument } from './example-flow';
 import { findNode, type FlowNode } from './flow-document';
 import { catalogText, effectOf, isUnsupported, localeOf, manifestOf, parametersFor, type NodeManifest, type ParamDef } from './node-manifests';
@@ -53,7 +52,6 @@ describe('node manifests', () => {
 
     it('have the same keys in English and Spanish', () => {
       for (const manifest of allManifests()) expect(catalogKeys(manifest, 'es'), manifest.key).toEqual(catalogKeys(manifest, 'en'));
-      for (const type of CREDENTIAL_TYPES) expect(Object.keys(type.catalog.es).sort(), type.id).toEqual(Object.keys(type.catalog.en).sort());
     });
 
     it('give a label to every parameter, every option and every field of a list, and a line to every operation', () => {

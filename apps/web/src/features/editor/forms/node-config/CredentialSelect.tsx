@@ -9,8 +9,8 @@ import { useIntl } from 'react-intl';
 
 import { credentialSource, credentialsQueryOptions } from '../../api/queries';
 import { useNoticeChannel } from '../../components/notice-channel';
-import { credentialType } from '../../model/credential-types';
-import { catalogText, localeOf, type CredentialSlot } from '../../model/node-manifests';
+import { catalogLocaleOf, credentialText, credentialType } from '../../../../app/credential-store/credential-types';
+import { type CredentialSlot } from '../../model/node-manifests';
 
 import { CreateCredentialDialog } from './CreateCredentialDialog';
 import { configMessages } from './messages';
@@ -34,7 +34,7 @@ export interface CredentialSelectProps {
  */
 export function CredentialSelect({ nodeId, slot, bound, t }: CredentialSelectProps) {
   const intl = useIntl();
-  const language = localeOf(intl.locale);
+  const language = catalogLocaleOf(intl.locale);
   const notices = useNoticeChannel();
   const actions = useNodeActions(nodeId);
   const query = useQuery(credentialsQueryOptions());
@@ -55,7 +55,7 @@ export function CredentialSelect({ nodeId, slot, bound, t }: CredentialSelectPro
         // The type is named only when the slot takes more than one: with one type it is the slot's own.
         label: intl.formatMessage(slot.types.length > 1 ? configMessages.credentialOptionTyped : configMessages.credentialOption, {
           name: credential.name,
-          type: type ? catalogText(type, language, 'name') : credential.type,
+          type: type ? credentialText(type, language, 'name') : credential.type,
           date: intl.formatDate(credential.updatedAt, { dateStyle: 'short' }),
         }),
       };
