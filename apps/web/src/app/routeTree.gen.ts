@@ -7,15 +7,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './shell/RootLayout'
-import { Route as shellHomeRouteImport } from './shell/Home'
+import { Route as DotDotFeaturesSessionRoutesSessionLayoutRouteImport } from './../features/session/routes/SessionLayout'
+import { Route as DotDotFeaturesSessionRoutesLoginRouteImport } from './../features/session/routes/login'
+import { Route as DotDotFeaturesSessionRoutesLandingRouteImport } from './../features/session/routes/landing'
+import { Route as DotDotFeaturesSessionRoutesOrgsRouteImport } from './../features/session/routes/orgs'
 import { Route as FlowsFlowIdRouteImport } from './../features/editor/routes/$flowId'
 import { Route as SettingsAppearanceRouteImport } from './../features/settings/routes/appearance'
+import { Route as DotDotFeaturesSessionRoutesOrgRouteImport } from './../features/session/routes/org'
 
-const shellHomeRoute = shellHomeRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const DotDotFeaturesSessionRoutesSessionLayoutRoute =
+  DotDotFeaturesSessionRoutesSessionLayoutRouteImport.update({
+    id: '/_session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotDotFeaturesSessionRoutesLoginRoute =
+  DotDotFeaturesSessionRoutesLoginRouteImport.update({
+    id: '/login',
+    path: '/login',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotDotFeaturesSessionRoutesLandingRoute =
+  DotDotFeaturesSessionRoutesLandingRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
+  } as any)
+const DotDotFeaturesSessionRoutesOrgsRoute =
+  DotDotFeaturesSessionRoutesOrgsRouteImport.update({
+    id: '/orgs',
+    path: '/orgs',
+    getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
+  } as any)
 const FlowsFlowIdRoute = FlowsFlowIdRouteImport.update({
   id: '/flows/$flowId',
   path: '/flows/$flowId',
@@ -26,45 +48,103 @@ const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
   path: '/settings/appearance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotDotFeaturesSessionRoutesOrgRoute =
+  DotDotFeaturesSessionRoutesOrgRouteImport.update({
+    id: '/orgs/$orgSlug',
+    path: '/orgs/$orgSlug',
+    getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof shellHomeRoute
+  '/': typeof DotDotFeaturesSessionRoutesLandingRoute
+  '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof shellHomeRoute
+  '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/': typeof DotDotFeaturesSessionRoutesLandingRoute
+  '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof shellHomeRoute
+  '/_session': typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
+  '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/_session/': typeof DotDotFeaturesSessionRoutesLandingRoute
+  '/_session/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/_session/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/flows/$flowId' | '/settings/appearance'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/orgs'
+    | '/flows/$flowId'
+    | '/settings/appearance'
+    | '/orgs/$orgSlug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/flows/$flowId' | '/settings/appearance'
-  id: '__root__' | '/' | '/flows/$flowId' | '/settings/appearance'
+  to:
+    | '/login'
+    | '/'
+    | '/orgs'
+    | '/flows/$flowId'
+    | '/settings/appearance'
+    | '/orgs/$orgSlug'
+  id:
+    | '__root__'
+    | '/_session'
+    | '/login'
+    | '/_session/'
+    | '/_session/orgs'
+    | '/flows/$flowId'
+    | '/settings/appearance'
+    | '/_session/orgs/$orgSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  shellHomeRoute: typeof shellHomeRoute
+  DotDotFeaturesSessionRoutesSessionLayoutRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
+  DotDotFeaturesSessionRoutesLoginRoute: typeof DotDotFeaturesSessionRoutesLoginRoute
   FlowsFlowIdRoute: typeof FlowsFlowIdRoute
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_session': {
+      id: '/_session'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_session/': {
+      id: '/_session/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof shellHomeRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesLandingRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRoute
+    }
+    '/_session/orgs': {
+      id: '/_session/orgs'
+      path: '/orgs'
+      fullPath: '/orgs'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesOrgsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRoute
     }
     '/flows/$flowId': {
       id: '/flows/$flowId'
@@ -80,11 +160,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAppearanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_session/orgs/$orgSlug': {
+      id: '/_session/orgs/$orgSlug'
+      path: '/orgs/$orgSlug'
+      fullPath: '/orgs/$orgSlug'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesOrgRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRoute
+    }
   }
 }
 
+interface DotDotFeaturesSessionRoutesSessionLayoutRouteChildren {
+  DotDotFeaturesSessionRoutesLandingRoute: typeof DotDotFeaturesSessionRoutesLandingRoute
+  DotDotFeaturesSessionRoutesOrgsRoute: typeof DotDotFeaturesSessionRoutesOrgsRoute
+  DotDotFeaturesSessionRoutesOrgRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+}
+
+const DotDotFeaturesSessionRoutesSessionLayoutRouteChildren: DotDotFeaturesSessionRoutesSessionLayoutRouteChildren =
+  {
+    DotDotFeaturesSessionRoutesLandingRoute:
+      DotDotFeaturesSessionRoutesLandingRoute,
+    DotDotFeaturesSessionRoutesOrgsRoute: DotDotFeaturesSessionRoutesOrgsRoute,
+    DotDotFeaturesSessionRoutesOrgRoute: DotDotFeaturesSessionRoutesOrgRoute,
+  }
+
+const DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren =
+  DotDotFeaturesSessionRoutesSessionLayoutRoute._addFileChildren(
+    DotDotFeaturesSessionRoutesSessionLayoutRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
-  shellHomeRoute: shellHomeRoute,
+  DotDotFeaturesSessionRoutesSessionLayoutRoute:
+    DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren,
+  DotDotFeaturesSessionRoutesLoginRoute: DotDotFeaturesSessionRoutesLoginRoute,
   FlowsFlowIdRoute: FlowsFlowIdRoute,
   SettingsAppearanceRoute: SettingsAppearanceRoute,
 }

@@ -615,7 +615,8 @@ describe('the node details view', () => {
       });
       // The canvas was told about the new line and port; that is not an edit of its own, so nothing was renamed.
       expect(status()).not.toMatch(/Renamed/);
-    });
+      // Types a long address key by key and walks three controls: slower than the 5 s default on CI runners (BL-107).
+    }, 15_000);
 
     it('takes the canvas back with the draft when the edits are undone', async () => {
       renderEditor();

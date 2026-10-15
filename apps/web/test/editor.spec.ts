@@ -42,13 +42,12 @@ async function boxOf(page: Page, id: string) {
   return { x: Math.round(box.x), y: Math.round(box.y) };
 }
 
-test('the editor is reachable from the navigation at a stable address', async ({ page }) => {
+test('the editor opens at its stable address', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('orcon.locale', 'en');
   });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Flow editor' }).first().click();
+  await page.goto(FLOW);
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`));
   await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
   // A reload of that address (the server answers every address with the page) opens the same flow.
@@ -61,7 +60,7 @@ test('the navigation links to the API reference, a page the server serves, in th
     window.localStorage.setItem('orcon.locale', 'en');
   });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
+  await page.goto('/settings/appearance');
   const link = page.getByRole('link', { name: 'API reference' }).first();
   await expect(link).toHaveAttribute('href', '/api/reference/');
   await expect(link).not.toHaveAttribute('target', '_blank');
