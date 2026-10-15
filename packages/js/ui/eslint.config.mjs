@@ -20,11 +20,11 @@ export default [
     // The brand art classes (theme choice, mascot and hero sizes) are defined in src/styles/index.css, outside the Tailwind theme.
     // React Flow marks parts of a node that must not start a drag, a pan or a wheel zoom with these classes.
     files: ['**/*.{ts,tsx}'],
-    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^(nodrag|nopan|nowheel)$', '^orcon-(edge-focus|run-ring|handle|handle-in)$', '^orcon-(brand-on-dark|brand-on-light|brand-hero-image|mascot-image)$'] }] },
+    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^(nodrag|nopan|nowheel)$', '^orcon-(edge-focus|run-ring|handle|handle-in)$', '^orcon-(brand-on-dark|brand-on-light|brand-hero-image|mascot-image|mascot-image-bare)$'] }] },
   },
   {
     // Stories force interaction states with the pseudo-* classes of the Storybook pseudo-states addon.
     files: ['**/*.stories.tsx'],
-    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^pseudo-(hover|focus|focus-visible|active)$', '^(nodrag|nopan|nowheel)$', '^orcon-(edge-focus|run-ring|handle|handle-in)$', '^orcon-(brand-on-dark|brand-on-light|brand-hero-image|mascot-image)$'] }] },
+    rules: { 'better-tailwindcss/no-unknown-classes': ['error', { ignore: ['^pseudo-(hover|focus|focus-visible|active)$', '^(nodrag|nopan|nowheel)$', '^orcon-(edge-focus|run-ring|handle|handle-in)$', '^orcon-(brand-on-dark|brand-on-light|brand-hero-image|mascot-image|mascot-image-bare)$'] }] },
   },
 ];

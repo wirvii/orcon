@@ -25,6 +25,13 @@ const art = {
 export interface BrandMarkProps {
   /** `lockup` shows the symbol and the wordmark; `symbol` only the symbol. */
   variant?: 'lockup' | 'symbol' | undefined;
+  /**
+   * Draw the art made for a dark or a light background whatever the theme is: for a surface that keeps its own
+   * look in both themes, such as the brand panel of the sign-in page. Without it the theme chooses.
+   */
+  on?: 'dark' | 'light' | undefined;
+  /** `large` is for a page of its own, such as the brand panel of the sign-in page. */
+  size?: 'default' | 'large' | undefined;
   className?: string | undefined;
 }
 
@@ -40,12 +47,12 @@ export interface BrandMarkProps {
  * inside its dark rounded square and the wordmark in navy. The container carries
  * the accessible name; the images are decoration.
  */
-export function BrandMark({ variant = 'lockup', className }: BrandMarkProps) {
+export function BrandMark({ variant = 'lockup', on, size = 'default', className }: BrandMarkProps) {
   const { dark, light } = art[variant];
   return (
     <span className={cn('inline-flex shrink-0 items-center', className)} role="img" aria-label={PRODUCT_NAME} data-brand-variant={variant}>
-      <img {...dark} alt="" aria-hidden className="orcon-brand-on-dark h-icon-24 w-auto" />
-      <img {...light} alt="" aria-hidden className="orcon-brand-on-light h-icon-24 w-auto" />
+      {on === 'light' ? null : <img {...dark} alt="" aria-hidden className={cn('w-auto', size === 'large' ? 'h-8' : 'h-icon-24', on === undefined && 'orcon-brand-on-dark')} />}
+      {on === 'dark' ? null : <img {...light} alt="" aria-hidden className={cn('w-auto', size === 'large' ? 'h-8' : 'h-icon-24', on === undefined && 'orcon-brand-on-light')} />}
     </span>
   );
 }

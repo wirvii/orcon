@@ -27,6 +27,8 @@ export const Default: Story = { args: { pose: 'welcome' } };
 export const Welcome: Story = { args: { pose: 'welcome' } };
 export const Happy: Story = { args: { pose: 'happy' } };
 export const Thinking: Story = { args: { pose: 'thinking' } };
+/** The cut-out alone, without the panel, for a hero spot. */
+export const Bare: Story = { args: { pose: 'welcome', bare: true } };
 
 export const Matrix: Story = {
   render: () => (
@@ -37,6 +39,10 @@ export const Matrix: Story = {
         {
           label: 'approved cut-out',
           cells: (['welcome', 'happy', 'thinking'] as const).map((pose) => <Mascot key={pose} pose={pose} />),
+        },
+        {
+          label: 'bare',
+          cells: (['welcome', 'happy', 'thinking'] as const).map((pose) => <Mascot key={`bare-${pose}`} pose={pose} bare />),
         },
       ]}
     />
