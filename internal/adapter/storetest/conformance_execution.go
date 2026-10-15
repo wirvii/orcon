@@ -438,7 +438,9 @@ func fencingCase(t *testing.T, newStore Factory) {
 		err := e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AssertFence(ctx, bad, base) })
 		wantErr(t, name, err, store.ErrFenced)
 	}
-	// A fenced step that fails takes everything else of its transaction with it.
+	// A fenced step that fails takes everything else of its transaction with it. The claim started the execution, so
+	// its event is already there.
+	eventsBefore, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10)
 	err = e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		if _, err := tx.AppendEvent(ctx, store.Event{ID: next[store.EventID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, OccurredAt: base, Type: "lost", SchemaVersion: 1, Reference: []byte(`{}`), CreatedAt: base}); err != nil {
 			return err
@@ -446,8 +448,8 @@ func fencingCase(t *testing.T, newStore Factory) {
 		return tx.AssertFence(ctx, store.Fence{OrgID: e.orgA, Token: tok.ID, Epoch: fence.Epoch + 7, Owner: w}, base)
 	})
 	wantErr(t, "a step with a lost lease", err, store.ErrFenced)
-	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10); len(evs) != 0 {
-		t.Fatalf("a fenced transaction left %d events", len(evs))
+	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10); len(evs) != len(eventsBefore) {
+		t.Fatalf("a fenced transaction left %d events", len(evs)-len(eventsBefore))
 	}
 	// Moving the token ends the lease; the same fence then fails.
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.MoveToken(ctx, fence, "WAITING", base) }), "move the token")
@@ -503,7 +505,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	}
 	// The next claim raises the epoch; at the threshold the token is poisoned instead of retried.
 	for round := 2; round <= 3; round++ {
-		c, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now})
+		request := store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now}
+		claim := e.s.ClaimTokens
+		if round == 3 { // one abandonment short of the threshold: only the last chance claim takes it
+			claim = e.s.ClaimLastChanceToken
+		}
+		c, err := claim(e.ctx(), request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -535,12 +542,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	if got.Status != "SUSPENDED" || got.SuspendReason != "POISON" || got.AbandonedCount != 3 {
 		t.Fatalf("poisoned token = %+v", got)
 	}
-	// Graceful shutdown gives every lease of a worker back at once.
-	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, now)
-	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID {
+	// Graceful shutdown gives every lease of a worker back at once, and gives it back: no abandonment is counted.
+	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, 3, now)
+	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID || released[0].AbandonedCount != 0 || released[0].Poisoned {
 		t.Fatalf("released = %+v, %v", released, err)
 	}
-	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() {
+	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() || got.AbandonedCount != 0 {
 		t.Fatalf("released token = %+v", got)
 	}
 }
@@ -726,7 +733,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		}
 		return tx.AppendJournal(ctx, ops)
 	}), "journal intent")
-	listed, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 0, 100)
+	listed, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 0, store.ExternalOperationID{}, 100)
 	if err != nil || len(listed) != items {
 		t.Fatalf("journal has %d entries, %v", len(listed), err)
 	}
@@ -736,7 +743,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 			t.Fatalf("entry %d = %+v", i, o)
 		}
 	}
-	if rest, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 20, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
+	if rest, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 20, store.ExternalOperationID{}, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
 		t.Fatalf("journal from item 20 = %d entries, %v", len(rest), err)
 	}
 	// A repeated correlation key rejects the whole batch.
@@ -745,18 +752,51 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		{ID: next[store.ExternalOperationID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, NodeExecutionID: ne.ID, ItemIndex: 101, CorrelationKey: "key-00", ContractReference: "c", CreatedAt: base},
 	}
 	wantErr(t, "a repeated correlation key", e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AppendJournal(ctx, dup) }), flow.ErrConflict)
-	if all, _ := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 100, 100); len(all) != 0 {
+	if all, _ := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 100, store.ExternalOperationID{}, 100); len(all) != 0 {
 		t.Fatalf("a rejected batch left %d entries", len(all))
 	}
+	// Retries share an item index: one row per retry epoch. The list pages by the full
+	// (item index, id) key, so none of them is lost at a page boundary.
+	var retries []store.ExternalOperation
+	for epoch := int64(1); epoch <= 2; epoch++ {
+		retries = append(retries, store.ExternalOperation{ID: next[store.ExternalOperationID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, NodeExecutionID: ne.ID, ItemIndex: 3, RetryEpoch: epoch, CorrelationKey: fmt.Sprintf("retry-3-%d", epoch), ContractReference: "c", CreatedAt: base})
+	}
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AppendJournal(ctx, retries) }), "journal retry epochs")
+	var paged []store.ExternalOperation
+	var fromItem int64
+	var fromID store.ExternalOperationID
+	for {
+		page, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, fromItem, fromID, 2)
+		if err != nil {
+			t.Fatalf("paged journal: %v", err)
+		}
+		paged = append(paged, page...)
+		if len(page) < 2 {
+			break
+		}
+		last := page[len(page)-1]
+		fromItem, fromID = last.ItemIndex, last.ID
+	}
+	if len(paged) != items+len(retries) {
+		t.Fatalf("paged journal has %d entries, want %d", len(paged), items+len(retries))
+	}
+	seen := map[store.ExternalOperationID]bool{}
+	for i := range paged {
+		if seen[paged[i].ID] {
+			t.Fatalf("paged journal repeats %s", paged[i].ID)
+		}
+		seen[paged[i].ID] = true
+	}
 	// DISPATCHING is marked under the fence, before any send; it moves only PREPARED entries once.
-	deadline := realNow().Add(time.Minute).Truncate(time.Microsecond)
+	// The deadline is set from the database clock (ADR-0012 section 5).
+	const attemptTimeout = time.Minute
 	var moved int64
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		if err := tx.AssertFence(ctx, fence, base); err != nil {
 			return err
 		}
 		var err error
-		moved, err = tx.MarkDispatching(ctx, ids[:10], deadline, base)
+		moved, err = tx.MarkDispatching(ctx, ids[:10], attemptTimeout)
 		return err
 	}), "mark dispatching")
 	if moved != 10 {
@@ -764,14 +804,26 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 	}
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		var err error
-		moved, err = tx.MarkDispatching(ctx, ids[5:15], deadline, base)
+		moved, err = tx.MarkDispatching(ctx, ids[5:15], attemptTimeout)
 		return err
 	}), "mark dispatching again")
 	if moved != 5 {
 		t.Fatalf("%d entries moved on the second call, want 5 (only PREPARED ones)", moved)
 	}
+	var dbNow, dbLater time.Time
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
+		var err error
+		if dbNow, err = tx.DatabaseNow(ctx); err != nil {
+			return err
+		}
+		dbLater, err = tx.DatabaseNow(ctx)
+		return err
+	}), "database clock")
+	if dbNow.IsZero() || dbLater.Before(dbNow) {
+		t.Fatalf("database clock reads %v then %v", dbNow, dbLater)
+	}
 	gotOp, err := e.s.GetExternalOperation(e.ctx(), e.scopeA, ids[0])
-	if err != nil || gotOp.State != "DISPATCHING" || !gotOp.DispatchDeadlineAt.Equal(deadline) || gotOp.FirstDispatchedAt.IsZero() {
+	if err != nil || gotOp.State != "DISPATCHING" || gotOp.FirstDispatchedAt.IsZero() || !gotOp.DispatchDeadlineAt.Equal(gotOp.FirstDispatchedAt.Add(attemptTimeout)) {
 		t.Fatalf("dispatching entry = %+v, %v", gotOp, err)
 	}
 	// A lost lease stops the dispatch mark.
@@ -781,7 +833,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		if err := tx.AssertFence(ctx, stale, base); err != nil {
 			return err
 		}
-		_, err := tx.MarkDispatching(ctx, ids[20:], deadline, base)
+		_, err := tx.MarkDispatching(ctx, ids[20:], attemptTimeout)
 		return err
 	})
 	wantErr(t, "a dispatch mark with a lost lease", err, store.ErrFenced)

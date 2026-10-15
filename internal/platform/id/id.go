@@ -9,6 +9,7 @@ package id
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -157,5 +158,28 @@ func (s *Sequence) New() UUID {
 	var u UUID
 	u[6] = 0x70
 	binary.BigEndian.PutUint64(u[8:], 0x8000000000000000|n)
+	return u
+}
+
+// Derive is the function H of ADR-0008 section 6: the first 128 bits of the
+// SHA-256 of the length-prefixed fields, as a UUID. The engine derives the
+// identity of tokens, node executions and payloads with it, so recomputing a
+// step after a crash produces the same rows. The result is not a UUIDv7; the
+// ADR accepts that for these identities. The storage adapters compute the same
+// value for the rows they create themselves (events and attention requests of
+// recovery), so it must never change.
+func Derive(fields ...string) UUID {
+	size := 0
+	for _, f := range fields {
+		size += 8 + len(f)
+	}
+	buf := make([]byte, 0, size)
+	for _, f := range fields {
+		buf = binary.BigEndian.AppendUint64(buf, uint64(len(f)))
+		buf = append(buf, f...)
+	}
+	sum := sha256.Sum256(buf)
+	var u UUID
+	copy(u[:], sum[:16])
 	return u
 }

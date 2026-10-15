@@ -143,7 +143,7 @@ var allowedFunctions = map[string]bool{
 	"lag": true, "lead": true, "first_value": true, "last_value": true,
 	"coalesce": true, "greatest": true, "least": true, "abs": true, "ceil": true, "floor": true, "round": true,
 	"lower": true, "upper": true, "length": true, "substr": true, "substring": true, "trim": true, "concat": true,
-	"now": true, "date_trunc": true, "generate_series": true, "unnest": true,
+	"now": true, "clock_timestamp": true, "date_trunc": true, "generate_series": true, "unnest": true,
 	"strftime": true, "datetime": true, "ifnull": true, "iif": true, "instr": true,
 }
 

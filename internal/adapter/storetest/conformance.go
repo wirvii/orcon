@@ -33,6 +33,7 @@ import (
 
 // Store is every port the storage adapters implement, and Close.
 type Store interface { //nolint:interfacebloat // the suite exercises every port of the adapters through one value
+	store.Scopes
 	identity.OrgStore
 	identity.PrincipalStore
 	identity.UserStore
@@ -46,9 +47,11 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	connector.GrantStore
 	execution.WorkerStore
 	store.Reader
+	store.EngineReader
 	store.Inbox
 	store.Transactor
 	store.WorkQueue
+	store.LeaseRecovery
 	store.Deliveries
 	store.WaitResolver
 	io.Closer
@@ -171,6 +174,7 @@ func Conformance(t *testing.T, newStore Factory) {
 		{"CloseWhileOperationsRun", closeCase},
 	}
 	cases = append(cases, executionCases()...)
+	cases = append(cases, engineCases()...)
 	for i := range cases {
 		c := &cases[i]
 		t.Run(c.name, func(t *testing.T) { c.run(t, newStore) })

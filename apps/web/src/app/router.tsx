@@ -5,6 +5,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRouter, type RouterHistory } from '@tanstack/react-router';
 
 import { RouteError } from './errors/RouteError';
+import { onUnauthenticated } from './query-client';
 import { NotFound } from './shell/NotFound';
 import { routeTree } from './routeTree.gen';
 
@@ -14,7 +15,7 @@ import { routeTree } from './routeTree.gen';
  * `history`; the app uses the browser's.
  */
 export function createAppRouter({ queryClient, history }: { queryClient: QueryClient; history?: RouterHistory | undefined }) {
-  return createRouter({
+  const router = createRouter({
     routeTree,
     ...(history ? { history } : {}),
     context: { queryClient },
@@ -23,6 +24,16 @@ export function createAppRouter({ queryClient, history }: { queryClient: QueryCl
     defaultErrorComponent: RouteError,
     defaultNotFoundComponent: NotFound,
   });
+  // A 401 on any request of the page ends the session: the person is sent to sign-in with the address they
+  // were on, and everything read for them is dropped (orcon-web DT-4).
+  onUnauthenticated(queryClient, () => {
+    const here = router.state.location;
+    if (here.pathname === '/login') return;
+    void router.navigate({ to: '/login', search: { redirect: here.href } }).finally(() => {
+      queryClient.clear();
+    });
+  });
+  return router;
 }
 
 export type AppRouter = ReturnType<typeof createAppRouter>;
