@@ -3,6 +3,7 @@
 
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
+import { setActiveOrganization } from '../../../app/api/http';
 import { RouteError } from '../../../app/errors/RouteError';
 import { organizationBySlugQueryOptions } from '../api/queries';
 import { orgSlugSchema } from '../../../app/route-params';
@@ -26,6 +27,8 @@ export const Route = createFileRoute('/_session/orgs/$orgSlug')({
     const [organization] = await context.queryClient.query(organizationBySlugQueryOptions(params.orgSlug));
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's notFound() is a marker object it catches, not an Error
     if (organization === undefined) throw notFound();
+    // Every request of the pages below acts for this organization (the Orcon-Org header).
+    setActiveOrganization(organization.id);
     return { organization };
   },
   errorComponent: RouteError,
