@@ -53,14 +53,14 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   await expect(page.getByText('Email or password is incorrect.')).toBeVisible();
   await expectNoAccessibilityViolations(page);
 
-  // 2. The right password opens the organization's projects.
+  // 2. The right password opens the home page of the organization.
   await signIn(page, secret);
-  await expect(page).toHaveURL(new RegExp(`/orgs/${orgSlug}/projects$`));
-  await expect(page.getByRole('heading', { level: 1, name: 'Projects' })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/orgs/${orgSlug}/overview$`));
+  await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
   await expectNoAccessibilityViolations(page);
 
-  // 3. A new project opens its flows.
-  await page.getByRole('button', { name: 'New project' }).first().click();
+  // 3. A new project, started from the sidebar, opens its flows.
+  await page.getByRole('button', { name: 'Create a project' }).first().click();
   await page.getByLabel(/^Name/).fill(projectName);
   await page.getByRole('button', { name: 'Create project' }).click();
   await expect(page).toHaveURL(new RegExp(`/orgs/${orgSlug}/projects/${projectHandle}/flows$`));
@@ -83,7 +83,9 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   // 6. Signing out leaves the signed-in pages; the flows list is one address away.
   await page.goto(`/orgs/${orgSlug}/projects/${projectHandle}/flows`);
   await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  // The account button is the last menu button that is on screen (the sidebar's on a computer, the avatar of the top
+  // bar on a phone); its name is the person's, whoever they are.
+  await page.locator('button[aria-haspopup="menu"]:visible').last().click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login\?signedOut=true$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();

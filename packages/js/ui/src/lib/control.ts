@@ -24,7 +24,7 @@ export const menuItem = [
 ].join(' ');
 
 /** The floating panel behind menus, selects and popovers. */
-export const floatingPanel = 'z-dropdown rounded-md border border-border bg-surface-raised text-fg shadow-md';
+export const floatingPanel = 'z-dropdown rounded-panel border border-strong bg-surface-raised text-fg shadow-lg';
 
 /** Backdrop behind a modal dialog or sheet. Dims the page in both themes. */
 export const scrim = 'fixed inset-0 z-overlay bg-scrim opacity-60';

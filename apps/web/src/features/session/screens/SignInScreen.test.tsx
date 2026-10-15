@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { productApi } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, problem, signedIn } from '../../../../test/session-fixtures';
 
@@ -67,13 +68,13 @@ describe('SignInScreen', () => {
   });
 
   it('returns to the page it came from after signing in', async () => {
-    server.use(signedIn.createSession(), signedIn.currentUser, signedIn.organizations([acme]));
-    const { router } = renderRoute('/login?redirect=%2Fsettings%2Fappearance');
+    server.use(signedIn.createSession(), signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
+    const { router } = renderRoute('/login?redirect=%2Forgs%2Facme%2Fsettings%2Fappearance');
     await screen.findByRole('heading', { level: 1, name: 'Sign in' });
     await fillForm();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Appearance' })).toBeVisible();
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/settings/appearance');
+      expect(router.state.location.pathname).toBe('/orgs/acme/settings/appearance');
     });
   });
 });

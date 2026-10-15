@@ -500,9 +500,9 @@ export const parityScripts: Record<string, ParityScript> = {
     },
     verify: async (env) => {
       const slackNode = await env.node('Slack');
-      await expect(slackNode).toHaveAccessibleName(/Status: Uncertain/);
+      await expect(slackNode).toHaveAccessibleName(/Status: Needs review/);
       await waitFor(() => expect(nodeState(env, 'slack')).toBe('uncertain'));
-      await expect(slackNode.querySelector('[data-node-chips]')).toHaveTextContent('Uncertain');
+      await expect(slackNode.querySelector('[data-node-chips]')).toHaveTextContent('Needs review');
       await expect(slackNode.querySelector('[data-node-badge="UNCERTAIN"]')).not.toBeNull();
       // It is never drawn as a failure: the tile, the badge and the chip carry no danger color.
       for (const part of ['[data-tile-surface]', '[data-node-badge]', '[data-node-chips]']) await expect(slackNode.querySelector(part)?.outerHTML).not.toMatch(/status-danger/);

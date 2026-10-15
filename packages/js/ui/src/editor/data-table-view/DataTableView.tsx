@@ -46,7 +46,7 @@ function BinaryCell({ value }: { value: ReturnType<typeof asBinary> }) {
         {name} <span className="text-fg-muted">· {mediaType} · {intl.formatMessage(editorMessages.fileSize, { size })}</span>
       </span>
       {href ? (
-        <a href={href} download={name} aria-label={intl.formatMessage(editorMessages.download, { name })} className="text-fg-link inline-flex min-h-target min-w-target items-center justify-center rounded-sm px-1 underline">
+        <a href={href} download={name} aria-label={intl.formatMessage(editorMessages.download, { name })} className="text-fg-link inline-flex min-h-target min-w-target items-center justify-center rounded-sm px-1">
           <Download aria-hidden className="size-icon-16" />
         </a>
       ) : null}
