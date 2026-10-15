@@ -85,6 +85,19 @@ export function csrfToken(): string | undefined {
   return entry === undefined ? undefined : decodeURIComponent(entry.slice(prefix.length));
 }
 
+/** The header that names the organization an interactive request acts for; without it protected routes answer 403. */
+export const ORG_HEADER = 'Orcon-Org';
+
+let activeOrganizationId: string | undefined;
+
+/**
+ * Sets the organization the person is working in (the organization route calls it when it opens). Every
+ * request made while an organization is active carries it in `Orcon-Org`; `undefined` clears it.
+ */
+export function setActiveOrganization(organizationId: string | undefined): void {
+  activeOrganizationId = organizationId;
+}
+
 /** Calls the API and returns the parsed body with the entity tag of the answer. */
 export async function apiCall<T>({ method, path, query, body, ifMatch, schema, source }: ApiRequest<T>): Promise<ApiAnswer<T>> {
   const url = new URL(`${API_PREFIX}${path}`, window.location.origin);
@@ -93,6 +106,7 @@ export async function apiCall<T>({ method, path, query, body, ifMatch, schema, s
   }
 
   const headers: Record<string, string> = { Accept: 'application/json' };
+  if (activeOrganizationId !== undefined) headers[ORG_HEADER] = activeOrganizationId;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (ifMatch !== undefined) headers['If-Match'] = ifMatch;
   if (UNSAFE_METHODS.has(method)) {
