@@ -127,6 +127,30 @@ func (t *fakeJournalTx) AppendJournal(_ context.Context, ops []store.ExternalOpe
 	return nil
 }
 
+// InsertJournalIfAbsent keeps the rows whose correlation key the journal holds, as the adapters do.
+func (t *fakeJournalTx) InsertJournalIfAbsent(_ context.Context, ops []store.ExternalOperation) error {
+	t.j.mu.Lock()
+	defer t.j.mu.Unlock()
+	for i := range ops {
+		if t.j.hasKey(ops[i].CorrelationKey) {
+			continue
+		}
+		o := ops[i]
+		o.State = journal.StatePrepared
+		t.j.rows[o.ID] = &o
+	}
+	return nil
+}
+
+func (f *fakeJournal) hasKey(key string) bool {
+	for _, r := range f.rows {
+		if r.CorrelationKey == key {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *fakeJournalTx) MarkDispatching(_ context.Context, ids []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
 	t.j.mu.Lock()
 	defer t.j.mu.Unlock()

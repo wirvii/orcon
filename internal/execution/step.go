@@ -181,6 +181,12 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 		Input:         input,
 		Env:           r.envOf(ne.id),
 	}
+	if cp := r.checkpoint; cp != nil {
+		at := call
+		call.Checkpoint = func(ctx context.Context, fn func(ctx context.Context, tx any) error) error {
+			return cp(ctx, at, fn)
+		}
+	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {
 		return nil, r.portFailure(ctx, "", n, "node failed", err)

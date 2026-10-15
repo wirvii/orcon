@@ -468,6 +468,34 @@ func (t *sqliteTx) AppendJournal(ctx context.Context, operations []store.Externa
 	return nil
 }
 
+func (t *sqliteTx) UpsertNodeExecution(ctx context.Context, n store.NodeExecution) error {
+	if err := t.own(n.OrgID); err != nil {
+		return err
+	}
+	return t.q.UpsertNodeExecution(ctx, sqlcgen.UpsertNodeExecutionParams{
+		ID: uuidBytes(n.ID), OrgID: uuidBytes(n.OrgID), ExecutionID: uuidBytes(n.ExecutionID), TokenID: uuidBytes(n.TokenID),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt), FinishedAt: nullMicros(n.FinishedAt),
+		CreatedAt: micros(n.CreatedAt), UpdatedAt: micros(n.UpdatedAt),
+	})
+}
+
+func (t *sqliteTx) InsertJournalIfAbsent(ctx context.Context, operations []store.ExternalOperation) error {
+	for i := range operations {
+		o := &operations[i]
+		if err := t.own(o.OrgID); err != nil {
+			return err
+		}
+		if _, err := t.q.InsertExternalOperationIfAbsent(ctx, sqlcgen.InsertExternalOperationIfAbsentParams{
+			ID: uuidBytes(o.ID), OrgID: uuidBytes(o.OrgID), ExecutionID: uuidBytes(o.ExecutionID), NodeExecutionID: uuidBytes(o.NodeExecutionID),
+			ItemIndex: o.ItemIndex, CorrelationKey: o.CorrelationKey, ContractReference: o.ContractReference, BatchKey: nullText(o.BatchKey),
+			CreatedAt: micros(o.CreatedAt), UpdatedAt: micros(o.CreatedAt),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
 	// SQLite runs in one process: the injected clock is the database clock here (TY-5).
 	now := t.now()

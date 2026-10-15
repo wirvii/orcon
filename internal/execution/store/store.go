@@ -575,6 +575,13 @@ type Tx interface {
 	// AppendJournal inserts the operations as PREPARED in one statement group
 	// (intent before dispatch, ADR-0012 section 4). A repeated correlation key
 	// fails with flow.ErrConflict and inserts none.
+	// InsertJournalIfAbsent writes the operations whose correlation key the journal
+	// does not hold yet; the rows already there are kept. It is the write of a
+	// checkpoint that may run again after a crash (ADR-0012 section 4).
+	InsertJournalIfAbsent(ctx context.Context, operations []ExternalOperation) error
+	// UpsertNodeExecution writes a node execution, or completes the row an earlier
+	// write made; the start instant of the first write is kept.
+	UpsertNodeExecution(ctx context.Context, n NodeExecution) error
 	AppendJournal(ctx context.Context, operations []ExternalOperation) error
 	// MarkDispatching moves PREPARED operations to DISPATCHING and returns how
 	// many moved (ADR-0012 section 4, step 2). The dispatch deadline is the

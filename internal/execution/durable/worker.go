@@ -194,6 +194,7 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 	}
 	work := execution.WorkOptions{
 		Budget: e.cfg.CheckpointActivations, StopAtFork: true, Release: e.draining.Load(),
+		Checkpoint: e.checkpointOf(org, execID, l.fence),
 		// A worker that shuts down pauses at the next activation boundary, commits, and gives the token back.
 		Pause: func() bool {
 			return time.Since(started) >= e.cfg.CheckpointInterval || !l.valid(e.leases) || e.draining.Load()

@@ -268,6 +268,10 @@ type WorkOptions struct {
 	// there, with the token still held (the time bound of a confirmation point,
 	// or a lease that can no longer be trusted).
 	Pause func() bool
+	// Checkpoint opens the checkpoint transaction of each activation, for the
+	// nodes that act on external systems (see [NodeCall.Checkpoint]). Nil when no
+	// durable engine runs the segment.
+	Checkpoint ActivationCheckpoint
 }
 
 // WorkResult says how a segment ended.
@@ -292,6 +296,7 @@ type WorkResult struct {
 // execution is over.
 func (s *Session) Work(ctx context.Context, id TokenID, opt WorkOptions) (WorkResult, error) {
 	r := s.r
+	r.checkpoint = opt.Checkpoint
 	t := r.tokens[id]
 	if t == nil || t.state != TokenLeased {
 		return WorkResult{}, fmt.Errorf("%w: token %s is not leased in this session", ErrInvalidRequest, id)

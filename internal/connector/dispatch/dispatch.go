@@ -34,6 +34,7 @@ import (
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // HTTPNodeType is the type of the core HTTP node (ADR-0037 Annex B).
@@ -367,36 +368,18 @@ func describe(err error) error {
 	return fmt.Errorf("dispatch: %w", err)
 }
 
-// effects sends every item through the journal: intent, DISPATCHING mark,
-// sends, outcomes. An idempotent effect is sent with its correlation key as the
-// provider key, so a recovery repeats it with the same key.
+// effects runs an effect through the journal. The intent is written inside the
+// checkpoint of the activation, before any send (ADR-0012 section 4). What the
+// journal holds then decides each item, so a re-run of the activation after a
+// crash never sends an operation twice (ADR-0012 sections 6 and 7):
+//   - a PREPARED item is dispatched;
+//   - a DISPATCHING item goes to recovery: it is resent with its key while the key
+//     lives, otherwise it becomes UNCERTAIN;
+//   - a SUCCEEDED item reuses the response the journal stored, and nothing is sent.
 func (n *HTTPNode) effects(ctx context.Context, req request, cred Credential, call execution.NodeCall) ([]jsonvalue.Value, error) {
 	count := call.Input.Len()
 	now := n.cfg.Clock.Now()
-	execID, tokenID, nodeExecID, err := storeIdentities(call)
-	if err != nil {
-		return nil, err
-	}
-	ops := make([]store.ExternalOperation, count)
-	for i := range count {
-		ops[i] = store.ExternalOperation{
-			ID:                store.ExternalOperationID(n.cfg.IDs.New()),
-			OrgID:             call.Org,
-			ExecutionID:       execID,
-			NodeExecutionID:   nodeExecID,
-			ItemIndex:         int64(i),
-			CorrelationKey:    journal.CorrelationKey(string(call.Execution), string(call.Node.ID), string(call.Scope), string(call.Token), int64(i), 0),
-			ContractReference: HTTPNodeType,
-			CreatedAt:         now,
-		}
-	}
-	_ = tokenID
-	contract := journal.Contract{Idempotency: journal.IdempotencyNone}
-	if req.idempotent {
-		contract = journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: n.cfg.KeyTTL}
-	}
-	p := &effectProvider{n: n, req: req, cred: cred, results: make([]*jsonvalue.Value, count)}
-	j, err := journal.New(n.cfg.Journal, p, n.cfg.Clock, n.cfg.JournalCfg)
+	execID, _, nodeExecID, err := storeIdentities(call)
 	if err != nil {
 		return nil, err
 	}
@@ -404,26 +387,172 @@ func (n *HTTPNode) effects(ctx context.Context, req request, cred Credential, ca
 	if err != nil {
 		return nil, err
 	}
-	if err := j.Prepare(ctx, scope, ops); err != nil {
-		return nil, err
+	keys := make([]string, count)
+	ops := make([]store.ExternalOperation, count)
+	for i := range count {
+		keys[i] = journal.CorrelationKey(string(call.Execution), string(call.Node.ID), string(call.Scope), string(call.Token), int64(i), 0)
+		ops[i] = store.ExternalOperation{
+			ID:                store.ExternalOperationID(n.cfg.IDs.New()),
+			OrgID:             call.Org,
+			ExecutionID:       execID,
+			NodeExecutionID:   nodeExecID,
+			ItemIndex:         int64(i),
+			CorrelationKey:    keys[i],
+			ContractReference: HTTPNodeType,
+			CreatedAt:         now,
+		}
 	}
-	sum, err := j.Dispatch(ctx, scope, ops, contract)
+	contract := journal.Contract{Idempotency: journal.IdempotencyNone}
+	if req.idempotent {
+		contract = journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: n.cfg.KeyTTL}
+	}
+	p := &effectProvider{n: n, req: req, cred: cred, results: make([]*jsonvalue.Value, count)}
+	fenced := journalStore{base: n.cfg.Journal, checkpoint: call.Checkpoint}
+	j, err := journal.New(fenced, p, n.cfg.Clock, n.cfg.JournalCfg)
 	if err != nil {
 		return nil, err
 	}
-	if sum.Uncertain > 0 {
-		return nil, fmt.Errorf("%w: %d item(s)", ErrUnknownOutcome, sum.Uncertain)
+	if err := fenced.InTx(ctx, scope, func(ctx context.Context, tx store.Tx) error {
+		return j.PrepareTx(ctx, tx, ops)
+	}); err != nil {
+		return nil, err
 	}
-	if sum.Failed > 0 || sum.Pending > 0 {
-		return nil, fmt.Errorf("dispatch: %d item(s) failed and %d are pending", sum.Failed, sum.Pending)
+	// The rows the journal holds are the truth: after a crash they may carry the ids of an earlier attempt.
+	rows, err := operationsOf(ctx, fenced, scope, nodeExecID, keys)
+	if err != nil {
+		return nil, err
 	}
-	out := make([]jsonvalue.Value, 0, count)
-	for _, r := range p.results {
-		if r != nil {
-			out = append(out, *r)
+	var prepared []store.ExternalOperation
+	recovering := false
+	for i := range rows {
+		switch rows[i].State {
+		case journal.StatePrepared:
+			prepared = append(prepared, rows[i])
+		case journal.StateDispatching:
+			recovering = true
 		}
 	}
+	if len(prepared) > 0 {
+		if _, err := j.Dispatch(ctx, scope, prepared, contract); err != nil {
+			return nil, err
+		}
+	}
+	if recovering {
+		if _, err := j.Recover(ctx, scope, nodeExecID, contract); err != nil {
+			return nil, err
+		}
+	}
+	final, err := operationsOf(ctx, fenced, scope, nodeExecID, keys)
+	if err != nil {
+		return nil, err
+	}
+	return outputsOf(final, p.results)
+}
+
+// operationsOf returns the rows of a node execution for the given correlation keys,
+// in key order. A missing row is an error: the checkpoint writes every intent.
+func operationsOf(ctx context.Context, s journalStore, org orgscope.Org, node store.NodeExecutionID, keys []string) ([]store.ExternalOperation, error) {
+	byKey := make(map[string]store.ExternalOperation, len(keys))
+	var fromItem int64
+	var fromID store.ExternalOperationID
+	for {
+		page, err := s.base.ListExternalOperations(ctx, org, node, fromItem, fromID, operationPage)
+		if err != nil {
+			return nil, fmt.Errorf("dispatch: list operations: %w", err)
+		}
+		for i := range page {
+			byKey[page[i].CorrelationKey] = page[i]
+		}
+		if len(page) < operationPage {
+			break
+		}
+		last := page[len(page)-1]
+		fromItem, fromID = last.ItemIndex, last.ID
+	}
+	out := make([]store.ExternalOperation, len(keys))
+	for i, k := range keys {
+		row, ok := byKey[k]
+		if !ok {
+			return nil, fmt.Errorf("dispatch: item %d has no journal row", i)
+		}
+		out[i] = row
+	}
 	return out, nil
+}
+
+// outputsOf turns the settled items into the node's output, in item order. A send
+// made by this run is in results; an item settled by an earlier run is read from
+// the response the journal stored.
+func outputsOf(rows []store.ExternalOperation, results []*jsonvalue.Value) ([]jsonvalue.Value, error) {
+	out := make([]jsonvalue.Value, 0, len(rows))
+	uncertain := 0
+	for i := range rows {
+		row := rows[i]
+		switch row.State {
+		case journal.StateSucceeded:
+			if r := results[row.ItemIndex]; r != nil {
+				out = append(out, *r)
+				continue
+			}
+			v, err := storedResponse(row.ResponseReference)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		case journal.StateUncertain:
+			uncertain++
+		case journal.StateFailed:
+			return nil, fmt.Errorf("dispatch: item %d failed", row.ItemIndex)
+		default:
+			return nil, fmt.Errorf("dispatch: item %d is %s after the dispatch", row.ItemIndex, row.State)
+		}
+	}
+	if uncertain > 0 {
+		return nil, fmt.Errorf("%w: %d item(s)", ErrUnknownOutcome, uncertain)
+	}
+	return out, nil
+}
+
+// storedResponse reads the response the journal kept for a succeeded item.
+func storedResponse(text string) (jsonvalue.Value, error) {
+	if text == "" {
+		return jsonvalue.Null(), nil
+	}
+	v, err := jsonvalue.Parse([]byte(text))
+	if err != nil {
+		return jsonvalue.Value{}, fmt.Errorf("dispatch: stored response: %w", err)
+	}
+	return v, nil
+}
+
+// journalStore is the journal's view of the store during one activation. When the
+// durable engine supplies a checkpoint, every transaction of the journal runs inside
+// it, so the lease is checked on each write; reads go straight to the store.
+type journalStore struct {
+	base       journal.Store
+	checkpoint func(ctx context.Context, fn func(ctx context.Context, tx any) error) error
+}
+
+// operationPage is the page size of the reads of an activation's journal rows.
+const operationPage = 512
+
+// InTx implements [journal.Store].
+func (s journalStore) InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error {
+	if s.checkpoint == nil {
+		return s.base.InTx(ctx, org, fn)
+	}
+	return s.checkpoint(ctx, func(ctx context.Context, tx any) error {
+		t, ok := tx.(store.Tx)
+		if !ok {
+			return fmt.Errorf("dispatch: checkpoint transaction is %T, not a store transaction", tx)
+		}
+		return fn(ctx, t)
+	})
+}
+
+// ListExternalOperations implements [journal.Store].
+func (s journalStore) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
+	return s.base.ListExternalOperations(ctx, org, node, fromItem, fromID, limit)
 }
 
 // effectProvider performs the sends of a journal. Results are kept per item; a
@@ -447,14 +576,19 @@ func (p *effectProvider) Send(ctx context.Context, a *journal.Attempt) (journal.
 		}
 		return journal.Reply{Outcome: journal.StateFailed}, nil
 	}
-	var v jsonvalue.Value
+	v := jsonvalue.Null()
 	if len(items) > 0 {
 		v = items[0]
+	}
+	// The response is kept by the journal, so that a later run reads it instead of sending again.
+	text, err := jsonvalue.Marshal(v)
+	if err != nil {
+		return journal.Reply{}, fmt.Errorf("dispatch: encode response: %w", err)
 	}
 	p.mu.Lock()
 	p.results[i] = &v
 	p.mu.Unlock()
-	return journal.Reply{Outcome: journal.StateSucceeded}, nil
+	return journal.Reply{Outcome: journal.StateSucceeded, Response: string(text)}, nil
 }
 
 // storeIdentities converts the interpreter's text identities of a call to the

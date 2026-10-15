@@ -136,6 +136,8 @@ type run struct {
 	in   *Interpreter
 	plan *Plan
 	req  Request
+	// checkpoint is the checkpoint of the segment being worked, nil outside a durable engine.
+	checkpoint ActivationCheckpoint
 
 	payloads Payloads
 	state    State

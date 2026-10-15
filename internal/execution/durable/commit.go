@@ -321,8 +321,8 @@ func (e *Engine) writeNodeExecutions(ctx context.Context, tx store.Tx, a *applyI
 		if ne.State != execution.NodeRunning {
 			rec.FinishedAt = now
 		}
-		if err := tx.InsertNodeExecution(ctx, rec); err != nil {
-			return fmt.Errorf("insert node execution %s: %w", ne.ID, err)
+		if err := tx.UpsertNodeExecution(ctx, rec); err != nil {
+			return fmt.Errorf("write node execution %s: %w", ne.ID, err)
 		}
 	}
 	return nil
