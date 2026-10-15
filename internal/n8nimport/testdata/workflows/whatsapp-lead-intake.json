@@ -1,0 +1,205 @@
+{
+  "name": "WhatsApp lead intake",
+  "nodes": [
+    {
+      "parameters": { "content": "## Lead intake\nWhatsApp messages become leads.", "height": 160, "width": 320, "color": 4 },
+      "id": "11111111-0000-4000-8000-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-240, 40]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "wa-lead", "responseMode": "onReceived", "options": {} },
+      "id": "11111111-0000-4000-8000-000000000002",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "b2f1c0de-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "text",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.body.text.body }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "11111111-0000-4000-8000-000000000003",
+      "name": "Is Text Message",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.body.text.body }}",
+                    "rightValue": "precio",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Quote"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.body.text.body }}",
+                    "rightValue": "cita",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Appointment"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "11111111-0000-4000-8000-000000000004",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 200]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [ { "id": "a1", "name": "source", "value": "whatsapp", "type": "string" } ] },
+        "options": {}
+      },
+      "id": "11111111-0000-4000-8000-000000000005",
+      "name": "Create Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.example.test/api/leads",
+        "sendBody": true,
+        "options": {}
+      },
+      "id": "11111111-0000-4000-8000-000000000006",
+      "name": "Save to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 400],
+      "credentials": { "httpHeaderAuth": { "id": "7", "name": "CRM token" } }
+    },
+    {
+      "parameters": { "jsCode": "return items;" },
+      "id": "11111111-0000-4000-8000-000000000007",
+      "name": "Send Quote",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 120]
+    },
+    {
+      "parameters": { "amount": 15, "unit": "minutes" },
+      "id": "11111111-0000-4000-8000-000000000008",
+      "name": "Wait 15 min",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [880, 120],
+      "webhookId": "b2f1c0de-0000-4000-8000-000000000002"
+    },
+    {
+      "parameters": { "resource": "message", "operation": "send", "phoneNumberId": "123", "recipientPhoneNumber": "={{ $json.body.from }}" },
+      "id": "11111111-0000-4000-8000-000000000009",
+      "name": "Ask for Appointment",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [660, 280]
+    },
+    {
+      "parameters": { "promptType": "auto", "text": "={{ $json.body.text.body }}", "options": {} },
+      "id": "11111111-0000-4000-8000-000000000010",
+      "name": "Lead Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [880, 280]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini", "options": {} },
+      "id": "11111111-0000-4000-8000-000000000011",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [880, 460],
+      "credentials": { "openAiApi": { "id": "8", "name": "OpenAI account" } }
+    },
+    {
+      "parameters": {},
+      "id": "11111111-0000-4000-8000-000000000012",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 260]
+    },
+    {
+      "parameters": {},
+      "id": "11111111-0000-4000-8000-000000000013",
+      "name": "Notify Team",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1320, 260]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": { "main": [[{ "node": "Is Text Message", "type": "main", "index": 0 }]] },
+    "Is Text Message": {
+      "main": [
+        [{ "node": "Route by Intent", "type": "main", "index": 0 }],
+        [{ "node": "Notify Team", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [{ "node": "Send Quote", "type": "main", "index": 0 }],
+        [{ "node": "Ask for Appointment", "type": "main", "index": 0 }],
+        [{ "node": "Create Lead", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Lead": { "main": [[{ "node": "Save to CRM", "type": "main", "index": 0 }]] },
+    "Save to CRM": { "main": [[{ "node": "Merge", "type": "main", "index": 0 }]] },
+    "Send Quote": { "main": [[{ "node": "Wait 15 min", "type": "main", "index": 0 }]] },
+    "Wait 15 min": { "main": [[{ "node": "Merge", "type": "main", "index": 0 }]] },
+    "Ask for Appointment": { "main": [[{ "node": "Lead Agent", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "Lead Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Lead Agent": { "main": [[{ "node": "Merge", "type": "main", "index": 1 }]] },
+    "Merge": { "main": [[{ "node": "Notify Team", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "America/Bogota" },
+  "active": false
+}
