@@ -302,7 +302,7 @@ func (c *converter) convertNode(n *Node) *built {
 func outcomeOfFindings(findings []Finding) Outcome {
 	outcome := OutcomeConverted
 	for _, f := range findings {
-		if f.Code == FindReviewRequired {
+		if f.Code == FindReviewRequired || f.Code == FindNeedsSecret {
 			return OutcomeNeedsReview
 		}
 		if f.Code == FindAdapted || f.Code == FindDisabled {

@@ -1,0 +1,131 @@
+{
+  "name": "HTTP Request cases",
+  "active": false,
+  "nodes": [
+    {
+      "id": "h1",
+      "name": "Get quotes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.test/quotes",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {"name": "status", "value": "open"},
+            {"name": "limit", "value": "20"}
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {"name": "Accept", "value": "application/json"}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "h2",
+      "name": "Create ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.example.test/tickets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\"title\": \"Lead\", \"priority\": 2}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "7", "name": "Ticket token"}
+      }
+    },
+    {
+      "id": "h3",
+      "name": "Dynamic url",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "h4",
+      "name": "Expression method",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 0],
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "https://api.example.test/ping",
+        "options": {}
+      }
+    },
+    {
+      "id": "h5",
+      "name": "Form upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.example.test/upload",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "specifyBody": "keypair",
+        "bodyParameters": {"parameters": [{"name": "file", "value": "a"}]},
+        "options": {}
+      }
+    },
+    {
+      "id": "h6",
+      "name": "With timeout",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.test/slow",
+        "options": {"timeout": 5000}
+      }
+    },
+    {
+      "id": "h7",
+      "name": "Delete record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 0],
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://api.example.test/records/9",
+        "options": {}
+      }
+    },
+    {
+      "id": "h8",
+      "name": "Old version",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1400, 0],
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "https://api.example.test/old"
+      }
+    }
+  ],
+  "connections": {},
+  "settings": {}
+}
