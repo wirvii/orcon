@@ -532,13 +532,16 @@ type ExecutionQuery struct {
 	CreatedBefore time.Time
 	// UncertainOnly keeps the executions with an operation whose outcome is unknown.
 	UncertainOnly bool
+	// OldestFirst lists the oldest execution first, after the cursor; by default the newest comes first,
+	// before the cursor.
+	OldestFirst bool
 }
 
 // ProjectExecutionReader lists the executions of one project under a query. It is a port of its own,
 // so the organization-wide listing depends on it alone.
 type ProjectExecutionReader interface {
 	// ListProjectExecutions returns at most limit executions of the project that match the query,
-	// newest first, after the cursor.
+	// newest first (oldest first under query.OldestFirst), past the cursor in that direction.
 	ListProjectExecutions(ctx context.Context, org orgscope.Org, project identity.ProjectID, query ExecutionQuery, after Cursor, limit int) ([]Execution, error)
 }
 

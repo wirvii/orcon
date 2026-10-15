@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/oapi-codegen/runtime/types"
@@ -17,7 +18,6 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
-	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // execSortFields are the sort fields of listOrgExecutions (the allowlist of the contract, without the minus).
@@ -71,6 +71,15 @@ func (e *OrgExecutions) ListOrgExecutions(ctx context.Context, req apigen.ListOr
 	if err != nil {
 		return nil, err
 	}
+	// Each project is read from the cursor in the order asked for, one row more than a page: the first
+	// limit+1 rows after the cursor of the merged list all come from the first limit+1 rows of their own
+	// project, so the merge is exact and a further page exists exactly when a row beyond the page is left.
+	query := filter.query
+	query.OldestFirst = !terms[0].Descending
+	after, err := storeCursorOf(cursor)
+	if err != nil {
+		return nil, err
+	}
 	var rows []store.Execution
 	var items []listItem
 	for i := range readable {
@@ -78,7 +87,7 @@ func (e *OrgExecutions) ListOrgExecutions(ctx context.Context, req apigen.ListOr
 		if filter.project != "" && id.UUID(pid).String() != filter.project {
 			continue
 		}
-		batch, err := e.readProject(ctx, org, pid, filter.query)
+		batch, err := e.reader.ListProjectExecutions(ctx, org, pid, query, after, limit+1)
 		if err != nil {
 			return nil, err
 		}
@@ -106,24 +115,21 @@ func (e *OrgExecutions) ListOrgExecutions(ctx context.Context, req apigen.ListOr
 	return apigen.ListOrgExecutions200JSONResponse{Body: body}, nil
 }
 
-// readProject reads the executions of one project that match the query, newest first, page by page,
-// at most maxListRows of them.
-func (e *OrgExecutions) readProject(ctx context.Context, org orgscope.Org, project identity.ProjectID, query store.ExecutionQuery) ([]store.Execution, error) {
-	var out []store.Execution
-	var after store.Cursor
-	for len(out) < maxListRows {
-		batch, err := e.reader.ListProjectExecutions(ctx, org, project, query, after, page.MaxLimit)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, batch...)
-		if len(batch) < page.MaxLimit {
-			break
-		}
-		last := batch[len(batch)-1]
-		after = store.Cursor{CreatedAt: last.CreatedAt, ID: id.UUID(last.ID)}
+// storeCursorOf turns the position of a page token (the creation instant as sortKeyTime writes it, then
+// the identity) into the cursor of the store; no position is the first page.
+func storeCursorOf(position []string) (store.Cursor, error) {
+	if position == nil {
+		return store.Cursor{}, nil
 	}
-	return out, nil
+	micros, err := strconv.ParseInt(position[0], 10, 64)
+	if err != nil {
+		return store.Cursor{}, page.ErrInvalidToken
+	}
+	eid, err := id.Parse(position[1])
+	if err != nil {
+		return store.Cursor{}, page.ErrInvalidToken
+	}
+	return store.Cursor{CreatedAt: time.UnixMicro(micros).UTC(), ID: eid}, nil
 }
 
 // executionListFilter is the filter of listOrgExecutions: the project it narrows to (text, or empty) and

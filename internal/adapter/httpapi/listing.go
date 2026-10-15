@@ -39,7 +39,9 @@ func (it listItem) position(terms []page.Term) []string {
 	return append(out, it.id)
 }
 
-// comparePositions orders two positions by terms (a leading minus reverses a field), then by identity.
+// comparePositions orders two positions by terms (a leading minus reverses a field), then by identity
+// in the direction of the last term, the way the stores order (ORDER BY created_at DESC, id DESC), so a
+// keyset read of a store and this walk agree on the position that follows a given row.
 func comparePositions(a, b []string, terms []page.Term) int {
 	for i, t := range terms {
 		c := strings.Compare(a[i], b[i])
@@ -50,7 +52,11 @@ func comparePositions(a, b []string, terms []page.Term) int {
 			return c
 		}
 	}
-	return strings.Compare(a[len(terms)], b[len(terms)])
+	c := strings.Compare(a[len(terms)], b[len(terms)])
+	if len(terms) > 0 && terms[len(terms)-1].Descending {
+		return -c
+	}
+	return c
 }
 
 // listWindow sorts items by terms, keeps those after the cursor position (nil means the first

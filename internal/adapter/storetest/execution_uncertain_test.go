@@ -50,6 +50,44 @@ func sameExecutionIDs(got []execstore.ExecutionID, want ...execstore.ExecutionID
 	return true
 }
 
+// TestListProjectExecutionsKeysetBothDirections: the project listing walks past a cursor in the direction
+// asked for, newest first by default and oldest first under OldestFirst, and the two walks of the same
+// five executions are each other's reverse (BL-135).
+func TestListProjectExecutionsKeysetBothDirections(t *testing.T) {
+	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
+		t.Helper()
+		f := newFixture(t, newStore)
+		rec := f.flow(f.orgA, f.projA, "keyset")
+		var oldestFirst []execstore.ExecutionID
+		for i := range 5 {
+			oldestFirst = append(oldestFirst, runIn(t, f, rec, base.Add(time.Duration(i-10)*time.Minute), "SUCCEEDED", "TRIGGER"))
+		}
+		for _, oldest := range []bool{true, false} {
+			want := slices.Clone(oldestFirst)
+			if !oldest {
+				slices.Reverse(want)
+			}
+			var got []execstore.ExecutionID
+			var cursor execstore.Cursor
+			for range 5 {
+				rows, err := f.s.ListProjectExecutions(f.ctx(), scopeOf(f.orgA), f.projA, execstore.ExecutionQuery{OldestFirst: oldest}, cursor, 2)
+				if err != nil {
+					t.Fatalf("list (oldest first %v): %v", oldest, err)
+				}
+				if len(rows) == 0 {
+					break
+				}
+				got = append(got, executionIDsOf(rows)...)
+				last := rows[len(rows)-1]
+				cursor = execstore.Cursor{CreatedAt: last.CreatedAt, ID: [16]byte(last.ID)}
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("walk with oldest first %v = %v, want %v", oldest, got, want)
+			}
+		}
+	})
+}
+
 // reader returns the store as the execution reader it implements (the storetest suite names only the
 // project listing port; the single read and the filtered listing are the adapter's own methods).
 func reader(t *testing.T, f *fixture) execstore.Reader { //nolint:ireturn // the callers choose the adapter's reader, not a type
