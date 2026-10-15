@@ -138,6 +138,8 @@ linters:
               desc: platform packages are leaves (AL-1)
             - pkg: github.com/wirvii/orcon/internal/credential
               desc: platform packages are leaves (AL-1)
+            - pkg: github.com/wirvii/orcon/internal/journal
+              desc: platform packages are leaves (AL-1)
         pgx-confined:
           files:
             - "$all"
@@ -279,6 +281,10 @@ linters:
             # Excluded here because adapter-private-storetest-dbrules below governs them (it allows only dbrules).
             - "!**/internal/adapter/sqlite/*_test.go"
             - "!**/internal/adapter/postgres/*_test.go"
+            # Integration tests under test/ run the engine over the real stores through storetest (SPEC-001
+            # Enmienda 12 section 12-3, owner exception P-6a of 2026-10-13); nothing else of the adapters is
+            # allowed to them, and no area imports storetest, not even in a test.
+            - "!**/test/**"
             # PROPOSED exception, not yet in AL-2.4 and awaiting the owner's approval (SPEC-004 SE1b): the
             # test files directly under test/isolation open the stores of both adapters through storetest,
             # as the isolation battery of E-ISO-3 needs real databases. They import nothing else of an

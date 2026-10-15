@@ -22,11 +22,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -66,6 +68,14 @@ type Options struct {
 	Clock clock.Clock
 	// Synchronous is the durability mode; [SynchronousFull] when zero.
 	Synchronous Synchronous
+	// PoisonThreshold is the number of abandonments after which a token is
+	// suspended as poison, counting the leases released when the process starts;
+	// [DefaultPoisonThreshold] when zero.
+	PoisonThreshold int64
+	// Outbox is the rule the events the store appends itself go through from the
+	// start, including the ones of the release of leases at open; an engine
+	// replaces it with [Store.RouteEvents]. Nil publishes none.
+	Outbox store.OutboxRule
 	// Readers is the size of the read connection pool; GOMAXPROCS when zero.
 	Readers int
 	// BusyTimeout bounds the wait for a locked database; 5 s when zero.
@@ -86,6 +96,9 @@ type Store struct {
 	writer  *writer
 	reads   *sqlcgen.Queries
 
+	// rule routes the events the store appends itself to the outbox.
+	rule atomic.Pointer[store.OutboxRule]
+
 	// mu orders Close after the operations in flight: every operation holds a
 	// read lock for its whole duration, Close takes the write lock.
 	mu     sync.RWMutex
@@ -105,6 +118,12 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	}
 	if opts.Synchronous == 0 {
 		opts.Synchronous = SynchronousFull
+	}
+	if opts.PoisonThreshold == 0 {
+		opts.PoisonThreshold = DefaultPoisonThreshold
+	}
+	if opts.PoisonThreshold < store.MinPoisonThreshold {
+		return nil, fmt.Errorf("open sqlite store: PoisonThreshold %d is below the minimum %d (with 1 every token would have to run alone)", opts.PoisonThreshold, store.MinPoisonThreshold)
 	}
 	if opts.Readers <= 0 {
 		opts.Readers = runtime.GOMAXPROCS(0)
@@ -153,6 +172,7 @@ func (s *Store) open(ctx context.Context) error {
 	s.writer = newWriter(ctx, writeDB)
 	// A standalone process is the only holder of the file: whatever a crashed predecessor left
 	// leased belongs to nobody (ADR-0013 section 9).
+	s.RouteEvents(s.opts.Outbox)
 	var tokenTable int
 	if err := s.writeDB.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'token'`).Scan(&tokenTable); err != nil {
 		return fmt.Errorf("look for the token table: %w", err)
@@ -295,4 +315,21 @@ func annotate(op string, err error) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	return mapError(op, err)
+}
+
+// RouteEvents implements [store.EventRouter].
+func (s *Store) RouteEvents(rule store.OutboxRule) {
+	if rule == nil {
+		s.rule.Store(nil)
+		return
+	}
+	s.rule.Store(&rule)
+}
+
+// outboxRule returns the rule in force, nil when none is.
+func (s *Store) outboxRule() store.OutboxRule {
+	if r := s.rule.Load(); r != nil {
+		return *r
+	}
+	return nil
 }

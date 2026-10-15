@@ -41,15 +41,16 @@ export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleF
   const root = createRootRouteWithContext<RouterContext>()({ component: Outlet });
   const page = createRoute({
     getParentRoute: () => root,
-    path: '/',
+    // The editor sits under its project, so the sub-flow widget finds the organization and project of the address.
+    path: '/orgs/$orgSlug/projects/$projectHandle',
     component: () => (
       <NoticeContext.Provider value={channel}>
         <EditorStoreProvider store={store}>{ui}</EditorStoreProvider>
       </NoticeContext.Provider>
     ),
   });
-  const flow = createRoute({ getParentRoute: () => root, path: '/flows/$flowId', component: () => null });
-  const router = createRouter({ routeTree: root.addChildren([page, flow]), history: createMemoryHistory({ initialEntries: ['/'] }), context: { queryClient } });
+  const flow = createRoute({ getParentRoute: () => root, path: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId', component: () => null });
+  const router = createRouter({ routeTree: root.addChildren([page, flow]), history: createMemoryHistory({ initialEntries: ['/orgs/acme/projects/ventas'] }), context: { queryClient } });
   const view = renderInApp(<RouterProvider router={router} />, { queryClient });
   return { ...view, store, channel };
 }

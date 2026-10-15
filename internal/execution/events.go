@@ -19,6 +19,8 @@ type EventType string
 const (
 	// EventExecutionStarted marks the move from QUEUED to RUNNING.
 	EventExecutionStarted EventType = "execution.started"
+	// EventExecutionResumed marks the move from WAITING or SUSPENDED back to RUNNING.
+	EventExecutionResumed EventType = "execution.resumed"
 	// EventExecutionSucceeded marks an execution that ended with no live token.
 	EventExecutionSucceeded EventType = "execution.succeeded"
 	// EventExecutionFailed marks an execution that ended with an error.

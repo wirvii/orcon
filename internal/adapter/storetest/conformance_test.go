@@ -6,11 +6,14 @@ package storetest_test
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"go.uber.org/goleak"
 
+	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/execution/executiontest"
 )
 
 // storeFlag selects the stores the conformance battery runs against:
@@ -19,11 +22,11 @@ import (
 //	sqlite    SQLite only
 //	postgres  PostgreSQL only; the test starts a server and fails if it cannot
 //	both      SQLite and PostgreSQL; PostgreSQL must be available
-var storeFlag = flag.String("store", "auto", "stores to test: auto, sqlite, postgres or both")
+func storeFlag() string { return executiontest.StoreFlag("auto") }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	switch *storeFlag {
+	switch storeFlag() {
 	case "auto", "sqlite":
 	case "postgres", "both":
 		enablePostgres()
@@ -36,8 +39,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func wantSQLite() bool   { return *storeFlag != "postgres" }
-func wantPostgres() bool { return *storeFlag != "sqlite" }
+func wantSQLite() bool   { return storeFlag() != "postgres" }
+func wantPostgres() bool { return storeFlag() != "sqlite" }
 
 // forEachStore runs fn as a subtest per selected store, with a factory of fresh
 // stores of that kind. Tests named in a criterion use it, so one command selects
@@ -55,10 +58,10 @@ func forEachStore(t *testing.T, fn func(t *testing.T, newStore storetest.Factory
 // TestConformance runs the shared battery against the selected stores
 // (E-STO-1: the same battery passes on SQLite and PostgreSQL).
 func TestConformance(t *testing.T) {
-	switch *storeFlag {
+	switch storeFlag() {
 	case "auto", "sqlite", "postgres", "both":
 	default:
-		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", *storeFlag)
+		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", storeFlag())
 	}
 	ran := 0
 	if wantSQLite() {
@@ -71,6 +74,31 @@ func TestConformance(t *testing.T) {
 	}
 	if ran == 0 {
 		t.Fatal("no store selected")
+	}
+}
+
+// TestAbandonCount runs the contract of the abandon count on the selected
+// stores (E-REC-5): the parts that need a worker are in test/engine/durable.
+func TestAbandonCount(t *testing.T) {
+	switch storeFlag() {
+	case "auto", "sqlite", "postgres", "both":
+	default:
+		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", storeFlag())
+	}
+	if wantSQLite() {
+		t.Run("sqlite", func(t *testing.T) {
+			storetest.AbandonCount(t, sqliteFactory())
+			t.Run("StartupReleaseAddsOne", func(t *testing.T) { sqliteStartupCounts(t) })
+			t.Run("ThresholdBelowTwoIsRejected", func(t *testing.T) {
+				_, err := sqlite.Open(t.Context(), sqlite.Options{Path: filepath.Join(t.TempDir(), "orcon.db"), BinaryVersion: binaryVersionDefault, PoisonThreshold: 1})
+				if err == nil {
+					t.Fatal("a poison threshold of 1 was accepted")
+				}
+			})
+		})
+	}
+	if wantPostgres() {
+		t.Run("postgres", func(t *testing.T) { storetest.AbandonCount(t, postgresFactory()) })
 	}
 }
 
@@ -88,4 +116,31 @@ func TestFloorSmoke(t *testing.T) {
 	if dsn != "" {
 		t.Run("postgres", func(t *testing.T) { storetest.Smoke(t, attachPostgres(dsn)) })
 	}
+}
+
+// sqliteStartupCounts closes a database with a token leased and opens it again:
+// the open releases the lease and counts one abandonment, because the process
+// that held it did not return it (SQLite has one process, so nothing else can).
+func sqliteStartupCounts(t *testing.T) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "orcon.db")
+	open := func() *sqlite.Store {
+		s, err := sqlite.Open(t.Context(), sqlite.Options{Path: path, BinaryVersion: binaryVersionDefault})
+		if err != nil {
+			t.Fatalf("open sqlite store: %v", err)
+		}
+		return s
+	}
+	first := open()
+	left := storetest.SeedLeftLeased(t, first)
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second := open()
+	t.Cleanup(func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("close sqlite store: %v", err)
+		}
+	})
+	storetest.CheckStartupRelease(t, second, left)
 }

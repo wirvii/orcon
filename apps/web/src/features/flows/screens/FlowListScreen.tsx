@@ -77,7 +77,7 @@ export function FlowListScreen() {
               <li key={flow.id} className="border-border flex flex-col gap-1 border-b p-4 last:border-b-0 md:grid md:grid-cols-4 md:items-center md:gap-4">
                 <span className="font-medium wrap-anywhere">
                   <Link asChild>
-                    <RouterLink to="/flows/$flowId" params={{ flowId: flow.id }}>
+                    <RouterLink to="/orgs/$orgSlug/projects/$projectHandle/flows/$flowId" params={{ orgSlug, projectHandle, flowId: flow.id }}>
                       {flow.name}
                     </RouterLink>
                   </Link>
@@ -106,7 +106,7 @@ export function FlowListScreen() {
           </ul>
         )}
       </QueryState>
-      <CreateFlowDialog open={creating} onOpenChange={setCreating} orgId={organization.id} projectId={project.id} />
+      <CreateFlowDialog open={creating} onOpenChange={setCreating} orgId={organization.id} projectId={project.id} orgSlug={orgSlug} projectHandle={projectHandle} />
     </div>
   );
 }

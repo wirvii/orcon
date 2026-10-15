@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AppShell, BrandMark, type NavEntry } from '@orcon/ui';
-import { linkOptions, useNavigate, useParams, useRouter, useRouterState } from '@tanstack/react-router';
+import { linkOptions, useMatches, useNavigate, useParams, useRouter, useRouterState } from '@tanstack/react-router';
 import { Braces, FolderKanban, KeyRound, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
@@ -64,9 +64,12 @@ export function SessionShell({ children }: { children: ReactNode }) {
       : pathname.startsWith('/settings')
         ? 'settings'
         : undefined;
+  // A page that fills the space between the bars (the flow editor) declares it in its route's staticData.
+  const fill = useMatches({ select: (matches) => matches.some((match) => (match.staticData as { fill?: boolean }).fill === true) });
 
   return (
     <AppShell
+      fill={fill}
       navigation={navigation}
       currentId={currentId}
       brand={<BrandMark />}
@@ -77,7 +80,7 @@ export function SessionShell({ children }: { children: ReactNode }) {
         if (entry.id === 'settings') void navigate(settingsLink);
       }}
     >
-      <div className="flex flex-col gap-3">
+      <div className={fill ? 'flex min-h-0 flex-1 flex-col gap-3' : 'flex flex-col gap-3'}>
         <ConnectionBanners />
         {children}
       </div>
