@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BrandHero, Button, ErrorSummary, FormField, Input, Link, Mascot, ProblemAlert, fieldIdForName, type ProblemDetails } from '@orcon/ui';
+import { Banner, BrandHero, Button, ErrorSummary, FormField, Input, Link, Mascot, ProblemAlert, fieldIdForName, type ProblemDetails } from '@orcon/ui';
 import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
@@ -50,6 +50,11 @@ const messages = defineMessages({
     id: 'session.signIn.throttled',
     defaultMessage: 'Too many attempts. Wait {minutes, plural, one {# minute} other {# minutes}} and try again.',
     description: 'Shown when the server stops sign-in attempts for an account for a while. The minutes come from the server.',
+  },
+  signedOut: {
+    id: 'session.signIn.signedOut',
+    defaultMessage: 'You signed out.',
+    description: 'Notice on the sign-in page after the person chose to sign out.',
   },
   languageLink: {
     id: 'session.signIn.languageLink',
@@ -120,21 +125,24 @@ export function SignInScreen() {
   );
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-screen-sm flex-col justify-center gap-6 p-4 md:p-8">
+    <main className="mx-auto flex min-h-dvh w-full max-w-screen-sm flex-col justify-center gap-4 p-4 md:p-6">
       <ConnectionBanners />
-      <div className="flex flex-col items-center gap-4">
-        <Mascot pose="welcome" />
-        <BrandHero />
+      <div className="flex flex-col items-center gap-2">
+        {/* A small mascot keeps the form above the fold on a laptop, even with an error showing. */}
+        <Mascot pose="welcome" className="p-2 [&_img]:max-h-16" />
+        <BrandHero className="gap-1" />
       </div>
 
-      <div className="flex flex-col gap-2">
+      {search.signedOut === true && failure === undefined ? <Banner tone="success" title={intl.formatMessage(messages.signedOut)} /> : null}
+
+      <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
         <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.description)}</p>
       </div>
 
       {failure ? <FailureAlert failure={failure} /> : null}
 
-      <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+      <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
         {submitCount > 0 ? <ErrorSummary errors={summary} focusOnMount /> : null}
 
         <FormField

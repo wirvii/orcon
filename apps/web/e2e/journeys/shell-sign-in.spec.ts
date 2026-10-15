@@ -85,8 +85,9 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\?signedOut=true$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('You signed out.')).toBeVisible();
 
   // 7. A signed-out visit to a signed-in address asks to sign in, and returns there afterwards.
   const asked = `/orgs/${orgSlug}/projects/${projectHandle}/flows`;

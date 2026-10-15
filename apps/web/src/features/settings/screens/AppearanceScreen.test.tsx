@@ -3,14 +3,39 @@
 
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderRoute } from '../../../../test/screen-harness';
+import { http } from 'msw';
+
+import { renderRoute, server } from '../../../../test/screen-harness';
+import { acme, problem, signedIn } from '../../../../test/session-fixtures';
 import { FIRST_USEFUL_MARK } from '../../../app/perf/marks';
 
 const heading = (name: string) => screen.findByRole('heading', { level: 2, name });
 
 describe('the appearance screen', () => {
+  // Unless a test signs in, nobody has a session: the page asks once and keeps the plain frame.
+  beforeEach(() => {
+    server.use(http.get('/api/v1/users/me', () => problem(401, 'unauthenticated', 'unauthenticated')));
+  });
+
+  it('keeps the signed-in frame (projects and account menu) for a person who is signed in', async () => {
+    server.use(signedIn.currentUser, signedIn.organizations([acme]));
+    renderRoute('/settings/appearance');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeVisible();
+    const links = await screen.findAllByRole('link', { name: 'Projects' });
+    for (const link of links) expect(link).toHaveAttribute('href', '/orgs/acme/projects');
+  });
+
+  it('shows the plain frame, without account controls, to a person who is not signed in', async () => {
+    server.use(http.get('/api/v1/users/me', () => problem(401, 'unauthenticated', 'unauthenticated')));
+    const { router } = renderRoute('/settings/appearance');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
+    expect(router.state.location.pathname).toBe('/settings/appearance');
+    expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull();
+  });
+
   it('shows the page, the links to its sections and the form', async () => {
     renderRoute('/settings/appearance');
     expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();

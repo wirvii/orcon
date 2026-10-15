@@ -4,17 +4,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
-import { PageShell } from '../../../app/shell/PageShell';
 import { appearanceSearchSchema } from '../model/preferences';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
 
-/** The page is public: a person can choose the theme and language before signing in (SPEC-016 C-8). */
+/** The page is public: a person can choose the theme and language before signing in (SPEC-016 C-8). The frame comes from the settings layout. */
 function AppearancePage() {
-  return (
-    <PageShell>
-      <AppearanceScreen />
-    </PageShell>
-  );
+  return <AppearanceScreen />;
 }
 
 // This page reads no server data, so it has no loader. A route that does prefetches through
