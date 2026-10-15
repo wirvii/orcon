@@ -373,11 +373,7 @@ func (s *Store) CreateProject(ctx context.Context, org orgscope.Org, p identity.
 		if err != nil {
 			return err
 		}
-		if err := q.InsertProject(ctx, sqlcgen.InsertProjectParams{
-			ID: uuidBytes(p.ID), OrgID: scope, Name: p.Name, Slug: p.Slug, Handle: nullText(p.Handle),
-			Environment: nullText(p.Environment), IsProtected: boolInt(p.IsProtected),
-			CreatedAt: micros(p.CreatedAt), UpdatedAt: micros(p.UpdatedAt),
-		}); err != nil {
+		if err := insertProjectRow(ctx, q, scope, p); err != nil {
 			return err
 		}
 		return insertPendingOrg(ctx, q, org, entry)

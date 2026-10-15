@@ -33,6 +33,13 @@ type OrgStore interface {
 	CreateOrganization(ctx context.Context, o OrgRecord) error
 	// GetOrganization returns the organization of the scope, or [ErrNotFound].
 	GetOrganization(ctx context.Context, org orgscope.Org) (OrgRecord, error)
+	// CreateOrganizationWithAdmin inserts an organization, the first membership of its
+	// administrator, the administrator's role binding and the audit entries of the creation,
+	// all in one transaction (SPEC-004 R-AUD-02). The entries join the organization chain. A
+	// repeated slug fails with [ErrConflict]; an unknown user with [ErrReference].
+	//
+	//orcon:scope instance the organization does not exist before this call, so there is no scope to hold
+	CreateOrganizationWithAdmin(ctx context.Context, o OrgRecord, m MembershipRecord, grant RoleBindingRecord, entries []audit.Entry) error
 }
 
 // PrincipalStore persists principals, the rows of whoever acts.
@@ -184,6 +191,11 @@ type ProjectStore interface {
 	// instance fails with [ErrHandleTaken]; an unknown organization with
 	// [ErrReference]. The entry belongs to the organization chain of the scope.
 	CreateProject(ctx context.Context, org orgscope.Org, p ProjectRecord, entry audit.Entry) error
+	// CreateProjectWithGrant is [ProjectStore.CreateProject] with a role binding of the creator
+	// in the project and the increment of the authorization epoch, all in one transaction. When
+	// the context carries an idempotency claim, the record of the claim is written in the same
+	// transaction (see internal/platform/idempotencyclaim).
+	CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p ProjectRecord, grant RoleBindingRecord, entry audit.Entry) error
 	// GetProject returns one project of the organization, or [ErrNotFound].
 	GetProject(ctx context.Context, org orgscope.Org, project ProjectID) (ProjectRecord, error)
 	// ListProjects returns at most limit projects of the organization with an

@@ -47,6 +47,37 @@ func (q *Queries) GetProjectOrganization(ctx context.Context, id []byte) ([]byte
 	return org_id, err
 }
 
+const insertRoleBinding = `-- name: InsertRoleBinding :exec
+INSERT INTO role_binding (id, org_id, scope_kind, project_id, application_user_id, role_name, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+`
+
+type InsertRoleBindingParams struct {
+	ID                []byte
+	OrgID             []byte
+	ScopeKind         string
+	ProjectID         []byte
+	ApplicationUserID []byte
+	RoleName          string
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+// orcon:scope org
+func (q *Queries) InsertRoleBinding(ctx context.Context, arg InsertRoleBindingParams) error {
+	_, err := q.db.ExecContext(ctx, insertRoleBinding,
+		arg.ID,
+		arg.OrgID,
+		arg.ScopeKind,
+		arg.ProjectID,
+		arg.ApplicationUserID,
+		arg.RoleName,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const listCustomRolePermissions = `-- name: ListCustomRolePermissions :many
 SELECT r.id, p.permission
 FROM custom_role AS r
@@ -121,4 +152,19 @@ func (q *Queries) ListRoleBindingsOfUser(ctx context.Context, orgID []byte, appl
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAuthorizationEpoch = `-- name: UpdateAuthorizationEpoch :execrows
+UPDATE org
+SET authorization_epoch = authorization_epoch + 1
+WHERE id = ?1
+`
+
+// orcon:scope instance
+func (q *Queries) UpdateAuthorizationEpoch(ctx context.Context, id []byte) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAuthorizationEpoch, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

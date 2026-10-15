@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 	"unicode/utf8"
 
 	"github.com/wirvii/orcon/internal/audit"
@@ -35,6 +36,12 @@ type NewProject struct {
 	Environment string
 	// By is the principal that creates the project; it is the actor of the audit entry.
 	By audit.Actor
+	// Unprotected creates the project without protection. A new project is protected unless the
+	// caller says otherwise (SPEC-005 createProject).
+	Unprotected bool
+	// Creator is the user who creates the project. It receives the Project Admin role in the
+	// project, in the same transaction (SPEC-016 Q3 = A). The zero value grants nothing.
+	Creator UserID
 }
 
 // Projects creates projects and assigns their handles.
@@ -66,7 +73,7 @@ func (p *Projects) Create(ctx context.Context, org orgscope.Org, in NewProject) 
 	now := p.clock.Now()
 	rec := ProjectRecord{
 		ID: ProjectID(p.ids.New()), OrgID: OrgIDOf(org), Name: in.Name, Slug: in.Slug,
-		Environment: in.Environment, IsProtected: true, CreatedAt: now, UpdatedAt: now,
+		Environment: in.Environment, IsProtected: !in.Unprotected, CreatedAt: now, UpdatedAt: now,
 	}
 	for _, handle := range handleCandidates(orgRecord.Slug, in.Slug) {
 		rec.Handle = handle
@@ -78,7 +85,7 @@ func (p *Projects) Create(ctx context.Context, org orgscope.Org, in NewProject) 
 		if err != nil {
 			return ProjectRecord{}, fmt.Errorf("create project: audit: %w", err)
 		}
-		err = p.store.CreateProject(ctx, org, rec, entry)
+		err = p.createIn(ctx, org, rec, in.Creator, entry, now)
 		if err == nil {
 			return rec, nil
 		}
@@ -88,6 +95,18 @@ func (p *Projects) Create(ctx context.Context, org orgscope.Org, in NewProject) 
 	}
 	// The cause is dropped on purpose: a driver error would quote the handle.
 	return ProjectRecord{}, ErrHandleUnavailable
+}
+
+// createIn stores the project, with the Project Admin binding of creator when there is one.
+func (p *Projects) createIn(ctx context.Context, org orgscope.Org, rec ProjectRecord, creator UserID, entry audit.Entry, now time.Time) error {
+	if creator.IsZero() {
+		return p.store.CreateProject(ctx, org, rec, entry)
+	}
+	grant := RoleBindingRecord{
+		ID: RoleBindingID(p.ids.New()), OrgID: rec.OrgID, ScopeKind: RoleScopeProject, ProjectID: rec.ID,
+		UserID: creator, RoleName: RoleProjectAdmin, CreatedAt: now, UpdatedAt: now,
+	}
+	return p.store.CreateProjectWithGrant(ctx, org, rec, grant, entry)
 }
 
 // projectDetails are the fields of the project.created entry: the identity and the

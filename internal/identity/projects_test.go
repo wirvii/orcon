@@ -36,6 +36,11 @@ type fakeStore struct {
 
 func newFakeStore() *fakeStore { return &fakeStore{orgs: map[identity.OrgID]identity.OrgRecord{}} }
 
+// CreateOrganizationWithAdmin is CreateOrganization: the fake keeps no memberships or bindings.
+func (f *fakeStore) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+	return f.CreateOrganization(ctx, o)
+}
+
 func (f *fakeStore) CreateOrganization(_ context.Context, o identity.OrgRecord) error {
 	f.orgs[o.ID] = o
 	return nil
@@ -47,6 +52,11 @@ func (f *fakeStore) GetOrganization(_ context.Context, org orgscope.Org) (identi
 		return identity.OrgRecord{}, identity.ErrNotFound
 	}
 	return o, nil
+}
+
+// CreateProjectWithGrant is CreateProject: the fake keeps no role bindings.
+func (f *fakeStore) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, _ identity.RoleBindingRecord, entry audit.Entry) error {
+	return f.CreateProject(ctx, org, p, entry)
 }
 
 func (f *fakeStore) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord, _ audit.Entry) error {

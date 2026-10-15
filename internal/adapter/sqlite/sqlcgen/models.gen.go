@@ -384,6 +384,25 @@ type HumanTask struct {
 	UpdatedAt              int64
 }
 
+type IdempotencyRecord struct {
+	ID                  []byte
+	OrgID               []byte
+	Requester           string
+	IdempotencyKey      string
+	Fingerprint         []byte
+	Status              string
+	ResourceReference   sql.NullString
+	ResponseStatus      sql.NullInt64
+	ResponseContentType sql.NullString
+	ResponseLocation    sql.NullString
+	ResponseEtag        sql.NullString
+	ResponseBody        []byte
+	IsSecretIssued      int64
+	ExpiresAt           int64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
 type InstanceAlert struct {
 	ID                              []byte
 	Kind                            string
