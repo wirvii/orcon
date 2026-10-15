@@ -1,0 +1,275 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/wirvii/orcon/internal/adapter/egress"
+	"github.com/wirvii/orcon/internal/adapter/llm/openai"
+	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/ai/provider"
+	"github.com/wirvii/orcon/internal/connector/declarative"
+	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
+	"github.com/wirvii/orcon/internal/execution/store"
+	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/config"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/redact"
+	"github.com/wirvii/orcon/internal/trigger"
+	"github.com/wirvii/orcon/test/mockllm"
+	"github.com/wirvii/orcon/test/mockprovider"
+)
+
+// The fixed values of the end-to-end test: the signing secret and the
+// subscription token of the WhatsApp credential, and the sender of the messages.
+const (
+	testAppSecret    = "test-app-secret"
+	testVerifyToken  = "test-verify-token"
+	testSender       = "573000000000"
+	whatsappFlowFile = "../../examples/flows/whatsapp-agent.json"
+	whatsappRoute    = "/hooks/engine/whatsapp"
+	graphHost        = "https://graph.facebook.com"
+)
+
+// TestWhatsAppMessageRunsAgentAndReplies is the first end-to-end run of the
+// agent flow (SPEC-003 WhatsApp inbound and outbound, SPEC-006 agent node): a
+// signed WhatsApp notification starts the example flow, the agent answers
+// through the scripted model with the memory of the sender, and the reply goes
+// to the Graph endpoint of the mock provider. Both stores run the same test.
+func TestWhatsAppMessageRunsAgentAndReplies(t *testing.T) {
+	for _, kind := range e2eKinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			runWhatsAppAgentFlow(t, kind)
+		})
+	}
+}
+
+func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
+	t.Helper()
+	ctx := t.Context()
+	env := storetest.NewEngineEnv(t, kind, storetest.EngineOptions{})
+	st, ok := env.Store.(engineStore)
+	if !ok {
+		t.Fatalf("the %s store does not implement the engine store", kind)
+	}
+
+	graph := mockprovider.New()
+	graphSrv := httptest.NewServer(graph)
+	t.Cleanup(graphSrv.Close)
+
+	llm := mockllm.New(t,
+		mockllm.Reply{Body: chatCompletion("Tu pedido sale hoy.")},
+		mockllm.Reply{Body: chatCompletion("Si no estas, lo dejamos con el vecino.")},
+	)
+
+	eng, err := newEngine(st, engineOptions{
+		role: config.RoleStandalone, logger: slog.New(slog.DiscardHandler), version: "test",
+		senderPolicy: func(u *url.URL) egress.Policy {
+			return egress.Policy{Domains: []string{u.Hostname()}, Schemes: []string{"http"}, AllowPrivateNetworks: true}
+		},
+		credentials: testWhatsAppCredentials,
+		models:      testModels{baseURL: llm.URL(), client: llm.Client()},
+	})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+	runCtx, stopEngine := context.WithCancel(ctx)
+	engineDone := make(chan error, 1)
+	go func() { engineDone <- eng.run(runCtx) }()
+	t.Cleanup(func() {
+		stopEngine()
+		if err := <-engineDone; err != nil {
+			t.Errorf("engine stopped with error: %v", err)
+		}
+	})
+
+	publishWhatsAppFlow(t, env, eng, graphSrv.URL)
+
+	handler, err := newAPIRouter(config.RoleStandalone, slog.New(slog.DiscardHandler), eng.ingress())
+	if err != nil {
+		t.Fatalf("build the router: %v", err)
+	}
+
+	// The subscription handshake echoes the challenge when the token matches.
+	handshake(t, handler, testVerifyToken, "1158201444", http.StatusOK, "1158201444")
+	handshake(t, handler, "wrong-token", "1158201445", http.StatusForbidden, "")
+
+	// The first message starts one execution; the agent answers and the reply is sent.
+	exec := postSigned(t, handler, messageBody("wamid.1", "When does my order arrive?"), testAppSecret, http.StatusAccepted)
+	waitExecution(t, env, st, exec)
+
+	// The second message comes from the same sender, so the model sees the first exchange.
+	exec = postSigned(t, handler, messageBody("wamid.2", "And if I am not home?"), testAppSecret, http.StatusAccepted)
+	waitExecution(t, env, st, exec)
+
+	model := llm.Requests()
+	if len(model) != 2 {
+		t.Fatalf("the model received %d requests, want 2", len(model))
+	}
+	if !strings.Contains(string(model[1].Body), "When does my order arrive?") {
+		t.Fatalf("the second model call does not carry the first message of the sender: %s", model[1].Body)
+	}
+
+	sent := graph.Requests()
+	if len(sent) != 2 {
+		t.Fatalf("the Graph endpoint received %d sends, want 2", len(sent))
+	}
+	for i, answer := range []string{"Tu pedido sale hoy.", "Si no estas, lo dejamos con el vecino."} {
+		r := sent[i]
+		if r.Method != http.MethodPost || r.Path != mockprovider.GraphPrefix+mockprovider.MockPhoneNumberID+"/messages" {
+			t.Fatalf("send %d went to %s %s", i, r.Method, r.Path)
+		}
+		if r.Authorization != "Bearer "+mockprovider.Token {
+			t.Fatalf("send %d carried Authorization %q", i, r.Authorization)
+		}
+		body := string(r.Body)
+		if !strings.Contains(body, testSender) || !strings.Contains(body, answer) {
+			t.Fatalf("send %d body %s does not carry the recipient and the answer %q", i, body, answer)
+		}
+	}
+
+	// A notification that carries no message (a delivery status) starts nothing.
+	status := []byte(`{"entry":[{"changes":[{"value":{"statuses":[{"id":"wamid.1","status":"delivered"}]}}]}]}`)
+	postSigned(t, handler, string(status), testAppSecret, http.StatusOK)
+	if n := len(llm.Requests()); n != 2 {
+		t.Fatalf("a status notification reached the model: %d requests", n)
+	}
+
+	// A request with a wrong signature is refused before anything starts.
+	postSigned(t, handler, messageBody("wamid.3", "forged"), "not-the-secret", http.StatusUnauthorized)
+	if n := len(llm.Requests()); n != 2 {
+		t.Fatalf("a forged request reached the model: %d requests", n)
+	}
+}
+
+// testWhatsAppCredentials resolves the one WhatsApp credential the test flow
+// names: a bearer token the mock provider accepts, the app secret that signs
+// the notifications and the verify token of the handshake.
+func testWhatsAppCredentials(_ context.Context, _ identity.OrgID, credentialID string) (httpdispatch.Credential, error) {
+	if credentialID != whatsappCredential {
+		return httpdispatch.Credential{}, errors.New("unknown test credential")
+	}
+	return httpdispatch.Credential{
+		Auth: declarative.Auth{Type: declarative.AuthBearer, Field: "token"},
+		Fields: map[string]string{
+			"token":       mockprovider.Token,
+			"appSecret":   testAppSecret,
+			"verifyToken": testVerifyToken,
+		},
+	}, nil
+}
+
+// testModels reaches the scripted model provider of the test over plain http.
+type testModels struct {
+	baseURL string
+	client  *http.Client
+}
+
+// Model implements [chain.Models]: every model is an OpenAI chat endpoint of the test.
+func (m testModels) Model(_ context.Context, _ identity.OrgID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // the chain port returns the provider interface
+	if ref.Provider != providerOpenAI {
+		return nil, errors.New("the test models serve one provider only")
+	}
+	return openai.New(openai.Config{BaseURL: m.baseURL, APIKey: redact.New("test-key"), HTTPClient: m.client})
+}
+
+// publishWhatsAppFlow stores the example flow, points its Graph address at the
+// mock provider, publishes it and activates it, through the trigger service the
+// process runs. The example itself is what an owner imports; only its host changes.
+func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, graphURL string) {
+	t.Helper()
+	ctx := t.Context()
+	raw, err := os.ReadFile(whatsappFlowFile)
+	if err != nil {
+		t.Fatalf("read the example flow: %v", err)
+	}
+	draft := []byte(strings.ReplaceAll(string(raw), graphHost, graphURL))
+	now := env.Clock.Now()
+	rec := flow.Record{
+		ID: flow.FlowID(env.IDs.New()), OrgID: env.Org, ProjectID: env.Project, Name: "whatsapp-agent",
+		Draft: draft, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := env.Store.CreateFlow(ctx, rec); err != nil {
+		t.Fatalf("create flow: %v", err)
+	}
+	by := identity.PrincipalID(env.IDs.New())
+	if err := env.Store.CreatePrincipal(ctx, flow.PrincipalRecord{ID: by, Kind: flow.PrincipalUser, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("create the publishing principal: %v", err)
+	}
+	if _, err := eng.trigger.Publish(ctx, trigger.PublishCommand{Org: env.Org, Flow: rec.ID, By: by}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if err := eng.trigger.Activate(ctx, env.Org, rec.ID); err != nil {
+		t.Fatalf("activate: %v", err)
+	}
+}
+
+// handshake sends the subscription GET of the provider and checks the status and the echo.
+func handshake(t *testing.T, h http.Handler, token, challenge string, want int, echo string) {
+	t.Helper()
+	target := whatsappRoute + "?hub.mode=subscribe&hub.verify_token=" + url.QueryEscape(token) + "&hub.challenge=" + challenge
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != want {
+		t.Fatalf("GET handshake with token %q: status %d, want %d: %s", token, rec.Code, want, rec.Body.String())
+	}
+	if want == http.StatusOK && rec.Body.String() != echo {
+		t.Fatalf("handshake echoed %q, want %q", rec.Body.String(), echo)
+	}
+}
+
+// postSigned sends one notification signed with secret, as the provider signs it,
+// and checks the status. For a 202 it returns the execution the request started.
+func postSigned(t *testing.T, h http.Handler, body, secret string, want int) store.ExecutionID {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(body))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, whatsappRoute, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Hub-Signature-256", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != want {
+		t.Fatalf("POST %s: status %d, want %d: %s", whatsappRoute, rec.Code, want, rec.Body.String())
+	}
+	if want != http.StatusAccepted {
+		return store.ExecutionID{}
+	}
+	u, err := id.Parse(rec.Header().Get("Orcon-Execution-Id"))
+	if err != nil {
+		t.Fatalf("the response names no execution: %v", err)
+	}
+	return store.ExecutionID(u)
+}
+
+// messageBody is one Meta notification carrying one text message from the test sender.
+func messageBody(messageID, text string) string {
+	return fmt.Sprintf(`{"object":"whatsapp_business_account","entry":[{"id":"waba-1","changes":[{"field":"messages","value":{`+
+		`"messaging_product":"whatsapp","metadata":{"display_phone_number":"15550100","phone_number_id":%q},`+
+		`"contacts":[{"profile":{"name":"Ana"},"wa_id":%q}],`+
+		`"messages":[{"from":%q,"id":%q,"timestamp":"1760000000","type":"text","text":{"body":%q}}]}}]}]}`,
+		mockprovider.MockPhoneNumberID, testSender, testSender, messageID, text)
+}
+
+// chatCompletion is one OpenAI chat answer with the given text.
+func chatCompletion(text string) string {
+	return fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion","model":"gpt-4o-mini",`+
+		`"choices":[{"index":0,"message":{"role":"assistant","content":%q,"refusal":null},"finish_reason":"stop"}],`+
+		`"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`, text)
+}

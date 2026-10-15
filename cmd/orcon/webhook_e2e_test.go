@@ -94,7 +94,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 
 	// The true branch: the amount is above the threshold, the provider is called.
 	exec := postEvent(t, handler, "/hooks/engine/orders", `{"amount": 42}`, http.StatusAccepted)
-	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	waitExecution(t, env, st, exec)
 	if n := len(provider.Requests()); n != 1 {
 		t.Fatalf("the provider received %d requests, want 1", n)
 	}
@@ -104,7 +104,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 
 	// The false branch: the amount is below the threshold, nothing is called.
 	exec = postEvent(t, handler, "/hooks/engine/orders", `{"amount": 1}`, http.StatusAccepted)
-	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	waitExecution(t, env, st, exec)
 	if n := len(provider.Requests()); n != 1 {
 		t.Fatalf("the false branch called the provider: %d requests", n)
 	}
@@ -189,8 +189,8 @@ func postEvent(t *testing.T, h http.Handler, path, body string, want int) store.
 	return store.ExecutionID(u)
 }
 
-// waitExecution polls the store until the execution reaches the state.
-func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec store.ExecutionID, want execution.State) {
+// waitExecution polls the store until the execution has succeeded.
+func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec store.ExecutionID) {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	var last string
@@ -198,8 +198,11 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 		ex, err := st.GetExecution(t.Context(), env.Org, exec)
 		if err == nil {
 			last = ex.Status
-			if last == string(want) {
+			if last == string(execution.ExecSucceeded) {
 				return
+			}
+			if last == string(execution.ExecFailed) {
+				break
 			}
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -208,5 +211,5 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 	for i := range events {
 		t.Logf("event %s", events[i].Type)
 	}
-	t.Fatalf("execution %s stayed in %q, want %s", exec, last, want)
+	t.Fatalf("execution %s stayed in %q, want %s", exec, last, execution.ExecSucceeded)
 }

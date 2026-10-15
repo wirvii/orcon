@@ -76,3 +76,4 @@ brand/manifest.json  # brand asset manifest read by tools/brandcheck; JSON has n
 internal/adapter/connectors/**/*.json  # connector package JSON (manifest, body, catalogs, authoring record); JSON has no comment syntax
 internal/adapter/connectors/**/LICENSE  # canonical license text of a connector package, must stay byte-identical
 internal/adapter/connectors/**/NOTICE  # attribution notice of a connector package, shipped verbatim
+examples/flows/*.json  # example flow documents for import; JSON has no comment syntax
