@@ -101,7 +101,7 @@ func openStore(ctx context.Context, cfg *config.Config, version string) (persist
 	version = storeVersion(version)
 	switch cfg.Value("store.driver").Text() {
 	case "postgres":
-		s, err := postgres.Open(ctx, postgres.Options{DSN: cfg.Value("store.postgres.dsn").Text(), BinaryVersion: version})
+		s, err := postgres.Open(ctx, postgresOptions(cfg, version))
 		if err != nil {
 			return nil, fmt.Errorf("open the postgres store: %w", err)
 		}
@@ -122,6 +122,17 @@ func openStore(ctx context.Context, cfg *config.Config, version string) (persist
 		return s, nil
 	default:
 		return nil, fmt.Errorf("store.driver %q is not supported", cfg.Value("store.driver").Text())
+	}
+}
+
+// postgresOptions maps the store.postgres.* settings onto the PostgreSQL adapter.
+// The pool is bounded by store.postgres.maxConnections, so the process never
+// opens more connections than the operator allowed for the shared instance.
+func postgresOptions(cfg *config.Config, version string) postgres.Options {
+	return postgres.Options{
+		DSN:           cfg.Value("store.postgres.dsn").Text(),
+		BinaryVersion: version,
+		MaxConns:      int32(cfg.Value("store.postgres.maxConnections").Int()), //nolint:gosec // the schema bounds maxConnections to 1..1000
 	}
 }
 
