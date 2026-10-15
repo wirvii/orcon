@@ -28,9 +28,9 @@ sqlite:UpdateAttentionRequestResolvedByPrincipalToNull  # PostgreSQL clears the 
 sqlite:UpdateOperationalAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorPackageInstalledByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
 sqlite:UpdateConnectorGrantGrantedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
-sqlite:UpdateFlowDraftUpdatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
-sqlite:UpdateNodeTestDataCreatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
-sqlite:UpdateFlowNodePinPinnedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
-sqlite:UpdateTestRunStartedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
-sqlite:UpdateEffectPreviewDecidedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
-sqlite:UpdateFlowEditingSessionOpenedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0016); SQLite has no engine functions
+sqlite:UpdateFlowDraftUpdatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions
+sqlite:UpdateNodeTestDataCreatedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions
+sqlite:UpdateFlowNodePinPinnedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions
+sqlite:UpdateTestRunStartedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions
+sqlite:UpdateEffectPreviewDecidedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions
+sqlite:UpdateFlowEditingSessionOpenedByPrincipalToNull  # PostgreSQL clears the same column in orcon_engine.clear_principal_references (migration 0017); SQLite has no engine functions

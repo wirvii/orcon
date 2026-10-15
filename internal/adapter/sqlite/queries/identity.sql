@@ -174,8 +174,8 @@ UPDATE connector_grant
 SET granted_by_principal_id = NULL
 WHERE id IN (SELECT target.id FROM connector_grant AS target WHERE target.granted_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
 
--- The editor tables (migrations 0014 and 0015) add six actor columns; PostgreSQL clears them in the same
--- function as the columns above (migration 0016).
+-- The editor tables (migrations 0015 and 0016) add six actor columns; PostgreSQL clears them in the same
+-- function as the columns above (migration 0017).
 
 -- name: UpdateFlowDraftUpdatedByPrincipalToNull :execrows
 -- orcon:scope engine

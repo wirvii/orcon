@@ -557,8 +557,8 @@ SET draft_updated_by_principal_id = NULL
 WHERE id IN (SELECT target.id FROM flow AS target WHERE target.draft_updated_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
 `
 
-// The editor tables (migrations 0014 and 0015) add six actor columns; PostgreSQL clears them in the same
-// function as the columns above (migration 0016).
+// The editor tables (migrations 0015 and 0016) add six actor columns; PostgreSQL clears them in the same
+// function as the columns above (migration 0017).
 // orcon:scope engine
 // orcon:include-deleted the draft of a deleted flow keeps the principal that last changed it
 func (q *Queries) UpdateFlowDraftUpdatedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {

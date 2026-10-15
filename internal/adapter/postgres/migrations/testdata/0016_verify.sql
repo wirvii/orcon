@@ -1,6 +1,9 @@
 -- SPDX-FileCopyrightText: The Orcon Authors
 -- SPDX-License-Identifier: Apache-2.0
-SELECT 'schema_migration: migration 0016 is not recorded exactly once' WHERE (SELECT count(*) FROM schema_migration WHERE version = 16) <> 1;
-SELECT 'clear_principal_references: does not clear an actor column of the editor tables' WHERE (SELECT count(*) FROM (VALUES ('node_test_data'), ('flow_node_pin'), ('test_run'), ('effect_preview'), ('flow_editing_session'), ('flow')) AS t(tbl) WHERE position(tbl IN pg_get_functiondef('orcon_engine.clear_principal_references(uuid, integer)'::regprocedure)) = 0) > 0;
-SELECT 'clear_principal_references: the engine role cannot update node_test_data.created_by_principal_id' WHERE NOT has_column_privilege('orcon_engine', 'node_test_data', 'created_by_principal_id', 'UPDATE');
-SELECT 'clear_principal_references: the engine role cannot update test_run.started_by_principal_id' WHERE NOT has_column_privilege('orcon_engine', 'test_run', 'started_by_principal_id', 'UPDATE');
+SELECT 'flow_data: the rows of the previous version must all be PRODUCTION' WHERE (SELECT count(*) FROM flow_data WHERE namespace = 'PRODUCTION') <> 2;
+SELECT 'node_test_data: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM node_test_data) <> 4;
+SELECT 'flow_node_pin: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM flow_node_pin) <> 2;
+SELECT 'test_run: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM test_run) <> 2;
+SELECT 'test_run_seed: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM test_run_seed) <> 2;
+SELECT 'effect_preview: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM effect_preview) <> 2;
+SELECT 'flow_editing_session: the rows of the editor seed must survive the rebuild' WHERE (SELECT count(*) FROM flow_editing_session) <> 2;

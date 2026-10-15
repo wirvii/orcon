@@ -89,19 +89,19 @@
   reason: clears connector_grant.granted_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references
 - dialect: sqlite
   query: UpdateFlowDraftUpdatedByPrincipalToNull
-  reason: clears flow.draft_updated_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears flow.draft_updated_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
   query: UpdateNodeTestDataCreatedByPrincipalToNull
-  reason: clears node_test_data.created_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears node_test_data.created_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
   query: UpdateFlowNodePinPinnedByPrincipalToNull
-  reason: clears flow_node_pin.pinned_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears flow_node_pin.pinned_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
   query: UpdateTestRunStartedByPrincipalToNull
-  reason: clears test_run.started_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears test_run.started_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
   query: UpdateEffectPreviewDecidedByPrincipalToNull
-  reason: clears effect_preview.decided_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears effect_preview.decided_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
 - dialect: sqlite
   query: UpdateFlowEditingSessionOpenedByPrincipalToNull
-  reason: clears flow_editing_session.opened_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0016)
+  reason: clears flow_editing_session.opened_by_principal_id of every organization when a principal is deleted, in bounded batches (orcon-db IN-12, QY-8); PostgreSQL does it in orcon_engine.clear_principal_references (migration 0017)
