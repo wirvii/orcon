@@ -37,6 +37,10 @@ type Config struct {
 	Clock clock.Clock
 	// IDs generates the identities of new rows; required.
 	IDs id.Generator
+	// Verifier authenticates public requests before they start executions. It
+	// is optional: without it no request is authenticated, so a route must not
+	// rely on a signature the build cannot check.
+	Verifier Verifier
 }
 
 // Service runs the trigger lifecycle: publish, activate, deactivate, roll
@@ -52,6 +56,7 @@ type Service struct {
 	starter     Starter
 	clock       clock.Clock
 	ids         id.Generator
+	verifier    Verifier
 }
 
 // New builds a service. Store, Flows, Catalog, Credentials, Clock and IDs are
@@ -74,6 +79,7 @@ func New(cfg Config) (*Service, error) {
 	return &Service{
 		store: cfg.Store, flows: cfg.Flows, catalog: cfg.Catalog, credentials: cfg.Credentials,
 		nodeTypes: cfg.NodeTypes, settings: cfg.Settings, starter: cfg.Starter, clock: cfg.Clock, ids: cfg.IDs,
+		verifier: cfg.Verifier,
 	}, nil
 }
 

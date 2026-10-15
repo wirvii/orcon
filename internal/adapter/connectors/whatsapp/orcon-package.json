@@ -228,6 +228,18 @@
           "type": "STRING",
           "sensitive": true,
           "required": true
+        },
+        {
+          "name": "appSecret",
+          "type": "STRING",
+          "sensitive": true,
+          "required": false
+        },
+        {
+          "name": "verifyToken",
+          "type": "STRING",
+          "sensitive": true,
+          "required": false
         }
       ],
       "scheme": {

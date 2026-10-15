@@ -56,6 +56,9 @@ func Validate(def Definition) error {
 	for _, name := range names {
 		v.operation(name, def.Operations[name])
 	}
+	for _, name := range slices.Sorted(maps.Keys(def.Triggers)) {
+		v.trigger("triggers/"+name, def.Triggers[name])
+	}
 	return v.err()
 }
 

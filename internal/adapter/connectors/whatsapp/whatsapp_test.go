@@ -150,7 +150,7 @@ func decodeBody(t *testing.T, data []byte) declarative.Definition {
 	if err != nil {
 		t.Fatalf("connector.json is not JSON: %v", err)
 	}
-	top := objectOf(t, root, "connector.json", "format", "http", "operations")
+	top := objectOf(t, root, "connector.json", "format", "http", "operations", "triggers")
 	def := declarative.Definition{Format: top.str("format"), Operations: map[string]declarative.Operation{}}
 
 	h := top.child("http", "baseUrl", "headers", "timeout", "auth")
@@ -198,6 +198,23 @@ func decodeBody(t *testing.T, data []byte) declarative.Definition {
 			}
 		}
 		def.Operations[m.Key] = op
+	}
+	if tv, ok := top.value("triggers"); ok {
+		def.Triggers = map[string]declarative.Trigger{}
+		for _, m := range tv.Members() {
+			o := objectOf(t, m.Value, "triggers/"+m.Key, "family", "verify", "handshake")
+			tr := declarative.Trigger{Family: o.str("family")}
+			if v := o.child("verify", "type", "header", "prefix", "field"); len(v.members) > 0 {
+				tr.Verify = &declarative.Verify{Type: v.str("type"), Header: v.str("header"), Prefix: v.str("prefix"), Field: v.str("field")}
+			}
+			if h := o.child("handshake", "type", "modeParam", "tokenParam", "challengeParam", "field"); len(h.members) > 0 {
+				tr.Handshake = &declarative.Handshake{
+					Type: h.str("type"), ModeParam: h.str("modeParam"), TokenParam: h.str("tokenParam"),
+					ChallengeParam: h.str("challengeParam"), Field: h.str("field"),
+				}
+			}
+			def.Triggers[m.Key] = tr
+		}
 	}
 	return def
 }

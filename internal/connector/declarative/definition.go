@@ -14,6 +14,8 @@ type Definition struct {
 	Format     string               `json:"format"`
 	HTTP       HTTP                 `json:"http"`
 	Operations map[string]Operation `json:"operations"`
+	// Triggers are the declared triggers, keyed by name (ADR-0030 §8).
+	Triggers map[string]Trigger `json:"triggers,omitempty"`
 }
 
 // HTTP holds the defaults of every request (ADR-0030 §2) and the

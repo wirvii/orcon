@@ -15,12 +15,33 @@ import (
 // become the items of an execution.
 var ErrBadBody = errors.New("the body is not JSON")
 
+// ErrUnauthorized means a public request did not prove that its sender knows
+// the trigger's secret: the signature is missing or wrong, or the handshake
+// token is wrong. Nothing is started and the caller learns nothing more.
+var ErrUnauthorized = errors.New("the request is not authenticated")
+
 // IngressRequest is a public request addressed to a trigger: the method and
-// the path it came to, and its raw body.
+// the path it came to, its headers and query, and its raw body. Headers are
+// read by the verifier only; the body is the event when it is accepted.
 type IngressRequest struct {
-	Method string
-	Path   string
-	Body   []byte
+	Method  string
+	Path    string
+	Headers map[string][]string
+	Query   map[string]string
+	Body    []byte
+}
+
+// Verifier authenticates public requests against the verification a trigger
+// declares. The request is checked before the acceptance is read, so a refused
+// request never starts an execution.
+type Verifier interface {
+	// Verify returns an error wrapping [ErrUnauthorized] unless the request
+	// carries the signature the route's trigger declares.
+	Verify(ctx context.Context, r Resolved, req IngressRequest) error
+	// Challenge answers a subscription handshake: it returns the text to echo,
+	// or an error wrapping [ErrUnauthorized] when the token is wrong or the
+	// trigger declares no handshake.
+	Challenge(ctx context.Context, r Resolved, req IngressRequest) (string, error)
 }
 
 // Accepted is a request the ingress accepted: the execution it started. The
@@ -50,6 +71,11 @@ func (s *Service) Ingest(ctx context.Context, req IngressRequest) (Accepted, err
 	if err != nil {
 		return Accepted{}, fmt.Errorf("resolve %s %s: %w", req.Method, req.Path, err)
 	}
+	if s.verifier != nil {
+		if err := s.verifier.Verify(ctx, r, req); err != nil {
+			return Accepted{}, fmt.Errorf("%w: %w", ErrUnauthorized, err)
+		}
+	}
 	acc, err := s.Accept(ctx, r.Org, r.FlowID, r.NodeID)
 	if err != nil {
 		return Accepted{}, err
@@ -62,4 +88,24 @@ func (s *Service) Ingest(ctx context.Context, req IngressRequest) (Accepted, err
 		return Accepted{}, fmt.Errorf("start the execution of node %q: %w", r.NodeID, err)
 	}
 	return Accepted{ExecutionID: id}, nil
+}
+
+// Handshake answers the subscription request of a provider that verifies a
+// webhook address with a GET (SPEC-002 T2; ADR-0030 §8). It resolves the GET
+// address, asks the verifier for the challenge and returns it. It starts no
+// execution and reads no acceptance. Without a verifier nothing can be
+// confirmed, so the request is refused.
+func (s *Service) Handshake(ctx context.Context, req IngressRequest) (string, error) {
+	if s.verifier == nil {
+		return "", fmt.Errorf("%w: no verifier is wired", ErrUnauthorized)
+	}
+	r, err := s.store.ResolveRoute(ctx, req.Method, req.Path)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s %s: %w", req.Method, req.Path, err)
+	}
+	challenge, err := s.verifier.Challenge(ctx, r, req)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrUnauthorized, err)
+	}
+	return challenge, nil
 }
