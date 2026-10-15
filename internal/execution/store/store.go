@@ -662,6 +662,32 @@ type ClaimRequest struct {
 	// claim skips the tokens one abandonment short of it ([WorkQueue.ClaimLastChanceToken]
 	// takes those); [DefaultPoisonThreshold] when zero.
 	PoisonThreshold int64
+	// ExecutionLimit is the most tokens of one execution that may be leased at
+	// once (ADR-0014 section 2.2); [DefaultExecutionLimit] when zero.
+	ExecutionLimit int64
+}
+
+// DefaultExecutionLimit is the execution token limit of new flows (ADR-0014 §2).
+const DefaultExecutionLimit = 64
+
+// Priority classes as stored on a token (token.effective_priority): the smaller
+// value is claimed first (SPEC-001 R-FAIR-01).
+const (
+	PriorityHigh   int64 = 0
+	PriorityNormal int64 = 1
+	PriorityLow    int64 = 2
+)
+
+// MaxRunnableRows bounds the claim snapshot: fairness keys times three classes.
+const MaxRunnableRows = 10000
+
+// RunnableCount is one row of the claim snapshot: the runnable tokens of a
+// fairness key at one stored priority, and when the oldest became claimable.
+type RunnableCount struct {
+	FairnessKey string
+	Priority    int64
+	Runnable    int64
+	Oldest      time.Time
 }
 
 // DefaultPoisonThreshold is the number of abandonments after which a token is
@@ -763,6 +789,10 @@ type WorkQueue interface {
 	//
 	//orcon:scope engine the timer scan covers the due timers of every organization (ADR-0047 section 2)
 	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
+	// RunnableCounts returns the claimable tokens grouped by fairness key and
+	// priority, at most a fixed number of rows. A worker plans its claims from
+	// it (ADR-0014 section 1); it is a snapshot, not a reservation.
+	RunnableCounts(ctx context.Context, now time.Time) ([]RunnableCount, error)
 }
 
 // LeaseRecovery gives leases back: the reaper's expired ones, the ones an owner

@@ -125,6 +125,9 @@ type Config struct {
 	// ShutdownGrace bounds the time a graceful shutdown waits for the held
 	// tokens to checkpoint and release (30 s).
 	ShutdownGrace time.Duration
+	// ExecutionLimit is the most tokens of one execution that may be leased at
+	// once (ADR-0014 section 2.2); store.DefaultExecutionLimit when zero.
+	ExecutionLimit int
 	// Concurrency is the number of tokens the process works at the same time (4).
 	Concurrency int
 	// PoisonThreshold is the number of abandonments after which a token is

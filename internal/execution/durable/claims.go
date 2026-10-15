@@ -104,5 +104,6 @@ func (e *Engine) claimDone(kind claimKind) {
 func (e *Engine) claimRequest(limit int) store.ClaimRequest {
 	return store.ClaimRequest{
 		Worker: e.cfg.Worker, Limit: limit, LeaseTTL: e.cfg.LeaseTTL, Now: e.cfg.Clock.Now(), PoisonThreshold: e.cfg.PoisonThreshold,
+		ExecutionLimit: int64(e.cfg.ExecutionLimit),
 	}
 }
