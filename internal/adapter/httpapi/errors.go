@@ -16,8 +16,15 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/identity"
 )
+
+// isStaleRevision reports whether err is a staleRevisionError.
+func isStaleRevision(err error) bool {
+	var stale staleRevisionError
+	return errors.As(err, &stale)
+}
 
 // unavailableRetry is the Retry-After of an operation that has no handler yet.
 const unavailableRetry = 30 * time.Second
@@ -118,6 +125,18 @@ func knownError(w http.ResponseWriter, r *http.Request, err error) bool {
 		problem.Write(w, r, problem.PreconditionRequired)
 	case errors.Is(err, conditional.ErrMismatch), errors.Is(err, conditional.ErrMalformed):
 		problem.Write(w, r, problem.PreconditionFailed)
+	case isStaleRevision(err):
+		var stale staleRevisionError
+		errors.As(err, &stale)
+		problem.Write(w, r, problem.PreconditionFailed, problem.Header("ETag", stale.etag))
+	case errors.Is(err, credential.ErrNotFound):
+		problem.Write(w, r, problem.NotFound)
+	case errors.Is(err, credential.ErrInvalid):
+		problem.Write(w, r, problem.ValidationFailed)
+	case errors.Is(err, credential.ErrConflict):
+		problem.Write(w, r, problem.Conflict)
+	case errors.Is(err, credential.ErrNotOwner), errors.Is(err, credential.ErrNotUsable):
+		problem.Write(w, r, problem.Forbidden)
 	default:
 		return false
 	}
