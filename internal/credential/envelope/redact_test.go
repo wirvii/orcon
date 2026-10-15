@@ -26,13 +26,17 @@ func TestKeyMaterialNeverPrintsInStructs(t *testing.T) {
 	}
 	mk := NewLocalMasterKey("file", "/k", key)
 	ring := NewKeyring(mk, newFakeStore())
-	ring.keys[KeyID{Level: LevelInstance, Version: 1}] = cachedKey{key: key.clone(), expires: time.Now()}
+	// UTC times carry no pointer to the lazily loaded local zone. fmt walks
+	// time.Time.loc by reflection while another test's logging initializes
+	// the local zone, which is a data race on that zone.
+	expires := time.Unix(0, 0).UTC()
+	ring.keys[KeyID{Level: LevelInstance, Version: 1}] = cachedKey{key: key.clone(), expires: expires}
 
 	values := map[string]any{
 		"Key":              key,
 		"LocalMasterKey":   *mk,
 		"*LocalMasterKey":  mk,
-		"cachedKey":        cachedKey{key: key, expires: time.Now()},
+		"cachedKey":        cachedKey{key: key, expires: expires},
 		"DataKey":          DataKey{Key: key},
 		"*Keyring":         ring,
 		"struct with Key":  struct{ K Key }{key},

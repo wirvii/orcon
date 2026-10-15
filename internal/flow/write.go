@@ -55,8 +55,10 @@ func (b *builder) flag(key string, p *bool) {
 	}
 }
 
+// strs writes a list of strings. An empty list is omitted: the reader requires at least one item in
+// a list, so writing "[]" would produce a document the reader rejects (BL-101).
 func (b *builder) strs(key string, items []string) {
-	if items == nil {
+	if len(items) == 0 {
 		return
 	}
 	vs := make([]jsonvalue.Value, len(items))
@@ -220,6 +222,7 @@ func (n *Node) writeBlocks(b *builder) {
 		a.str("notify", string(n.Attention.Notify))
 		b.val("attention", a.build())
 	}
+	b.strs("sensitivePaths", n.SensitivePaths)
 }
 
 func (k IntOrKeyword) value() jsonvalue.Value {

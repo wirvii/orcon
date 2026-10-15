@@ -236,30 +236,9 @@ func (q *Queries) GetFlowVersionByNumber(ctx context.Context, orgID pgtype.UUID,
 	return i, err
 }
 
-const getProject = `-- name: GetProject :one
-SELECT id, org_id, name, slug, environment, is_protected, created_at, updated_at
-FROM project
-WHERE org_id = $1 AND id = $2
-`
-
-// orcon:scope org
-func (q *Queries) GetProject(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) (Project, error) {
-	row := q.db.QueryRow(ctx, getProject, orgID, iD)
-	var i Project
-	err := row.Scan(
-		&i.ID,
-		&i.OrgID,
-		&i.Name,
-		&i.Slug,
-		&i.Environment,
-		&i.IsProtected,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const insertFlow = `-- name: InsertFlow :exec
+
+
 INSERT INTO flow (id, org_id, project_id, name, draft_document, draft_document_format, draft_revision, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, 'orcon/flow@1', 0, $6, $7)
 `
@@ -274,6 +253,10 @@ type InsertFlowParams struct {
 	UpdatedAt     pgtype.Timestamptz
 }
 
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+// Queries of flow, flow_version and flow_snapshot. The PostgreSQL file
+// of the same name holds the same query names.
 // orcon:scope org
 // orcon:include-deleted a new flow row is inserted active; nothing is read
 func (q *Queries) InsertFlow(ctx context.Context, arg InsertFlowParams) error {
@@ -353,43 +336,6 @@ func (q *Queries) InsertFlowVersion(ctx context.Context, arg InsertFlowVersionPa
 		arg.PublishedByPrincipalID,
 		arg.PublishedAt,
 		arg.CreatedAt,
-	)
-	return err
-}
-
-const insertProject = `-- name: InsertProject :exec
-
-
-INSERT INTO project (id, org_id, name, slug, environment, is_protected, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-`
-
-type InsertProjectParams struct {
-	ID          pgtype.UUID
-	OrgID       pgtype.UUID
-	Name        string
-	Slug        string
-	Environment pgtype.Text
-	IsProtected bool
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-}
-
-// SPDX-FileCopyrightText: The Orcon Authors
-// SPDX-License-Identifier: Apache-2.0
-// Queries of project, flow, flow_version and flow_snapshot. The PostgreSQL file
-// of the same name holds the same query names.
-// orcon:scope org
-func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) error {
-	_, err := q.db.Exec(ctx, insertProject,
-		arg.ID,
-		arg.OrgID,
-		arg.Name,
-		arg.Slug,
-		arg.Environment,
-		arg.IsProtected,
-		arg.CreatedAt,
-		arg.UpdatedAt,
 	)
 	return err
 }
@@ -517,45 +463,6 @@ func (q *Queries) ListFlows(ctx context.Context, arg ListFlowsParams) ([]ListFlo
 			&i.ActivationState,
 			&i.DeletedAt,
 			&i.DeletedByPrincipalID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listProjects = `-- name: ListProjects :many
-SELECT id, org_id, name, slug, environment, is_protected, created_at, updated_at
-FROM project
-WHERE org_id = $1 AND id > $2
-ORDER BY id
-LIMIT $3
-`
-
-// orcon:scope org
-// orcon:hot
-func (q *Queries) ListProjects(ctx context.Context, orgID pgtype.UUID, afterID pgtype.UUID, pageSize int32) ([]Project, error) {
-	rows, err := q.db.Query(ctx, listProjects, orgID, afterID, pageSize)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Project{}
-	for rows.Next() {
-		var i Project
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.Name,
-			&i.Slug,
-			&i.Environment,
-			&i.IsProtected,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

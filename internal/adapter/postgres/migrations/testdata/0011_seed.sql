@@ -1,0 +1,8 @@
+-- SPDX-FileCopyrightText: The Orcon Authors
+-- SPDX-License-Identifier: Apache-2.0
+INSERT INTO principal (id, kind, created_at, updated_at) VALUES ('00000011-0000-7000-8000-000100000001', 'USER', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO principal (id, kind, created_at, updated_at) VALUES ('00000011-0000-7000-8000-000200000001', 'USER', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO application_user (id, principal_id, email_normalized, display_name, status, created_at, updated_at) VALUES ('00000012-0000-7000-8000-000100000001', '00000011-0000-7000-8000-000100000001', 'user-1@example.test', 'display_name-1-1', 'ACTIVE', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO application_user (id, principal_id, email_normalized, display_name, status, created_at, updated_at) VALUES ('00000012-0000-7000-8000-000200000001', '00000011-0000-7000-8000-000200000001', 'user-2@example.test', 'display_name-2-1', 'ACTIVE', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO membership (id, org_id, application_user_id, status, invited_by_principal_id, created_at, updated_at) VALUES ('00000013-0000-7000-8000-000100000001', '00000003-0000-7000-8000-000100000001', '00000012-0000-7000-8000-000100000001', 'ACTIVE', '00000004-0000-7000-8000-000100000001', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO membership (id, org_id, application_user_id, status, invited_by_principal_id, created_at, updated_at) VALUES ('00000013-0000-7000-8000-000200000001', '00000003-0000-7000-8000-000200000001', '00000012-0000-7000-8000-000200000001', 'ACTIVE', '00000004-0000-7000-8000-000200000001', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');

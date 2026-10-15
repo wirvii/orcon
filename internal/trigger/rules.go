@@ -17,6 +17,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Codes of the trigger rules T-V1..T-V9 (ADR-0024 section 2).
@@ -54,7 +55,7 @@ const typeRespond = "orcon.respond"
 
 // ruleContext carries what the document-level rules compare the draft with.
 type ruleContext struct {
-	org     identity.OrgID
+	org     orgscope.Org
 	project identity.ProjectID
 	// previous is the live version, for T-V4; nil on the first publication.
 	previous *flow.Document

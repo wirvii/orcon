@@ -4,16 +4,21 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
+	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // micros is the stored form of an instant: Unix microseconds in UTC
@@ -87,6 +92,9 @@ func mapError(op string, err error) error {
 	if errors.As(err, &se) {
 		switch se.Code() {
 		case sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
+			if strings.Contains(se.Error(), handleColumn) {
+				return fmt.Errorf("%s: %w: %w", op, identity.ErrHandleTaken, err)
+			}
 			return fmt.Errorf("%s: %w: %w", op, flow.ErrConflict, err)
 		case sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
 			return fmt.Errorf("%s: %w: %w", op, flow.ErrReference, err)
@@ -95,6 +103,40 @@ func mapError(op string, err error) error {
 		}
 	}
 	return fmt.Errorf("%s: %w", op, err)
+}
+
+// handleColumn is how SQLite names the unique index uq_project_handle in a violation message.
+const handleColumn = "project.handle"
+
+// scoped returns the stored form of the organization of a scope. The zero scope
+// scopes to nothing and is refused (orcon-db TI-2).
+func scoped(org orgscope.Org) ([]byte, error) {
+	if org.IsZero() {
+		return nil, identity.ErrNoScope
+	}
+	return org.UUID().Bytes(), nil
+}
+
+// readOf is [Store.read] for one organization: the zero scope is refused before the
+// read starts, as the PostgreSQL adapter refuses it (orcon-db TI-2).
+func (s *Store) readOf(ctx context.Context, op string, org orgscope.Org, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	if _, err := scoped(org); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return s.read(ctx, op, fn)
+}
+
+// scopedRecord is [scoped] for a record that names its organization: the record
+// is written only under the scope of that organization.
+func scopedRecord(org orgscope.Org, recordOrg identity.OrgID) ([]byte, error) {
+	b, err := scoped(org)
+	if err != nil {
+		return nil, err
+	}
+	if !recordOrg.Matches(org) {
+		return nil, identity.ErrScopeMismatch
+	}
+	return b, nil
 }
 
 func isNoRows(err error) bool { return errors.Is(err, sql.ErrNoRows) }

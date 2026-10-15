@@ -179,7 +179,7 @@ func TestConnectorIDOf(t *testing.T) {
 
 // resolver is a node-type catalog fake that answers for connector nodes.
 type resolver struct {
-	resolve func(nodeType string, pin *flow.ConnectorPin, operation string) flow.NodeResolution
+	resolve func(n *flow.Node) flow.NodeResolution
 }
 
 func (r resolver) Lookup(_ context.Context, nodeType string) (flow.NodeType, bool) {
@@ -189,11 +189,11 @@ func (r resolver) Lookup(_ context.Context, nodeType string) (flow.NodeType, boo
 	return flow.NodeType{}, false
 }
 
-func (r resolver) ResolveNode(_ context.Context, nodeType string, pin *flow.ConnectorPin, operation string) flow.NodeResolution {
-	if strings.HasPrefix(nodeType, "orcon.") {
+func (r resolver) ResolveNode(_ context.Context, n *flow.Node) flow.NodeResolution {
+	if strings.HasPrefix(n.Type, "orcon.") {
 		return flow.NodeResolution{Type: flow.NodeType{Purity: flow.PurityPure}, Known: true}
 	}
-	return r.resolve(nodeType, pin, operation)
+	return r.resolve(n)
 }
 
 // TestPublishLevel5ConnectorPins: what the catalog says about a pin decides
@@ -206,8 +206,8 @@ func TestPublishLevel5ConnectorPins(t *testing.T) {
 		pin       *flow.ConnectorPin
 		operation string
 	}
-	catalog := resolver{resolve: func(nodeType string, pin *flow.ConnectorPin, operation string) flow.NodeResolution {
-		seen.nodeType, seen.pin, seen.operation = nodeType, pin, operation
+	catalog := resolver{resolve: func(n *flow.Node) flow.NodeResolution {
+		seen.nodeType, seen.pin, seen.operation = n.Type, n.Connector, flow.SelectionOf(n).Operation
 		return flow.NodeResolution{Known: true, Type: flow.NodeType{Purity: flow.PurityRead}}
 	}}
 	if r := flow.ValidateWithTypes(t.Context(), &doc, catalog); r.HasErrors() {
@@ -219,7 +219,7 @@ func TestPublishLevel5ConnectorPins(t *testing.T) {
 
 	t.Run("a pin problem is a CONNECTOR error naming the node", func(t *testing.T) {
 		t.Parallel()
-		blocked := resolver{resolve: func(string, *flow.ConnectorPin, string) flow.NodeResolution {
+		blocked := resolver{resolve: func(*flow.Node) flow.NodeResolution {
 			return flow.NodeResolution{Known: true, Type: flow.NodeType{Purity: flow.PurityRead}, Problems: []string{"uses acme.shop version 1.2.0, which is revoked"}}
 		}}
 		r := flow.ValidateWithTypes(t.Context(), &doc, blocked)
@@ -232,7 +232,7 @@ func TestPublishLevel5ConnectorPins(t *testing.T) {
 
 	t.Run("a type no package defines is a V10 error", func(t *testing.T) {
 		t.Parallel()
-		none := resolver{resolve: func(string, *flow.ConnectorPin, string) flow.NodeResolution { return flow.NodeResolution{} }}
+		none := resolver{resolve: func(*flow.Node) flow.NodeResolution { return flow.NodeResolution{} }}
 		if r := flow.ValidateWithTypes(t.Context(), &doc, none); !r.Has(flow.CodeV10, flow.SeverityError) {
 			t.Errorf("errors = %v", r.Errors())
 		}
@@ -240,8 +240,8 @@ func TestPublishLevel5ConnectorPins(t *testing.T) {
 
 	t.Run("an unknown operation is a V10 error at the parameter", func(t *testing.T) {
 		t.Parallel()
-		noOp := resolver{resolve: func(string, *flow.ConnectorPin, string) flow.NodeResolution {
-			return flow.NodeResolution{Known: true, UnknownOperation: true}
+		noOp := resolver{resolve: func(*flow.Node) flow.NodeResolution {
+			return flow.NodeResolution{Known: true, Selection: flow.SelectionUnknown, Operations: []string{"order.create"}}
 		}}
 		r := flow.ValidateWithTypes(t.Context(), &doc, noOp)
 		errs := r.Errors()
@@ -249,27 +249,12 @@ func TestPublishLevel5ConnectorPins(t *testing.T) {
 			t.Errorf("errors = %v", errs)
 		}
 	})
-
-	t.Run("an expression operation is not resolved statically", func(t *testing.T) {
-		t.Parallel()
-		d := withConnectorNode(t, &flow.ConnectorPin{Version: "1.2.0", Digest: pinDigest})
-		node(&d, "fetch").Parameters = obj(jsonvalue.Member{Key: "operation", Value: jsonvalue.String("={{ $json.op }}")})
-		got := ""
-		c := resolver{resolve: func(_ string, _ *flow.ConnectorPin, operation string) flow.NodeResolution {
-			got = operation
-			return flow.NodeResolution{Known: true, Type: flow.NodeType{Purity: flow.PurityRead}}
-		}}
-		flow.ValidateWithTypes(t.Context(), &d, c)
-		if got != "" {
-			t.Errorf("an expression was passed to the catalog as the operation %q", got)
-		}
-	})
 }
 
 func TestPublishWithAppliesLevel5(t *testing.T) {
 	t.Parallel()
 	doc := withConnectorNode(t, &flow.ConnectorPin{Version: "1.2.0", Digest: pinDigest})
-	blocked := resolver{resolve: func(string, *flow.ConnectorPin, string) flow.NodeResolution {
+	blocked := resolver{resolve: func(*flow.Node) flow.NodeResolution {
 		return flow.NodeResolution{Known: true, Type: flow.NodeType{Purity: flow.PurityRead}, Problems: []string{"is not granted"}}
 	}}
 	f := flow.NewFlow(doc.ID)

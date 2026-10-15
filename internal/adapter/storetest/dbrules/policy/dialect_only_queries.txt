@@ -17,3 +17,14 @@ sqlite:ResolveWaitSecret  # SPEC-001 C2: PostgreSQL calls the orcon_engine funct
 postgres:LockJoinInstance  # SPEC-001 C2: arrivals at one join serialize on PostgreSQL; SQLite has one writer
 postgres:LockTriggerRoute  # SPEC-002 T1: claims of one web path serialize on an advisory lock across organizations; SQLite has a single writer
 postgres:MarkTriggerRoutesChanged  # SPEC-002 T1: pg_notify tells the api processes to rebuild the route index; SQLite has no signal yet (T2 adds the in-process one)
+sqlite:UpdateFlowDeletedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateFlowVersionPublishedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateMembershipInvitedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateInstanceAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateExternalOperationResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateHumanTaskResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateAttentionRequestAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateAttentionRequestResolvedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateOperationalAlertAcknowledgedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateConnectorPackageInstalledByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions
+sqlite:UpdateConnectorGrantGrantedByPrincipalToNull  # PostgreSQL clears the same columns in orcon_engine.clear_principal_references (migration 0013); SQLite has no engine functions

@@ -15,19 +15,29 @@ import (
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
 
 // Stores is everything the battery needs from a storage backend: the flow
 // ports the service reads and the ports that create the rows of a scenario.
 // The SQLite and PostgreSQL adapters implement it, and so does [Memory].
-type Stores interface {
+type Stores interface { //nolint:interfacebloat // the battery exercises every port of a backend through one value
 	trigger.FlowSource
-	flow.InstanceStore
-	flow.ProjectStore
+	identity.OrgStore
+	principalRows
+	identity.ProjectStore
 	flow.Store
 	flow.VersionStore
 	flow.SnapshotStore
+}
+
+// principalRows is the part of [identity.PrincipalStore] the battery uses: the
+// scenario creates its principal and reads the system one. The deletion of a
+// principal is not part of the battery, so the in-memory store does not offer it.
+type principalRows interface {
+	CreatePrincipal(ctx context.Context, p identity.PrincipalRecord) error
+	GetSystemPrincipal(ctx context.Context) (identity.PrincipalRecord, error)
 }
 
 // Backend is one store under test.
@@ -36,6 +46,11 @@ type Backend struct {
 	Triggers trigger.Store
 	// Flows holds the flow ports.
 	Flows Stores
+	// Scope turns the identity of an organization of the battery into the scope
+	// the store methods take. Only the tests that build the backend may create
+	// scopes (ADR-0046 section 2), so the battery receives this function instead
+	// of creating them itself.
+	Scope func(identity.OrgID) orgscope.Org
 }
 
 // Memory is an in-memory implementation of the trigger store and of the flow
@@ -50,9 +65,9 @@ type Memory struct {
 }
 
 type memState struct {
-	orgs       map[identity.OrgID]*flow.OrgRecord
-	principals map[identity.PrincipalID]*flow.PrincipalRecord
-	projects   map[identity.ProjectID]*flow.ProjectRecord
+	orgs       map[identity.OrgID]*identity.OrgRecord
+	principals map[identity.PrincipalID]*identity.PrincipalRecord
+	projects   map[identity.ProjectID]*identity.ProjectRecord
 	flows      map[flow.FlowID]*flow.Record
 	versions   map[flow.FlowVersionID]*flow.VersionRecord
 	snapshots  map[flow.FlowSnapshotID]*flow.SnapshotRecord
@@ -64,9 +79,9 @@ type memState struct {
 // NewMemory returns an empty store.
 func NewMemory() *Memory {
 	return &Memory{s: memState{
-		orgs:       map[identity.OrgID]*flow.OrgRecord{},
-		principals: map[identity.PrincipalID]*flow.PrincipalRecord{},
-		projects:   map[identity.ProjectID]*flow.ProjectRecord{},
+		orgs:       map[identity.OrgID]*identity.OrgRecord{},
+		principals: map[identity.PrincipalID]*identity.PrincipalRecord{},
+		projects:   map[identity.ProjectID]*identity.ProjectRecord{},
 		flows:      map[flow.FlowID]*flow.Record{},
 		versions:   map[flow.FlowVersionID]*flow.VersionRecord{},
 		snapshots:  map[flow.FlowSnapshotID]*flow.SnapshotRecord{},
@@ -107,14 +122,17 @@ func cloneRows[K comparable, V any](in map[K]*V) map[K]*V {
 func (m *Memory) Backend() Backend { return Backend{Triggers: m, Flows: m} }
 
 // Atomic implements [trigger.Store].
-func (m *Memory) Atomic(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
+func (m *Memory) Atomic(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("run a transaction: %w", err)
+	}
+	if org.IsZero() {
+		return identity.ErrNoScope
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	before := m.s.clone()
-	if err := fn(ctx, &memTx{m: m, org: org}); err != nil {
+	if err := fn(ctx, &memTx{m: m, org: identity.OrgID(org.UUID())}); err != nil {
 		m.s = before
 		return err
 	}
@@ -122,14 +140,17 @@ func (m *Memory) Atomic(ctx context.Context, org identity.OrgID, fn func(ctx con
 }
 
 // Read implements [trigger.Store].
-func (m *Memory) Read(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
+func (m *Memory) Read(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("run a read: %w", err)
+	}
+	if org.IsZero() {
+		return identity.ErrNoScope
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	before := m.s.clone()
-	err := fn(ctx, &memTx{m: m, org: org, readOnly: true})
+	err := fn(ctx, &memTx{m: m, org: identity.OrgID(org.UUID()), readOnly: true})
 	m.s = before // a read changes nothing, whatever fn did
 	return err
 }

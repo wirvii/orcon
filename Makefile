@@ -168,11 +168,12 @@ goleak-check:
 PG_IMAGES ?= postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b143664907d6e146eb6e1 postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
 
 # test-postgres needs a container runtime (testcontainers); the adapters skip without
-# ORCON_TEST_POSTGRES. It runs the adapter tests once per image of PG_IMAGES.
+# ORCON_TEST_POSTGRES. It runs the adapter tests and the cross-organization isolation
+# battery (test/isolation) once per image of PG_IMAGES.
 test-postgres:
 	set -e; for image in $(PG_IMAGES); do \
 		echo "test-postgres: $$image"; \
-		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/...; \
+		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/... ./test/isolation/...; \
 	done
 
 # test-compat-floor proves the compatibility floor of every migration and the

@@ -9,25 +9,32 @@
 // outcomes are not-found, empty or validation errors, and nothing that carries
 // a value planted in B (see [Org.Sentinel]).
 //
-// This package is the skeleton the later cuts fill:
-//
 //   - [Registry] holds one [Case] per [Subject], a subject being an HTTP route
 //     or a store method. [Registry.Missing] and [Registry.Orphans] compare the
 //     registry with a [Surface], so a new route or store method without a case
-//     fails TestRegistryComplete. The surface is empty today because no route
-//     or store method that handles organization data exists yet.
-//   - [Env] carries what a case needs: the store under test, the two
-//     organizations and whether the run is the PostgreSQL row-level-security
-//     only mode (build tag isolation_rls_only), in which the filter of wall 1
-//     is switched off by a test-only hook so wall 3 stands alone.
+//     fails TestRegistryComplete. The surface of the store methods is
+//     [StoreSurface]: every method of [Stores], and TestSurfaceIsEverythingTheAdaptersImplement
+//     ties that list to what the adapters implement. No HTTP route handles
+//     organization data yet, so [StoreSurface] has no routes.
+//   - [Env] carries what a case needs: the store under test, seeded by [Seed]
+//     with both organizations, and whether the run is the PostgreSQL
+//     row-level-security only mode (build tag isolation_rls_only). That mode needs
+//     a test-only hook that switches the filter of wall 1 off; the hook arrives
+//     with the full battery (SPEC-004 SE17), and until then the cases are skipped
+//     in that mode instead of claiming to test wall 3 alone.
 //   - [Leaks] and [AssertNoLeak] search anything returned to, or stored for,
 //     the attacking organization for the sentinel values of the other one.
 //
-// The store is chosen with the -store flag, which follows -args:
+// The store is chosen with the -store flag, which follows -args (auto, the default,
+// is SQLite plus PostgreSQL when ORCON_TEST_POSTGRES=1):
 //
 //	go test ./test/isolation/... -args -store=sqlite
 //	go test ./test/isolation/... -args -store=postgres
 //	go test -tags isolation_rls_only ./test/isolation/... -args -store=postgres
+//
+// Every case gets a fresh database through internal/adapter/storetest, the only
+// adapter package the test files here may import (a proposed exception to
+// architecture-layers.md AL-2.4, see .golangci.yml).
 //
 // Cuts that add routes or store methods add their cases here in the same
 // change (orcon-db TI-11); the case for webhook path collisions between

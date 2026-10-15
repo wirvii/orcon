@@ -397,6 +397,7 @@ func (d *decoder) nodeBlocks(o *obj, n *Node) {
 		n.Trigger = d.trigger(c)
 		c.done()
 	}
+	n.SensitivePaths = o.strings("sensitivePaths")
 	if c, ok := o.child("attention", false); ok {
 		n.Attention = &Attention{Notify: AttentionNotify(c.str("notify", true))}
 		c.done()

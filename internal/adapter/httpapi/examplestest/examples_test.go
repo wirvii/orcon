@@ -33,12 +33,12 @@ func TestExamples(t *testing.T) {
 	}
 	contract := filepath.Clean(contractPath)
 	if _, err := os.Stat(contract); err != nil {
-		t.Skipf("no contract at %s yet: only the self-test runs", contract)
+		t.Skipf("no contract at %s: only the self-test runs", contract)
 	}
 	if _, err := os.Stat(binaryPath()); err != nil {
 		t.Skipf("no binary at %s (build it with make build-go): only the self-test runs", binaryPath())
 	}
-	t.Skip("no non-interactive credential procedure yet; this test runs the real examples once SPEC-005 API3 (the first non-interactive credential, tracked as BL-062) provides one, until then only TestRunnerAgainstFake proves the runner")
+	t.Skip("the contract has no non-interactive credential procedure yet (SPEC-005 API3, tracked as BL-062), so no server can be asked with a credential; this test runs the real examples once API3 provides one, until then only TestRunnerAgainstFake proves the runner")
 }
 
 func binaryPath() string {
