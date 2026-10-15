@@ -3,7 +3,7 @@
 
 -- Visual flow editor storage (SPEC-014 section 6). The SQLite file of the same name holds the same queries
 -- with the same names. Pruning of editor data crosses organizations and runs in the orcon_engine function
--- prune_batch (migration 0015), which is what the two purge queries at the end of this file call.
+-- prune_batch (migration 0024), which is what the two purge queries at the end of this file call.
 
 -- Node test outputs are append-only (ADR-0082 section 3).
 -- name: InsertNodeTestData :exec
@@ -169,7 +169,7 @@ ORDER BY opened_at, id
 LIMIT sqlc.arg(page_size);
 
 -- Retention of editor test data: the orcon_engine function removes up to page_size unreferenced rows
--- created more than 24 hours before now and returns how many it removed (migration 0015).
+-- created more than 24 hours before now and returns how many it removed (migration 0024).
 -- name: PurgeEditorTestData :one
 -- orcon:scope engine
 SELECT orcon_engine.prune_batch('editor_test_data', sqlc.arg(page_size), sqlc.arg(now)) AS removed_count;

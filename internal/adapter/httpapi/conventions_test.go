@@ -5,7 +5,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"io"
 	"log/slog"
@@ -13,12 +12,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/conditional"
-	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // TestIdempotencyInThePipeline: the idempotency step is installed on the
@@ -146,7 +147,7 @@ func TestKnownErrorsAreMapped(t *testing.T) {
 // TestIdempotencyStoreCanBeReplaced: Deps.Idempotency is the seam for the durable store.
 func TestIdempotencyStoreCanBeReplaced(t *testing.T) {
 	calls := 0
-	store := &countingStore{onBegin: func() { calls++ }}
+	store := &countingStore{onLookup: func() { calls++ }}
 	h := newHarness(t, func(d *Deps) { d.Idempotency = store })
 	h.do(http.MethodPost, "/api/v1/things", "token-a", func(r *http.Request) { r.Header.Set("Idempotency-Key", "k") })
 	if calls != 1 {
@@ -154,18 +155,16 @@ func TestIdempotencyStoreCanBeReplaced(t *testing.T) {
 	}
 }
 
-// countingStore claims every key and counts the claims.
+// countingStore has no record of any key and counts the lookups.
 type countingStore struct {
-	onBegin func()
+	onLookup func()
 }
 
-func (c *countingStore) Begin(context.Context, idempotency.Key, [sha256.Size]byte) (idempotency.Record, bool, error) {
-	c.onBegin()
-	return idempotency.Record{}, true, nil
+func (c *countingStore) LookupIdempotency(context.Context, orgscope.Org, identity.IdempotencyKey, time.Time) (identity.IdempotencyRecord, bool, error) {
+	c.onLookup()
+	return identity.IdempotencyRecord{}, false, nil
 }
 
-func (*countingStore) Complete(context.Context, idempotency.Key, *idempotency.Response) error {
+func (*countingStore) CompleteIdempotency(context.Context, orgscope.Org, identity.IdempotencyKey, identity.IdempotencyCompletion, time.Time) error {
 	return nil
 }
-
-func (*countingStore) Abandon(context.Context, idempotency.Key) error { return nil }

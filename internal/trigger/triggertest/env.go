@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -85,7 +86,7 @@ func (e *env) organization(slug string) (identity.OrgID, identity.ProjectID) {
 	project := identity.ProjectID(e.ids.New())
 	must(e.t, "create the project of "+slug, e.b.Flows.CreateProject(e.ctx(), e.b.Scope(org), identity.ProjectRecord{
 		ID: project, OrgID: org, Name: "Alpha", Slug: "alpha", Environment: "development", IsProtected: true, CreatedAt: Start, UpdatedAt: Start,
-	}))
+	}, audittest.Org(e.t, id.UUID(org), "project.created")))
 	return org, project
 }
 

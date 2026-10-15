@@ -1,6 +1,4 @@
 -- SPDX-FileCopyrightText: The Orcon Authors
 -- SPDX-License-Identifier: Apache-2.0
-INSERT INTO flow_data (id, org_id, flow_id, namespace, data_key, value_document, value_document_format, version, created_at, updated_at) VALUES ('00000037-0000-7000-8000-000100000001', '00000003-0000-7000-8000-000100000001', '00000006-0000-7000-8000-000100000001', 'TEST', 'editor-test-value-1', '\x7b7d', 'orcon/value@1', 0, '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
-INSERT INTO wait (id, org_id, execution_id, token_id, node_execution_id, kind, status, created_at, updated_at) VALUES ('00000036-0000-7000-8000-000100000001', '00000003-0000-7000-8000-000100000001', '0000000b-0000-7000-8000-000100000001', '0000000c-0000-7000-8000-000100000001', '0000000d-0000-7000-8000-000100000001', 'EFFECT_CONFIRMATION', 'OPEN', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
-INSERT INTO flow_data (id, org_id, flow_id, namespace, data_key, value_document, value_document_format, version, created_at, updated_at) VALUES ('00000037-0000-7000-8000-000200000001', '00000003-0000-7000-8000-000200000001', '00000006-0000-7000-8000-000200000001', 'TEST', 'editor-test-value-2', '\x7b7d', 'orcon/value@1', 0, '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
-INSERT INTO wait (id, org_id, execution_id, token_id, node_execution_id, kind, status, created_at, updated_at) VALUES ('00000036-0000-7000-8000-000200000001', '00000003-0000-7000-8000-000200000001', '0000000b-0000-7000-8000-000200000001', '0000000c-0000-7000-8000-000200000001', '0000000d-0000-7000-8000-000200000001', 'EFFECT_CONFIRMATION', 'OPEN', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+-- Migration 0015 adds a function and no table: the rows of the earlier seeds are the data it reads.
+SELECT 1 WHERE FALSE;

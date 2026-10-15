@@ -11,8 +11,7 @@ import { z } from 'zod';
 import { formatIssue } from '../../../../app/forms/zod-messages';
 import { CredentialNameTaken, type CredentialSummary } from '../../api/credential-source';
 import { useCreateCredential } from '../../api/mutations';
-import { credentialType, type CredentialType } from '../../model/credential-types';
-import { catalogText, localeOf } from '../../model/node-manifests';
+import { catalogLocaleOf, credentialText, credentialType, type CredentialType } from '../../../../app/credential-store/credential-types';
 
 import { configMessages } from './messages';
 
@@ -39,7 +38,7 @@ function schemaFor(type: CredentialType | undefined) {
 
 function CredentialForm({ formId, types, initialName, onCreated, onClose, onBusy }: { formId: string } & Pick<CreateCredentialDialogProps, 'types' | 'initialName' | 'onCreated'> & { onClose: () => void; onBusy: (busy: boolean) => void }) {
   const intl = useIntl();
-  const language = localeOf(intl.locale);
+  const language = catalogLocaleOf(intl.locale);
   const create = useCreateCredential();
   const [failed, setFailed] = useState(false);
   const defaultType = types[0] ?? '';
@@ -55,7 +54,7 @@ function CredentialForm({ formId, types, initialName, onCreated, onClose, onBusy
   const typeId = form.watch('type');
   const type = credentialType(typeId);
   const { errors } = form.formState;
-  const text = (key: string) => (type ? catalogText(type, language, key) : key);
+  const text = (key: string) => (type ? credentialText(type, language, key) : key);
   const typeName = text('name');
 
   const submit = form.handleSubmit(
@@ -93,7 +92,7 @@ function CredentialForm({ formId, types, initialName, onCreated, onClose, onBusy
             }}
             options={types.map((id) => {
               const known = credentialType(id);
-              return { value: id, label: known ? catalogText(known, language, 'name') : id };
+              return { value: id, label: known ? credentialText(known, language, 'name') : id };
             })}
           />
         </FormField>

@@ -4,7 +4,7 @@
 -- orcon:compatibility-floor self
 
 -- Migration 0013 created orcon_engine.clear_principal_references for the actor columns of migrations 0002
--- to 0011. The editor tables of migrations 0015 and 0016 add six actor columns that name a principal: the
+-- to 0011. The editor tables of migrations 0024 and 0025 add six actor columns that name a principal: the
 -- author of a node test output, the one who pinned a node, the one who started a test run, the one who decided
 -- an effect preview, the one who opened an editing session and the one who last changed a flow draft. An
 -- applied migration is immutable (MG-5), so this migration replaces the function to include them. The

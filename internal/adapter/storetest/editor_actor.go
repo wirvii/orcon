@@ -17,8 +17,8 @@ import (
 	"github.com/wirvii/orcon/internal/platform/id"
 )
 
-// editorActorColumns are the actor columns that the editor tables add (migrations 0015 and 0016 of both
-// adapters), as table and column. The PostgreSQL function that clears them is replaced by migration 0017.
+// editorActorColumns are the actor columns that the editor tables add (migrations 0024 and 0025 of both
+// adapters), as table and column. The PostgreSQL function that clears them is replaced by migration 0026.
 var editorActorColumns = []struct{ table, column string }{
 	{"node_test_data", "created_by_principal_id"},
 	{"flow_node_pin", "pinned_by_principal_id"},

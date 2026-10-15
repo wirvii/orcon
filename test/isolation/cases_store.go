@@ -13,9 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // The cases of the store methods. Each one acts as organization A, with A's scope
@@ -27,8 +31,11 @@ import (
 // storeCases lists the cases by method name; the name must be the name of a method of [Stores].
 var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	// Organization.
-	"CreateOrganization": caseCreateOrganization,
-	"GetOrganization":    caseGetOrganization,
+	"CreateOrganization":          caseCreateOrganization,
+	"CreateOrganizationWithAdmin": caseCreateOrganizationWithAdmin,
+	"LookupIdempotency":           caseLookupIdempotency,
+	"CompleteIdempotency":         caseCompleteIdempotency,
+	"GetOrganization":             caseGetOrganization,
 	// Principals.
 	"CreatePrincipal":    caseCreatePrincipal,
 	"GetSystemPrincipal": caseGetSystemPrincipal,
@@ -37,6 +44,44 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"CreateUser":     caseCreateUser,
 	"GetUser":        caseGetUser,
 	"GetUserByEmail": caseGetUserByEmail,
+	// Organizations of a user (engine plane: membership rows of every organization).
+	"ResolveUserOrganizations":  caseResolveUserOrganizations,
+	"GetUserCredentialsByEmail": caseGetUserCredentialsByEmail,
+	// Authorization evaluator reads (ADR-0041 section 6).
+	"Epoch":               caseEpoch,
+	"ActiveMember":        caseActiveMember,
+	"Bindings":            caseBindings,
+	"CustomRoles":         caseCustomRoles,
+	"ProjectOrganization": caseProjectOrganization,
+	// Key store (ADR-0042).
+	"MasterCanary":             caseMasterCanary,
+	"PutMasterCanary":          caseMasterCanary,
+	"PutKey":                   casePutKey,
+	"Key":                      caseKey,
+	"ActiveKey":                caseActiveKey,
+	"ActiveKeys":               caseActiveKeys,
+	"ListOrgsWithoutActiveKey": caseListOrgsWithoutActiveKey,
+	"SetPasswordHash":          caseSetPasswordHash,
+	// Sessions and the sign-in throttle (instance tables).
+	"CreateSession":          caseCreateSession,
+	"AppendInstanceEntry":    caseAppendInstanceEntry,
+	"CreateUserWithEntry":    caseCreateUserWithEntry,
+	"ChangePassword":         caseChangePassword,
+	"PendingChains":          caseAuditChain,
+	"ListPending":            caseAuditChain,
+	"Tail":                   caseAuditChain,
+	"CommitBlock":            caseAuditChain,
+	"ListSealed":             caseAuditChain,
+	"ListBlocks":             caseAuditChain,
+	"GetSession":             caseGetSession,
+	"GetSessionByTokenHash":  caseGetSessionByTokenHash,
+	"UpdateSessionActivity":  caseUpdateSessionActivity,
+	"MarkSessionRevoked":     caseMarkSessionRevoked,
+	"GetLoginThrottle":       caseGetLoginThrottle,
+	"PutLoginThrottle":       casePutLoginThrottle,
+	"ClearLoginThrottle":     caseClearLoginThrottle,
+	"IncrementLoginThrottle": caseIncrementLoginThrottle,
+	"LockLoginThrottle":      caseLockLoginThrottle,
 	// Memberships.
 	"CreateMembership":       caseCreateMembership,
 	"GetMembership":          caseGetMembership,
@@ -44,15 +89,17 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"ListMemberships":        caseListMemberships,
 	"UpdateMembershipStatus": caseUpdateMembershipStatus,
 	// Projects.
-	"CreateProject": caseCreateProject,
-	"GetProject":    caseGetProject,
-	"ListProjects":  caseListProjects,
+	"CreateProject":          caseCreateProject,
+	"CreateProjectWithGrant": caseCreateProjectWithGrant,
+	"GetProject":             caseGetProject,
+	"ListProjects":           caseListProjects,
 	// Flows.
-	"CreateFlow":      caseCreateFlow,
-	"GetFlow":         caseGetFlow,
-	"GetFlowByName":   caseGetFlowByName,
-	"ListFlows":       caseListFlows,
-	"UpdateFlowDraft": caseUpdateFlowDraft,
+	"CreateFlow":          caseCreateFlow,
+	"CreateFlowWithEntry": caseCreateFlowWithEntry,
+	"GetFlow":             caseGetFlow,
+	"GetFlowByName":       caseGetFlowByName,
+	"ListFlows":           caseListFlows,
+	"UpdateFlowDraft":     caseUpdateFlowDraft,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
 	"GetVersion":         caseGetVersion,
@@ -373,10 +420,10 @@ func caseCreateProject(ctx context.Context, tb testing.TB, env *Env) {
 		ID: fresh[identity.ProjectID](env), OrgID: identity.OrgID(env.B.UUID), Name: "Intruder", Slug: "intruder", Handle: "intruder",
 		IsProtected: true, CreatedAt: seededAt, UpdatedAt: seededAt,
 	}
-	wantErr(tb, "a project of B under A's scope", env.Stores.CreateProject(ctx, env.A.Scope, rec), identity.ErrScopeMismatch)
+	wantErr(tb, "a project of B under A's scope", env.Stores.CreateProject(ctx, env.A.Scope, rec, audittest.Org(tb, env.B.UUID, "project.created")), identity.ErrScopeMismatch)
 	// B's handle is taken for everyone. The store says so, and only that.
 	rec.OrgID, rec.Handle = identity.OrgID(env.A.UUID), env.B.Project.Handle
-	err := env.Stores.CreateProject(ctx, env.A.Scope, rec)
+	err := env.Stores.CreateProject(ctx, env.A.Scope, rec, audittest.Org(tb, env.A.UUID, "project.created"))
 	wantErr(tb, "A taking B's handle", err, identity.ErrHandleTaken)
 	AssertNoLeak(tb, "the refusal", errText(err), env.B.Sentinel("project-name"), env.B.Sentinel("flow-name"), env.B.Sentinel("org-name"))
 	intact(ctx, tb, env)
@@ -552,4 +599,121 @@ func errText(err error) string {
 		return ""
 	}
 	return fmt.Sprint(err)
+}
+
+// ---------------------------------------------------------------- organizations of a user
+
+// caseResolveUserOrganizations (SPEC-004 R-ID-02, section 7-3): a user lists only the
+// organizations of its active memberships, and a suspended membership leaves the list.
+func caseResolveUserOrganizations(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	got, err := env.Stores.ResolveUserOrganizations(ctx, env.A.User.ID, identity.MaxResolvedOrganizations)
+	if err != nil || len(got) != 1 || got[0].ID != env.A.Record.ID {
+		tb.Fatalf("organizations of the user of A = %+v, %v; want only A", got, err)
+	}
+	noLeak(tb, "the organizations of a user", got, err, &env.B)
+
+	if err := env.Stores.UpdateMembershipStatus(ctx, env.B.Scope, env.B.Membership.ID, identity.MembershipSuspended, time.Now().UTC()); err != nil {
+		tb.Fatalf("suspend the membership of B: %v", err)
+	}
+	got, err = env.Stores.ResolveUserOrganizations(ctx, env.B.User.ID, identity.MaxResolvedOrganizations)
+	if err != nil || len(got) != 0 {
+		tb.Fatalf("organizations of a user whose only membership is suspended = %+v, %v; want none", got, err)
+	}
+}
+
+// ---------------------------------------------------------------- grants and claims
+
+func caseCreateProjectWithGrant(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	rec := identity.ProjectRecord{
+		ID: fresh[identity.ProjectID](env), OrgID: identity.OrgID(env.B.UUID), Name: "Intruder", Slug: "intruder-grant", Handle: "intruder-grant",
+		IsProtected: true, CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	grant := identity.RoleBindingRecord{
+		ID: fresh[identity.RoleBindingID](env), OrgID: identity.OrgID(env.B.UUID), ScopeKind: identity.RoleScopeProject, ProjectID: rec.ID,
+		UserID: env.B.User.ID, RoleName: identity.RoleProjectAdmin, CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	// A project of B under A's scope is refused before the database is asked.
+	wantErr(tb, "a project of B with its grant under A's scope",
+		env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, []audit.Entry{audittest.Org(tb, env.B.UUID, "project.created")}), identity.ErrScopeMismatch)
+	// A project of A whose grant names B's organization is refused as well.
+	rec.OrgID, rec.Handle, rec.Slug = identity.OrgID(env.A.UUID), "intruder-a", "intruder-a"
+	err := env.Stores.CreateProjectWithGrant(ctx, env.A.Scope, rec, grant, []audit.Entry{audittest.Org(tb, env.A.UUID, "project.created")})
+	wantErr(tb, "a grant of B inside A's project", err, identity.ErrScopeMismatch)
+	AssertNoLeak(tb, "the refusal", errText(err), env.B.Sentinel("project-name"), env.B.Sentinel("org-name"))
+	intact(ctx, tb, env)
+}
+
+func caseCreateFlowWithEntry(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	rec := flow.Record{
+		ID: fresh[flow.FlowID](env), OrgID: identity.OrgID(env.A.UUID), ProjectID: env.B.Project.ID, Name: "planted", Draft: []byte(`{}`),
+		CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	err := env.Stores.CreateFlowWithEntry(ctx, env.A.Scope, rec, audittest.Org(tb, env.A.UUID, "flow.created"))
+	wantErr(tb, "a flow of A in B's project", err, identity.ErrReference)
+	noLeak(tb, "the refusal", nil, err, &env.B)
+	rec.OrgID = identity.OrgID(env.B.UUID)
+	wantErr(tb, "a flow of B under A's scope", env.Stores.CreateFlowWithEntry(ctx, env.A.Scope, rec, audittest.Org(tb, env.B.UUID, "flow.created")), identity.ErrScopeMismatch)
+	intact(ctx, tb, env)
+}
+
+// orgKeyOf is a first organization key the store keeps as opaque bytes.
+func orgKeyOf() identity.OrgKeyRecord {
+	return identity.OrgKeyRecord{Version: 1, Wrapped: []byte("wrapped"), MasterKeyReference: "test", Status: "ACTIVE", Probe: []byte("probe"), CreatedAt: seededAt}
+}
+
+func caseCreateOrganizationWithAdmin(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	org := identity.OrgRecord{ID: fresh[identity.OrgID](env), Name: "Newco", Slug: "newco", Status: identity.OrgActive, CreatedAt: seededAt, UpdatedAt: seededAt}
+	m := identity.MembershipRecord{ID: identity.MembershipID(env.IDs.New()), OrgID: org.ID, UserID: env.A.User.ID, Status: identity.MembershipActive, CreatedAt: seededAt, UpdatedAt: seededAt}
+	grant := identity.RoleBindingRecord{
+		ID: fresh[identity.RoleBindingID](env), OrgID: org.ID, ScopeKind: identity.RoleScopeOrg, UserID: env.A.User.ID,
+		RoleName: identity.RoleAdmin, CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	// A membership of B inside the new organization is refused.
+	bad := m
+	bad.OrgID = identity.OrgID(env.B.UUID)
+	wantErr(tb, "a membership of B in the new organization",
+		env.Stores.CreateOrganizationWithAdmin(ctx, org, orgKeyOf(), bad, grant, []audit.Entry{audittest.Org(tb, id.UUID(org.ID), "org.created")}), identity.ErrScopeMismatch)
+	// An audit entry of B's chain written with the new organization is refused.
+	wantErr(tb, "an entry of B's chain in the new organization",
+		env.Stores.CreateOrganizationWithAdmin(ctx, org, orgKeyOf(), m, grant, []audit.Entry{audittest.Org(tb, env.B.UUID, "org.created")}), identity.ErrScopeMismatch)
+	intact(ctx, tb, env)
+}
+
+func caseLookupIdempotency(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	key := identity.IdempotencyKey{Requester: "PRINCIPAL:b-user", Value: "key-b"}
+	if err := env.Stores.CompleteIdempotency(ctx, env.B.Scope, key, identity.IdempotencyCompletion{
+		ID: fresh[id.UUID](env), Response: identity.IdempotencyResponse{Status: 201, Body: []byte(env.B.Sentinel("record"))},
+	}, seededAt); err != nil {
+		tb.Fatalf("record of B: %v", err)
+	}
+	if _, found, err := env.Stores.LookupIdempotency(ctx, env.A.Scope, key, seededAt); err != nil || found {
+		tb.Fatalf("A sees the record of B: found %v, err %v", found, err)
+	}
+}
+
+func caseCompleteIdempotency(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	key := identity.IdempotencyKey{Requester: "PRINCIPAL:shared", Value: "key-shared"}
+	bodyB, bodyA := env.B.Sentinel("record"), env.A.Sentinel("record")
+	complete := func(scope orgscope.Org, body string) {
+		tb.Helper()
+		if err := env.Stores.CompleteIdempotency(ctx, scope, key, identity.IdempotencyCompletion{
+			ID: fresh[id.UUID](env), Response: identity.IdempotencyResponse{Status: 201, Body: []byte(body)},
+		}, seededAt); err != nil {
+			tb.Fatalf("complete %s: %v", body, err)
+		}
+	}
+	complete(env.B.Scope, bodyB)
+	complete(env.A.Scope, bodyA)
+	gotB, _, _ := env.Stores.LookupIdempotency(ctx, env.B.Scope, key, seededAt)
+	gotA, _, _ := env.Stores.LookupIdempotency(ctx, env.A.Scope, key, seededAt)
+	if string(gotB.Response.Body) != bodyB || string(gotA.Response.Body) != bodyA {
+		tb.Fatalf("the completions of two organizations share a record: B holds %q, A holds %q", gotB.Response.Body, gotA.Response.Body)
+	}
+	AssertNoLeak(tb, "the record of A", string(gotA.Response.Body), bodyB)
 }

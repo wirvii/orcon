@@ -3,7 +3,7 @@
 
 import { AppShell, BrandMark, type NavEntry } from '@orcon/ui';
 import { linkOptions, useMatches, useNavigate, useParams, useRouter, useRouterState } from '@tanstack/react-router';
-import { Braces, FolderKanban, Settings } from 'lucide-react';
+import { Braces, FolderKanban, KeyRound, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
@@ -15,6 +15,11 @@ const messages = defineMessages({
     id: 'session.nav.projects',
     defaultMessage: 'Projects',
     description: 'Navigation entry that opens the projects of the organization being used.',
+  },
+  credentials: {
+    id: 'session.nav.credentials',
+    defaultMessage: 'Credentials',
+    description: 'Navigation entry that opens the credentials of the project being used.',
   },
   settings: { id: 'app.nav.settings', defaultMessage: 'Settings', description: 'Navigation entry for the settings pages.' },
   api: {
@@ -35,19 +40,30 @@ export function SessionShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const { orgSlug } = useParams({ strict: false });
+  const { orgSlug, projectHandle } = useParams({ strict: false });
   const projectsLink = orgSlug === undefined ? undefined : linkOptions({ to: '/orgs/$orgSlug/projects', params: { orgSlug } });
+  const credentialsLink =
+    orgSlug === undefined || projectHandle === undefined ? undefined : linkOptions({ to: '/orgs/$orgSlug/projects/$projectHandle/credentials', params: { orgSlug, projectHandle } });
 
   const navigation: NavEntry[] = [
     ...(projectsLink === undefined
       ? []
       : [{ id: 'projects', icon: FolderKanban, href: router.buildLocation(projectsLink).href, label: intl.formatMessage(messages.projects) }]),
+    ...(credentialsLink === undefined
+      ? []
+      : [{ id: 'credentials', icon: KeyRound, href: router.buildLocation(credentialsLink).href, label: intl.formatMessage(messages.credentials) }]),
     { id: 'settings', icon: Settings, href: router.buildLocation(settingsLink).href, label: intl.formatMessage(messages.settings) },
     // The API reference is a page the server answers, not a route of the app: a plain link that loads it.
     { id: 'api', icon: Braces, href: '/api/reference/', label: intl.formatMessage(messages.api), fullPage: true },
   ];
 
-  const currentId = pathname.includes('/projects') ? 'projects' : pathname.startsWith('/settings') ? 'settings' : undefined;
+  const currentId = pathname.endsWith('/credentials')
+    ? 'credentials'
+    : pathname.includes('/projects')
+      ? 'projects'
+      : pathname.startsWith('/settings')
+        ? 'settings'
+        : undefined;
   // A page that fills the space between the bars (the flow editor) declares it in its route's staticData.
   const fill = useMatches({ select: (matches) => matches.some((match) => (match.staticData as { fill?: boolean }).fill === true) });
 
@@ -60,6 +76,7 @@ export function SessionShell({ children }: { children: ReactNode }) {
       actions={<UserMenu />}
       onNavigate={(entry) => {
         if (entry.id === 'projects' && projectsLink !== undefined) void navigate(projectsLink);
+        if (entry.id === 'credentials' && credentialsLink !== undefined) void navigate(credentialsLink);
         if (entry.id === 'settings') void navigate(settingsLink);
       }}
     >

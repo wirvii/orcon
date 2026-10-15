@@ -62,7 +62,7 @@ func TestNewCatalogRejectsMalformedDefinitions(t *testing.T) {
 func TestDenyAllDeniesEverything(t *testing.T) {
 	var a authz.Authorizer = authz.DenyAll{}
 	for _, mode := range []authz.Mode{authz.ModeAll, authz.ModeAny, authz.ModeAuthenticated, authz.ModeAnonymous} {
-		got, err := a.Authorize(t.Context(), authz.Request{
+		got, _, err := a.Authorize(t.Context(), authz.Request{
 			Principal:   identity.Principal{Kind: identity.PrincipalSystem},
 			Requirement: authz.Requirement{Mode: mode, Permissions: []authz.Permission{"org:delete"}},
 		})
