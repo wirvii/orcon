@@ -135,6 +135,37 @@ Allowed status values: `Pending`, `Changes requested`, `Approved`. Only the owne
 | S7 Approval page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S8 Empty states, 404 and error page | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
 | S9 Settings › Appearance and language | Screen template | Approved | 2026-10-13 | 2f9aa73 | Published Storybook catalog (light and dark) | Approved by the owner with the first version of the design catalog (SPEC-007 E-GATE-1). |
+| ComingSoon | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| OrgSwitcher | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| UserMenu | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SidebarNav | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| BottomTabBar | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| PageHeader | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| StatCard | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| HourlyBars | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| CountTabs | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| FilterChip | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ListRow / DenseList | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ActiveToggle | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ChooserDialog | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ImportReport | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ExpressionChips | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| CredentialBadge | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| DuplicateProtectionBox | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| ExecutionTimeline | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| PlainError | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SessionList | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| RoleCards | Component (SPEC-019 §7) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.1 Sign-in | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.2 Sidebar and shell | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.3 Organization overview | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.4 Project | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.5 Create flow | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.6 Flow editor | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.7 Step details | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.8 Executions | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.9 Credentials | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
+| SPEC-019 §4.10 Settings | Screen (SPEC-019 §4) | Pending | 2026-10-15 | — | Pending capture (SPEC-019 §8) | Introduced by SPEC-019 UX0. |
 
 ## Editor parity review
 
@@ -176,3 +207,5 @@ The V1 bar for the flow editor is that every interaction of the parity table in 
 ## Third-party licenses
 
 Every web dependency is compatible with Apache-2.0; the notices that ship with the binary are in [`NOTICE`](../../NOTICE) (shadcn/ui and @xyflow/react attribution, the OFL-1.1 fonts, and the note that axe-core is development-only). The version-pinned table with the verified license of each dependency is in [`third-party-licenses.md`](third-party-licenses.md).
+
+Third-party names and logos are trademarks of their owners and are used only to identify the service (nominative use). Connector icons follow the brand guidelines recorded for each connector (orcon-connector IC-6).
