@@ -1,0 +1,9 @@
+{
+  "format": "orcon/connector-authoring@1",
+  "kind": { "chosen": "DECLARATIVE" },
+  "verbExceptions": [],
+  "resourceExceptions": [],
+  "rateLimitSources": [
+    { "name": "graph", "url": "https://developers.facebook.com/docs/whatsapp/messaging-limits" }
+  ]
+}

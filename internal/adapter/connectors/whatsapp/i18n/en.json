@@ -1,0 +1,20 @@
+{
+  "connector.displayName": "WhatsApp Cloud API",
+  "connector.description": "Send WhatsApp messages and mark them as read through the WhatsApp Cloud API of Meta.",
+  "node.whatsapp.displayName": "WhatsApp Cloud API",
+  "parameter.whatsapp.phoneNumberId.description": "The ID of the WhatsApp Business phone number that sends or works with the message.",
+  "parameter.whatsapp.to.description": "Recipient phone number in international format, digits only, such as 573001234567.",
+  "parameter.whatsapp.text.description": "The Meta text object, such as {\"body\": \"Hello\"}. Optional field: preview_url.",
+  "parameter.whatsapp.template.description": "The Meta template object: name, language.code and components, as approved in the WhatsApp Business account.",
+  "parameter.whatsapp.image.description": "The Meta image object: link (https URL of a JPEG or PNG file) and optional caption.",
+  "parameter.whatsapp.document.description": "The Meta document object: link (https URL), filename and optional caption.",
+  "parameter.whatsapp.messageId.description": "The WhatsApp message ID (wamid) to mark as read.",
+  "operation.message.send.displayName": "Send a text message",
+  "operation.templateMessage.send.displayName": "Send a template message",
+  "operation.imageMessage.send.displayName": "Send an image",
+  "operation.documentMessage.send.displayName": "Send a document",
+  "operation.message.update.displayName": "Mark a message as read",
+  "operation.phoneNumber.get.displayName": "Get a phone number",
+  "credential.systemUser.displayName": "System user access token",
+  "changelog.1.0.0.first": "First release: text, template, image and document messages, mark as read, and the phone number test."
+}
