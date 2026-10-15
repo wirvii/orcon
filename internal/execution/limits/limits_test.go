@@ -63,8 +63,26 @@ func TestConcurrencyLimits(t *testing.T) {
 	if got := maxTokens.Load(); got > int64(cfg.WorkerTokens) {
 		t.Fatalf("worker held %d tokens, cap %d", got, cfg.WorkerTokens)
 	}
+	// Whether the load reaches the node cap depends on the scheduler, so the node level is also
+	// driven on purpose: the grants that fill one node's cap make the next acquire refuse there.
+	var fill []*Grant
+	for range cfg.NodeConcurrency {
+		g, err := l.Acquire("n0", 100)
+		if err != nil {
+			t.Fatalf("a grant within the node cap was refused: %v", err)
+		}
+		fill = append(fill, g)
+	}
+	if _, err := l.Acquire("n0", 100); !errors.Is(err, ErrThrottled) {
+		t.Fatalf("a grant above the node cap was not refused: %v", err)
+	} else if th, ok := ThrottleOf(err); !ok || th.Level != LevelNode {
+		t.Fatalf("a grant above the node cap named the wrong level: %+v", th)
+	}
+	for _, g := range fill {
+		g.Release()
+	}
 	if _, ok := throttled.Load(LevelNode); !ok {
-		t.Fatal("the node level never throttled under load")
+		t.Fatal("the node level never throttled")
 	}
 
 	// The worker level, held by grants that stay in flight.
