@@ -164,6 +164,7 @@ func (v *validator) request(base string, op Operation) {
 		if r.Body.Type == "RAW" && r.Body.Raw == "" {
 			v.addf(base+"/body/raw", "a RAW body needs its text")
 		}
+		templates = append(templates, r.Body.Raw)
 		for _, k := range slices.Sorted(maps.Keys(r.Body.Fields)) {
 			n := r.Body.Fields[k].Value
 			if r.Body.Type == "FORM" {

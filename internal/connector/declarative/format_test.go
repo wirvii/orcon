@@ -193,6 +193,11 @@ func TestBodyRulesValidate(t *testing.T) {
 			op.Request.Body = &Body{Type: "JSON", Fields: map[string]Node{"x": {Value: inner}}}
 			d.Operations["thing.create"] = op
 		},
+		"credential inside a RAW body": func(d *Definition) {
+			op := writeOp(SafetyUnsafe)
+			op.Request.Body = &Body{Type: "RAW", Raw: "token={{$credentials.token}}"}
+			d.Operations["thing.create"] = op
+		},
 		"form field that is not a string": func(d *Definition) {
 			op := writeOp(SafetyUnsafe)
 			op.Request.Body = &Body{Type: "FORM", Fields: map[string]Node{"x": {Value: jsonvalue.Int(1)}}}
