@@ -3,14 +3,14 @@
 
 import type { z } from 'zod';
 
-import { ContractError } from '../../../app/errors/contract-error';
+import { ContractError } from '../errors/contract-error';
 
 /**
- * The transport of the session operations. It is the one place of the session area that calls
- * `fetch`: it sends the cookies of the same origin, copies the CSRF cookie into the header of
- * every unsafe request and turns an error answer into an {@link ApiProblem}. When the generated
- * SDK (`@orcon/sdk`, SPEC-005 API2-contract) exists, the operations in `operations.ts` call it
- * instead and this file goes away.
+ * The transport shared by the feature operations (session, projects, flows). It is the one place
+ * of the app that calls `fetch`: it sends the cookies of the same origin, copies the CSRF cookie into
+ * the header of every unsafe request and turns an error answer into an {@link ApiProblem}. When the
+ * generated SDK (`@orcon/sdk`, SPEC-005 API2-contract) exists, the feature operations call it instead
+ * and this file goes away.
  */
 
 const API_PREFIX = '/api/v1';
