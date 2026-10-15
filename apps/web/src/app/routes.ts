@@ -13,7 +13,16 @@ export const routes = rootRoute('shell/RootLayout.tsx', [
   layout('session', '../features/session/routes/SessionLayout.tsx', [
     index('../features/session/routes/landing.tsx'),
     route('/orgs', '../features/session/routes/orgs.tsx'),
-    route('/orgs/$orgSlug', '../features/session/routes/org.tsx'),
+    route('/orgs/$orgSlug', '../features/session/routes/org.tsx', [
+      index('../features/projects/routes/org-index.tsx'),
+      route('/projects', '../features/projects/routes/projects.tsx'),
+      route('/projects/$projectHandle', '../features/projects/routes/project.tsx', [
+        index('../features/projects/routes/project-index.tsx'),
+        route('/flows', '../features/flows/routes/flows.tsx'),
+        route('/executions', '../features/executions/routes/executions.tsx'),
+        route('/executions/$executionId', '../features/executions/routes/execution.tsx'),
+      ]),
+    ]),
   ]),
   physical('/flows', '../features/editor/routes'),
   physical('/settings', '../features/settings/routes'),

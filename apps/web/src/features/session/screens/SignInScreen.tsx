@@ -13,7 +13,7 @@ import { formatIssue } from '../../../app/forms/zod-messages';
 import { ConnectionBanners } from '../../../app/shell/ConnectionBanners';
 import { toProblemDetails } from '../../../app/errors/to-problem-details';
 import { markFirstUsefulScreen } from '../../../app/perf/marks';
-import { ApiProblem } from '../api/http';
+import { ApiProblem } from '../../../app/api/http';
 import { useSignIn } from '../api/mutations';
 import { safeRedirect } from '../model/redirect';
 

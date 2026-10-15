@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 
-import { apiRequest } from './http';
+import { apiRequest } from '../../../app/api/http';
 
 /** The response shapes of SPEC-016 §3.1 (the Session never carries the token). */
 export const sessionSchema = z.object({

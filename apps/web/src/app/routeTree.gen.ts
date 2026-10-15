@@ -14,6 +14,13 @@ import { Route as DotDotFeaturesSessionRoutesOrgsRouteImport } from './../featur
 import { Route as FlowsFlowIdRouteImport } from './../features/editor/routes/$flowId'
 import { Route as SettingsAppearanceRouteImport } from './../features/settings/routes/appearance'
 import { Route as DotDotFeaturesSessionRoutesOrgRouteImport } from './../features/session/routes/org'
+import { Route as DotDotFeaturesProjectsRoutesOrgIndexRouteImport } from './../features/projects/routes/org-index'
+import { Route as DotDotFeaturesProjectsRoutesProjectsRouteImport } from './../features/projects/routes/projects'
+import { Route as DotDotFeaturesProjectsRoutesProjectRouteImport } from './../features/projects/routes/project'
+import { Route as DotDotFeaturesProjectsRoutesProjectIndexRouteImport } from './../features/projects/routes/project-index'
+import { Route as DotDotFeaturesExecutionsRoutesExecutionsRouteImport } from './../features/executions/routes/executions'
+import { Route as DotDotFeaturesFlowsRoutesFlowsRouteImport } from './../features/flows/routes/flows'
+import { Route as DotDotFeaturesExecutionsRoutesExecutionRouteImport } from './../features/executions/routes/execution'
 
 const DotDotFeaturesSessionRoutesSessionLayoutRoute =
   DotDotFeaturesSessionRoutesSessionLayoutRouteImport.update({
@@ -54,6 +61,48 @@ const DotDotFeaturesSessionRoutesOrgRoute =
     path: '/orgs/$orgSlug',
     getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
   } as any)
+const DotDotFeaturesProjectsRoutesOrgIndexRoute =
+  DotDotFeaturesProjectsRoutesOrgIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesProjectsRoutesProjectsRoute =
+  DotDotFeaturesProjectsRoutesProjectsRouteImport.update({
+    id: '/projects',
+    path: '/projects',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesProjectsRoutesProjectRoute =
+  DotDotFeaturesProjectsRoutesProjectRouteImport.update({
+    id: '/projects/$projectHandle',
+    path: '/projects/$projectHandle',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesProjectsRoutesProjectIndexRoute =
+  DotDotFeaturesProjectsRoutesProjectIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
+  } as any)
+const DotDotFeaturesExecutionsRoutesExecutionsRoute =
+  DotDotFeaturesExecutionsRoutesExecutionsRouteImport.update({
+    id: '/executions',
+    path: '/executions',
+    getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
+  } as any)
+const DotDotFeaturesFlowsRoutesFlowsRoute =
+  DotDotFeaturesFlowsRoutesFlowsRouteImport.update({
+    id: '/flows',
+    path: '/flows',
+    getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
+  } as any)
+const DotDotFeaturesExecutionsRoutesExecutionRoute =
+  DotDotFeaturesExecutionsRoutesExecutionRouteImport.update({
+    id: '/executions/$executionId',
+    path: '/executions/$executionId',
+    getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof DotDotFeaturesSessionRoutesLandingRoute
@@ -61,7 +110,14 @@ export interface FileRoutesByFullPath {
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
-  '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
+  '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
+  '/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
+  '/orgs/$orgSlug/projects/$projectHandle/': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
+  '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
@@ -69,7 +125,12 @@ export interface FileRoutesByTo {
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
-  '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
+  '/orgs/$orgSlug': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
+  '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,7 +140,14 @@ export interface FileRoutesById {
   '/_session/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
   '/flows/$flowId': typeof FlowsFlowIdRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
-  '/_session/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRoute
+  '/_session/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
+  '/_session/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/_session/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/_session/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
+  '/_session/orgs/$orgSlug/projects/$projectHandle/': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
+  '/_session/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
+  '/_session/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,6 +158,13 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/settings/appearance'
     | '/orgs/$orgSlug'
+    | '/orgs/$orgSlug/'
+    | '/orgs/$orgSlug/projects'
+    | '/orgs/$orgSlug/projects/$projectHandle'
+    | '/orgs/$orgSlug/projects/$projectHandle/'
+    | '/orgs/$orgSlug/projects/$projectHandle/executions'
+    | '/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -98,6 +173,11 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/settings/appearance'
     | '/orgs/$orgSlug'
+    | '/orgs/$orgSlug/projects'
+    | '/orgs/$orgSlug/projects/$projectHandle'
+    | '/orgs/$orgSlug/projects/$projectHandle/executions'
+    | '/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
   id:
     | '__root__'
     | '/_session'
@@ -107,6 +187,13 @@ export interface FileRouteTypes {
     | '/flows/$flowId'
     | '/settings/appearance'
     | '/_session/orgs/$orgSlug'
+    | '/_session/orgs/$orgSlug/'
+    | '/_session/orgs/$orgSlug/projects'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle/'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle/executions'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -167,13 +254,106 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotFeaturesSessionRoutesOrgRouteImport
       parentRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRoute
     }
+    '/_session/orgs/$orgSlug/': {
+      id: '/_session/orgs/$orgSlug/'
+      path: '/'
+      fullPath: '/orgs/$orgSlug/'
+      preLoaderRoute: typeof DotDotFeaturesProjectsRoutesOrgIndexRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/projects': {
+      id: '/_session/orgs/$orgSlug/projects'
+      path: '/projects'
+      fullPath: '/orgs/$orgSlug/projects'
+      preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/projects/$projectHandle': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle'
+      path: '/projects/$projectHandle'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle'
+      preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/projects/$projectHandle/': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle/'
+      path: '/'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle/'
+      preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectIndexRouteImport
+      parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
+    }
+    '/_session/orgs/$orgSlug/projects/$projectHandle/executions': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle/executions'
+      path: '/executions'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle/executions'
+      preLoaderRoute: typeof DotDotFeaturesExecutionsRoutesExecutionsRouteImport
+      parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
+    }
+    '/_session/orgs/$orgSlug/projects/$projectHandle/flows': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle/flows'
+      path: '/flows'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle/flows'
+      preLoaderRoute: typeof DotDotFeaturesFlowsRoutesFlowsRouteImport
+      parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
+    }
+    '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
+      path: '/executions/$executionId'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
+      preLoaderRoute: typeof DotDotFeaturesExecutionsRoutesExecutionRouteImport
+      parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
+    }
   }
 }
+
+interface DotDotFeaturesProjectsRoutesProjectRouteChildren {
+  DotDotFeaturesProjectsRoutesProjectIndexRoute: typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
+  DotDotFeaturesExecutionsRoutesExecutionsRoute: typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
+  DotDotFeaturesFlowsRoutesFlowsRoute: typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  DotDotFeaturesExecutionsRoutesExecutionRoute: typeof DotDotFeaturesExecutionsRoutesExecutionRoute
+}
+
+const DotDotFeaturesProjectsRoutesProjectRouteChildren: DotDotFeaturesProjectsRoutesProjectRouteChildren =
+  {
+    DotDotFeaturesProjectsRoutesProjectIndexRoute:
+      DotDotFeaturesProjectsRoutesProjectIndexRoute,
+    DotDotFeaturesExecutionsRoutesExecutionsRoute:
+      DotDotFeaturesExecutionsRoutesExecutionsRoute,
+    DotDotFeaturesFlowsRoutesFlowsRoute: DotDotFeaturesFlowsRoutesFlowsRoute,
+    DotDotFeaturesExecutionsRoutesExecutionRoute:
+      DotDotFeaturesExecutionsRoutesExecutionRoute,
+  }
+
+const DotDotFeaturesProjectsRoutesProjectRouteWithChildren =
+  DotDotFeaturesProjectsRoutesProjectRoute._addFileChildren(
+    DotDotFeaturesProjectsRoutesProjectRouteChildren,
+  )
+
+interface DotDotFeaturesSessionRoutesOrgRouteChildren {
+  DotDotFeaturesProjectsRoutesOrgIndexRoute: typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  DotDotFeaturesProjectsRoutesProjectsRoute: typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  DotDotFeaturesProjectsRoutesProjectRoute: typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
+}
+
+const DotDotFeaturesSessionRoutesOrgRouteChildren: DotDotFeaturesSessionRoutesOrgRouteChildren =
+  {
+    DotDotFeaturesProjectsRoutesOrgIndexRoute:
+      DotDotFeaturesProjectsRoutesOrgIndexRoute,
+    DotDotFeaturesProjectsRoutesProjectsRoute:
+      DotDotFeaturesProjectsRoutesProjectsRoute,
+    DotDotFeaturesProjectsRoutesProjectRoute:
+      DotDotFeaturesProjectsRoutesProjectRouteWithChildren,
+  }
+
+const DotDotFeaturesSessionRoutesOrgRouteWithChildren =
+  DotDotFeaturesSessionRoutesOrgRoute._addFileChildren(
+    DotDotFeaturesSessionRoutesOrgRouteChildren,
+  )
 
 interface DotDotFeaturesSessionRoutesSessionLayoutRouteChildren {
   DotDotFeaturesSessionRoutesLandingRoute: typeof DotDotFeaturesSessionRoutesLandingRoute
   DotDotFeaturesSessionRoutesOrgsRoute: typeof DotDotFeaturesSessionRoutesOrgsRoute
-  DotDotFeaturesSessionRoutesOrgRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+  DotDotFeaturesSessionRoutesOrgRoute: typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
 }
 
 const DotDotFeaturesSessionRoutesSessionLayoutRouteChildren: DotDotFeaturesSessionRoutesSessionLayoutRouteChildren =
@@ -181,7 +361,8 @@ const DotDotFeaturesSessionRoutesSessionLayoutRouteChildren: DotDotFeaturesSessi
     DotDotFeaturesSessionRoutesLandingRoute:
       DotDotFeaturesSessionRoutesLandingRoute,
     DotDotFeaturesSessionRoutesOrgsRoute: DotDotFeaturesSessionRoutesOrgsRoute,
-    DotDotFeaturesSessionRoutesOrgRoute: DotDotFeaturesSessionRoutesOrgRoute,
+    DotDotFeaturesSessionRoutesOrgRoute:
+      DotDotFeaturesSessionRoutesOrgRouteWithChildren,
   }
 
 const DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren =

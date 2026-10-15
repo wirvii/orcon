@@ -5,7 +5,7 @@ import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
 import { organizationBySlugQueryOptions } from '../api/queries';
-import { orgSlugSchema } from '../model/params';
+import { orgSlugSchema } from '../../../app/route-params';
 
 /**
  * The organization disposition: the slug in the address must name an organization the person is an
