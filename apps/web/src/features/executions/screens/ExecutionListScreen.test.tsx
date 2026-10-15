@@ -36,6 +36,19 @@ describe('ExecutionListScreen', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
+  it('unavailable: a calm state, no server title and no request id', async () => {
+    server.use(
+      ...beforeRuns(),
+      http.get(`/api/v1/projects/${project.id}/executions`, () =>
+        problem(503, 'Service unavailable', 'service-unavailable', { 'Retry-After': '30' }),
+      ),
+    );
+    renderRoute(address);
+    expect(await screen.findByRole('heading', { name: 'Run history will be available soon' })).toBeVisible();
+    expect(screen.queryByText('Service unavailable')).toBeNull();
+    expect(screen.queryByText('Request ID')).toBeNull();
+  });
+
   it('forbidden', async () => {
     server.use(...beforeRuns(), http.get(`/api/v1/projects/${project.id}/executions`, () => problem(403, 'forbidden', 'forbidden')));
     renderRoute(address);

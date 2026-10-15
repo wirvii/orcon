@@ -370,6 +370,8 @@
   "runs.mode.webhook": "Webhook",
   "runs.notStarted": "Sin empezar",
   "runs.stillRunning": "En curso",
+  "runs.unavailable.text": "Ya puedes editar y publicar flujos; sus ejecuciones aparecerán aquí cuando el historial esté listo.",
+  "runs.unavailable.title": "El historial de ejecuciones estará disponible pronto",
   "session.nav.credentials": "Credenciales",
   "session.nav.projects": "Proyectos",
   "session.noOrganization.description": "Un administrador de una organización tiene que añadir tu cuenta. Pídele que lo haga y luego vuelve a iniciar sesión.",
