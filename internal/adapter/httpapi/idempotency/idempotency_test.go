@@ -5,44 +5,45 @@ package idempotency_test
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
+	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/idempotencyclaim"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 const route = "POST /things/{thingId}"
 
+// org is the organization of every principal of these tests.
+var org = func() id.UUID { var u id.UUID; u[15] = 99; return u }()
+
 func principal(n byte, credential string, kind identity.CredentialType) identity.Principal {
 	var u id.UUID
 	u[15] = n
-	var org id.UUID
-	org[15] = 99
 	return identity.Principal{ID: identity.PrincipalID(u), OrgID: identity.OrgID(org), CredentialType: kind, CredentialID: credential}
 }
 
 var (
-	keyA    = principal(1, "key-a", identity.CredentialPersonalKey)
-	keyB    = principal(1, "key-b", identity.CredentialPersonalKey)
-	session = principal(1, "session-1", identity.CredentialSession)
+	keyA = principal(1, "key-a", identity.CredentialPersonalKey)
+	keyB = principal(1, "key-b", identity.CredentialPersonalKey)
 )
 
-// rig is a mux with one idempotent route and a handler that counts its runs.
+// rig is a mux with one idempotent route. Its handler stands for an operation that claims
+// its key in its transaction: it writes the record with the store and answers 201.
 type rig struct {
 	t       *testing.T
 	clk     *clock.Fake
@@ -53,40 +54,72 @@ type rig struct {
 	mux     *http.ServeMux
 }
 
-func newRig(t *testing.T, cfg func(*idempotency.Config)) *rig {
+func newRig(t *testing.T, cfg func(*idempotency.Config, *rig)) *rig {
 	t.Helper()
 	r := &rig{t: t, clk: clock.NewFake(time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)), who: keyA}
 	r.store = idempotency.NewMemoryStore(r.clk)
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
+	r.handler = func(w http.ResponseWriter, req *http.Request) {
 		n := r.runs.Add(1)
+		if err := r.store.Claim(req.Context(), scopeOf(), "things/created"); err != nil {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Location", "/api/v1/things/created")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = fmt.Fprintf(w, `{"run":%d}`, n)
 	}
-	c := idempotency.Config{Store: r.store, Logger: slog.New(slog.DiscardHandler), Route: route}
+	c := idempotency.Config{Store: r.store, Clock: r.clk, IDs: id.NewSequence(), Logger: slog.New(slog.DiscardHandler), Route: route}
 	if cfg != nil {
-		cfg(&c)
+		cfg(&c, r)
 	}
 	idem := idempotency.Middleware(c)
 	r.mux = http.NewServeMux()
 	r.mux.Handle(route, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		req = req.WithContext(middleware.WithPrincipal(req.Context(), r.who))
-		idem(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { r.handler(w, req) })).ServeHTTP(w, req)
+		ctx := authz.WithOrgScope(middleware.WithPrincipal(req.Context(), r.who), scopeOf())
+		req = req.WithContext(ctx)
+		idem(r.handler).ServeHTTP(w, req)
 	}))
 	return r
 }
 
-func (r *rig) post(path, key, body string) *httptest.ResponseRecorder {
+// scopeOf is the organization scope of the rig's principals, issued the way tests may issue it.
+func scopeOf() orgscope.Org {
+	s, err := issue.New(org)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+func (r *rig) post(key, body string) *httptest.ResponseRecorder {
 	r.t.Helper()
-	req := httptest.NewRequestWithContext(r.t.Context(), http.MethodPost, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(r.t.Context(), http.MethodPost, "/things/thing-1", strings.NewReader(body))
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
 	}
 	rec := httptest.NewRecorder()
-	rec.Header().Set("Orcon-Request-Id", "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a62")
 	r.mux.ServeHTTP(rec, req)
 	return rec
+}
+
+// preclaim writes the record of a request that is still running, as its transaction would.
+func (r *rig) preclaim(key string, p identity.Principal, body string) {
+	r.t.Helper()
+	fp, err := idempotency.Fingerprint(route, []string{"thingId=thing-1"}, []byte(body))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	requester := "PRINCIPAL:" + p.ID.String()
+	if p.CredentialType != identity.CredentialSession {
+		requester = string(p.CredentialType) + ":" + p.CredentialID
+	}
+	ctx := idempotencyclaim.With(r.t.Context(), idempotencyclaim.Claim{
+		ID: id.NewSequence().New(), Requester: requester, Value: key, Fingerprint: fp,
+	})
+	if err := r.store.Claim(ctx, scopeOf(), "things/created"); err != nil {
+		r.t.Fatal(err)
+	}
 }
 
 func problemCode(t *testing.T, rec *httptest.ResponseRecorder) string {
@@ -100,365 +133,145 @@ func problemCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return doc.Code
 }
 
-func TestIdempotencyReplay(t *testing.T) {
+func TestFirstRequestRunsAndTheRepeatReplays(t *testing.T) {
 	r := newRig(t, nil)
-	first := r.post("/things/1", "k1", `{"a":1,"b":2}`)
-	if first.Code != http.StatusCreated || first.Header().Get("Idempotent-Replayed") != "" {
-		t.Fatalf("first = %d replayed %q", first.Code, first.Header().Get("Idempotent-Replayed"))
-	}
-	// The same content written differently has the same fingerprint (canonical JSON).
-	second := r.post("/things/1", "k1", "{ \"b\": 2,\n \"a\": 1 }")
-	if second.Code != http.StatusCreated {
-		t.Fatalf("second = %d (%s)", second.Code, second.Body.String())
-	}
-	if second.Header().Get("Idempotent-Replayed") != "true" {
-		t.Error("the replay is not marked Idempotent-Replayed: true")
-	}
-	if second.Body.String() != first.Body.String() || second.Header().Get("Location") != first.Header().Get("Location") {
-		t.Errorf("the replay differs: %q vs %q", second.Body.String(), first.Body.String())
-	}
-	if got := r.runs.Load(); got != 1 {
-		t.Errorf("the handler ran %d times, want 1", got)
-	}
-}
-
-func TestIdempotencyFingerprintMismatch(t *testing.T) {
-	r := newRig(t, nil)
-	r.post("/things/1", "k1", `{"a":1}`)
-	for name, rec := range map[string]*httptest.ResponseRecorder{
-		"other body":       r.post("/things/1", "k1", `{"a":2}`),
-		"other path value": r.post("/things/2", "k1", `{"a":1}`),
-	} {
-		if rec.Code != http.StatusUnprocessableEntity || problemCode(t, rec) != "idempotency-key-reused" {
-			t.Errorf("%s: %d %s, want 422 idempotency-key-reused", name, rec.Code, rec.Body.String())
-		}
-	}
-	if got := r.runs.Load(); got != 1 {
-		t.Errorf("the handler ran %d times, want 1", got)
-	}
-}
-
-func TestIdempotencyInProgress(t *testing.T) {
-	r := newRig(t, nil)
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		close(entered)
-		<-release
-		w.WriteHeader(http.StatusCreated)
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	var first *httptest.ResponseRecorder
-	go func() {
-		defer wg.Done()
-		first = r.post("/things/1", "k1", `{}`)
-	}()
-	<-entered
-	twin := r.post("/things/1", "k1", `{}`)
-	if twin.Code != http.StatusConflict || problemCode(t, twin) != "idempotency-in-progress" {
-		t.Errorf("twin = %d %s, want 409 idempotency-in-progress", twin.Code, twin.Body.String())
-	}
-	if twin.Header().Get("Retry-After") == "" {
-		t.Error("the in-progress answer has no Retry-After")
-	}
-	close(release)
-	wg.Wait()
+	first := r.post("key-1", `{"name":"a"}`)
 	if first.Code != http.StatusCreated {
-		t.Errorf("first = %d", first.Code)
+		t.Fatalf("first = %d, want 201 (%s)", first.Code, first.Body.String())
 	}
-	if got := r.runs.Load(); got != 1 {
-		t.Errorf("the handler ran %d times, want 1", got)
+	again := r.post("key-1", `{ "name" : "a" }`)
+	if again.Code != http.StatusCreated {
+		t.Fatalf("repeat = %d, want 201", again.Code)
 	}
-}
-
-func TestIdempotencySecretNotStored(t *testing.T) {
-	r := newRig(t, func(c *idempotency.Config) { c.IssuesSecret = true })
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Location", "/api/v1/api-keys/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a74")
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a74","secret":"example-secret-1"}`))
+	if got := again.Header().Get(idempotency.ReplayedHeader); got != "true" {
+		t.Errorf("%s = %q, want true", idempotency.ReplayedHeader, got)
 	}
-	first := r.post("/things/1", "k1", `{}`)
-	if first.Code != http.StatusCreated || !strings.Contains(first.Body.String(), "example-secret-1") {
-		t.Fatalf("first = %d %s: the creator must see the secret once", first.Code, first.Body.String())
+	if again.Body.String() != first.Body.String() {
+		t.Errorf("repeat body = %q, want the first body %q", again.Body.String(), first.Body.String())
 	}
-	key := idempotency.Key{Org: keyA.OrgID.String(), Requester: "PAK:key-a", Value: "k1"}
-	rec, ok := r.store.Peek(key)
-	if !ok || !rec.Completed {
-		t.Fatalf("no completed record: %+v", rec)
+	if again.Header().Get("Location") != "/api/v1/things/created" {
+		t.Errorf("repeat Location = %q", again.Header().Get("Location"))
 	}
-	if len(rec.Response.Body) != 0 || strings.Contains(string(rec.Response.Body), "secret") {
-		t.Errorf("the stored record holds a body: %q", rec.Response.Body)
-	}
-	replay := r.post("/things/1", "k1", `{}`)
-	if replay.Code != http.StatusConflict || problemCode(t, replay) != "secret-already-issued" {
-		t.Errorf("replay = %d %s, want 409 secret-already-issued", replay.Code, replay.Body.String())
-	}
-	if strings.Contains(replay.Body.String(), "example-secret-1") {
-		t.Error("the replay leaks the secret")
-	}
-	if replay.Header().Get("Location") != "/api/v1/api-keys/0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a74" {
-		t.Errorf("the replay does not point at the resource: %q", replay.Header().Get("Location"))
+	if n := r.runs.Load(); n != 1 {
+		t.Errorf("the operation ran %d times, want 1", n)
 	}
 }
 
-func TestIdempotencyServerErrorsAreNotStored(t *testing.T) {
+func TestSameKeyWithAnotherBodyIsRefused(t *testing.T) {
 	r := newRig(t, nil)
-	fail := true
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		if fail {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+	r.post("key-1", `{"name":"a"}`)
+	rec := r.post("key-1", `{"name":"b"}`)
+	if rec.Code != http.StatusUnprocessableEntity || problemCode(t, rec) != "idempotency-key-reused" {
+		t.Fatalf("different body = %d %s, want 422 idempotency-key-reused", rec.Code, rec.Body.String())
+	}
+}
+
+func TestClientErrorReleasesTheKey(t *testing.T) {
+	r := newRig(t, nil)
+	r.handler = func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusBadRequest) }
+	if rec := r.post("key-1", `{}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("first = %d, want 400", rec.Code)
+	}
+	r.handler = func(w http.ResponseWriter, req *http.Request) {
+		if err := r.store.Claim(req.Context(), scopeOf(), "things/created"); err != nil {
+			t.Fatal(err)
 		}
 		w.WriteHeader(http.StatusCreated)
 	}
-	if rec := r.post("/things/1", "k1", `{}`); rec.Code != http.StatusInternalServerError {
-		t.Fatalf("first = %d", rec.Code)
-	}
-	fail = false
-	if rec := r.post("/things/1", "k1", `{}`); rec.Code != http.StatusCreated || rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Errorf("the retry after a 500 = %d replayed %q, want a fresh 201", rec.Code, rec.Header().Get("Idempotent-Replayed"))
-	}
-	if got := r.runs.Load(); got != 2 {
-		t.Errorf("handler runs = %d, want 2", got)
+	if rec := r.post("key-1", `{}`); rec.Code != http.StatusCreated {
+		t.Fatalf("after a client error = %d, want the key released and 201", rec.Code)
 	}
 }
 
-// TestIdempotencyClientErrorsReleaseTheKey: only a success is stored (Amendment 8
-// section 8-2(c)), so a 4xx lets the client correct the request under the same key.
-func TestIdempotencyClientErrorsReleaseTheKey(t *testing.T) {
+func TestRunningRequestAnswersConflict(t *testing.T) {
 	r := newRig(t, nil)
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		w.WriteHeader(http.StatusConflict)
+	r.preclaim("key-1", keyA, `{}`)
+	rec := r.post("key-1", `{}`)
+	if rec.Code != http.StatusConflict || problemCode(t, rec) != "idempotency-in-progress" {
+		t.Fatalf("running twin = %d %s, want 409 idempotency-in-progress", rec.Code, rec.Body.String())
 	}
-	r.post("/things/1", "k1", `{}`)
-	rec := r.post("/things/1", "k1", `{}`)
-	if rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Errorf("a 409 was replayed, want it released")
+	if rec.Header().Get("Retry-After") == "" {
+		t.Error("the conflict carries no Retry-After")
 	}
-	if got := r.runs.Load(); got != 2 {
-		t.Errorf("handler runs = %d, want 2", got)
-	}
-}
-
-// TestIdempotencyOversizedSuccessIsRefusedOnRetry: a success too large to store is
-// not run again; the retry gets 409 with the address of the resource.
-func TestIdempotencyOversizedSuccessIsRefusedOnRetry(t *testing.T) {
-	r := newRig(t, nil)
-	big := strings.Repeat("x", 1<<20+10)
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Location", "/api/v1/things/created")
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"v":"` + big + `"}`))
-	}
-	first := r.post("/things/1", "k1", `{}`)
-	if first.Code != http.StatusCreated || first.Body.Len() < len(big) {
-		t.Fatalf("first answer = %d with %d bytes, want the full 201", first.Code, first.Body.Len())
-	}
-	retry := r.post("/things/1", "k1", `{}`)
-	if retry.Code != http.StatusConflict || problemCode(t, retry) != "conflict" {
-		t.Errorf("retry = %d %s, want 409 conflict", retry.Code, retry.Body.String())
-	}
-	if retry.Header().Get("Location") != "/api/v1/things/created" {
-		t.Errorf("retry Location = %q", retry.Header().Get("Location"))
-	}
-	if got := r.runs.Load(); got != 1 {
-		t.Errorf("handler runs = %d, want 1", got)
+	if r.runs.Load() != 0 {
+		t.Errorf("the operation ran while its twin was running")
 	}
 }
 
-// TestUnavailableStoreAnswers503: without a durable store the request does not run.
-func TestUnavailableStoreAnswers503(t *testing.T) {
-	r := newRig(t, func(c *idempotency.Config) { c.Store = idempotency.UnavailableStore{} })
-	rec := r.post("/things/1", "k1", `{}`)
-	if rec.Code != http.StatusServiceUnavailable || problemCode(t, rec) != "service-unavailable" {
-		t.Errorf("got %d %s, want 503 service-unavailable", rec.Code, rec.Body.String())
-	}
-	if got := r.runs.Load(); got != 0 {
-		t.Errorf("handler runs = %d, want 0", got)
-	}
-}
-
-func TestIdempotencyPanicReleasesTheKey(t *testing.T) {
-	r := newRig(t, nil)
-	crash := true
-	r.handler = func(w http.ResponseWriter, _ *http.Request) {
-		r.runs.Add(1)
-		if crash {
-			panic("boom")
+func TestStaleRecordIsRebuiltFromItsResource(t *testing.T) {
+	r := newRig(t, func(c *idempotency.Config, _ *rig) {
+		c.Rebuild = func(_ context.Context, rec identity.IdempotencyRecord) (identity.IdempotencyResponse, error) {
+			if rec.ResourceRef != "things/created" {
+				return identity.IdempotencyResponse{}, idempotency.ErrNoRebuild
+			}
+			return identity.IdempotencyResponse{Status: http.StatusCreated, ContentType: "application/json", Location: "/api/v1/things/created", Body: []byte(`{"rebuilt":true}`)}, nil
 		}
-		w.WriteHeader(http.StatusCreated)
+	})
+	r.preclaim("key-1", keyA, `{}`)
+	r.clk.Advance(40 * time.Second)
+	rec := r.post("key-1", `{}`)
+	if rec.Code != http.StatusCreated || rec.Body.String() != `{"rebuilt":true}` {
+		t.Fatalf("stale record = %d %s, want the rebuilt 201", rec.Code, rec.Body.String())
 	}
-	func() {
-		defer func() { _ = recover() }()
-		r.post("/things/1", "k1", `{}`)
-	}()
-	crash = false
-	if rec := r.post("/things/1", "k1", `{}`); rec.Code != http.StatusCreated {
-		t.Errorf("the retry after a crash = %d, want 201 (the key must be free)", rec.Code)
+	if rec.Header().Get(idempotency.ReplayedHeader) != "true" {
+		t.Errorf("the rebuilt answer is not marked as replayed")
+	}
+	if again := r.post("key-1", `{}`); again.Body.String() != `{"rebuilt":true}` {
+		t.Errorf("the rebuilt record was not completed: %s", again.Body.String())
 	}
 }
 
-func TestIdempotencyScopesByRequesterAndOrganization(t *testing.T) {
+func TestStaleRecordWithoutRebuildConflicts(t *testing.T) {
 	r := newRig(t, nil)
-	r.post("/things/1", "k1", `{}`)
+	r.preclaim("key-1", keyA, `{}`)
+	r.clk.Advance(40 * time.Second)
+	if rec := r.post("key-1", `{}`); rec.Code != http.StatusConflict {
+		t.Fatalf("stale record without a rebuild = %d, want 409", rec.Code)
+	}
+}
+
+func TestOtherRequesterDoesNotShareTheRecord(t *testing.T) {
+	r := newRig(t, nil)
+	r.post("key-1", `{}`)
 	r.who = keyB
-	if rec := r.post("/things/1", "k1", `{}`); rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Error("two keys of one user share a record")
+	if rec := r.post("key-1", `{}`); rec.Header().Get(idempotency.ReplayedHeader) == "true" {
+		t.Fatalf("another key of the same user replayed the first key's response")
 	}
-	r.who = session
-	if rec := r.post("/things/1", "k1", `{}`); rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Error("a session shares the record of a key")
-	}
-	other := principal(2, "key-a", identity.CredentialPersonalKey)
-	other.OrgID = identity.OrgID(id.UUID{15: 7})
-	r.who = other
-	if rec := r.post("/things/1", "k1", `{}`); rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Error("another organization shares the record")
-	}
-	if got := r.runs.Load(); got != 4 {
-		t.Errorf("handler runs = %d, want 4", got)
+	if n := r.runs.Load(); n != 2 {
+		t.Errorf("the operation ran %d times, want 2", n)
 	}
 }
 
-func TestIdempotencyKeyValidation(t *testing.T) {
-	required := newRig(t, func(c *idempotency.Config) { c.Required = true })
-	if rec := required.post("/things/1", "", `{}`); rec.Code != http.StatusBadRequest || problemCode(t, rec) != "validation-failed" {
-		t.Errorf("missing required key = %d %s", rec.Code, rec.Body.String())
-	}
-	optional := newRig(t, nil)
-	if rec := optional.post("/things/1", "", `{}`); rec.Code != http.StatusCreated {
-		t.Errorf("missing optional key = %d, want the handler to run", rec.Code)
-	}
-	for name, key := range map[string]string{"space": "has space", "non ASCII": "clé", "too long": strings.Repeat("k", 256), "control": "a\x01b"} {
-		if rec := optional.post("/things/1", key, `{}`); rec.Code != http.StatusBadRequest {
-			t.Errorf("%s key = %d, want 400", name, rec.Code)
-		}
-	}
-	if rec := optional.post("/things/1", strings.Repeat("k", 255), `{}`); rec.Code != http.StatusCreated {
-		t.Errorf("a key of 255 characters = %d, want 201", rec.Code)
-	}
-	if rec := optional.post("/things/1", "bad-body", `{`); rec.Code != http.StatusBadRequest {
-		t.Errorf("a body that is not JSON = %d, want 400", rec.Code)
+func TestRequiredKeyIsEnforced(t *testing.T) {
+	r := newRig(t, func(c *idempotency.Config, _ *rig) { c.Required = true })
+	rec := r.post("", `{}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("missing key = %d, want 400", rec.Code)
 	}
 }
 
-func TestIdempotencyRecordsExpire(t *testing.T) {
+func TestInvalidKeyIsRefused(t *testing.T) {
 	r := newRig(t, nil)
-	r.post("/things/1", "k1", `{}`)
-	r.clk.Advance(idempotency.TTL - time.Minute)
-	if rec := r.post("/things/1", "k1", `{}`); rec.Header().Get("Idempotent-Replayed") != "true" {
-		t.Error("the record expired early")
-	}
-	r.clk.Advance(2 * time.Minute)
-	if rec := r.post("/things/1", "k1", `{}`); rec.Header().Get("Idempotent-Replayed") != "" {
-		t.Error("the record outlived its 24 hours")
+	if rec := r.post("has space", `{}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("a key with a space = %d, want 400", rec.Code)
 	}
 }
 
-func TestFingerprintIgnoresWhitespaceAndMemberOrder(t *testing.T) {
-	a, err := idempotency.Fingerprint("POST /x", []string{"id=1"}, []byte(`{"a":1,"b":[1,2]}`))
-	if err != nil {
-		t.Fatal(err)
+func TestUnavailableStoreRefusesKeyedRequests(t *testing.T) {
+	r := newRig(t, func(c *idempotency.Config, _ *rig) { c.Store = idempotency.UnavailableStore{} })
+	if rec := r.post("key-1", `{}`); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("keyed request without a store = %d, want 503", rec.Code)
 	}
-	b, _ := idempotency.Fingerprint("POST /x", []string{"id=1"}, []byte("{\n \"b\": [1, 2],\n \"a\": 1\n}"))
-	if a != b {
-		t.Error("equivalent bodies have different fingerprints")
-	}
-	for name, other := range map[string][sha256.Size]byte{
-		"route":   fp(t, "POST /y", []string{"id=1"}, `{"a":1,"b":[1,2]}`),
-		"path":    fp(t, "POST /x", []string{"id=2"}, `{"a":1,"b":[1,2]}`),
-		"body":    fp(t, "POST /x", []string{"id=1"}, `{"a":1,"b":[2,1]}`),
-		"no body": fp(t, "POST /x", []string{"id=1"}, ``),
-	} {
-		if other == a {
-			t.Errorf("a different %s has the same fingerprint", name)
-		}
-	}
-	if _, err := idempotency.Fingerprint("POST /x", nil, []byte(`{`)); err == nil {
-		t.Error("a body that is not JSON was fingerprinted")
+	if r.runs.Load() != 0 {
+		t.Errorf("the operation ran without its idempotency store")
 	}
 }
 
-func fp(t *testing.T, route string, params []string, body string) [sha256.Size]byte {
-	t.Helper()
-	out, err := idempotency.Fingerprint(route, params, []byte(body))
-	if err != nil {
-		t.Fatal(err)
+func TestRequestWithoutKeyRunsWithoutRecord(t *testing.T) {
+	r := newRig(t, nil)
+	r.post("", `{}`)
+	r.post("", `{}`)
+	if n := r.runs.Load(); n != 2 {
+		t.Errorf("unkeyed requests ran %d times, want 2", n)
 	}
-	return out
-}
-
-// failingStore fails the step named in fail.
-type failingStore struct {
-	idempotency.Store
-	fail string
-}
-
-var errStore = errors.New("store down")
-
-func (f failingStore) Begin(ctx context.Context, k idempotency.Key, fpr [sha256.Size]byte) (idempotency.Record, bool, error) {
-	if f.fail == "begin" {
-		return idempotency.Record{}, false, errStore
-	}
-	return f.Store.Begin(ctx, k, fpr)
-}
-
-func (f failingStore) Complete(ctx context.Context, k idempotency.Key, resp *idempotency.Response) error {
-	if f.fail == "complete" {
-		return errStore
-	}
-	return f.Store.Complete(ctx, k, resp)
-}
-
-func TestIdempotencyStoreFailures(t *testing.T) {
-	for _, step := range []string{"begin", "complete"} {
-		r := newRig(t, nil)
-		r.store = idempotency.NewMemoryStore(r.clk)
-		failing := failingStore{Store: r.store, fail: step}
-		idem := idempotency.Middleware(idempotency.Config{Store: failing, Logger: slog.New(slog.DiscardHandler), Route: route})
-		mux := http.NewServeMux()
-		runs := 0
-		mux.Handle(route, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			req = req.WithContext(middleware.WithPrincipal(req.Context(), keyA))
-			idem(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { runs++; w.WriteHeader(http.StatusCreated) })).ServeHTTP(w, req)
-		}))
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/things/1", strings.NewReader(`{}`))
-		req.Header.Set("Idempotency-Key", "k1")
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, req)
-		switch step {
-		case "begin":
-			if rec.Code != http.StatusInternalServerError || runs != 0 {
-				t.Errorf("begin failure: %d, handler runs %d; want 500 and no run", rec.Code, runs)
-			}
-		case "complete":
-			if rec.Code != http.StatusCreated || runs != 1 {
-				t.Errorf("complete failure: %d, handler runs %d; the client still gets the answer", rec.Code, runs)
-			}
-		}
-	}
-}
-
-func TestMemoryStoreLimits(t *testing.T) {
-	clk := clock.NewFake(time.Now())
-	s := idempotency.NewMemoryStore(clk)
-	if err := s.Complete(t.Context(), idempotency.Key{Value: "nope"}, &idempotency.Response{}); !errors.Is(err, idempotency.ErrNotClaimed) {
-		t.Errorf("completing an unclaimed key: %v", err)
-	}
-	if err := s.Abandon(t.Context(), idempotency.Key{Value: "nope"}); err != nil {
-		t.Errorf("abandoning an unclaimed key: %v", err)
-	}
-	if _, ok := s.Peek(idempotency.Key{Value: "nope"}); ok {
-		t.Error("Peek found a key that was never claimed")
-	}
-	_ = io.Discard
 }

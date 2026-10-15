@@ -15,6 +15,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
 )
@@ -37,17 +38,24 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security) (*ht
 		Catalog:       catalog,
 		Authenticator: identity.RejectAll{},
 		Authorizer:    authz.DenyAll{},
-		// No durable store exists yet; operations that take an Idempotency-Key answer 503
-		// until the first API2-core pull request wires it.
+		// Without the security wiring there is no store, so an operation that takes an
+		// Idempotency-Key answers 503 rather than running without the protection.
 		Idempotency: idempotency.UnavailableStore{},
 	}
 	if sec != nil {
 		deps.Authenticator = sec.sessions
 		deps.Authorizer = sec.evaluator
+		deps.Idempotency = sec.store
+		projects := httpapi.NewProjects(
+			identity.NewProjects(sec.store, sec.store, sec.clock, sec.ids), sec.store,
+			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec,
+		)
+		deps.Rebuilds = projects.Rebuilds()
 		deps.Server = productServer{
 			StrictServerInterface: httpapi.Unavailable{},
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin),
 			orgs:                  httpapi.NewOrgs(sec.store),
+			projects:              projects,
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -63,6 +71,23 @@ type productServer struct {
 	apigen.StrictServerInterface
 	sessions *httpapi.Sessions
 	orgs     *httpapi.Orgs
+	projects *httpapi.Projects
+}
+
+func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.projects.ListProjects(ctx, req)
+}
+
+func (s productServer) CreateProject(ctx context.Context, req apigen.CreateProjectRequestObject) (apigen.CreateProjectResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.projects.CreateProject(ctx, req)
+}
+
+func (s productServer) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObject) (apigen.ListFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.projects.ListFlows(ctx, req)
+}
+
+func (s productServer) CreateFlow(ctx context.Context, req apigen.CreateFlowRequestObject) (apigen.CreateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.projects.CreateFlow(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it

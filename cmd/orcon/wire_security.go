@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/codec/permissionsyaml"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/kms/env"
 	"github.com/wirvii/orcon/internal/adapter/kms/file"
 	"github.com/wirvii/orcon/internal/adapter/postgres"
@@ -22,6 +23,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/credential/envelope"
+	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/config"
@@ -37,6 +39,10 @@ const sealInterval = 50 * time.Millisecond
 // from the instance key (SPEC-004 R-AUTH-02: failed attempts are counted per keyed identifier).
 const identifierPurpose = "orcon/identifier@1"
 
+// pageTokenPurpose is the purpose the key of the page tokens is derived for from the instance key
+// (ADR-0042); a token does not survive a change of the instance key.
+const pageTokenPurpose = "orcon/page-token@1"
+
 // persistence is what the security wiring needs from a store. Both adapters implement it
 // (storetest proves that for the ports of every area).
 type persistence interface { //nolint:interfacebloat // the wiring holds the store behind every port the roles use, as the storetest suite does
@@ -48,6 +54,8 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	identity.LoginThrottleStore
 	identity.OrganizationResolver
 	identity.ProjectStore
+	identity.IdempotencyStore
+	flow.Store
 	identity.MembershipStore
 	authz.Store
 	envelope.KeyStore
@@ -64,6 +72,9 @@ type security struct {
 	evaluator    *authz.Evaluator
 	sealer       *audit.Sealer
 	publicOrigin string
+	clock        clock.Clock
+	ids          id.Generator
+	pageCodec    *page.Codec
 }
 
 // openSecurity opens the configured store, loads the master key and checks it against the
@@ -156,9 +167,18 @@ func wireSecurity(ctx context.Context, cfg *config.Config, logger *slog.Logger, 
 	if err != nil {
 		return nil, fmt.Errorf("load the permission catalog: %w", err)
 	}
+	_, pageKey, err := kr.ActiveSubkey(ctx, envelope.InstanceScope(), pageTokenPurpose)
+	if err != nil {
+		return nil, fmt.Errorf("derive the page token key: %w", err)
+	}
+	codec, err := page.NewCodec(pageKey)
+	if err != nil {
+		return nil, fmt.Errorf("page tokens: %w", err)
+	}
 	return &security{
 		store: store, keyring: kr, sessions: sessions, evaluator: authz.NewEvaluator(store, catalog),
 		sealer: audit.NewSealer(store, auditKeys{kr: kr}, ids, clk), publicOrigin: cfg.Value("publicUrl").Text(),
+		clock: clk, ids: ids, pageCodec: codec,
 	}, nil
 }
 

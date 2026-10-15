@@ -63,7 +63,11 @@ type Deps struct {
 	// a store in the memory of the process survives neither a restart nor a second api
 	// process. The composition root wires the durable store, or
 	// idempotency.UnavailableStore while there is none.
-	Idempotency idempotency.Store
+	Idempotency identity.IdempotencyStore
+	// Rebuilds answers the repeats of an in-progress idempotency record left by a crash, by
+	// operation identifier (for example "createProject"). An operation without one answers 409
+	// idempotency-in-progress to such a repeat.
+	Rebuilds map[string]idempotency.Rebuild
 	// Reference is the file system of the reference site; nil means the
 	// embedded one.
 	Reference fs.FS
@@ -293,7 +297,8 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body
 	}
 	if !op.Public && op.IdempotencyKey != "" {
 		chain = append(chain, idempotency.Middleware(idempotency.Config{
-			Store: deps.Idempotency, Logger: deps.Logger, Required: op.IdempotencyKey == "required",
+			Store: deps.Idempotency, Clock: deps.Clock, IDs: deps.IDs, Rebuild: deps.Rebuilds[op.ID],
+			Logger: deps.Logger, Required: op.IdempotencyKey == "required",
 			IssuesSecret: op.IssuesSecret, Route: op.Pattern,
 		}))
 	}
