@@ -374,7 +374,10 @@ func TestBucketRefusalDelaysTheWork(t *testing.T) {
 			eachStore(t, func(t *testing.T, env *storetest.EngineEnv) {
 				t.Helper()
 				const executions = 10
-				r := newRig(t, env, tc.params, limit.Spec{Capacity: 2, RefillPerSecond: 8})
+				// A slow refill keeps the bucket empty for the whole burst even
+				// on a loaded runner; a fast refill let it refill between the
+				// claims and never refuse, which made the test flaky in CI.
+				r := newRig(t, env, tc.params, limit.Spec{Capacity: 2, RefillPerSecond: 1})
 				eng := r.engine()
 				ids := make([]store.ExecutionID, executions)
 				for i := range ids {
