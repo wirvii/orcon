@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { productApi } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
-import { acme, globex, problem, sessionId, signedIn } from '../../../../test/session-fixtures';
+import { acme, currentUser, globex, problem, sessionId, signedIn } from '../../../../test/session-fixtures';
 
 describe('the session area routes', () => {
   it('sends a person without a session to sign-in, with the address they asked for', async () => {
@@ -74,7 +74,23 @@ describe('the session area routes', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
     expect(revoked).toBe(true);
+    expect(screen.getByText('You signed out.')).toBeVisible();
     expect(queryClient.getQueryCache().findAll({ queryKey: ['session'] })).toHaveLength(0);
+  });
+
+  it('shows the name derived from the email when the account has only the placeholder name', async () => {
+    server.use(
+      http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, email: 'jftamayop@example.com', displayName: 'Owner' })),
+      signedIn.organizations([acme]),
+      productApi.projects([]),
+    );
+    renderRoute('/orgs/acme');
+    const button = await screen.findByRole('button', { name: 'Account menu' });
+    expect(within(button).getByRole('img', { name: 'jftamayop' })).toBeVisible();
+    expect(button).toHaveTextContent('JF');
+    await userEvent.click(button);
+    expect(await screen.findByText('jftamayop')).toBeVisible();
+    expect(screen.queryByText('Owner')).toBeNull();
   });
 
   it('offers switching organization only to a person with more than one', async () => {

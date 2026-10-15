@@ -387,6 +387,7 @@
   "session.signIn.languageLink": "Language and appearance",
   "session.signIn.password": "Password",
   "session.signIn.showPassword": "Show password",
+  "session.signIn.signedOut": "You signed out.",
   "session.signIn.submit": "Sign in",
   "session.signIn.throttled": "Too many attempts. Wait {minutes, plural, one {# minute} other {# minutes}} and try again.",
   "session.signIn.title": "Sign in",

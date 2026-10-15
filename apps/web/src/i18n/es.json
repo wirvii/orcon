@@ -387,6 +387,7 @@
   "session.signIn.languageLink": "Idioma y apariencia",
   "session.signIn.password": "Contraseña",
   "session.signIn.showPassword": "Mostrar contraseña",
+  "session.signIn.signedOut": "Cerraste sesión.",
   "session.signIn.submit": "Iniciar sesión",
   "session.signIn.throttled": "Demasiados intentos. Espera {minutes, plural, one {# minuto} other {# minutos}} y vuelve a intentarlo.",
   "session.signIn.title": "Iniciar sesión",

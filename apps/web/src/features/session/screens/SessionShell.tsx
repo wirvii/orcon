@@ -4,10 +4,13 @@
 import { AppShell, BrandMark, type NavEntry } from '@orcon/ui';
 import { linkOptions, useMatches, useNavigate, useParams, useRouter, useRouterState } from '@tanstack/react-router';
 import { Braces, FolderKanban, KeyRound, Settings } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, type ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import { ConnectionBanners } from '../../../app/shell/ConnectionBanners';
+import { organizationsQueryOptions } from '../api/queries';
+import { rememberedOrganization, rememberOrganization } from '../api/last-org';
 import { UserMenu } from './UserMenu';
 
 const messages = defineMessages({
@@ -40,7 +43,16 @@ export function SessionShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const { orgSlug, projectHandle } = useParams({ strict: false });
+  const params = useParams({ strict: false });
+  const { projectHandle } = params;
+  // Outside an organization's pages (settings) the navigation still offers the projects of the organization the
+  // person was in, or of the only one they belong to.
+  const organizations = useQuery({ ...organizationsQueryOptions(), enabled: params.orgSlug === undefined });
+  const onlyOrganization = organizations.data?.length === 1 ? organizations.data[0]?.slug : undefined;
+  const orgSlug = params.orgSlug ?? rememberedOrganization() ?? onlyOrganization;
+  useEffect(() => {
+    if (params.orgSlug !== undefined) rememberOrganization(params.orgSlug);
+  }, [params.orgSlug]);
   const projectsLink = orgSlug === undefined ? undefined : linkOptions({ to: '/orgs/$orgSlug/projects', params: { orgSlug } });
   const credentialsLink =
     orgSlug === undefined || projectHandle === undefined ? undefined : linkOptions({ to: '/orgs/$orgSlug/projects/$projectHandle/credentials', params: { orgSlug, projectHandle } });
