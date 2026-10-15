@@ -24,6 +24,16 @@ export const runMessages = defineMessages({
     defaultMessage: 'You cannot see the data of this run. Ask an administrator of the project for access to run data.',
     description: 'Explains that the items of a run are hidden for this person, and whom to ask.',
   },
+  unavailableTitle: {
+    id: 'runs.unavailable.title',
+    defaultMessage: 'Run history will be available soon',
+    description: 'Title of the runs list while the server cannot list runs yet.',
+  },
+  unavailableText: {
+    id: 'runs.unavailable.text',
+    defaultMessage: 'Flows can be edited and published already; their runs will be listed here once the history is ready.',
+    description: 'Explains that the runs list is not ready yet and that nothing the person did is lost.',
+  },
   noRunsTitle: { id: 'runs.empty.title', defaultMessage: 'No runs yet', description: 'Title of the runs list when nothing has run.' },
   noRunsText: {
     id: 'runs.empty.text',

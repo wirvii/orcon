@@ -370,6 +370,8 @@
   "runs.mode.webhook": "Webhook",
   "runs.notStarted": "Not started",
   "runs.stillRunning": "Still running",
+  "runs.unavailable.text": "Flows can be edited and published already; their runs will be listed here once the history is ready.",
+  "runs.unavailable.title": "Run history will be available soon",
   "session.nav.credentials": "Credentials",
   "session.nav.projects": "Projects",
   "session.noOrganization.description": "An administrator of an organization has to add your account. Ask them, then sign in again.",

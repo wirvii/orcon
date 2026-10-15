@@ -55,6 +55,7 @@ export function ExecutionListScreen() {
       />
       <QueryState
         query={{ status: runs.status, data: items, error: runs.error, refetch: runs.refetch }}
+        unavailable={{ title: intl.formatMessage(runMessages.unavailableTitle), description: intl.formatMessage(runMessages.unavailableText) }}
         empty={{ title: intl.formatMessage(runMessages.noRunsTitle), description: intl.formatMessage(runMessages.noRunsText) }}
       >
         {(rows) => (

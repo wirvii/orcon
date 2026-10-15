@@ -29,6 +29,66 @@ export const problemMessages = defineMessages({
     defaultMessage: 'Someone already resolved this request.',
     description: 'Shown when a person tries to decide an attention request that another person already decided.',
   },
+  serviceUnavailable: {
+    id: 'problem.service-unavailable',
+    defaultMessage: 'The service is not available right now. Try again in a few minutes.',
+    description: 'Shown when the server answers that an operation is not available yet or the service is down.',
+  },
+  internalError: {
+    id: 'problem.internal-error',
+    defaultMessage: 'Something went wrong on our side. Try again in a moment.',
+    description: 'Shown when the server failed unexpectedly.',
+  },
+  rateLimited: {
+    id: 'problem.rate-limited',
+    defaultMessage: 'Too many requests. Wait a moment and try again.',
+    description: 'Shown when the server limits how often a person can call it.',
+  },
+  unauthenticated: {
+    id: 'problem.unauthenticated',
+    defaultMessage: 'Your session ended. Sign in again.',
+    description: 'Shown when the request has no valid session.',
+  },
+  forbidden: {
+    id: 'problem.forbidden',
+    defaultMessage: 'You do not have permission to do this.',
+    description: 'Shown when the person lacks the permission for an action.',
+  },
+  notFound: {
+    id: 'problem.not-found',
+    defaultMessage: 'We could not find what you asked for.',
+    description: 'Shown when the requested item does not exist or is not visible to the person.',
+  },
+  conflict: {
+    id: 'problem.conflict',
+    defaultMessage: 'Someone changed this at the same time. Reload and try again.',
+    description: 'Shown when a change collides with another change.',
+  },
+  preconditionFailed: {
+    id: 'problem.precondition-failed',
+    defaultMessage: 'This changed since you opened it. Reload and try again.',
+    description: 'Shown when the item changed since the person loaded it.',
+  },
+  validationFailed: {
+    id: 'problem.validation-failed',
+    defaultMessage: 'Some of the data is not valid. Check the highlighted fields.',
+    description: 'Shown when the server rejects the data sent.',
+  },
+  payloadTooLarge: {
+    id: 'problem.payload-too-large',
+    defaultMessage: 'What you sent is too large.',
+    description: 'Shown when the request body exceeds the server limit.',
+  },
+  csrfCheckFailed: {
+    id: 'problem.csrf-check-failed',
+    defaultMessage: 'The page is out of date. Reload it and try again.',
+    description: 'Shown when the anti-forgery check of a change fails.',
+  },
+  stepUpRequired: {
+    id: 'problem.step-up-required',
+    defaultMessage: 'Confirm your identity again to continue.',
+    description: 'Shown when an action needs a recent re-authentication.',
+  },
 });
 
 /**
@@ -37,6 +97,18 @@ export const problemMessages = defineMessages({
  */
 export const knownProblemMessages: Readonly<Record<string, MessageDescriptor>> = {
   'attention-already-resolved': problemMessages.attentionAlreadyResolved,
+  'service-unavailable': problemMessages.serviceUnavailable,
+  'internal-error': problemMessages.internalError,
+  'rate-limited': problemMessages.rateLimited,
+  'unauthenticated': problemMessages.unauthenticated,
+  'forbidden': problemMessages.forbidden,
+  'not-found': problemMessages.notFound,
+  'conflict': problemMessages.conflict,
+  'precondition-failed': problemMessages.preconditionFailed,
+  'validation-failed': problemMessages.validationFailed,
+  'payload-too-large': problemMessages.payloadTooLarge,
+  'csrf-check-failed': problemMessages.csrfCheckFailed,
+  'step-up-required': problemMessages.stepUpRequired,
 };
 
 /** Deterministic control id for a field name or JSON pointer, so an error summary can link to it. */
