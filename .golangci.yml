@@ -157,6 +157,22 @@ linters:
               desc: SQLite driver is confined to the sqlite adapter
             - pkg: database/sql
               desc: database/sql is used only by the sqlite adapter (postgres uses pgx natively)
+        # An organization scope is created only where ADR-0046 section 2 says: the authorization context
+        # (internal/authz), the engine (internal/execution and the adapter code that turns engine rows into
+        # scopes), the contract suite, the isolation battery, and tests. Everything else receives scopes.
+        orgscope-issue-confined:
+          files:
+            - "$all"
+            - "!**/internal/authz/**"
+            - "!**/internal/adapter/sqlite/engine_functions*.go"
+            - "!**/internal/adapter/postgres/engine_functions*.go"
+            - "!**/internal/adapter/storetest/**"
+            - "!**/internal/platform/orgscope/**"
+            - "!**/test/isolation/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/platform/orgscope/issue
+              desc: only the authorization context and the engine create an organization scope (ADR-0046 section 2, orcon-db TI-2)
         wazero-confined:
           files:
             - "$all"
@@ -263,6 +279,11 @@ linters:
             # Excluded here because adapter-private-storetest-dbrules below governs them (it allows only dbrules).
             - "!**/internal/adapter/sqlite/*_test.go"
             - "!**/internal/adapter/postgres/*_test.go"
+            # PROPOSED exception, not yet in AL-2.4 and awaiting the owner's approval (SPEC-004 SE1b): the
+            # test files directly under test/isolation open the stores of both adapters through storetest,
+            # as the isolation battery of E-ISO-3 needs real databases. They import nothing else of an
+            # adapter (adapter-private-sqlite and adapter-private-postgres still apply to them).
+            - "!**/test/isolation/*_test.go"
             - "!**/cmd/**"
             # AL-2.4 exception: code under test/** may import storetest and nothing else (approved by the owner).
             - "!**/test/**"

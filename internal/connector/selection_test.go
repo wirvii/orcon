@@ -55,12 +55,12 @@ func TestOperationSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.grant(w.orgA, identity.ProjectID{}, single)
-	types := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+	types := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 	pin := pinText("1.2.0", rec.Digest)
 
 	t.Run("the contract is the one of the selected operation", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, nil)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 		p := &flow.ConnectorPin{Version: "1.2.0", Digest: rec.Digest}
 		for _, tt := range []struct {
 			operation string
@@ -135,7 +135,7 @@ func TestOperationSelection(t *testing.T) {
 
 	t.Run("a trigger selects no operation", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, nil)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 		p := &flow.ConnectorPin{Version: "1.2.0", Digest: rec.Digest}
 		with := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.orderCreated@1", p, "order.get"))
 		if !with.Known || with.Selection != flow.SelectionOnTrigger || len(with.Problems) != 0 {
@@ -159,7 +159,7 @@ func TestOperationSelection(t *testing.T) {
 
 	t.Run("a node without a pin still has its selection judged", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, nil)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 		res := cat.ResolveNode(t.Context(), packageNode(t, "acme.shop.order@1", nil, ""))
 		if res.Selection != flow.SelectionMissing || len(res.Problems) != 1 || !strings.Contains(res.Problems[0], "no connector pin") {
 			t.Errorf("%+v", res)
@@ -224,7 +224,7 @@ func TestCompositeCatalog(t *testing.T) {
 	t.Run("a core type is resolved by the core types, without pin or selection", func(t *testing.T) {
 		t.Parallel()
 		core := &fakeCore{}
-		cat := w.registry.Catalog(w.orgA, w.project, core)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, core)
 		get := cat.ResolveNode(t.Context(), httpNode(t, `{ "method": "GET", "operation": "x.y" }`))
 		if !get.Known || get.Type.Purity != flow.PurityRead || len(get.Problems) != 0 || get.Selection != flow.SelectionOK {
 			t.Errorf("GET: %+v", get)
@@ -242,7 +242,7 @@ func TestCompositeCatalog(t *testing.T) {
 
 	t.Run("a core type with a pin is not judged on the pin here", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 		n := httpNode(t, `{ "method": "GET" }`)
 		n.Connector = pin
 		if res := cat.ResolveNode(t.Context(), n); !res.Known || len(res.Problems) != 0 {
@@ -253,7 +253,7 @@ func TestCompositeCatalog(t *testing.T) {
 	t.Run("lookup delegates to the core types for a type no package owns", func(t *testing.T) {
 		t.Parallel()
 		core := &fakeCore{}
-		cat := w.registry.Catalog(w.orgA, w.project, core)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, core)
 		nt, ok := cat.Lookup(t.Context(), "orcon.http@1")
 		if !ok || nt.Purity != flow.PurityEffect {
 			t.Errorf("Lookup(orcon.http@1) = %+v, %v; the palette shows the worst case", nt, ok)
@@ -272,7 +272,7 @@ func TestCompositeCatalog(t *testing.T) {
 
 	t.Run("an unknown type is unknown", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 		for _, nodeType := range []string{"vendor.thing@1", "other.shop.order@1", "acme.shop.missing@1"} {
 			res := cat.ResolveNode(t.Context(), &flow.Node{ID: "n1", Type: nodeType, Connector: nil, Parameters: value(t, `{}`)})
 			if res.Known && res.Selection == flow.SelectionOK && len(res.Problems) == 0 {
@@ -288,7 +288,7 @@ func TestCompositeCatalog(t *testing.T) {
 
 	t.Run("without core types a core type is unknown", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, nil)
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, nil)
 		if res := cat.ResolveNode(t.Context(), httpNode(t, `{}`)); res.Known || len(res.Problems) != 0 {
 			t.Errorf("%+v", res)
 		}
@@ -299,7 +299,7 @@ func TestCompositeCatalog(t *testing.T) {
 
 	t.Run("a flow with a core node and a package node publishes", func(t *testing.T) {
 		t.Parallel()
-		cat := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+		cat := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 		text := strings.Replace(flowText(pinText("1.2.0", rec.Digest), `{ "operation": "order.get" }`),
 			`"type": "orcon.end@1"`, `"type": "orcon.http@1"`, 1)
 		if errs := publishErrors(t, cat, text); errs != nil {

@@ -133,7 +133,7 @@ func TestPublishLevel5Connector(t *testing.T) {
 			w := newWorld(t)
 			rec := w.install("1.2.0")
 			tt.setup(w, rec)
-			types := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+			types := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 			f := newFlow(t, flowText(tt.pin(rec), tt.params))
 
 			v, err := f.PublishWith(t.Context(), types)
@@ -169,7 +169,7 @@ func TestPublishLevel5ConnectorRollbackAndSnapshot(t *testing.T) {
 	w := newWorld(t)
 	rec := w.install("1.2.0")
 	w.grant(w.orgA, identity.ProjectID{}, rec)
-	types := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+	types := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 	f := newFlow(t, flowText(pinText("1.2.0", rec.Digest), createOperation))
 
 	if _, err := f.SnapshotWith(ctx, types); err != nil {
@@ -199,7 +199,7 @@ func TestSelectedOperationDecidesTheContract(t *testing.T) {
 	w := newWorld(t)
 	rec := w.install("1.2.0")
 	w.grant(w.orgA, identity.ProjectID{}, rec)
-	types := w.registry.Catalog(w.orgA, w.project, &fakeCore{})
+	types := w.registry.Catalog(scopeFor(w.orgA), w.project, &fakeCore{})
 	pin := pinText("1.2.0", rec.Digest)
 
 	attentionOff := func(text string) string {

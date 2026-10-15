@@ -2,9 +2,9 @@
 # SPDX-FileCopyrightText: The Orcon Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Proves that every rule detects what it is meant to detect: it plants 19
-# violations (SPEC-008 Annex E.6; 18 and 19 are the orgscope analyzer of
-# SPEC-004) in a scratch copy of the module and fails
+# Proves that every rule detects what it is meant to detect: it plants 21
+# violations (SPEC-008 Annex E.6; 18, 19 and 21 are the orgscope analyzer of
+# SPEC-004 and 20 is its scope-creation rule) in a scratch copy of the module and fails
 # unless each one is reported by the expected tool. A rule that exists but
 # detects nothing is the failure this guards against.
 #
@@ -175,6 +175,37 @@ func Wipe(ctx context.Context, db *sql.DB, table string) error {
 	_, err := db.ExecContext(ctx, "DELETE FROM "+table)
 	return err
 }'
+# 20: a package outside the places ADR-0046 names creates an organization scope (depguard).
+fixture internal/zzfixture20 a.go 'import (
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
+)
+
+// Forge is planted.
+func Forge(u id.UUID) (issue.Org, error) {
+	return issue.New(u)
+}'
+# 21: a store port method that takes no organization scope and does not say why (orgscope).
+fixture internal/zzfixture21port a.go 'import "context"
+
+// Store is planted: its method neither takes a scope nor carries a scope directive.
+type Store interface {
+	// Leak is planted.
+	Leak(ctx context.Context, id string) (string, error)
+}'
+fixture internal/adapter/sqlite/zzfixture21 a.go 'import (
+	"context"
+
+	"github.com/wirvii/orcon/internal/zzfixture21port"
+)
+
+// Impl is planted.
+type Impl struct{}
+
+// Leak is planted.
+func (Impl) Leak(context.Context, string) (string, error) { return "", nil }
+
+var _ zzfixture21port.Store = Impl{}'
 
 # One golangci-lint run covers the lint-detected cases. golangci-lint exits 1
 # when it finds issues, which is the expected outcome here.
@@ -219,8 +250,9 @@ expect_lint 11 "indentation with spaces" internal/zzfixture11 'gofmt|goimports'
 expect_lint 12 "slog message that is not constant" internal/zzfixture12 sloglint
 expect_lint 13 "error compared with ==" internal/zzfixture13 errorlint
 expect_lint 14 "http.ListenAndServe without timeouts" internal/adapter/zzfixture14 gosec
+expect_lint 20 "scope creation outside authz and the engine" internal/zzfixture20 depguard
 
-# 15-19 are detected by the project tools, run from the scratch module.
+# 15-19 and 21 are detected by the project tools, run from the scratch module.
 if (cd "$tmp" && "$BIN/spdxcheck" internal/zzfixture15/a.go) 2>&1 | grep -q 'missing SPDX'; then
   pass 15 "Go file without SPDX header"
 else
@@ -246,10 +278,15 @@ if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/adapter/s
 else
   fail 19 "SQL text that is not a constant (orconvet orgscope reported nothing)"
 fi
+if (cd "$tmp" && GOWORK=off go vet -vettool="$BIN/orconvet" ./internal/adapter/sqlite/zzfixture21/ 2>&1) | grep -q 'takes no orgscope.Org'; then
+  pass 21 "store port method without an organization scope"
+else
+  fail 21 "store port method without an organization scope (orconvet orgscope reported nothing)"
+fi
 
 if [ "$failed" -ne 0 ]; then
-  echo "lint-fixtures: $failed of 19 planted violations were not detected; lint output follows" >&2
+  echo "lint-fixtures: $failed of 21 planted violations were not detected; lint output follows" >&2
   cat "$lint_out" >&2
   exit 1
 fi
-echo "lint-fixtures: all 19 planted violations detected"
+echo "lint-fixtures: all 21 planted violations detected"

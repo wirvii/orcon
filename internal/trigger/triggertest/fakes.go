@@ -12,6 +12,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
 
@@ -65,7 +66,7 @@ func (c *Credentials) SetMissing(names ...string) {
 }
 
 // Missing implements [trigger.Credentials].
-func (c *Credentials) Missing(context.Context, identity.OrgID, identity.ProjectID, string, jsonvalue.Value) ([]string, error) {
+func (c *Credentials) Missing(context.Context, orgscope.Org, identity.ProjectID, string, jsonvalue.Value) ([]string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]string(nil), c.missing...), nil

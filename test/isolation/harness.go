@@ -10,6 +10,13 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // Store names the store a run targets.
@@ -37,17 +44,66 @@ func ParseStore(s string) (Store, error) {
 	}
 }
 
+// ParseStores turns a -store flag value into the stores a run covers: "sqlite",
+// "postgres", "both", or "auto" (SQLite, and PostgreSQL when it is available, which
+// the caller says with postgresAvailable).
+func ParseStores(s string, postgresAvailable bool) ([]Store, error) {
+	switch s {
+	case "both":
+		return []Store{StoreSQLite, StorePostgres}, nil
+	case "auto":
+		if postgresAvailable {
+			return []Store{StoreSQLite, StorePostgres}, nil
+		}
+		return []Store{StoreSQLite}, nil
+	}
+	st, err := ParseStore(s)
+	if err != nil {
+		return nil, fmt.Errorf("%w (or both, auto)", err)
+	}
+	return []Store{st}, nil
+}
+
+// Stores is every store port the isolation cases act through: whatever the
+// adapters implement, as seen by the areas. Adding a port to an adapter without
+// adding it here fails TestSurfaceIsEverythingTheAdaptersImplement.
+type Stores interface { //nolint:interfacebloat // the battery exercises every port of the adapters through one value
+	identity.OrgStore
+	identity.PrincipalStore
+	identity.UserStore
+	identity.MembershipStore
+	identity.ProjectStore
+	flow.Store
+	flow.VersionStore
+	flow.SnapshotStore
+	execution.WorkerStore
+}
+
 // Org is one of the two organizations of a run.
 type Org struct {
 	ID   string
 	Name string
 	slug string
+
+	// UUID and Scope are the identity and the scope of the organization once the run is seeded.
+	UUID  id.UUID
+	Scope orgscope.Org
+
+	// What seeding stored for the organization; every text field that the other
+	// organization must never see carries the sentinels of [Org.Sentinel].
+	Record     identity.OrgRecord
+	Project    identity.ProjectRecord
+	Flow       flow.Record
+	Version    flow.VersionRecord
+	Snapshot   flow.SnapshotRecord
+	User       identity.UserRecord
+	Membership identity.MembershipRecord
 }
 
 // Sentinel returns a value that appears nowhere else, to plant in a field of
 // the organization's data (a flow name, a project, a credential label) and to
 // search for in whatever the other organization receives or stores.
-func (o Org) Sentinel(label string) string {
+func (o *Org) Sentinel(label string) string {
 	return "orcon-sentinel-" + o.slug + "-" + label
 }
 
@@ -56,20 +112,36 @@ type Env struct {
 	Store   Store
 	RLSOnly bool // wall 3 alone: the filter of wall 1 is off (build tag isolation_rls_only)
 	A, B    Org  // A attacks, B is attacked
+	// Stores is the store under test, seeded with both organizations; nil in an Env that was not seeded.
+	Stores Stores
+	// IDs creates the identities a case needs for new rows.
+	IDs id.Generator
 }
 
-// NewEnv builds the environment of a run. The argument rlsOnly is the build-tag
-// constant [RLSOnly]; it is a parameter so the combination check can be tested.
+// NewEnv builds the environment of a run, without a store. The argument rlsOnly
+// is the build-tag constant [RLSOnly]; it is a parameter so the combination
+// check can be tested.
 func NewEnv(store Store, rlsOnly bool) (*Env, error) {
 	if rlsOnly && store != StorePostgres {
 		return nil, ErrRLSOnlyNeedsPostgres
 	}
-	return &Env{
+	env := &Env{
 		Store:   store,
 		RLSOnly: rlsOnly,
 		A:       Org{ID: "0192b8e0-0000-7000-8000-00000000000a", Name: "Organization A", slug: "a"},
 		B:       Org{ID: "0192b8e0-0000-7000-8000-00000000000b", Name: "Organization B", slug: "b"},
-	}, nil
+	}
+	for _, o := range []*Org{&env.A, &env.B} {
+		u, err := id.Parse(o.ID)
+		if err != nil {
+			return nil, fmt.Errorf("isolation: organization id %q: %w", o.ID, err)
+		}
+		o.UUID = u
+		if o.Scope, err = issue.New(u); err != nil {
+			return nil, fmt.Errorf("isolation: scope of %q: %w", o.ID, err)
+		}
+	}
+	return env, nil
 }
 
 // Leaks returns the forbidden values that appear in haystack.
@@ -110,7 +182,7 @@ func (k Kind) String() string {
 
 // Subject is something that handles organization data and so needs an
 // isolation case: an HTTP route ("POST /v1/projects/{projectId}/flows") or a
-// store method ("FlowStore.Get").
+// store method ("GetFlow").
 type Subject struct {
 	Kind Kind
 	Name string
@@ -208,8 +280,13 @@ func (r *Registry) Orphans(s Surface) []Subject {
 // Len is the number of registered cases.
 func (r *Registry) Len() int { return len(r.cases) }
 
-// Run runs every case as a subtest, in subject order.
-func (r *Registry) Run(ctx context.Context, t *testing.T, env *Env) {
+// EnvFactory returns the environment of one case. A run that needs a store gives
+// every case a fresh, seeded one, so no case sees what another did.
+type EnvFactory func(t *testing.T) *Env
+
+// Run runs every case as a subtest, in subject order, each in the environment
+// newEnv returns for it.
+func (r *Registry) Run(ctx context.Context, t *testing.T, newEnv EnvFactory) {
 	t.Helper()
 	subjects := make([]Subject, 0, len(r.cases))
 	for sub := range r.cases {
@@ -219,7 +296,7 @@ func (r *Registry) Run(ctx context.Context, t *testing.T, env *Env) {
 	for _, sub := range subjects {
 		c := r.cases[sub]
 		t.Run(sub.String(), func(t *testing.T) {
-			c.Run(ctx, t, env)
+			c.Run(ctx, t, newEnv(t))
 		})
 	}
 }
@@ -232,17 +309,3 @@ func sortSubjects(s []Subject) {
 		return s[i].Name < s[j].Name
 	})
 }
-
-// NoSurface is the surface of a tree without routes or store methods that
-// handle organization data, which is the tree today. A cut that adds the first
-// route or store method replaces it in [DefaultSurface].
-type NoSurface struct{}
-
-// Routes returns nothing.
-func (NoSurface) Routes() []string { return nil }
-
-// StoreMethods returns nothing.
-func (NoSurface) StoreMethods() []string { return nil }
-
-// DefaultSurface is what TestRegistryComplete compares [BuildRegistry] with.
-var DefaultSurface Surface = NoSurface{}

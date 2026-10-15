@@ -14,6 +14,9 @@ import (
 	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // memStore is an in-memory implementation of the connector stores. It follows
@@ -85,9 +88,12 @@ func (s *memStore) ListPackageVersions(_ context.Context, connectorID, afterVers
 	return out[:min(limit, len(out))], nil
 }
 
-func (s *memStore) InsertGrant(_ context.Context, g connector.GrantRecord) error {
+func (s *memStore) InsertGrant(_ context.Context, org orgscope.Org, g connector.GrantRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if g.OrgID != identity.OrgID(org.UUID()) {
+		return fmt.Errorf("insert grant: %w", identity.ErrScopeMismatch)
+	}
 	for i := range s.grants {
 		h := &s.grants[i]
 		if h.OrgID == g.OrgID && h.PackageID == g.PackageID && h.ProjectID == g.ProjectID {
@@ -98,11 +104,11 @@ func (s *memStore) InsertGrant(_ context.Context, g connector.GrantRecord) error
 	return nil
 }
 
-func (s *memStore) FindGrant(_ context.Context, org identity.OrgID, pkg connector.PackageID, project identity.ProjectID) (connector.GrantRecord, error) {
+func (s *memStore) FindGrant(_ context.Context, org orgscope.Org, pkg connector.PackageID, project identity.ProjectID) (connector.GrantRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.grants {
-		if g := &s.grants[i]; g.OrgID == org && g.PackageID == pkg && (g.ProjectID == (identity.ProjectID{}) || g.ProjectID == project) {
+		if g := &s.grants[i]; g.OrgID == identity.OrgID(org.UUID()) && g.PackageID == pkg && (g.ProjectID == (identity.ProjectID{}) || g.ProjectID == project) {
 			return *g, nil
 		}
 	}
@@ -178,3 +184,12 @@ func (c *fakeCore) ResolveCore(_ context.Context, n *flow.Node) (flow.NodeType, 
 var unsafeHTTP = flow.NodeType{Purity: flow.PurityEffect, Contract: &flow.Contract{
 	Effect: flow.EffectUnknown, Level: flow.SafetyUnsafe, OnUncertain: flow.OnUncertainSuspend,
 }}
+
+// scopeFor issues the scope of an organization of a test.
+func scopeFor(org identity.OrgID) orgscope.Org {
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		panic(err)
+	}
+	return scope
+}

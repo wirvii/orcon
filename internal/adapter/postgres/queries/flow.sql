@@ -1,28 +1,8 @@
 -- SPDX-FileCopyrightText: The Orcon Authors
 -- SPDX-License-Identifier: Apache-2.0
 
--- Queries of project, flow, flow_version and flow_snapshot. The PostgreSQL file
+-- Queries of flow, flow_version and flow_snapshot. The PostgreSQL file
 -- of the same name holds the same query names.
-
--- name: InsertProject :exec
--- orcon:scope org
-INSERT INTO project (id, org_id, name, slug, environment, is_protected, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(name), sqlc.arg(slug), sqlc.arg(environment), sqlc.arg(is_protected), sqlc.arg(created_at), sqlc.arg(updated_at));
-
--- name: GetProject :one
--- orcon:scope org
-SELECT id, org_id, name, slug, environment, is_protected, created_at, updated_at
-FROM project
-WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
-
--- name: ListProjects :many
--- orcon:scope org
--- orcon:hot
-SELECT id, org_id, name, slug, environment, is_protected, created_at, updated_at
-FROM project
-WHERE org_id = sqlc.arg(org_id) AND id > sqlc.arg(after_id)
-ORDER BY id
-LIMIT sqlc.arg(page_size);
 
 -- name: InsertFlow :exec
 -- orcon:scope org

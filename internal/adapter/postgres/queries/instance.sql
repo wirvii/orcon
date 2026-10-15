@@ -1,30 +1,8 @@
 -- SPDX-FileCopyrightText: The Orcon Authors
 -- SPDX-License-Identifier: Apache-2.0
 
--- Queries of the instance tables (org, principal, worker, schema_migration).
--- The PostgreSQL file of the same name holds the same query names.
-
--- name: InsertOrganization :exec
--- orcon:scope instance
-INSERT INTO org (id, name, slug, status, deletion_scheduled_at, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(slug), sqlc.arg(status), sqlc.arg(deletion_scheduled_at), sqlc.arg(created_at), sqlc.arg(updated_at));
-
--- name: GetOrganization :one
--- orcon:scope instance
-SELECT id, name, slug, status, deletion_scheduled_at, created_at, updated_at
-FROM org
-WHERE id = sqlc.arg(id);
-
--- name: InsertPrincipal :exec
--- orcon:scope instance
-INSERT INTO principal (id, kind, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(kind), sqlc.arg(created_at), sqlc.arg(updated_at));
-
--- name: GetSystemPrincipal :one
--- orcon:scope instance
-SELECT id, kind, created_at, updated_at
-FROM principal
-WHERE kind = 'SYSTEM';
+-- Queries of the worker registry. The organization and principal queries are in identity.sql.
+-- The SQLite file of the same name holds the same query names.
 
 -- name: UpsertWorker :exec
 -- orcon:scope instance

@@ -10,6 +10,7 @@ import (
 
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // CoreTypes describes node types that no connector package owns: orcon.http@1
@@ -30,7 +31,7 @@ type CoreTypes interface {
 // (ADR-0007 section 9, ADR-0034 section 1).
 type Catalog struct {
 	registry *Registry
-	org      identity.OrgID
+	org      orgscope.Org
 	project  identity.ProjectID
 	core     CoreTypes
 }

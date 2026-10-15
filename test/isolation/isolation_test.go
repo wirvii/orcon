@@ -7,26 +7,55 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
+	"go.uber.org/goleak"
+
+	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/test/isolation"
 )
 
 // storeFlag is set after -args: go test ./test/isolation/... -args -store=postgres.
-var storeFlag = flag.String("store", "sqlite", "store under test: sqlite or postgres")
+//
+//	auto      SQLite, and PostgreSQL when ORCON_TEST_POSTGRES=1 (default)
+//	sqlite    SQLite only
+//	postgres  PostgreSQL only; the test starts a server and fails if it cannot
+//	both      SQLite and PostgreSQL; PostgreSQL must be available
+var storeFlag = flag.String("store", "auto", "store under test: auto, sqlite, postgres or both")
 
-func testEnv(t *testing.T) *isolation.Env {
+func TestMain(m *testing.M) {
+	flag.Parse()
+	switch *storeFlag {
+	case "postgres", "both":
+		storetest.EnablePostgres()
+	}
+	if os.Getenv("ORCON_TEST_POSTGRES") == "1" || storetest.PostgresEnabled() {
+		// The container client keeps goroutines of its own for the whole run.
+		_ = runWithPostgres(m) // the test wrapper takes the exit code from m.Run
+		return
+	}
+	goleak.VerifyTestMain(m)
+}
+
+// selectedStores returns the stores this run covers.
+func selectedStores(t *testing.T) []isolation.Store {
 	t.Helper()
-	store, err := isolation.ParseStore(*storeFlag)
+	stores, err := isolation.ParseStores(*storeFlag, storetest.PostgresEnabled() || os.Getenv("ORCON_TEST_POSTGRES") == "1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := isolation.NewEnv(store, isolation.RLSOnly)
-	if err != nil {
-		t.Fatal(err)
+	return stores
+}
+
+func factoryOf(t *testing.T, st isolation.Store) storetest.Factory {
+	t.Helper()
+	if st == isolation.StorePostgres {
+		return storetest.PostgresFactory()
 	}
-	return env
+	return storetest.SQLiteFactory()
 }
 
 // fakeSurface is a surface with fixed contents.
@@ -45,15 +74,65 @@ func TestRegistryComplete(t *testing.T) {
 	for _, s := range reg.Orphans(isolation.DefaultSurface) {
 		t.Errorf("the isolation case for %s has no route or store method; remove it", s)
 	}
+	if len(isolation.DefaultSurface.StoreMethods()) == 0 {
+		t.Error("the surface has no store methods: the registry would be complete by being empty")
+	}
 }
 
-// TestCrossOrgSmoke runs every registered case for the chosen store.
-func TestCrossOrgSmoke(t *testing.T) {
-	env := testEnv(t)
-	if env.A.ID == env.B.ID || env.A.Sentinel("x") == env.B.Sentinel("x") {
-		t.Fatalf("organizations A and B are not distinct: %+v %+v", env.A, env.B)
+// TestSurfaceIsEverythingTheAdaptersImplement ties the surface to the adapters: the methods
+// of the SQLite store and of the PostgreSQL store that implement ports are exactly the
+// methods the battery has a case for.
+func TestSurfaceIsEverythingTheAdaptersImplement(t *testing.T) {
+	want := append(isolation.StoreSurface{}.StoreMethods(), isolation.UncoveredStoreMethods...)
+	slices.Sort(want)
+	for adapter, got := range storetest.PortMethodNames() {
+		if !slices.Equal(got, want) {
+			t.Errorf("the %s store implements %v; the isolation surface is %v (add the port to isolation.Stores and write its cases)", adapter, got, want)
+		}
 	}
-	isolation.BuildRegistry().Run(t.Context(), t, env)
+}
+
+// TestCrossOrgSmoke runs every registered case for the chosen stores, each on a fresh
+// database seeded with organizations A and B.
+func TestCrossOrgSmoke(t *testing.T) {
+	if isolation.RLSOnly {
+		t.Skip("the rls-only mode needs the test hook that switches the filter of wall 1 off, which the full battery cut (SPEC-004 SE17) delivers; running the cases here would not test wall 3 alone")
+	}
+	reg := isolation.BuildRegistry()
+	for _, st := range selectedStores(t) {
+		t.Run(string(st), func(t *testing.T) {
+			newStore := factoryOf(t, st)
+			reg.Run(t.Context(), t, func(t *testing.T) *isolation.Env {
+				t.Helper()
+				env := isolation.Seed(t.Context(), t, newStore(t), st, isolation.RLSOnly)
+				if env.A.ID == env.B.ID || env.A.Sentinel("x") == env.B.Sentinel("x") {
+					t.Fatalf("organizations A and B are not distinct: %+v %+v", env.A.ID, env.B.ID)
+				}
+				return env
+			})
+		})
+	}
+}
+
+// TestSeededOrganizationsAreIndependent checks the harness itself: what Seed stores for A
+// is invisible under B's scope and the other way round, so the cases start from isolation
+// that already holds for reads they did not write.
+func TestSeededOrganizationsAreIndependent(t *testing.T) {
+	for _, st := range selectedStores(t) {
+		t.Run(string(st), func(t *testing.T) {
+			env := isolation.Seed(t.Context(), t, factoryOf(t, st)(t), st, false)
+			ctx := t.Context()
+			if got, err := env.Stores.GetFlow(ctx, env.A.Scope, env.A.Flow.ID); err != nil || got.Name != env.A.Sentinel("flow-name") {
+				t.Errorf("A's flow under A's scope = %+v, %v", got, err)
+			}
+			if got, err := env.Stores.GetFlow(ctx, env.B.Scope, env.A.Flow.ID); err == nil {
+				t.Errorf("A's flow under B's scope = %+v", got)
+			}
+			if got, err := env.Stores.GetFlow(ctx, env.A.Scope, env.B.Flow.ID); err == nil {
+				t.Errorf("B's flow under A's scope = %+v", got)
+			}
+		})
+	}
 }
 
 func TestRegistryDetectsMissingAndOrphanCases(t *testing.T) {
@@ -129,7 +208,7 @@ func TestRegistryRunsEveryCase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	reg.Run(t.Context(), t, env)
+	reg.Run(t.Context(), t, func(*testing.T) *isolation.Env { return env })
 	if got := strings.Join(ran, ""); got != "AB" {
 		t.Errorf("cases ran as %q, want AB (sorted)", got)
 	}
@@ -156,6 +235,30 @@ func TestParseStore(t *testing.T) {
 		if _, err := isolation.ParseStore(bad); !errors.Is(err, isolation.ErrUnknownStore) {
 			t.Errorf("ParseStore(%q): err = %v, want ErrUnknownStore", bad, err)
 		}
+	}
+}
+
+func TestParseStores(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		in        string
+		available bool
+		want      string
+	}{
+		{"sqlite", false, "sqlite"}, {"postgres", true, "postgres"}, {"both", false, "sqlite,postgres"},
+		{"auto", false, "sqlite"}, {"auto", true, "sqlite,postgres"},
+	} {
+		got, err := isolation.ParseStores(tc.in, tc.available)
+		var names []string
+		for _, s := range got {
+			names = append(names, string(s))
+		}
+		if err != nil || strings.Join(names, ",") != tc.want {
+			t.Errorf("ParseStores(%q, %v) = %v, %v; want %s", tc.in, tc.available, names, err, tc.want)
+		}
+	}
+	if _, err := isolation.ParseStores("mysql", false); !errors.Is(err, isolation.ErrUnknownStore) {
+		t.Errorf("ParseStores(mysql): err = %v, want ErrUnknownStore", err)
 	}
 }
 

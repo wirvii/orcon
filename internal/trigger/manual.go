@@ -10,6 +10,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // ManualSource says which content a manual run executes.
@@ -25,7 +26,7 @@ const (
 
 // ManualCommand asks for a manual run of a flow.
 type ManualCommand struct {
-	Org    identity.OrgID
+	Org    orgscope.Org
 	Flow   flow.FlowID
 	Source ManualSource
 	// Node is the start event to enter through. It may be empty when the flow
@@ -82,7 +83,7 @@ func (s *Service) PrepareManualRun(ctx context.Context, cmd ManualCommand) (Manu
 }
 
 // snapshotDraft validates the draft and freezes it as a snapshot.
-func (s *Service) snapshotDraft(ctx context.Context, doc *flow.Document, org identity.OrgID, flowID flow.FlowID, run *ManualRun) error {
+func (s *Service) snapshotDraft(ctx context.Context, doc *flow.Document, org orgscope.Org, flowID flow.FlowID, run *ManualRun) error {
 	var report flow.Report
 	if s.nodeTypes != nil {
 		report = flow.ValidateWithTypes(ctx, doc, s.nodeTypes)
@@ -101,8 +102,8 @@ func (s *Service) snapshotDraft(ctx context.Context, doc *flow.Document, org ide
 	if err != nil {
 		return fmt.Errorf("encode the snapshot: %w", err)
 	}
-	rec, err := s.flows.CreateSnapshot(ctx, flow.SnapshotRecord{
-		ID: flow.FlowSnapshotID(s.ids.New()), OrgID: org, FlowID: flowID, ContentHash: hash.String(),
+	rec, err := s.flows.CreateSnapshot(ctx, org, flow.SnapshotRecord{
+		ID: flow.FlowSnapshotID(s.ids.New()), OrgID: identity.OrgID(org.UUID()), FlowID: flowID, ContentHash: hash.String(),
 		Document: raw, CreatedAt: s.clock.Now().UTC(),
 	})
 	if err != nil {
