@@ -80,6 +80,11 @@ export async function mockDraftApi(page: Page): Promise<void> {
 
   await page.route('**/api/v1/flows/*/draft', async (route) => {
     const flowId = flowIdOf(route.request().url());
+    // The real server refuses a protected route that names no organization: the editor must send Orcon-Org (BL-130).
+    if (route.request().headers()['orcon-org'] !== acme.id) {
+      await route.fulfill(problemBody(403, 'Forbidden', 'forbidden'));
+      return;
+    }
     const draft = drafts.get(flowId);
     if (draft === undefined) {
       await route.fulfill(problemBody(404, 'Flow not found', 'not-found'));
