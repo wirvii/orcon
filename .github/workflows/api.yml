@@ -19,8 +19,29 @@ concurrency:
   group: api-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  api-contract:
+  # changes computes the areas the change touches (scripts/ci-changes.sh). Jobs below use
+  # job-level `if:` on its outputs and never a workflow-level paths filter: a skipped job
+  # counts as passed for a required check. Any doubt runs everything.
+  changes:
     if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.areas.outputs.go }}
+      web: ${{ steps.areas.outputs.web }}
+      api: ${{ steps.areas.outputs.api }}
+      skills: ${{ steps.areas.outputs.skills }}
+      docs: ${{ steps.areas.outputs.docs }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: areas
+        uses: ./.github/actions/changes
+
+  api-contract:
+    needs: changes
+    if: (needs.changes.outputs.go == 'true') && (github.ref_type != 'tag')
     runs-on: ubuntu-latest
     steps:
       # Full history: api-compat reads the last release tag and its contract.
