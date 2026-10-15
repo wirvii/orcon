@@ -14,6 +14,7 @@ import (
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Config holds the dependencies of a [Service].
@@ -79,7 +80,7 @@ func New(cfg Config) (*Service, error) {
 
 // PublishCommand asks to publish the draft of a flow.
 type PublishCommand struct {
-	Org  identity.OrgID
+	Org  orgscope.Org
 	Flow flow.FlowID
 	By   identity.PrincipalID
 	// ExpectedDraftRevision, when set, makes the publication fail with
@@ -93,7 +94,7 @@ type PublishCommand struct {
 // RollbackCommand asks to republish the content of an earlier version as the
 // next one (R-ACT-04).
 type RollbackCommand struct {
-	Org  identity.OrgID
+	Org  orgscope.Org
 	Flow flow.FlowID
 	By   identity.PrincipalID
 	// ToVersion is the number of the version whose content is republished.
@@ -163,7 +164,7 @@ func (s *Service) Rollback(ctx context.Context, cmd RollbackCommand) (Published,
 
 // publication is one publication in progress.
 type publication struct {
-	org           identity.OrgID
+	org           orgscope.Org
 	flowID        flow.FlowID
 	by            identity.PrincipalID
 	rec           flow.Record
@@ -302,7 +303,7 @@ func (s *Service) insertVersion(ctx context.Context, tx Tx, p *publication, pre 
 		return flow.VersionRecord{}, err
 	}
 	version := flow.VersionRecord{
-		ID: flow.FlowVersionID(s.ids.New()), OrgID: p.org, FlowID: p.flowID, Number: number,
+		ID: flow.FlowVersionID(s.ids.New()), OrgID: identity.OrgID(p.org.UUID()), FlowID: p.flowID, Number: number,
 		Document: pre.document, ContentHash: pre.hash.String(),
 		PublishedByPrincipalID: p.by, PublishedAt: now, CreatedAt: now,
 		ConnectorReferences: s.connectorReferences(&pre.doc),
@@ -341,7 +342,7 @@ func mergeReports(r flow.Report, extra []flow.Issue) flow.Report {
 }
 
 // ruleContext reads what rule T-V4 compares the draft with: the live version.
-func (s *Service) ruleContext(ctx context.Context, org identity.OrgID, rec flow.Record, allowImported bool) (*ruleContext, error) {
+func (s *Service) ruleContext(ctx context.Context, org orgscope.Org, rec flow.Record, allowImported bool) (*ruleContext, error) {
 	rc := &ruleContext{org: org, project: rec.ProjectID, allowImportedAddressChange: allowImported}
 	if rec.ActiveVersionID.IsZero() {
 		return rc, nil
@@ -381,7 +382,7 @@ func (s *Service) documentReport(ctx context.Context, doc *flow.Document, rc *ru
 // Validate runs, without publishing, every check publication would run on the
 // draft, including whether its addresses are free. The report is the answer;
 // the error is only for a failure to check.
-func (s *Service) Validate(ctx context.Context, org identity.OrgID, flowID flow.FlowID) (flow.Report, error) {
+func (s *Service) Validate(ctx context.Context, org orgscope.Org, flowID flow.FlowID) (flow.Report, error) {
 	rec, err := s.flows.GetFlow(ctx, org, flowID)
 	if err != nil {
 		return flow.Report{}, fmt.Errorf("validate flow %s: %w", flowID, err)
@@ -431,7 +432,7 @@ func (s *Service) Validate(ctx context.Context, org identity.OrgID, flowID flow.
 
 // syncRegistry brings the registry entries of the flow in line with the specs
 // of the version just published (ADR-0024 sections 2 and 3).
-func (s *Service) syncRegistry(ctx context.Context, tx Tx, org identity.OrgID, flowID flow.FlowID, activation flow.ActivationState, version flow.FlowVersionID, specs []Spec, now time.Time) error {
+func (s *Service) syncRegistry(ctx context.Context, tx Tx, org orgscope.Org, flowID flow.FlowID, activation flow.ActivationState, version flow.FlowVersionID, specs []Spec, now time.Time) error {
 	existing, err := tx.ListTriggers(ctx, flowID)
 	if err != nil {
 		return err
@@ -478,7 +479,7 @@ func (s *Service) syncRegistry(ctx context.Context, tx Tx, org identity.OrgID, f
 
 // triggerWrite carries what every entry written by one publication shares.
 type triggerWrite struct {
-	org     identity.OrgID
+	org     orgscope.Org
 	flowID  flow.FlowID
 	version flow.FlowVersionID
 	status  Status
@@ -490,7 +491,7 @@ type triggerWrite struct {
 func (s *Service) upsertTrigger(ctx context.Context, tx Tx, w *triggerWrite, have *Trigger, spec *Spec) (*Trigger, error) {
 	if have == nil {
 		t := Trigger{
-			ID: ID(s.ids.New()), OrgID: w.org, FlowID: w.flowID, NodeID: spec.NodeID,
+			ID: ID(s.ids.New()), OrgID: identity.OrgID(w.org.UUID()), FlowID: w.flowID, NodeID: spec.NodeID,
 			Family: spec.Family, Type: spec.Type, ConfigurationHash: spec.ConfigurationHash,
 			FlowVersionID: w.version, Status: w.status, Health: HealthOK, CreatedAt: w.now, UpdatedAt: w.now,
 		}
@@ -507,7 +508,7 @@ func (s *Service) upsertTrigger(ctx context.Context, tx Tx, w *triggerWrite, hav
 // syncAddresses makes the production addresses of an entry the desired ones:
 // new ones are inserted, kept ones are left alone, changed ones are updated,
 // and the ones no longer wanted are retired with a grace period.
-func (s *Service) syncAddresses(ctx context.Context, tx Tx, org identity.OrgID, t *Trigger, desired []AddressSpec, now time.Time) error {
+func (s *Service) syncAddresses(ctx context.Context, tx Tx, org orgscope.Org, t *Trigger, desired []AddressSpec, now time.Time) error {
 	current, err := tx.ListAddresses(ctx, t.ID)
 	if err != nil {
 		return err
@@ -539,10 +540,10 @@ func (s *Service) syncAddresses(ctx context.Context, tx Tx, org identity.OrgID, 
 
 // reconcileAddress inserts the wanted address when there is none, and
 // otherwise brings the stored one in line with it.
-func (s *Service) reconcileAddress(ctx context.Context, tx Tx, org identity.OrgID, t *Trigger, have *Address, want *AddressSpec, now time.Time) error {
+func (s *Service) reconcileAddress(ctx context.Context, tx Tx, org orgscope.Org, t *Trigger, have *Address, want *AddressSpec, now time.Time) error {
 	if have == nil {
 		a := Address{
-			ID: AddressID(s.ids.New()), OrgID: org, TriggerID: t.ID, Family: want.Family, Scope: ScopeProduction,
+			ID: AddressID(s.ids.New()), OrgID: identity.OrgID(org.UUID()), TriggerID: t.ID, Family: want.Family, Scope: ScopeProduction,
 			Pattern: want.Pattern, StaticPrefix: want.StaticPrefix, RandomSuffix: want.RandomSuffix,
 			ResponseProfile: want.ResponseProfile, Status: AddressActive, CreatedAt: now, UpdatedAt: now,
 			Methods: s.newMethods(want.Methods),
@@ -584,7 +585,7 @@ func sameStrings(a, b []string) bool {
 
 // appendEvent writes one event of the trigger stream; the members of its data
 // document come from data, and the id and the instant are the service's.
-func (s *Service) appendEvent(ctx context.Context, tx Tx, org identity.OrgID, flowID flow.FlowID, node flow.NodeID, eventType string, now time.Time, data map[string]jsonvalue.Value) error {
+func (s *Service) appendEvent(ctx context.Context, tx Tx, org orgscope.Org, flowID flow.FlowID, node flow.NodeID, eventType string, now time.Time, data map[string]jsonvalue.Value) error {
 	members := make([]jsonvalue.Member, 0, len(data))
 	for _, key := range sortedKeys(data) {
 		members = append(members, jsonvalue.Member{Key: key, Value: data[key]})
@@ -598,6 +599,6 @@ func (s *Service) appendEvent(ctx context.Context, tx Tx, org identity.OrgID, fl
 		return fmt.Errorf("encode the data of event %s: %w", eventType, err)
 	}
 	return tx.AppendEvent(ctx, Event{
-		ID: EventID(s.ids.New()), OrgID: org, OccurredAt: now, FlowID: flowID, NodeID: node, Type: eventType, Data: raw,
+		ID: EventID(s.ids.New()), OrgID: identity.OrgID(org.UUID()), OccurredAt: now, FlowID: flowID, NodeID: node, Type: eventType, Data: raw,
 	})
 }

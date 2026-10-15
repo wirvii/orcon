@@ -10,6 +10,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Store is the storage port of the trigger area. It runs a unit of work in one
@@ -23,9 +24,9 @@ type Store interface {
 	// Atomic runs fn in one read-write transaction scoped to org. When fn
 	// returns an error the transaction is rolled back and Atomic returns that
 	// error; storage errors are mapped to the errors of the flow area.
-	Atomic(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx Tx) error) error
+	Atomic(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
 	// Read runs fn on one consistent read-only view scoped to org.
-	Read(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx Tx) error) error
+	Read(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
 }
 
 // Tx is one transaction of a [Store], bound to an organization. Every method
@@ -123,16 +124,16 @@ type RoutePage struct {
 // outside a lifecycle transaction. The adapters of the flow area implement it.
 type FlowSource interface {
 	// GetFlow returns a non-deleted flow, or flow.ErrNotFound.
-	GetFlow(ctx context.Context, org identity.OrgID, flowID flow.FlowID) (flow.Record, error)
+	GetFlow(ctx context.Context, org orgscope.Org, flowID flow.FlowID) (flow.Record, error)
 	// GetVersion returns a version by identity, or flow.ErrVersionNotFound.
-	GetVersion(ctx context.Context, org identity.OrgID, version flow.FlowVersionID) (flow.VersionRecord, error)
+	GetVersion(ctx context.Context, org orgscope.Org, version flow.FlowVersionID) (flow.VersionRecord, error)
 	// GetVersionByNumber returns a version of the flow by its number, or
 	// flow.ErrVersionNotFound.
-	GetVersionByNumber(ctx context.Context, org identity.OrgID, flowID flow.FlowID, number int64) (flow.VersionRecord, error)
+	GetVersionByNumber(ctx context.Context, org orgscope.Org, flowID flow.FlowID, number int64) (flow.VersionRecord, error)
 	// CreateSnapshot stores a snapshot, or returns the one with the same hash.
-	CreateSnapshot(ctx context.Context, s flow.SnapshotRecord) (flow.SnapshotRecord, error)
+	CreateSnapshot(ctx context.Context, org orgscope.Org, s flow.SnapshotRecord) (flow.SnapshotRecord, error)
 	// GetProject returns one project of the organization, or flow.ErrNotFound.
-	GetProject(ctx context.Context, org identity.OrgID, project identity.ProjectID) (flow.ProjectRecord, error)
+	GetProject(ctx context.Context, org orgscope.Org, project identity.ProjectID) (identity.ProjectRecord, error)
 }
 
 // Delivery is the guarantee a source gives about delivering an event
@@ -183,7 +184,7 @@ type Catalog interface {
 type Credentials interface {
 	// Missing returns the credentials the node refers to that the project
 	// cannot use, as names fit to show a person; empty if none.
-	Missing(ctx context.Context, org identity.OrgID, project identity.ProjectID, nodeType string, parameters jsonvalue.Value) ([]string, error)
+	Missing(ctx context.Context, org orgscope.Org, project identity.ProjectID, nodeType string, parameters jsonvalue.Value) ([]string, error)
 }
 
 // Settings are the instance settings the trigger rules read.
@@ -208,7 +209,7 @@ const (
 // ManualRun is a manual run ready to start: the revision to execute, in mode
 // [ModeManual], without deduplication or cap (R-INT-01).
 type ManualRun struct {
-	Org    identity.OrgID
+	Org    orgscope.Org
 	FlowID flow.FlowID
 	// Node is the start event the run enters through.
 	Node flow.NodeID

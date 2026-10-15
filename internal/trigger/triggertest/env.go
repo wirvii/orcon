@@ -18,6 +18,7 @@ import (
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
 
@@ -30,7 +31,9 @@ type Factory func(t *testing.T) Backend
 var Start = time.Date(2026, 10, 13, 9, 30, 15, 0, time.UTC)
 
 // env is one scenario: a backend, a service over it, and two organizations
-// with a project each.
+// with a project each. The organizations are named twice: by identity, for the
+// rows the scenario writes, and by scope, which every store method and every
+// service command takes.
 type env struct {
 	t       *testing.T
 	b       Backend
@@ -41,6 +44,8 @@ type env struct {
 	svc     *trigger.Service
 	orgA    identity.OrgID
 	orgB    identity.OrgID
+	scopeA  orgscope.Org
+	scopeB  orgscope.Org
 	projA   identity.ProjectID
 	projB   identity.ProjectID
 	user    identity.PrincipalID
@@ -49,6 +54,9 @@ type env struct {
 func newEnv(t *testing.T, f Factory, settings trigger.Settings) *env {
 	t.Helper()
 	e := &env{t: t, b: f(t), clock: clock.NewFake(Start), ids: id.NewSequence(), creds: &Credentials{}, starter: &RecordingStarter{}}
+	if e.b.Scope == nil {
+		t.Fatal("the backend has no Scope: the battery cannot make the scopes of its organizations")
+	}
 	svc, err := trigger.New(trigger.Config{
 		Store: e.b.Triggers, Flows: e.b.Flows, Catalog: DefaultCatalog(), Credentials: e.creds,
 		Settings: settings, Starter: e.starter, Clock: e.clock, IDs: e.ids,
@@ -59,9 +67,10 @@ func newEnv(t *testing.T, f Factory, settings trigger.Settings) *env {
 	e.svc = svc
 	ctx := e.ctx()
 	e.user = identity.PrincipalID(e.ids.New())
-	must(t, "create the principal", e.b.Flows.CreatePrincipal(ctx, flow.PrincipalRecord{ID: e.user, Kind: flow.PrincipalUser, CreatedAt: Start, UpdatedAt: Start}))
+	must(t, "create the principal", e.b.Flows.CreatePrincipal(ctx, identity.PrincipalRecord{ID: e.user, Kind: identity.PrincipalUser, CreatedAt: Start, UpdatedAt: Start}))
 	e.orgA, e.projA = e.organization("org-a")
 	e.orgB, e.projB = e.organization("org-b")
+	e.scopeA, e.scopeB = e.b.Scope(e.orgA), e.b.Scope(e.orgB)
 	return e
 }
 
@@ -70,26 +79,26 @@ func (e *env) ctx() context.Context { return e.t.Context() }
 func (e *env) organization(slug string) (identity.OrgID, identity.ProjectID) {
 	e.t.Helper()
 	org := identity.OrgID(e.ids.New())
-	must(e.t, "create organization "+slug, e.b.Flows.CreateOrganization(e.ctx(), flow.OrgRecord{
-		ID: org, Name: slug, Slug: slug, Status: flow.OrgActive, CreatedAt: Start, UpdatedAt: Start,
+	must(e.t, "create organization "+slug, e.b.Flows.CreateOrganization(e.ctx(), identity.OrgRecord{
+		ID: org, Name: slug, Slug: slug, Status: identity.OrgActive, CreatedAt: Start, UpdatedAt: Start,
 	}))
 	project := identity.ProjectID(e.ids.New())
-	must(e.t, "create the project of "+slug, e.b.Flows.CreateProject(e.ctx(), flow.ProjectRecord{
+	must(e.t, "create the project of "+slug, e.b.Flows.CreateProject(e.ctx(), e.b.Scope(org), identity.ProjectRecord{
 		ID: project, OrgID: org, Name: "Alpha", Slug: "alpha", Environment: "development", IsProtected: true, CreatedAt: Start, UpdatedAt: Start,
 	}))
 	return org, project
 }
 
 // newFlow creates a flow whose draft is the document.
-func (e *env) newFlow(org identity.OrgID, project identity.ProjectID, name string, draft []byte) flow.FlowID {
+func (e *env) newFlow(org orgscope.Org, project identity.ProjectID, name string, draft []byte) flow.FlowID {
 	e.t.Helper()
-	rec := flow.Record{ID: flow.FlowID(e.ids.New()), OrgID: org, ProjectID: project, Name: name, Draft: draft, CreatedAt: Start, UpdatedAt: Start}
-	must(e.t, "create flow "+name, e.b.Flows.CreateFlow(e.ctx(), rec))
+	rec := flow.Record{ID: flow.FlowID(e.ids.New()), OrgID: identity.OrgID(org.UUID()), ProjectID: project, Name: name, Draft: draft, CreatedAt: Start, UpdatedAt: Start}
+	must(e.t, "create flow "+name, e.b.Flows.CreateFlow(e.ctx(), org, rec))
 	return rec.ID
 }
 
 // saveDraft replaces the draft at its current revision.
-func (e *env) saveDraft(org identity.OrgID, flowID flow.FlowID, draft []byte) {
+func (e *env) saveDraft(org orgscope.Org, flowID flow.FlowID, draft []byte) {
 	e.t.Helper()
 	rec, err := e.b.Flows.GetFlow(e.ctx(), org, flowID)
 	must(e.t, "read the flow", err)
@@ -97,21 +106,21 @@ func (e *env) saveDraft(org identity.OrgID, flowID flow.FlowID, draft []byte) {
 	must(e.t, "save the draft", err)
 }
 
-func (e *env) publish(org identity.OrgID, flowID flow.FlowID) trigger.Published {
+func (e *env) publish(org orgscope.Org, flowID flow.FlowID) trigger.Published {
 	e.t.Helper()
 	p, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: org, Flow: flowID, By: e.user})
 	must(e.t, "publish", err)
 	return p
 }
 
-func (e *env) triggers(org identity.OrgID, flowID flow.FlowID) []trigger.Trigger {
+func (e *env) triggers(org orgscope.Org, flowID flow.FlowID) []trigger.Trigger {
 	e.t.Helper()
 	st, err := e.svc.Status(e.ctx(), org, flowID)
 	must(e.t, "status", err)
 	return st.Triggers
 }
 
-func (e *env) addresses(org identity.OrgID, id trigger.ID) []trigger.Address {
+func (e *env) addresses(org orgscope.Org, id trigger.ID) []trigger.Address {
 	e.t.Helper()
 	var out []trigger.Address
 	must(e.t, "list addresses", e.b.Triggers.Read(e.ctx(), org, func(ctx context.Context, tx trigger.Tx) error {
@@ -123,7 +132,7 @@ func (e *env) addresses(org identity.OrgID, id trigger.ID) []trigger.Address {
 }
 
 // addressesByPattern indexes the addresses of an entry by their path.
-func (e *env) addressesByPattern(org identity.OrgID, id trigger.ID) map[string]*trigger.Address {
+func (e *env) addressesByPattern(org orgscope.Org, id trigger.ID) map[string]*trigger.Address {
 	e.t.Helper()
 	list := e.addresses(org, id)
 	out := make(map[string]*trigger.Address, len(list))
@@ -133,7 +142,7 @@ func (e *env) addressesByPattern(org identity.OrgID, id trigger.ID) map[string]*
 	return out
 }
 
-func (e *env) events(org identity.OrgID, flowID flow.FlowID) []trigger.Event {
+func (e *env) events(org orgscope.Org, flowID flow.FlowID) []trigger.Event {
 	e.t.Helper()
 	var out []trigger.Event
 	must(e.t, "list events", e.b.Triggers.Read(e.ctx(), org, func(ctx context.Context, tx trigger.Tx) error {

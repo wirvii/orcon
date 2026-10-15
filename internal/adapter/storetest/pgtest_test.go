@@ -4,15 +4,15 @@
 package storetest_test
 
 // The PostgreSQL half of the suite needs a server; see the same helper in
-// internal/adapter/postgres/pgtest_test.go for the environment variables.
+// internal/adapter/postgres/pgtest_test.go for the environment variables. The
+// container is started here, in a test file, and handed to storetest, which creates
+// a database per test (pgserver.go). test/isolation has the same starter in its own
+// test files.
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -20,47 +20,43 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/wirvii/orcon/internal/adapter/storetest"
 )
 
 const defaultImage = "postgres:17"
 
-var server struct {
-	enabled  bool
-	adminDSN string
-	err      error
+func enablePostgres()       { storetest.EnablePostgres() }
+func postgresEnabled() bool { return storetest.PostgresEnabled() }
+
+func newPostgresDatabase(tb testing.TB) string {
+	tb.Helper()
+	return storetest.NewPostgresDatabase(tb)
 }
 
-// enablePostgres turns the PostgreSQL tests on regardless of the environment, for a
-// test run that asked for PostgreSQL explicitly (-store=postgres). Call it
-// before [Run].
-func enablePostgres() { server.enabled = true }
-
-// postgresEnabled reports whether this run has a PostgreSQL server.
-func postgresEnabled() bool { return server.enabled }
-
 // runWithPostgres starts the server when the PostgreSQL tests are on, runs the tests and
-// stops the server. Use it as the body of TestMain.
-func runWithPostgres(m *testing.M) {
+// stops the server. Use it as the body of TestMain; it returns the exit code of m.Run.
+func runWithPostgres(m *testing.M) int {
 	if os.Getenv("ORCON_TEST_POSTGRES") == "1" {
-		server.enabled = true
+		storetest.EnablePostgres()
 	}
-	if !server.enabled {
-		m.Run()
-		return
+	if !storetest.PostgresEnabled() {
+		return m.Run()
 	}
 	stop := func() {}
 	if dsn := os.Getenv("ORCON_TEST_POSTGRES_DSN"); dsn != "" {
-		server.adminDSN = dsn
+		storetest.UsePostgresServer(dsn, nil)
 		announce(dsn)
 	} else {
 		dsn, terminate, err := startContainer(os.Getenv("ORCON_TEST_POSTGRES_IMAGE"))
-		server.adminDSN, server.err = dsn, err
+		storetest.UsePostgresServer(dsn, err)
 		if terminate != nil {
 			stop = terminate
 		}
 	}
-	m.Run()
+	code := m.Run()
 	stop()
+	return code
 }
 
 func startContainer(image string) (dsn string, terminate func(), err error) {
@@ -94,58 +90,6 @@ func startContainer(image string) (dsn string, terminate func(), err error) {
 		return "", terminate, err
 	}
 	return "postgres://postgres:postgres@" + net.JoinHostPort(host, port.Port()) + "/postgres?sslmode=disable", terminate, nil
-}
-
-// requirePostgres skips the test when PostgreSQL tests are off and fails it when they
-// are on but the server could not start.
-func requirePostgres(tb testing.TB) {
-	tb.Helper()
-	if !server.enabled {
-		tb.Skip("PostgreSQL tests are off: set ORCON_TEST_POSTGRES=1 (make test-postgres)")
-	}
-	if server.err != nil {
-		tb.Fatalf("PostgreSQL is enabled but unavailable: %v", server.err)
-	}
-}
-
-// newPostgresDatabase creates a database with a unique name, drops it when the test
-// ends and returns the connection string of a superuser on it. The cluster
-// roles of the engine are created by the first migration, not here.
-func newPostgresDatabase(tb testing.TB) string {
-	tb.Helper()
-	requirePostgres(tb)
-	ctx := tb.Context()
-	admin, err := pgx.Connect(ctx, server.adminDSN)
-	if err != nil {
-		tb.Fatalf("connect to the PostgreSQL server: %v", err)
-	}
-	defer admin.Close(context.WithoutCancel(ctx)) //nolint:errcheck // closing the admin connection cannot fail a test
-	var suffix [6]byte
-	if _, err := rand.Read(suffix[:]); err != nil {
-		tb.Fatal(err)
-	}
-	name := "orcon_" + hex.EncodeToString(suffix[:])
-	if _, err := admin.Exec(ctx, "CREATE DATABASE "+name+" TEMPLATE template0"); err != nil {
-		tb.Fatalf("create database: %v", err)
-	}
-	tb.Cleanup(func() {
-		cleanup := context.WithoutCancel(ctx)
-		c, err := pgx.Connect(cleanup, server.adminDSN)
-		if err != nil {
-			tb.Errorf("drop %s: %v", name, err)
-			return
-		}
-		defer c.Close(cleanup) //nolint:errcheck // closing the admin connection cannot fail a test
-		if _, err := c.Exec(cleanup, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
-			tb.Errorf("drop %s: %v", name, err)
-		}
-	})
-	u, err := url.Parse(server.adminDSN)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	u.Path = "/" + name
-	return u.String()
 }
 
 func announce(dsn string) {

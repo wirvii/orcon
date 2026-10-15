@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	}
 	if os.Getenv("ORCON_TEST_POSTGRES") == "1" || postgresEnabled() {
 		// The container client keeps goroutines of its own for the whole run.
-		runWithPostgres(m)
+		_ = runWithPostgres(m) // the test wrapper takes the exit code from m.Run
 		return
 	}
 	goleak.VerifyTestMain(m)
@@ -38,6 +38,19 @@ func TestMain(m *testing.M) {
 
 func wantSQLite() bool   { return *storeFlag != "postgres" }
 func wantPostgres() bool { return *storeFlag != "sqlite" }
+
+// forEachStore runs fn as a subtest per selected store, with a factory of fresh
+// stores of that kind. Tests named in a criterion use it, so one command selects
+// the store through -args -store=.
+func forEachStore(t *testing.T, fn func(t *testing.T, newStore storetest.Factory)) {
+	t.Helper()
+	if wantSQLite() {
+		t.Run("sqlite", func(t *testing.T) { fn(t, sqliteFactory()) })
+	}
+	if wantPostgres() {
+		t.Run("postgres", func(t *testing.T) { fn(t, postgresFactory()) })
+	}
+}
 
 // TestConformance runs the shared battery against the selected stores
 // (E-STO-1: the same battery passes on SQLite and PostgreSQL).

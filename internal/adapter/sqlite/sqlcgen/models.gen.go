@@ -11,6 +11,16 @@ import (
 	"database/sql"
 )
 
+type ApplicationUser struct {
+	ID              []byte
+	PrincipalID     []byte
+	EmailNormalized string
+	DisplayName     string
+	Status          string
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
 type AttentionRequest struct {
 	ID                        []byte
 	OrgID                     []byte
@@ -430,6 +440,16 @@ type LimitBucket struct {
 	UpdatedAt       int64
 }
 
+type Membership struct {
+	ID                   []byte
+	OrgID                []byte
+	ApplicationUserID    []byte
+	Status               string
+	InvitedByPrincipalID []byte
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
 type MergeTracker struct {
 	ID                      []byte
 	OrgID                   []byte
@@ -610,6 +630,7 @@ type Project struct {
 	IsProtected int64
 	CreatedAt   int64
 	UpdatedAt   int64
+	Handle      sql.NullString
 }
 
 type SchemaMigration struct {

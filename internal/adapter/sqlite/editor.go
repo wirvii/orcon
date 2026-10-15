@@ -15,6 +15,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow/editor"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // editorBool stores a boolean as 0 or 1 (orcon-db TY-1).
@@ -206,10 +207,14 @@ func editingSessionFrom(row *sqlcgen.FlowEditingSession) (editor.EditingSession,
 }
 
 // InsertNodeTestData implements [editor.Store].
-func (s *Store) InsertNodeTestData(ctx context.Context, d editor.NodeTestData) error {
+func (s *Store) InsertNodeTestData(ctx context.Context, org orgscope.Org, d editor.NodeTestData) error {
 	return s.write(ctx, "insert node test data", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, d.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.InsertNodeTestData(ctx, sqlcgen.InsertNodeTestDataParams{
-			ID: uuidBytes(d.ID), OrgID: uuidBytes(d.OrgID), FlowID: uuidBytes(d.FlowID), NodeID: d.NodeID,
+			ID: uuidBytes(d.ID), OrgID: scope, FlowID: uuidBytes(d.FlowID), NodeID: d.NodeID,
 			SourceKind: d.SourceKind, OutputDocument: d.OutputDocument,
 			OutputDocumentFormat: nullEditorFormat(d.OutputDocument, editor.NodeTestOutputFormat),
 			BlobID:               nullUUIDBytes(d.BlobID), ItemCount: d.ItemCount, SizeBytes: d.SizeBytes,
@@ -220,10 +225,14 @@ func (s *Store) InsertNodeTestData(ctx context.Context, d editor.NodeTestData) e
 }
 
 // GetNodeTestData implements [editor.Store].
-func (s *Store) GetNodeTestData(ctx context.Context, org identity.OrgID, dataID id.UUID) (editor.NodeTestData, error) {
+func (s *Store) GetNodeTestData(ctx context.Context, org orgscope.Org, dataID id.UUID) (editor.NodeTestData, error) {
 	var out editor.NodeTestData
 	err := s.read(ctx, "get node test data", func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetNodeTestData(ctx, uuidBytes(org), uuidBytes(dataID))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		row, err := q.GetNodeTestData(ctx, scope, uuidBytes(dataID))
 		if err != nil {
 			return err
 		}
@@ -234,11 +243,15 @@ func (s *Store) GetNodeTestData(ctx context.Context, org identity.OrgID, dataID 
 }
 
 // ListNodeTestDataForNode implements [editor.Store].
-func (s *Store) ListNodeTestDataForNode(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string, limit int) ([]editor.NodeTestData, error) {
+func (s *Store) ListNodeTestDataForNode(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string, limit int) ([]editor.NodeTestData, error) {
 	var out []editor.NodeTestData
 	err := s.read(ctx, "list node test data", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
 		rows, err := q.ListNodeTestDataForNode(ctx, sqlcgen.ListNodeTestDataForNodeParams{
-			OrgID: uuidBytes(org), FlowID: uuidBytes(flowID), NodeID: nodeID, PageSize: clampPage(limit),
+			OrgID: scope, FlowID: uuidBytes(flowID), NodeID: nodeID, PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err
@@ -256,10 +269,14 @@ func (s *Store) ListNodeTestDataForNode(ctx context.Context, org identity.OrgID,
 }
 
 // PinNode implements [editor.Store].
-func (s *Store) PinNode(ctx context.Context, pin editor.NodePin) error {
+func (s *Store) PinNode(ctx context.Context, org orgscope.Org, pin editor.NodePin) error {
 	return s.write(ctx, "pin node", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, pin.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.UpsertFlowNodePin(ctx, sqlcgen.UpsertFlowNodePinParams{
-			ID: uuidBytes(pin.ID), OrgID: uuidBytes(pin.OrgID), FlowID: uuidBytes(pin.FlowID), NodeID: pin.NodeID,
+			ID: uuidBytes(pin.ID), OrgID: scope, FlowID: uuidBytes(pin.FlowID), NodeID: pin.NodeID,
 			NodeTestDataID: uuidBytes(pin.NodeTestDataID), PinnedByPrincipalID: nullUUIDBytes(pin.PinnedByPrincipal),
 			CreatedAt: micros(pin.CreatedAt), UpdatedAt: micros(pin.UpdatedAt),
 		})
@@ -267,10 +284,14 @@ func (s *Store) PinNode(ctx context.Context, pin editor.NodePin) error {
 }
 
 // GetNodePin implements [editor.Store].
-func (s *Store) GetNodePin(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string) (editor.NodePin, error) {
+func (s *Store) GetNodePin(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string) (editor.NodePin, error) {
 	var out editor.NodePin
 	err := s.read(ctx, "get node pin", func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlowNodePin(ctx, uuidBytes(org), uuidBytes(flowID), nodeID)
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		row, err := q.GetFlowNodePin(ctx, scope, uuidBytes(flowID), nodeID)
 		if err != nil {
 			return err
 		}
@@ -281,11 +302,15 @@ func (s *Store) GetNodePin(ctx context.Context, org identity.OrgID, flowID flow.
 }
 
 // ListNodePins implements [editor.Store].
-func (s *Store) ListNodePins(ctx context.Context, org identity.OrgID, flowID flow.FlowID, afterNodeID string, limit int) ([]editor.NodePin, error) {
+func (s *Store) ListNodePins(ctx context.Context, org orgscope.Org, flowID flow.FlowID, afterNodeID string, limit int) ([]editor.NodePin, error) {
 	var out []editor.NodePin
 	err := s.read(ctx, "list node pins", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
 		rows, err := q.ListFlowNodePins(ctx, sqlcgen.ListFlowNodePinsParams{
-			OrgID: uuidBytes(org), FlowID: uuidBytes(flowID), AfterNodeID: afterNodeID, AfterID: nil, PageSize: clampPage(limit),
+			OrgID: scope, FlowID: uuidBytes(flowID), AfterNodeID: afterNodeID, AfterID: nil, PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err
@@ -303,9 +328,13 @@ func (s *Store) ListNodePins(ctx context.Context, org identity.OrgID, flowID flo
 }
 
 // UnpinNode implements [editor.Store].
-func (s *Store) UnpinNode(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string) error {
+func (s *Store) UnpinNode(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string) error {
 	return s.write(ctx, "unpin node", func(ctx context.Context, q *sqlcgen.Queries) error {
-		n, err := q.DeleteFlowNodePin(ctx, uuidBytes(org), uuidBytes(flowID), nodeID)
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		n, err := q.DeleteFlowNodePin(ctx, scope, uuidBytes(flowID), nodeID)
 		if err != nil {
 			return err
 		}
@@ -317,10 +346,14 @@ func (s *Store) UnpinNode(ctx context.Context, org identity.OrgID, flowID flow.F
 }
 
 // InsertTestRun implements [editor.Store].
-func (s *Store) InsertTestRun(ctx context.Context, run editor.TestRun) error {
+func (s *Store) InsertTestRun(ctx context.Context, org orgscope.Org, run editor.TestRun) error {
 	return s.write(ctx, "insert test run", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, run.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.InsertTestRun(ctx, sqlcgen.InsertTestRunParams{
-			ID: uuidBytes(run.ID), OrgID: uuidBytes(run.OrgID), FlowID: uuidBytes(run.FlowID),
+			ID: uuidBytes(run.ID), OrgID: scope, FlowID: uuidBytes(run.FlowID),
 			ExecutionID: uuidBytes(run.ExecutionID), FlowSnapshotID: uuidBytes(run.FlowSnapshotID),
 			TargetKind: run.TargetKind, TargetNodeID: nullText(run.TargetNodeID), EffectMode: run.EffectMode,
 			PlanDocument: run.PlanDocument, PlanDocumentFormat: editor.TestPlanFormat,
@@ -330,10 +363,14 @@ func (s *Store) InsertTestRun(ctx context.Context, run editor.TestRun) error {
 }
 
 // GetTestRun implements [editor.Store].
-func (s *Store) GetTestRun(ctx context.Context, org identity.OrgID, runID id.UUID) (editor.TestRun, error) {
+func (s *Store) GetTestRun(ctx context.Context, org orgscope.Org, runID id.UUID) (editor.TestRun, error) {
 	var out editor.TestRun
 	err := s.read(ctx, "get test run", func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetTestRun(ctx, uuidBytes(org), uuidBytes(runID))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		row, err := q.GetTestRun(ctx, scope, uuidBytes(runID))
 		if err != nil {
 			return err
 		}
@@ -344,10 +381,14 @@ func (s *Store) GetTestRun(ctx context.Context, org identity.OrgID, runID id.UUI
 }
 
 // ListTestRuns implements [editor.Store].
-func (s *Store) ListTestRuns(ctx context.Context, org identity.OrgID, flowID flow.FlowID, limit int) ([]editor.TestRun, error) {
+func (s *Store) ListTestRuns(ctx context.Context, org orgscope.Org, flowID flow.FlowID, limit int) ([]editor.TestRun, error) {
 	var out []editor.TestRun
 	err := s.read(ctx, "list test runs", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListTestRuns(ctx, uuidBytes(org), uuidBytes(flowID), clampPage(limit))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		rows, err := q.ListTestRuns(ctx, scope, uuidBytes(flowID), clampPage(limit))
 		if err != nil {
 			return err
 		}
@@ -364,20 +405,28 @@ func (s *Store) ListTestRuns(ctx context.Context, org identity.OrgID, flowID flo
 }
 
 // InsertTestRunSeed implements [editor.Store].
-func (s *Store) InsertTestRunSeed(ctx context.Context, seed editor.TestRunSeed) error {
+func (s *Store) InsertTestRunSeed(ctx context.Context, org orgscope.Org, seed editor.TestRunSeed) error {
 	return s.write(ctx, "insert test run seed", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, seed.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.InsertTestRunSeed(ctx, sqlcgen.InsertTestRunSeedParams{
-			ID: uuidBytes(seed.ID), OrgID: uuidBytes(seed.OrgID), TestRunID: uuidBytes(seed.TestRunID), NodeID: seed.NodeID,
+			ID: uuidBytes(seed.ID), OrgID: scope, TestRunID: uuidBytes(seed.TestRunID), NodeID: seed.NodeID,
 			SeedKind: seed.SeedKind, NodeTestDataID: uuidBytes(seed.NodeTestDataID), CreatedAt: micros(seed.CreatedAt),
 		})
 	})
 }
 
 // ListTestRunSeeds implements [editor.Store].
-func (s *Store) ListTestRunSeeds(ctx context.Context, org identity.OrgID, runID id.UUID, limit int) ([]editor.TestRunSeed, error) {
+func (s *Store) ListTestRunSeeds(ctx context.Context, org orgscope.Org, runID id.UUID, limit int) ([]editor.TestRunSeed, error) {
 	var out []editor.TestRunSeed
 	err := s.read(ctx, "list test run seeds", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListTestRunSeeds(ctx, uuidBytes(org), uuidBytes(runID), clampPage(limit))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		rows, err := q.ListTestRunSeeds(ctx, scope, uuidBytes(runID), clampPage(limit))
 		if err != nil {
 			return err
 		}
@@ -394,10 +443,14 @@ func (s *Store) ListTestRunSeeds(ctx context.Context, org identity.OrgID, runID 
 }
 
 // InsertEffectPreview implements [editor.Store].
-func (s *Store) InsertEffectPreview(ctx context.Context, p *editor.EffectPreview) error {
+func (s *Store) InsertEffectPreview(ctx context.Context, org orgscope.Org, p *editor.EffectPreview) error {
 	return s.write(ctx, "insert effect preview", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, p.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.InsertEffectPreview(ctx, sqlcgen.InsertEffectPreviewParams{
-			ID: uuidBytes(p.ID), OrgID: uuidBytes(p.OrgID), ExecutionID: uuidBytes(p.ExecutionID),
+			ID: uuidBytes(p.ID), OrgID: scope, ExecutionID: uuidBytes(p.ExecutionID),
 			NodeExecutionID: uuidBytes(p.NodeExecutionID), NodeID: p.NodeID, Status: p.Status, Effect: p.Effect,
 			SafetyLevel: p.SafetyLevel, ItemCount: p.ItemCount, IsPreviewAvailable: editorBool(p.IsPreviewAvailable),
 			PreviewDocument: p.PreviewDocument, PreviewDocumentFormat: editor.EffectPreviewFormat, PreviewSha256: p.PreviewSHA256,
@@ -409,10 +462,14 @@ func (s *Store) InsertEffectPreview(ctx context.Context, p *editor.EffectPreview
 }
 
 // GetEffectPreview implements [editor.Store].
-func (s *Store) GetEffectPreview(ctx context.Context, org identity.OrgID, previewID id.UUID) (editor.EffectPreview, error) {
+func (s *Store) GetEffectPreview(ctx context.Context, org orgscope.Org, previewID id.UUID) (editor.EffectPreview, error) {
 	var out editor.EffectPreview
 	err := s.read(ctx, "get effect preview", func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetEffectPreview(ctx, uuidBytes(org), uuidBytes(previewID))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		row, err := q.GetEffectPreview(ctx, scope, uuidBytes(previewID))
 		if err != nil {
 			return err
 		}
@@ -423,12 +480,16 @@ func (s *Store) GetEffectPreview(ctx context.Context, org identity.OrgID, previe
 }
 
 // DecideEffectPreview implements [editor.Store]. A stale revision or a preview that is not open is a conflict.
-func (s *Store) DecideEffectPreview(ctx context.Context, org identity.OrgID, previewID id.UUID, expectedRevision int64, status string, decision []byte, decidedBy identity.PrincipalID, now time.Time) error {
+func (s *Store) DecideEffectPreview(ctx context.Context, org orgscope.Org, previewID id.UUID, expectedRevision int64, status string, decision []byte, decidedBy identity.PrincipalID, now time.Time) error {
 	return s.write(ctx, "decide effect preview", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
 		n, err := q.MarkEffectPreviewDecided(ctx, sqlcgen.MarkEffectPreviewDecidedParams{
 			Status: status, DecisionDocument: decision, DecisionDocumentFormat: nullEditorFormat(decision, editor.EffectDecisionFormat),
 			DecidedByPrincipalID: nullUUIDBytes(decidedBy), DecidedAt: nullMicrosOrNull(now), UpdatedAt: micros(now),
-			OrgID: uuidBytes(org), ID: uuidBytes(previewID), ExpectedRevision: expectedRevision,
+			OrgID: scope, ID: uuidBytes(previewID), ExpectedRevision: expectedRevision,
 		})
 		if err != nil {
 			return err
@@ -441,10 +502,14 @@ func (s *Store) DecideEffectPreview(ctx context.Context, org identity.OrgID, pre
 }
 
 // ListEffectPreviews implements [editor.Store].
-func (s *Store) ListEffectPreviews(ctx context.Context, org identity.OrgID, execID store.ExecutionID, limit int) ([]editor.EffectPreview, error) {
+func (s *Store) ListEffectPreviews(ctx context.Context, org orgscope.Org, execID store.ExecutionID, limit int) ([]editor.EffectPreview, error) {
 	var out []editor.EffectPreview
 	err := s.read(ctx, "list effect previews", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListEffectPreviews(ctx, uuidBytes(org), uuidBytes(execID), clampPage(limit))
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		rows, err := q.ListEffectPreviews(ctx, scope, uuidBytes(execID), clampPage(limit))
 		if err != nil {
 			return err
 		}
@@ -461,10 +526,14 @@ func (s *Store) ListEffectPreviews(ctx context.Context, org identity.OrgID, exec
 }
 
 // UpsertEditingSession implements [editor.Store].
-func (s *Store) UpsertEditingSession(ctx context.Context, e editor.EditingSession) error {
+func (s *Store) UpsertEditingSession(ctx context.Context, org orgscope.Org, e editor.EditingSession) error {
 	return s.write(ctx, "upsert editing session", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, e.OrgID)
+		if err != nil {
+			return err
+		}
 		return q.UpsertFlowEditingSession(ctx, sqlcgen.UpsertFlowEditingSessionParams{
-			ID: uuidBytes(e.ID), OrgID: uuidBytes(e.OrgID), FlowID: uuidBytes(e.FlowID),
+			ID: uuidBytes(e.ID), OrgID: scope, FlowID: uuidBytes(e.FlowID),
 			OpenedByPrincipalID: nullUUIDBytes(e.OpenedByPrincipal), ClientLabel: e.ClientLabel,
 			LastSeenDraftRevision: e.LastSeenDraftRevision, OpenedAt: micros(e.OpenedAt), LastSeenAt: micros(e.LastSeenAt),
 			ExpiresAt: micros(e.ExpiresAt), CreatedAt: micros(e.CreatedAt), UpdatedAt: micros(e.UpdatedAt),
@@ -473,11 +542,15 @@ func (s *Store) UpsertEditingSession(ctx context.Context, e editor.EditingSessio
 }
 
 // ListEditingSessions implements [editor.Store].
-func (s *Store) ListEditingSessions(ctx context.Context, org identity.OrgID, flowID flow.FlowID, now time.Time, limit int) ([]editor.EditingSession, error) {
+func (s *Store) ListEditingSessions(ctx context.Context, org orgscope.Org, flowID flow.FlowID, now time.Time, limit int) ([]editor.EditingSession, error) {
 	var out []editor.EditingSession
 	err := s.read(ctx, "list editing sessions", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
 		rows, err := q.ListFlowEditingSessions(ctx, sqlcgen.ListFlowEditingSessionsParams{
-			OrgID: uuidBytes(org), FlowID: uuidBytes(flowID), Now: micros(now), PageSize: clampPage(limit),
+			OrgID: scope, FlowID: uuidBytes(flowID), Now: micros(now), PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err

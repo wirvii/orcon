@@ -33,11 +33,27 @@
 // (path, reason, date, approved-by, added with owner approval); in any other file
 // the annotation is itself a finding.
 //
+// Rule 3, every method of a store port is scoped or says why not (ADR-0046
+// section 2, orcon-db TI-2). A data-access package states which ports its store
+// implements with assertions of the form
+//
+//	var _ identity.ProjectStore = (*Store)(nil)
+//
+// and every method of every interface asserted that way, if the interface is
+// declared in an area of this module, must take an orgscope.Org parameter or
+// carry a line of its doc comment
+//
+//	//orcon:scope instance <reason>      (or: engine)
+//
+// A method with neither is reported at the assertion, so a new port method
+// cannot slip in without its organization scope or a stated reason. The
+// directive on a method that does take a scope is not needed and is not
+// checked.
+//
 // What this does not do: it does not read the statement (tools/sqlcheck does,
-// on the query files), and it does not check that a store method receives an
-// orgscope.Org (that type arrives with the first tables). Import rules of the
-// depguard configuration remain the backstop for the drivers' import paths;
-// lint-fixtures plants an import of database/sql and of pgx to prove it.
+// on the query files). Import rules of the depguard configuration remain the
+// backstop for the drivers' import paths; lint-fixtures plants an import of
+// database/sql and of pgx to prove it.
 package orgscope
 
 import (
@@ -130,6 +146,7 @@ func run(pass *analysis.Pass) (any, error) {
 	})
 	if inLayer {
 		reportSinkValues(pass, insp)
+		checkPorts(pass)
 	}
 	return nil, nil //nolint:nilnil // analyzers without a result return nil
 }
@@ -414,6 +431,110 @@ func containsAny(path string, runs []string) bool {
 func isDriver(path string) bool {
 	for _, p := range driverPrefixes {
 		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// scopeTypes are the import path suffixes of the packages that declare
+// orgscope.Org (the alias package and the issuing package behind it).
+var scopeTypes = []string{"internal/platform/orgscope", "internal/platform/orgscope/issue"}
+
+// scopeDirective marks a port method that is deliberately not organization-scoped.
+const scopeDirective = "//orcon:scope"
+
+// checkPorts applies rule 3 to the port assertions of a data-access package.
+func checkPorts(pass *analysis.Pass) {
+	for _, f := range pass.Files {
+		if strings.HasSuffix(pass.Fset.Position(f.Pos()).Filename, "_test.go") {
+			continue
+		}
+		for _, decl := range f.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				vs, ok := spec.(*ast.ValueSpec)
+				if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "_" || vs.Type == nil {
+					continue
+				}
+				checkPort(pass, vs)
+			}
+		}
+	}
+}
+
+func checkPort(pass *analysis.Pass, vs *ast.ValueSpec) {
+	t := pass.TypesInfo.TypeOf(vs.Type)
+	if t == nil {
+		return
+	}
+	iface, ok := t.Underlying().(*types.Interface)
+	if !ok {
+		return
+	}
+	for i := range iface.NumMethods() {
+		m := iface.Method(i)
+		if m.Pkg() == nil || !isAreaPackage(m.Pkg().Path()) {
+			continue // a standard-library interface such as io.Closer
+		}
+		sig, ok := m.Type().(*types.Signature)
+		if !ok || takesScope(sig) || hasScopeDirective(pass, m) {
+			continue
+		}
+		pass.Reportf(vs.Pos(), "port method %s.%s takes no orgscope.Org and has no %s instance|engine <reason> line in its comment: an organization-scoped method takes the scope, any other says why (ADR-0046 section 2)", types.TypeString(t, func(p *types.Package) string { return p.Name() }), m.Name(), scopeDirective)
+	}
+}
+
+// isAreaPackage reports whether path is a package of an area of the module (a
+// directory of internal that is not a platform package or an adapter).
+func isAreaPackage(path string) bool {
+	_, rest, ok := strings.Cut(path, "internal/")
+	if !ok {
+		return false
+	}
+	return !strings.HasPrefix(rest, "adapter/") && !strings.HasPrefix(rest, "platform/")
+}
+
+// takesScope reports whether a parameter of sig is an orgscope.Org.
+func takesScope(sig *types.Signature) bool {
+	params := sig.Params()
+	for i := range params.Len() {
+		named, ok := types.Unalias(params.At(i).Type()).(*types.Named)
+		if !ok || named.Obj().Name() != "Org" || named.Obj().Pkg() == nil {
+			continue
+		}
+		for _, suffix := range scopeTypes {
+			if path := named.Obj().Pkg().Path(); path == suffix || strings.HasSuffix(path, "/"+suffix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasScopeDirective reports whether the comment lines directly above the
+// declaration of m hold "//orcon:scope instance <reason>" or "... engine <reason>".
+func hasScopeDirective(pass *analysis.Pass, m *types.Func) bool {
+	pos := pass.Fset.Position(m.Pos())
+	data, err := os.ReadFile(pos.Filename)
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(string(data), "\n")
+	for i := pos.Line - 2; i >= 0 && i < len(lines); i-- {
+		text := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(text, "//") {
+			return false
+		}
+		rest, ok := strings.CutPrefix(text, scopeDirective)
+		if !ok {
+			continue
+		}
+		kind, reason, _ := strings.Cut(strings.TrimSpace(rest), " ")
+		if (kind == "instance" || kind == "engine") && strings.TrimSpace(reason) != "" {
 			return true
 		}
 	}

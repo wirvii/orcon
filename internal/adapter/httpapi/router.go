@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/reference"
@@ -22,6 +23,9 @@ import (
 	"github.com/wirvii/orcon/internal/platform/config"
 	"github.com/wirvii/orcon/internal/platform/id"
 )
+
+// ErrNoIdempotencyStore means the contract has idempotent operations and no store was given.
+var ErrNoIdempotencyStore = errors.New("the contract has operations that take an Idempotency-Key and Deps.Idempotency is nil")
 
 // ErrRole means the role does not serve the API.
 var ErrRole = errors.New("this role does not serve the API")
@@ -54,6 +58,12 @@ type Deps struct {
 	// Auth names where requests carry credentials; the zero value means
 	// middleware.DefaultAuthConfig.
 	Auth middleware.AuthConfig
+	// Idempotency keeps the idempotency records. It is required when the contract has
+	// an operation that takes an Idempotency-Key: there is no silent default, because
+	// a store in the memory of the process survives neither a restart nor a second api
+	// process. The composition root wires the durable store, or
+	// idempotency.UnavailableStore while there is none.
+	Idempotency idempotency.Store
 	// Reference is the file system of the reference site; nil means the
 	// embedded one.
 	Reference fs.FS
@@ -131,6 +141,13 @@ func build(supplied *Deps, rawSpec []byte, register func(mux apigen.ServeMux, ba
 	spec, err := ParseSpec(rawSpec)
 	if err != nil {
 		return nil, err
+	}
+	if deps.Idempotency == nil {
+		for i := range spec.Operations {
+			if spec.Operations[i].IdempotencyKey != "" {
+				return nil, fmt.Errorf("%w (%s)", ErrNoIdempotencyStore, spec.Operations[i].ID)
+			}
+		}
 	}
 	if err := checkPermissions(spec, deps.Catalog); err != nil {
 		return nil, err
@@ -273,6 +290,12 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body
 	if body != nil {
 		// After authorization: a caller who may not call the operation learns nothing of its schema.
 		chain = append(chain, body)
+	}
+	if !op.Public && op.IdempotencyKey != "" {
+		chain = append(chain, idempotency.Middleware(idempotency.Config{
+			Store: deps.Idempotency, Logger: deps.Logger, Required: op.IdempotencyKey == "required",
+			IssuesSecret: op.IssuesSecret, Route: op.Pattern,
+		}))
 	}
 	return chain
 }

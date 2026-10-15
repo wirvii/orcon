@@ -13,6 +13,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 func sortedKeys[V any](m map[string]V) []string { return slices.Sorted(maps.Keys(m)) }
@@ -21,7 +22,7 @@ func sortedKeys[V any](m map[string]V) []string { return slices.Sorted(maps.Keys
 // version, without creating a version (R-ACT-02). A flow that is already
 // active is left as it is. A flow with no published version fails with
 // [ErrNotPublished].
-func (s *Service) Activate(ctx context.Context, org identity.OrgID, flowID flow.FlowID) error {
+func (s *Service) Activate(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
 	return s.setActivation(ctx, org, flowID, flow.ActivationActive)
 }
 
@@ -29,11 +30,11 @@ func (s *Service) Activate(ctx context.Context, org identity.OrgID, flowID flow.
 // answer as inactive and no automatic trigger accepts events. Executions in
 // progress go on (ADR-0024 section 5). A flow that is already inactive is left
 // as it is.
-func (s *Service) Deactivate(ctx context.Context, org identity.OrgID, flowID flow.FlowID) error {
+func (s *Service) Deactivate(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
 	return s.setActivation(ctx, org, flowID, flow.ActivationInactive)
 }
 
-func (s *Service) setActivation(ctx context.Context, org identity.OrgID, flowID flow.FlowID, target flow.ActivationState) error {
+func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID flow.FlowID, target flow.ActivationState) error {
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -76,7 +77,7 @@ func (s *Service) setActivation(ctx context.Context, org identity.OrgID, flowID 
 // triggers are switched off exactly as by a deactivation: addresses answer as
 // inactive, and new events are refused with the reason INACTIVE. Executions in
 // progress go on with their version (R-ACT-09, ADR-0024 section 8).
-func (s *Service) Delete(ctx context.Context, org identity.OrgID, flowID flow.FlowID, by identity.PrincipalID) error {
+func (s *Service) Delete(ctx context.Context, org orgscope.Org, flowID flow.FlowID, by identity.PrincipalID) error {
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -115,7 +116,7 @@ func (s *Service) Delete(ctx context.Context, org identity.OrgID, flowID flow.Fl
 // back inactive and so do its triggers: a person activates it explicitly
 // (R-ACT-09). A name already taken in the project fails with flow.ErrConflict
 // and nothing changes.
-func (s *Service) Restore(ctx context.Context, org identity.OrgID, flowID flow.FlowID) error {
+func (s *Service) Restore(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -142,7 +143,7 @@ func (s *Service) Restore(ctx context.Context, org identity.OrgID, flowID flow.F
 //
 // Warning: foreign-key cascades delete the executions of the flow too, without
 // batching or checking that none is running; the purge sweep of SPEC-001 C13 owns that order.
-func (s *Service) Purge(ctx context.Context, org identity.OrgID, flowID flow.FlowID) error {
+func (s *Service) Purge(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -182,7 +183,7 @@ type FlowStatus struct {
 
 // Status reports the activation state, the live version, whether the draft
 // has unpublished changes, and the triggers of the flow.
-func (s *Service) Status(ctx context.Context, org identity.OrgID, flowID flow.FlowID) (FlowStatus, error) {
+func (s *Service) Status(ctx context.Context, org orgscope.Org, flowID flow.FlowID) (FlowStatus, error) {
 	rec, err := s.flows.GetFlow(ctx, org, flowID)
 	if err != nil {
 		return FlowStatus{}, fmt.Errorf("status of flow %s: %w", flowID, err)
@@ -239,7 +240,7 @@ func draftDiffers(draft []byte, liveHash string) bool {
 // The ingress acceptance transaction of cut T2 repeats this read inside its own
 // transaction through [Tx.ResolveAcceptance]; calling it here is for callers
 // that only need the answer.
-func (s *Service) Accept(ctx context.Context, org identity.OrgID, flowID flow.FlowID, node flow.NodeID) (Acceptance, error) {
+func (s *Service) Accept(ctx context.Context, org orgscope.Org, flowID flow.FlowID, node flow.NodeID) (Acceptance, error) {
 	var acc Acceptance
 	err := s.store.Read(ctx, org, func(ctx context.Context, tx Tx) error {
 		var rerr error

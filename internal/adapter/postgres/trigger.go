@@ -15,6 +15,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
 
@@ -26,15 +27,15 @@ const addressPage = 1000
 
 // Atomic implements [trigger.Store]: fn runs in one READ COMMITTED
 // transaction with the organization context set, and rolls back when it fails.
-func (s *Store) Atomic(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
-	return s.inOrg(ctx, "run a trigger transaction", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+func (s *Store) Atomic(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
+	return s.inScope(ctx, "run a trigger transaction", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		return fn(ctx, &triggerTx{q: q, org: org})
 	})
 }
 
 // Read implements [trigger.Store]: fn runs in one read-only transaction.
-func (s *Store) Read(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
-	return s.inOrg(ctx, "run a trigger read", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+func (s *Store) Read(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
+	return s.inScope(ctx, "run a trigger read", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
 		return fn(ctx, &triggerTx{q: q, org: org})
 	})
 }
@@ -42,12 +43,15 @@ func (s *Store) Read(ctx context.Context, org identity.OrgID, fn func(ctx contex
 // triggerTx is one trigger transaction bound to an organization.
 type triggerTx struct {
 	q   *sqlcgen.Queries
-	org identity.OrgID
+	org orgscope.Org
 }
 
-var _ trigger.Tx = (*triggerTx)(nil)
+// triggerTx is not asserted to implement [trigger.Tx] with a variable declaration:
+// the orgscope analyzer (rule 3) reads such assertions as store ports, and the
+// methods of a transaction act on the organization that Atomic or Read scoped.
+// Atomic and Read pass the value as the interface, so the compiler still checks it.
 
-func (t *triggerTx) orgID() pgtype.UUID { return pgUUID(t.org) }
+func (t *triggerTx) orgID() pgtype.UUID { return pgUUID(t.org.UUID()) }
 
 func stateFrom(id flow.FlowID, name string, project, activeVersion pgtype.UUID, activation string, revision int64, deletedAt pgtype.Timestamptz) trigger.FlowState {
 	return trigger.FlowState{

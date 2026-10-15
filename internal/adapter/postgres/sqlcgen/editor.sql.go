@@ -243,7 +243,7 @@ type InsertNodeTestDataParams struct {
 // SPDX-License-Identifier: Apache-2.0
 // Visual flow editor storage (SPEC-014 section 6). The SQLite file of the same name holds the same queries
 // with the same names. Pruning of editor data crosses organizations and runs in the orcon_engine function
-// prune_batch (migration 0011), which is what the two purge queries at the end of this file call.
+// prune_batch (migration 0014), which is what the two purge queries at the end of this file call.
 // Node test outputs are append-only (ADR-0082 section 3).
 // orcon:scope org
 func (q *Queries) InsertNodeTestData(ctx context.Context, arg InsertNodeTestDataParams) error {
@@ -700,7 +700,7 @@ SELECT orcon_engine.prune_batch('editor_test_data', $1, $2) AS removed_count
 `
 
 // Retention of editor test data: the orcon_engine function removes up to page_size unreferenced rows
-// created more than 24 hours before now and returns how many it removed (migration 0011).
+// created more than 24 hours before now and returns how many it removed (migration 0014).
 // orcon:scope engine
 func (q *Queries) PurgeEditorTestData(ctx context.Context, pageSize int32, now pgtype.Timestamptz) (int64, error) {
 	row := q.db.QueryRow(ctx, purgeEditorTestData, pageSize, now)

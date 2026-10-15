@@ -13,6 +13,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
@@ -28,8 +29,8 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 }
 
 // CreateFlow implements [flow.Store].
-func (s *Store) CreateFlow(ctx context.Context, f flow.Record) error {
-	return s.inOrg(ctx, "create flow", f.OrgID, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+func (s *Store) CreateFlow(ctx context.Context, org orgscope.Org, f flow.Record) error {
+	return s.inScopeRecord(ctx, "create flow", org, f.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		return q.InsertFlow(ctx, sqlcgen.InsertFlowParams{
 			ID: pgUUID(f.ID), OrgID: pgUUID(f.OrgID), ProjectID: pgUUID(f.ProjectID),
 			Name: f.Name, DraftDocument: f.Draft,
@@ -39,10 +40,10 @@ func (s *Store) CreateFlow(ctx context.Context, f flow.Record) error {
 }
 
 // GetFlow implements [flow.Store].
-func (s *Store) GetFlow(ctx context.Context, org identity.OrgID, flowID flow.FlowID) (flow.Record, error) {
+func (s *Store) GetFlow(ctx context.Context, org orgscope.Org, flowID flow.FlowID) (flow.Record, error) {
 	var out flow.Record
-	err := s.inOrg(ctx, "get flow", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlow(ctx, pgUUID(org), pgUUID(flowID))
+	err := s.inScope(ctx, "get flow", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetFlow(ctx, pgUUID(org.UUID()), pgUUID(flowID))
 		if err != nil {
 			return err
 		}
@@ -53,10 +54,10 @@ func (s *Store) GetFlow(ctx context.Context, org identity.OrgID, flowID flow.Flo
 }
 
 // GetFlowByName implements [flow.Store].
-func (s *Store) GetFlowByName(ctx context.Context, org identity.OrgID, project identity.ProjectID, name string) (flow.Record, error) {
+func (s *Store) GetFlowByName(ctx context.Context, org orgscope.Org, project identity.ProjectID, name string) (flow.Record, error) {
 	var out flow.Record
-	err := s.inOrg(ctx, "get flow by name", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlowByName(ctx, pgUUID(org), pgUUID(project), name)
+	err := s.inScope(ctx, "get flow by name", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetFlowByName(ctx, pgUUID(org.UUID()), pgUUID(project), name)
 		if err != nil {
 			return err
 		}
@@ -68,11 +69,11 @@ func (s *Store) GetFlowByName(ctx context.Context, org identity.OrgID, project i
 }
 
 // ListFlows implements [flow.Store].
-func (s *Store) ListFlows(ctx context.Context, org identity.OrgID, project identity.ProjectID, after flow.FlowID, limit int) ([]flow.Record, error) {
+func (s *Store) ListFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID, after flow.FlowID, limit int) ([]flow.Record, error) {
 	var out []flow.Record
-	err := s.inOrg(ctx, "list flows", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.inScope(ctx, "list flows", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ListFlows(ctx, sqlcgen.ListFlowsParams{
-			OrgID: pgUUID(org), ProjectID: pgUUID(project), AfterID: pgUUID(after), PageSize: clampPage(limit),
+			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(project), AfterID: pgUUID(after), PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err
@@ -87,11 +88,11 @@ func (s *Store) ListFlows(ctx context.Context, org identity.OrgID, project ident
 }
 
 // UpdateFlowDraft implements [flow.Store].
-func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
+func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
 	var revision int64
-	err := s.inOrg(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.inScope(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
-			DraftDocument: draft, UpdatedAt: timestamp(now), OrgID: pgUUID(org), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
+			DraftDocument: draft, UpdatedAt: timestamp(now), OrgID: pgUUID(org.UUID()), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
 		})
 		if err != nil {
 			return err
@@ -101,7 +102,7 @@ func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID 
 			return replaceDraftReferences(ctx, q, org, flowID, references, now)
 		}
 		// Either the flow does not exist or its revision moved; tell them apart.
-		if _, err := q.GetFlow(ctx, pgUUID(org), pgUUID(flowID)); err != nil {
+		if _, err := q.GetFlow(ctx, pgUUID(org.UUID()), pgUUID(flowID)); err != nil {
 			return err
 		}
 		return flow.ErrDraftConflict
@@ -110,8 +111,8 @@ func (s *Store) UpdateFlowDraft(ctx context.Context, org identity.OrgID, flowID 
 }
 
 // PublishVersion implements [flow.VersionStore].
-func (s *Store) PublishVersion(ctx context.Context, v flow.VersionRecord) error {
-	return s.inOrg(ctx, "publish flow version", v.OrgID, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+func (s *Store) PublishVersion(ctx context.Context, org orgscope.Org, v flow.VersionRecord) error {
+	return s.inScopeRecord(ctx, "publish flow version", org, v.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		params := sqlcgen.InsertFlowVersionParams{
 			ID: pgUUID(v.ID), OrgID: pgUUID(v.OrgID), FlowID: pgUUID(v.FlowID),
 			VersionNumber: v.Number, Document: v.Document, ContentHash: v.ContentHash,
@@ -149,10 +150,10 @@ func versionFrom(row *sqlcgen.GetFlowVersionRow) flow.VersionRecord {
 }
 
 // GetVersion implements [flow.VersionStore].
-func (s *Store) GetVersion(ctx context.Context, org identity.OrgID, version flow.FlowVersionID) (flow.VersionRecord, error) {
+func (s *Store) GetVersion(ctx context.Context, org orgscope.Org, version flow.FlowVersionID) (flow.VersionRecord, error) {
 	var out flow.VersionRecord
-	err := s.inOrg(ctx, "get flow version", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlowVersion(ctx, pgUUID(org), pgUUID(version))
+	err := s.inScope(ctx, "get flow version", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetFlowVersion(ctx, pgUUID(org.UUID()), pgUUID(version))
 		if err != nil {
 			return notFoundAs(err, flow.ErrVersionNotFound)
 		}
@@ -163,10 +164,10 @@ func (s *Store) GetVersion(ctx context.Context, org identity.OrgID, version flow
 }
 
 // GetVersionByNumber implements [flow.VersionStore].
-func (s *Store) GetVersionByNumber(ctx context.Context, org identity.OrgID, flowID flow.FlowID, number int64) (flow.VersionRecord, error) {
+func (s *Store) GetVersionByNumber(ctx context.Context, org orgscope.Org, flowID flow.FlowID, number int64) (flow.VersionRecord, error) {
 	var out flow.VersionRecord
-	err := s.inOrg(ctx, "get flow version by number", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlowVersionByNumber(ctx, pgUUID(org), pgUUID(flowID), number)
+	err := s.inScope(ctx, "get flow version by number", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetFlowVersionByNumber(ctx, pgUUID(org.UUID()), pgUUID(flowID), number)
 		if err != nil {
 			return notFoundAs(err, flow.ErrVersionNotFound)
 		}
@@ -178,11 +179,11 @@ func (s *Store) GetVersionByNumber(ctx context.Context, org identity.OrgID, flow
 }
 
 // ListVersions implements [flow.VersionStore].
-func (s *Store) ListVersions(ctx context.Context, org identity.OrgID, flowID flow.FlowID, after int64, limit int) ([]flow.VersionRecord, error) {
+func (s *Store) ListVersions(ctx context.Context, org orgscope.Org, flowID flow.FlowID, after int64, limit int) ([]flow.VersionRecord, error) {
 	var out []flow.VersionRecord
-	err := s.inOrg(ctx, "list flow versions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.inScope(ctx, "list flow versions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ListFlowVersions(ctx, sqlcgen.ListFlowVersionsParams{
-			OrgID: pgUUID(org), FlowID: pgUUID(flowID), AfterNumber: after, PageSize: clampPage(limit),
+			OrgID: pgUUID(org.UUID()), FlowID: pgUUID(flowID), AfterNumber: after, PageSize: clampPage(limit),
 		})
 		if err != nil {
 			return err
@@ -204,9 +205,9 @@ func snapshotFrom(row *sqlcgen.GetFlowSnapshotRow) flow.SnapshotRecord {
 }
 
 // CreateSnapshot implements [flow.SnapshotStore].
-func (s *Store) CreateSnapshot(ctx context.Context, snap flow.SnapshotRecord) (flow.SnapshotRecord, error) {
+func (s *Store) CreateSnapshot(ctx context.Context, org orgscope.Org, snap flow.SnapshotRecord) (flow.SnapshotRecord, error) {
 	var out flow.SnapshotRecord
-	err := s.inOrg(ctx, "create flow snapshot", snap.OrgID, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+	err := s.inScopeRecord(ctx, "create flow snapshot", org, snap.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.InsertFlowSnapshot(ctx, sqlcgen.InsertFlowSnapshotParams{
 			ID: pgUUID(snap.ID), OrgID: pgUUID(snap.OrgID), FlowID: pgUUID(snap.FlowID),
 			ContentHash: snap.ContentHash, Document: snap.Document, CreatedAt: timestamp(snap.CreatedAt),
@@ -231,10 +232,10 @@ func (s *Store) CreateSnapshot(ctx context.Context, snap flow.SnapshotRecord) (f
 }
 
 // GetSnapshot implements [flow.SnapshotStore].
-func (s *Store) GetSnapshot(ctx context.Context, org identity.OrgID, snapshot flow.FlowSnapshotID) (flow.SnapshotRecord, error) {
+func (s *Store) GetSnapshot(ctx context.Context, org orgscope.Org, snapshot flow.FlowSnapshotID) (flow.SnapshotRecord, error) {
 	var out flow.SnapshotRecord
-	err := s.inOrg(ctx, "get flow snapshot", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		row, err := q.GetFlowSnapshot(ctx, pgUUID(org), pgUUID(snapshot))
+	err := s.inScope(ctx, "get flow snapshot", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetFlowSnapshot(ctx, pgUUID(org.UUID()), pgUUID(snapshot))
 		if err != nil {
 			return notFoundAs(err, flow.ErrSnapshotNotFound)
 		}

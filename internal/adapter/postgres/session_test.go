@@ -17,9 +17,9 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/postgres"
 	"github.com/wirvii/orcon/internal/adapter/storetest/dbrules"
-	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // TestPostgresSessionSettings checks every connection of the pool, not one: the
@@ -69,7 +69,11 @@ func TestLeakedOrganizationContextIsRefused(t *testing.T) {
 	if _, err := s.Pool().Exec(ctx, "SELECT set_config('orcon.org_id', '00000000-0000-7000-8000-000000000001', false)"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := s.GetOrganization(ctx, identity.OrgID(id.NewSequence().New()))
+	scope, err := issue.New(id.NewSequence().New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.GetOrganization(ctx, scope)
 	if !errors.Is(err, postgres.ErrSession) {
 		t.Fatalf("error %v, want ErrSession", err)
 	}
@@ -139,14 +143,18 @@ func TestNonSuperuserLogin(t *testing.T) {
 	ids := id.NewSequence()
 	now := time.Now()
 	org := identity.OrgID(ids.New())
-	if err := s.CreateOrganization(ctx, flow.OrgRecord{ID: org, Name: "A", Slug: "a", Status: flow.OrgActive, CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := s.CreateOrganization(ctx, identity.OrgRecord{ID: org, Name: "A", Slug: "a", Status: identity.OrgActive, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create organization: %v", err)
 	}
 	project := identity.ProjectID(ids.New())
-	if err := s.CreateProject(ctx, flow.ProjectRecord{ID: project, OrgID: org, Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Handle: "p", Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if _, err := s.GetProject(ctx, org, project); err != nil {
+	if _, err := s.GetProject(ctx, scope, project); err != nil {
 		t.Fatalf("get project: %v", err)
 	}
 

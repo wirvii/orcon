@@ -19,6 +19,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Source kinds of a node test output (ADR-0082 section 3).
@@ -179,52 +180,54 @@ type EditingSession struct {
 // row of the organization matches; [flow.ErrConflict] when a compare-and-set
 // misses (a stale revision, or a preview that already has a decision).
 type Store interface { //nolint:interfacebloat // one area's storage port; splitting it would scatter the transaction boundaries of one record family
-	// InsertNodeTestData appends an output. The record's organization is used.
-	InsertNodeTestData(ctx context.Context, data NodeTestData) error
+	// InsertNodeTestData appends an output. The record must name the organization of the scope.
+	InsertNodeTestData(ctx context.Context, org orgscope.Org, data NodeTestData) error
 	// GetNodeTestData returns one output of the organization.
-	GetNodeTestData(ctx context.Context, org identity.OrgID, dataID id.UUID) (NodeTestData, error)
+	GetNodeTestData(ctx context.Context, org orgscope.Org, dataID id.UUID) (NodeTestData, error)
 	// ListNodeTestDataForNode returns the latest outputs of one node, newest first, at most limit.
-	ListNodeTestDataForNode(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string, limit int) ([]NodeTestData, error)
+	ListNodeTestDataForNode(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string, limit int) ([]NodeTestData, error)
 
 	// PinNode sets the pin of a node: the first call creates revision 1, later calls
 	// replace the output and count one more revision.
-	PinNode(ctx context.Context, pin NodePin) error
+	PinNode(ctx context.Context, org orgscope.Org, pin NodePin) error
 	// GetNodePin returns the pin of one node.
-	GetNodePin(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string) (NodePin, error)
+	GetNodePin(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string) (NodePin, error)
 	// ListNodePins returns the pins of a flow after afterNodeID (keyset by node identifier), at most limit.
-	ListNodePins(ctx context.Context, org identity.OrgID, flowID flow.FlowID, afterNodeID string, limit int) ([]NodePin, error)
+	ListNodePins(ctx context.Context, org orgscope.Org, flowID flow.FlowID, afterNodeID string, limit int) ([]NodePin, error)
 	// UnpinNode removes the pin of one node.
-	UnpinNode(ctx context.Context, org identity.OrgID, flowID flow.FlowID, nodeID string) error
+	UnpinNode(ctx context.Context, org orgscope.Org, flowID flow.FlowID, nodeID string) error
 
 	// InsertTestRun records a test run.
-	InsertTestRun(ctx context.Context, run TestRun) error
+	InsertTestRun(ctx context.Context, org orgscope.Org, run TestRun) error
 	// GetTestRun returns one test run of the organization.
-	GetTestRun(ctx context.Context, org identity.OrgID, runID id.UUID) (TestRun, error)
+	GetTestRun(ctx context.Context, org orgscope.Org, runID id.UUID) (TestRun, error)
 	// ListTestRuns returns the test history of a flow, newest first, at most limit.
-	ListTestRuns(ctx context.Context, org identity.OrgID, flowID flow.FlowID, limit int) ([]TestRun, error)
+	ListTestRuns(ctx context.Context, org orgscope.Org, flowID flow.FlowID, limit int) ([]TestRun, error)
 	// InsertTestRunSeed records which output seeded a node of a run.
-	InsertTestRunSeed(ctx context.Context, seed TestRunSeed) error
+	InsertTestRunSeed(ctx context.Context, org orgscope.Org, seed TestRunSeed) error
 	// ListTestRunSeeds returns the seeds of a run, at most limit.
-	ListTestRunSeeds(ctx context.Context, org identity.OrgID, runID id.UUID, limit int) ([]TestRunSeed, error)
+	ListTestRunSeeds(ctx context.Context, org orgscope.Org, runID id.UUID, limit int) ([]TestRunSeed, error)
 
 	// InsertEffectPreview records the preview of one gated node activation.
-	InsertEffectPreview(ctx context.Context, preview *EffectPreview) error
+	InsertEffectPreview(ctx context.Context, org orgscope.Org, preview *EffectPreview) error
 	// GetEffectPreview returns one preview of the organization.
-	GetEffectPreview(ctx context.Context, org identity.OrgID, previewID id.UUID) (EffectPreview, error)
+	GetEffectPreview(ctx context.Context, org orgscope.Org, previewID id.UUID) (EffectPreview, error)
 	// DecideEffectPreview records the decision of an open preview whose revision is expectedRevision.
-	DecideEffectPreview(ctx context.Context, org identity.OrgID, previewID id.UUID, expectedRevision int64, status string, decision []byte, decidedBy identity.PrincipalID, now time.Time) error
+	DecideEffectPreview(ctx context.Context, org orgscope.Org, previewID id.UUID, expectedRevision int64, status string, decision []byte, decidedBy identity.PrincipalID, now time.Time) error
 	// ListEffectPreviews returns the previews of an execution, at most limit.
-	ListEffectPreviews(ctx context.Context, org identity.OrgID, execID store.ExecutionID, limit int) ([]EffectPreview, error)
+	ListEffectPreviews(ctx context.Context, org orgscope.Org, execID store.ExecutionID, limit int) ([]EffectPreview, error)
 
 	// UpsertEditingSession opens a session or renews it (same identifier).
-	UpsertEditingSession(ctx context.Context, session EditingSession) error
+	UpsertEditingSession(ctx context.Context, org orgscope.Org, session EditingSession) error
 	// ListEditingSessions returns the sessions of a flow that have not expired at now, at most limit.
-	ListEditingSessions(ctx context.Context, org identity.OrgID, flowID flow.FlowID, now time.Time, limit int) ([]EditingSession, error)
+	ListEditingSessions(ctx context.Context, org orgscope.Org, flowID flow.FlowID, now time.Time, limit int) ([]EditingSession, error)
 
 	// PurgeEditorTestData removes up to limit outputs that no pin and no run seed references and that were
 	// created more than 24 hours before now, and returns how many it removed (ADR-0017 amendment).
 	// It crosses organizations: it is the engine's retention, not a request of a person.
+	//orcon:scope engine the retention of every organization (ADR-0047 section 2, ADR-0017 amendment)
 	PurgeEditorTestData(ctx context.Context, now time.Time, limit int) (int64, error)
 	// PurgeEditorPresence removes up to limit sessions that expired before now and returns how many it removed.
+	//orcon:scope engine the retention of every organization (ADR-0047 section 2)
 	PurgeEditorPresence(ctx context.Context, now time.Time, limit int) (int64, error)
 }

@@ -13,6 +13,9 @@
 package scenarios
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/wirvii/orcon/internal/adapter/httpapi/examplestest"
 )
 
@@ -29,9 +32,22 @@ const (
 	fixedSession  = "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a69"
 )
 
+// awaitingSignIn returns the scenario of an example that needs a signed-in user.
+// Signing in is not connected yet (SPEC-016 SH2 connects the session operations
+// and SH5 the local account commands), so the scenario says so instead of seeding
+// state through a path that does not exist.
+func awaitingSignIn(name string) examplestest.Scenario {
+	return func(context.Context, *examplestest.Client) (examplestest.Bindings, error) {
+		return nil, fmt.Errorf("scenario %s: %w: it needs a signed-in user; the sign-in operations are not connected yet (SPEC-016 SH2, SH5)", name, ErrNotSeedable)
+	}
+}
+
 // All returns every scenario by name. The names are the ones the contract uses.
 func All() map[string]examplestest.Scenario {
 	return map[string]examplestest.Scenario{
+		"account-with-password":              awaitingSignIn("account-with-password"),
+		"signed-in-user":                     awaitingSignIn("signed-in-user"),
+		"user-with-organizations":            awaitingSignIn("user-with-organizations"),
 		"organization-ready":                 organizationReady,
 		"organization-with-projects":         organizationWithProjects,
 		"empty-project":                      emptyProject,
