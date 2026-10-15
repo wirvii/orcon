@@ -58,7 +58,7 @@ func TestEngineFunctionsAreOwnedByTheEngineRole(t *testing.T) {
 	}
 
 	var removed int64
-	if err := conn.QueryRow(ctx,"SELECT orcon_engine.prune_batch('editor_test_data', 10, $1)", time.Now().UTC()).Scan(&removed); err != nil {
+	if err := conn.QueryRow(ctx, "SELECT orcon_engine.prune_batch('editor_test_data', 10, $1)", time.Now().UTC()).Scan(&removed); err != nil {
 		t.Fatalf("prune_batch through its owner: %v", err)
 	}
 }
