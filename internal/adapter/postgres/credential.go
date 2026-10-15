@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -28,7 +29,7 @@ const credentialRowLimit = 1000
 var _ credential.Store = (*Store)(nil)
 
 // CreateCredential implements [credential.Store].
-func (s *Store) CreateCredential(ctx context.Context, org orgscope.Org, rec credential.Record, first credential.Version) error {
+func (s *Store) CreateCredential(ctx context.Context, org orgscope.Org, rec credential.Record, first credential.Version, entry audit.Entry) error {
 	err := s.inScopeRecord(ctx, "create credential", org, rec.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		hosts, err := credential.EncodeHosts(rec.AllowedHosts)
 		if err != nil {
@@ -43,7 +44,10 @@ func (s *Store) CreateCredential(ctx context.Context, org orgscope.Org, rec cred
 		}); err != nil {
 			return err
 		}
-		return insertCredentialVersionPG(ctx, q, first)
+		if err := insertCredentialVersionPG(ctx, q, first); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
@@ -114,7 +118,7 @@ func (s *Store) GetCredentialVersion(ctx context.Context, org orgscope.Org, cred
 
 // AddVersion implements [credential.Store]: the version and the move of the current pointer in one transaction. A
 // pointer that moved since the read makes no row change and is a conflict.
-func (s *Store) AddVersion(ctx context.Context, org orgscope.Org, cred id.UUID, expected int, v credential.Version, status credential.Status, at time.Time) error {
+func (s *Store) AddVersion(ctx context.Context, org orgscope.Org, cred id.UUID, expected int, v credential.Version, status credential.Status, at time.Time, entry audit.Entry) error {
 	err := s.inScopeRecord(ctx, "add credential version", org, v.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
 		if err := insertCredentialVersionPG(ctx, q, v); err != nil {
 			return err
@@ -129,13 +133,13 @@ func (s *Store) AddVersion(ctx context.Context, org orgscope.Org, cred id.UUID, 
 		if n != 1 {
 			return fmt.Errorf("the current version moved: %w", credential.ErrConflict)
 		}
-		return nil
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
 
 // UpdateCredential implements [credential.Store].
-func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec credential.Record) error {
+func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec credential.Record, entry audit.Entry) error {
 	err := s.inScope(ctx, "update credential", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		hosts, err := credential.EncodeHosts(rec.AllowedHosts)
 		if err != nil {
@@ -151,13 +155,13 @@ func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec cred
 		if n != 1 {
 			return credential.ErrNotFound
 		}
-		return nil
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
 
 // DeleteCredential implements [credential.Store]. The versions and the shares go with the row (ON DELETE CASCADE).
-func (s *Store) DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID) error {
+func (s *Store) DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, entry audit.Entry) error {
 	err := s.inScope(ctx, "delete credential", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.DeleteCredential(ctx, pgUUID(identity.OrgIDOf(org)), pgUUID(cred), pgUUID(project))
 		if err != nil {
@@ -166,7 +170,7 @@ func (s *Store) DeleteCredential(ctx context.Context, org orgscope.Org, project 
 		if n != 1 {
 			return credential.ErrNotFound
 		}
-		return nil
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
@@ -192,18 +196,21 @@ func (s *Store) GetShare(ctx context.Context, org orgscope.Org, cred id.UUID, pr
 }
 
 // CreateShare implements [credential.Store]. A project of another organization is a missing foreign key: ErrNotFound.
-func (s *Store) CreateShare(ctx context.Context, org orgscope.Org, sh credential.Share) error {
+func (s *Store) CreateShare(ctx context.Context, org orgscope.Org, sh credential.Share, entry audit.Entry) error {
 	err := s.inScopeRecord(ctx, "create credential share", org, sh.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
-		return q.InsertCredentialShare(ctx, sqlcgen.InsertCredentialShareParams{
+		if err := q.InsertCredentialShare(ctx, sqlcgen.InsertCredentialShareParams{
 			ID: pgUUID(sh.ID), OrgID: pgUUID(sh.OrgID), CredentialID: pgUUID(sh.CredentialID),
 			ProjectID: pgUUID(sh.ProjectID), GrantedByPrincipalID: nullPGUUID(sh.GrantedBy), CreatedAt: timestamp(sh.CreatedAt), UpdatedAt: timestamp(sh.CreatedAt),
-		})
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
 
 // DeleteShare implements [credential.Store].
-func (s *Store) DeleteShare(ctx context.Context, org orgscope.Org, cred id.UUID, project identity.ProjectID) error {
+func (s *Store) DeleteShare(ctx context.Context, org orgscope.Org, cred id.UUID, project identity.ProjectID, entry audit.Entry) error {
 	err := s.inScope(ctx, "delete credential share", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.DeleteCredentialShare(ctx, pgUUID(identity.OrgIDOf(org)), pgUUID(cred), pgUUID(project))
 		if err != nil {
@@ -212,7 +219,7 @@ func (s *Store) DeleteShare(ctx context.Context, org orgscope.Org, cred id.UUID,
 		if n != 1 {
 			return credential.ErrNotFound
 		}
-		return nil
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 	return credErr(err)
 }
