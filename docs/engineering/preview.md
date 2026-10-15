@@ -17,9 +17,11 @@ Every merge to `main` deploys a preview of Orcon to Cloud Run so maintainers can
 
 The preview is not public. The service accepts traffic only from its load balancer, and the load balancer requires Google Identity-Aware Proxy (IAP) sign-in. Only the Google accounts that maintainers explicitly authorize can open it. Anonymous requests are redirected to the Google sign-in page or rejected.
 
-## It is ephemeral
+## Data
 
-Data does not survive a restart or a new deployment. Anything the preview writes goes to the container's temporary disk, and instances are replaced on every merge and whenever Cloud Run decides. Never put real data or real credentials in it.
+The preview keeps its data in the database `orcon_preview` on the shared Cloud SQL instance `wirvii-shared-pg` (PostgreSQL 16, private address only), under its own login `orcon_preview`. That instance also hosts databases of other products: the preview only ever connects to its own database, and its pool is capped at five connections (`ORCON_STORE_POSTGRES_MAX_CONNECTIONS=5`). Data survives restarts and new deployments, but the preview is still not a place for real data or real credentials.
+
+The service reaches the instance through Direct VPC egress (network `shared-vpc`, subnet `shared-usc1`, private ranges only). Three Secret Manager secrets feed it, readable by the runtime identity and listed by the deployer identity: `orcon-preview-db-dsn`, `orcon-preview-master-key` (the `env` master key provider) and `orcon-preview-master-key-ack` (the master key fingerprint that completes the first start). The migrations create the cluster roles `orcon_owner`, `orcon_application` and `orcon_engine`. Cloud SQL does not give the login a superuser, so a one-time grant inside the preview database is needed: the login becomes a member (with `SET`) of the three roles, and `orcon_engine` receives `CREATE` on the `orcon_engine` schema so the engine functions can be handed to it.
 
 ## How it is deployed
 
