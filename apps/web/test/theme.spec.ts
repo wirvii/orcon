@@ -70,8 +70,9 @@ for (const device of ['light', 'dark'] as const) {
       const context = await browser.newContext({ colorScheme: device, locale: 'en-US' });
       const page = await context.newPage();
       await openSettings(page);
-      // Nothing is written for the system choice on a first visit, so move away from it first.
-      if (choice === 'Like the system') await save(page, 'Dark');
+      // A first visit is dark and nothing is written for it: choosing what is already chosen saves nothing, so go to
+      // a choice that is neither the one being tested nor the dark one first.
+      await save(page, choice === 'Light' ? 'Like the system' : 'Light');
       await save(page, choice);
 
       for (const moment of ['saved', 'reloaded', 'opened again'] as const) {
@@ -86,6 +87,26 @@ for (const device of ['light', 'dark'] as const) {
     });
   }
 }
+
+test('a first visit is dark, even on a light device', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'light', locale: 'en-US' });
+  const page = await context.newPage();
+  await page.goto('/login');
+  await expect(page.locator('#root')).toBeVisible();
+  expect(await shown(page)).toMatchObject({ attribute: 'dark', stored: null, scheme: 'dark' });
+  await context.close();
+});
+
+test('choosing the system theme follows the device again', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'light', locale: 'en-US' });
+  const page = await context.newPage();
+  await openSettings(page);
+  await save(page, 'Like the system');
+  await page.reload();
+  await expect(page.locator('#root')).toBeVisible();
+  expect(await shown(page)).toMatchObject({ attribute: null, stored: 'system', scheme: 'light' });
+  await context.close();
+});
 
 const seenSchema = z.array(z.object({ theme: z.string().nullable(), bodyExisted: z.boolean() }));
 
