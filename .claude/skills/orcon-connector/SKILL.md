@@ -4,7 +4,7 @@ description: Applies the Orcon connector authoring standards - declarative-first
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with Go, GNU make and the orcon binary; third-party authors need only the orcon binary.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   pinned: true
   owner: wirvii
 ---

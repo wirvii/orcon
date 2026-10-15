@@ -48,6 +48,9 @@ Planted cases in `internal/connector/authoring/testdata/bad/<case>/` (each must 
 | 24 | TE-4 cassette with a bearer token | `cassette-bearer` |
 | 25 | TE-4 cassette with a name that is not a pseudonym | `cassette-name` |
 | 26 | CR-6 `OAUTH2` credential without `test` | `oauth-no-test` |
+| 27 | IC-1 official connector without `icons/icon.svg` | `icon-missing` |
+| 28 | IC-6 official connector without `icons/SOURCE` | `icon-source-missing` |
+| 29 | IC-8 icon identical to a placeholder listed in `placeholder-icons.txt` | `icon-placeholder` |
 
 Planted case names are folder identifiers and do not change. `TestLintFixtures` requires the expected rule per case; `TestVocabularyMatchesRulebook` compares the verbs of `naming.md` (NM-4) and the codes of `errors.md` (ER-2) with `Verbs` and `ErrorCodes` in `internal/connector/authoring/vocabulary.go`.
 
