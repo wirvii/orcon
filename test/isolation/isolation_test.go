@@ -15,20 +15,25 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/execution/executiontest"
 	"github.com/wirvii/orcon/test/isolation"
 )
 
-// storeFlag is set after -args: go test ./test/isolation/... -args -store=postgres.
+// storeFlag returns the value of -store, set after -args: go test ./test/isolation/... -args -store=postgres.
 //
 //	auto      SQLite, and PostgreSQL when ORCON_TEST_POSTGRES=1 (default)
 //	sqlite    SQLite only
 //	postgres  PostgreSQL only; the test starts a server and fails if it cannot
 //	both      SQLite and PostgreSQL; PostgreSQL must be available
-var storeFlag = flag.String("store", "auto", "store under test: auto, sqlite, postgres or both")
+//
+// The flag is defined once, in executiontest, because this package links
+// storetest, which links executiontest: a second flag.String("store") panics
+// at start-up with "flag redefined: store".
+func storeFlag() string { return executiontest.StoreFlag("auto") }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	switch *storeFlag {
+	switch storeFlag() {
 	case "postgres", "both":
 		storetest.EnablePostgres()
 	}
@@ -43,7 +48,7 @@ func TestMain(m *testing.M) {
 // selectedStores returns the stores this run covers.
 func selectedStores(t *testing.T) []isolation.Store {
 	t.Helper()
-	stores, err := isolation.ParseStores(*storeFlag, storetest.PostgresEnabled() || os.Getenv("ORCON_TEST_POSTGRES") == "1")
+	stores, err := isolation.ParseStores(storeFlag(), storetest.PostgresEnabled() || os.Getenv("ORCON_TEST_POSTGRES") == "1")
 	if err != nil {
 		t.Fatal(err)
 	}
