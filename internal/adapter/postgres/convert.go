@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // timestamp converts an instant to the stored form: UTC, truncated to
@@ -62,6 +63,9 @@ func nullTimestamp(t time.Time) pgtype.Timestamptz {
 	return timestamp(t)
 }
 
+// handleIndex is the unique index of the project handle.
+const handleIndex = "uq_project_handle"
+
 // Violation classes of SQLSTATE (PostgreSQL appendix A).
 const (
 	codeNotNull    = "23502"
@@ -81,13 +85,17 @@ func mapError(op string, err error) error {
 		return fmt.Errorf("%s: %w", op, flow.ErrNotFound)
 	}
 	if errors.Is(err, flow.ErrDraftConflict) || errors.Is(err, flow.ErrNotFound) || errors.Is(err, flow.ErrVersionNotFound) ||
-		errors.Is(err, flow.ErrSnapshotNotFound) || errors.Is(err, ErrClosed) {
+		errors.Is(err, flow.ErrSnapshotNotFound) || errors.Is(err, ErrClosed) ||
+		errors.Is(err, identity.ErrNoScope) || errors.Is(err, identity.ErrScopeMismatch) {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	var pe *pgconn.PgError
 	if errors.As(err, &pe) {
 		switch pe.Code {
 		case codeUnique:
+			if pe.ConstraintName == handleIndex {
+				return fmt.Errorf("%s: %w: %w", op, identity.ErrHandleTaken, err)
+			}
 			return fmt.Errorf("%s: %w: %w", op, flow.ErrConflict, err)
 		case codeForeignKey:
 			return fmt.Errorf("%s: %w: %w", op, flow.ErrReference, err)

@@ -9,6 +9,10 @@ import (
 
 	"go.uber.org/goleak"
 
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 	"github.com/wirvii/orcon/internal/trigger/triggertest"
 )
 
@@ -28,7 +32,20 @@ func memory(t *testing.T) triggertest.Backend {
 	default:
 		t.Fatalf("unknown -store=%s (want auto, sqlite, postgres or both)", *storeFlag)
 	}
-	return triggertest.NewMemory().Backend()
+	b := triggertest.NewMemory().Backend()
+	b.Scope = scopeFor
+	return b
+}
+
+// scopeFor is the scope of an organization of a scenario. Only tests create
+// scopes (ADR-0046 section 2); the battery receives this function through the
+// backend.
+func scopeFor(org identity.OrgID) orgscope.Org {
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		panic(err)
+	}
+	return scope
 }
 
 func TestPublishActivateDeactivateRollback(t *testing.T) {

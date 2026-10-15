@@ -49,7 +49,7 @@ func New(cfg *Config, st Store, revisions Revisions, reader DocumentReader, deps
 	deps.Payloads = payloadReader{reader: st}
 	deps.Clock = cfg.Clock
 	e := &Engine{
-		cfg: *cfg, store: st, plans: NewPlans(revisions, reader, limits), interp: execution.NewInterpreter(deps),
+		cfg: *cfg, store: st, plans: NewPlans(revisions, st, reader, limits), interp: execution.NewInterpreter(deps),
 		leases: newLeaseTable(cfg.LeaseTTL), claims: &claimState{}, wake: make(chan struct{}, cfg.Concurrency), meta: make(map[store.ExecutionID]*store.Execution),
 	}
 	if router, ok := st.(store.EventRouter); ok {
@@ -112,7 +112,7 @@ func (e *Engine) Start(ctx context.Context, r StartRequest) (store.ExecutionID, 
 	if err != nil {
 		return store.ExecutionID{}, fmt.Errorf("start execution: %w", err)
 	}
-	err = e.store.InTx(ctx, r.OrgID, func(ctx context.Context, tx store.Tx) error {
+	err = e.inTx(ctx, r.OrgID, func(ctx context.Context, tx store.Tx) error {
 		now := e.cfg.Clock.Now()
 		ex.CreatedAt, ex.UpdatedAt = now, now
 		if err := tx.InsertExecution(ctx, ex); err != nil {
@@ -140,7 +140,11 @@ func (e *Engine) metaOf(ctx context.Context, org identity.OrgID, exec store.Exec
 		return m, nil
 	}
 	e.metaMu.Unlock()
-	m, err := e.store.GetExecution(ctx, org, exec)
+	scope, err := engineScope(e.store, org)
+	if err != nil {
+		return nil, err
+	}
+	m, err := e.store.GetExecution(ctx, scope, exec)
 	if err != nil {
 		return nil, fmt.Errorf("read execution %s: %w", exec, err)
 	}

@@ -101,8 +101,8 @@ func blockedCases() []blockedCase {
 func runBlocked(t *testing.T, f Factory, c *blockedCase) {
 	t.Helper()
 	e := newEnv(t, f, c.settings)
-	id := e.newFlow(e.orgA, e.projA, "blocked", Build(c.spec))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	id := e.newFlow(e.scopeA, e.projA, "blocked", Build(c.spec))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
 	issue := validationIssue(t, "publish", err, c.code)
 	if !contains(issue.Message, c.contains...) {
 		t.Fatalf("message %q lacks %v", issue.Message, c.contains)
@@ -110,7 +110,7 @@ func runBlocked(t *testing.T, f Factory, c *blockedCase) {
 	if n := versionCount(t, e, id); n != 0 {
 		t.Fatalf("a blocked publication left %d versions", n)
 	}
-	if trs := e.triggers(e.orgA, id); len(trs) != 0 {
+	if trs := e.triggers(e.scopeA, id); len(trs) != 0 {
 		t.Fatalf("a blocked publication left registry entries: %+v", trs)
 	}
 }
@@ -122,14 +122,14 @@ func boundsAreAllowed(t *testing.T, f Factory) {
 	e := newEnv(t, f, trigger.Settings{})
 	for _, window := range []string{"PT1M", "P90D", "PT24H"} {
 		spec := DocSpec{Name: "w" + window, Starts: []Node{{ID: "t", Block: WebhookBlock("w", `"dedupe":{"source":"HEADER","name":"X-Id","window":"`+window+`"}`)}}}
-		id := e.newFlow(e.orgA, e.projA, "bounds"+window, Build(spec))
-		if _, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user}); err != nil {
+		id := e.newFlow(e.scopeA, e.projA, "bounds"+window, Build(spec))
+		if _, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user}); err != nil {
 			t.Fatalf("window %s: %v", window, err)
 		}
 		// Free the path for the next flow of the loop.
-		must(t, "delete", e.svc.Delete(e.ctx(), e.orgA, id, e.user))
+		must(t, "delete", e.svc.Delete(e.ctx(), e.scopeA, id, e.user))
 		e.clock.Advance(RecoveryPlusADay)
-		must(t, "purge", e.svc.Purge(e.ctx(), e.orgA, id))
+		must(t, "purge", e.svc.Purge(e.ctx(), e.scopeA, id))
 	}
 }
 
@@ -138,10 +138,10 @@ func boundsAreAllowed(t *testing.T, f Factory) {
 func collisionInOrganization(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
-	first := e.newFlow(e.orgA, e.projA, "first flow", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
-	e.publish(e.orgA, first)
-	second := e.newFlow(e.orgA, e.projA, "second flow", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: second, By: e.user})
+	first := e.newFlow(e.scopeA, e.projA, "first flow", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
+	e.publish(e.scopeA, first)
+	second := e.newFlow(e.scopeA, e.projA, "second flow", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: second, By: e.user})
 	issue := validationIssue(t, "publish the second flow", err, trigger.CodeTV1)
 	if !contains(issue.Message, `"first flow"`, "/hooks/alpha/shared") {
 		t.Fatalf("the same-organization collision message = %q, want it to name the owning flow", issue.Message)
@@ -157,25 +157,25 @@ func collisionInOrganization(t *testing.T, f Factory) {
 func collisionAcrossOrganizations(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
-	other := e.newFlow(e.orgB, e.projB, "secret flow of the other organization", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
-	e.publish(e.orgB, other)
-	mine := e.newFlow(e.orgA, e.projA, "mine", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: mine, By: e.user})
+	other := e.newFlow(e.scopeB, e.projB, "secret flow of the other organization", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
+	e.publish(e.scopeB, other)
+	mine := e.newFlow(e.scopeA, e.projA, "mine", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("shared")}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: mine, By: e.user})
 	issue := validationIssue(t, "publish against another organization's path", err, trigger.CodeTV1)
 	if !contains(issue.Message, "path unavailable") {
 		t.Fatalf("the cross-organization message = %q, want the generic problem", issue.Message)
 	}
-	for _, leak := range []string{"secret flow", e.orgB.String(), e.projB.String(), other.String()} {
+	for _, leak := range []string{"secret flow", e.scopeB.String(), e.projB.String(), other.String()} {
 		if contains(issue.Message, leak) || contains(err.Error(), leak) {
 			t.Fatalf("the error leaks %q of another organization: %v", leak, err)
 		}
 	}
 	// The n8n family is shared by the whole instance: the same rule applies.
 	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"hook"}]}`
-	theirs := e.newFlow(e.orgB, e.projB, "theirs n8n", Build(DocSpec{Name: "c", Starts: []Node{{ID: "t", Block: n8n}}}))
-	e.publish(e.orgB, theirs)
-	ours := e.newFlow(e.orgA, e.projA, "ours n8n", Build(DocSpec{Name: "d", Starts: []Node{{ID: "t", Block: n8n}}}))
-	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: ours, By: e.user})
+	theirs := e.newFlow(e.scopeB, e.projB, "theirs n8n", Build(DocSpec{Name: "c", Starts: []Node{{ID: "t", Block: n8n}}}))
+	e.publish(e.scopeB, theirs)
+	ours := e.newFlow(e.scopeA, e.projA, "ours n8n", Build(DocSpec{Name: "d", Starts: []Node{{ID: "t", Block: n8n}}}))
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: ours, By: e.user})
 	validationIssue(t, "publish against an n8n path of another organization", err, trigger.CodeTV1)
 }
 
@@ -184,10 +184,10 @@ func collisionAcrossOrganizations(t *testing.T, f Factory) {
 func overlapWarns(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
-	a := e.newFlow(e.orgA, e.projA, "static", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("orders/new")}}}))
-	e.publish(e.orgA, a)
-	b := e.newFlow(e.orgA, e.projA, "parameter", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("orders/:id")}}}))
-	p := e.publish(e.orgA, b)
+	a := e.newFlow(e.scopeA, e.projA, "static", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("orders/new")}}}))
+	e.publish(e.scopeA, a)
+	b := e.newFlow(e.scopeA, e.projA, "parameter", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("orders/:id")}}}))
+	p := e.publish(e.scopeA, b)
 	if !p.Report.Has(trigger.CodeTV1, flow.SeverityWarning) {
 		t.Fatalf("overlapping patterns did not warn: %v", p.Report.Issues)
 	}
@@ -201,14 +201,14 @@ func missingCredential(t *testing.T, f Factory) {
 	e := newEnv(t, f, trigger.Settings{})
 	e.creds.SetMissing("feed token")
 	spec := single(TypePoll, `{"family":"POLL","poll":{"rules":[{"kind":"MINUTES","every":5}]}}`)
-	id := e.newFlow(e.orgA, e.projA, "poller", Build(spec))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	id := e.newFlow(e.scopeA, e.projA, "poller", Build(spec))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
 	issue := validationIssue(t, "publish without the credential", err, trigger.CodeTV3)
 	if !contains(issue.Message, "feed token") {
 		t.Fatalf("message %q does not name the credential", issue.Message)
 	}
 	e.creds.SetMissing()
-	e.publish(e.orgA, id)
+	e.publish(e.scopeA, id)
 }
 
 func importedAddress(t *testing.T, f Factory) {
@@ -218,12 +218,12 @@ func importedAddress(t *testing.T, f Factory) {
 		block := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"` + path + `"}]}`
 		return Build(DocSpec{Name: name, Imported: true, Starts: []Node{{ID: "t", Block: block}}})
 	}
-	id := e.newFlow(e.orgA, e.projA, "imported", spec("v1", "legacy-hook"))
-	e.publish(e.orgA, id)
-	e.saveDraft(e.orgA, id, spec("v2", "renamed-hook"))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	id := e.newFlow(e.scopeA, e.projA, "imported", spec("v1", "legacy-hook"))
+	e.publish(e.scopeA, id)
+	e.saveDraft(e.scopeA, id, spec("v2", "renamed-hook"))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
 	validationIssue(t, "change an imported address", err, trigger.CodeTV4)
-	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user, AllowImportedAddressChange: true})
 	must(t, "publish with the confirmation", err)
 }
 
@@ -235,10 +235,10 @@ func importedAddressNodeRemoved(t *testing.T, f Factory) {
 	e := newEnv(t, f, trigger.Settings{})
 	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
 	both := Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: n8n}, {ID: "keep", Block: WebhookBlock("kept")}}})
-	id := e.newFlow(e.orgA, e.projA, "imported", both)
-	e.publish(e.orgA, id)
-	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "keep", Block: WebhookBlock("kept")}}}))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	id := e.newFlow(e.scopeA, e.projA, "imported", both)
+	e.publish(e.scopeA, id)
+	e.saveDraft(e.scopeA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "keep", Block: WebhookBlock("kept")}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
 	issue := validationIssue(t, "delete a trigger node that owns an imported address", err, trigger.CodeTV4)
 	if !contains(issue.Message, "/legacy-hook") {
 		t.Fatalf("message %q does not name the address", issue.Message)
@@ -246,7 +246,7 @@ func importedAddressNodeRemoved(t *testing.T, f Factory) {
 	if n := versionCount(t, e, id); n != 1 {
 		t.Fatalf("the refused publication left %d versions, want 1", n)
 	}
-	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user, AllowImportedAddressChange: true})
 	must(t, "publish with the confirmation", err)
 }
 
@@ -256,15 +256,15 @@ func importedAddressBlockRemoved(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
 	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
-	id := e.newFlow(e.orgA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
-	e.publish(e.orgA, id)
-	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t"}}}))
-	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user})
+	id := e.newFlow(e.scopeA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
+	e.publish(e.scopeA, id)
+	e.saveDraft(e.scopeA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t"}}}))
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
 	issue := validationIssue(t, "drop the trigger block of a node with an imported address", err, trigger.CodeTV4)
 	if !contains(issue.Message, "/legacy-hook") {
 		t.Fatalf("message %q does not name the address", issue.Message)
 	}
-	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.orgA, Flow: id, By: e.user, AllowImportedAddressChange: true})
+	_, err = e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user, AllowImportedAddressChange: true})
 	must(t, "publish with the confirmation", err)
 }
 
@@ -275,16 +275,16 @@ func importedAddressRollback(t *testing.T, f Factory) {
 	e := newEnv(t, f, trigger.Settings{})
 	plain := `{"family":"WEBHOOK","addresses":[{"family":"NATIVE","path":"plain"}]}`
 	n8n := `{"family":"WEBHOOK","addresses":[{"family":"N8N","path":"legacy-hook"}]}`
-	id := e.newFlow(e.orgA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: plain}}}))
-	e.publish(e.orgA, id)
-	e.saveDraft(e.orgA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
-	e.publish(e.orgA, id)
-	_, err := e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.orgA, Flow: id, By: e.user, ToVersion: 1})
+	id := e.newFlow(e.scopeA, e.projA, "imported", Build(DocSpec{Name: "v1", Imported: true, Starts: []Node{{ID: "t", Block: plain}}}))
+	e.publish(e.scopeA, id)
+	e.saveDraft(e.scopeA, id, Build(DocSpec{Name: "v2", Imported: true, Starts: []Node{{ID: "t", Block: n8n}}}))
+	e.publish(e.scopeA, id)
+	_, err := e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.scopeA, Flow: id, By: e.user, ToVersion: 1})
 	issue := validationIssue(t, "roll back to a version without the imported address", err, trigger.CodeTV4)
 	if !contains(issue.Message, "/legacy-hook") {
 		t.Fatalf("message %q does not name the address", issue.Message)
 	}
-	_, err = e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.orgA, Flow: id, By: e.user, ToVersion: 1, AllowImportedAddressChange: true})
+	_, err = e.svc.Rollback(e.ctx(), trigger.RollbackCommand{Org: e.scopeA, Flow: id, By: e.user, ToVersion: 1, AllowImportedAddressChange: true})
 	must(t, "roll back with the confirmation", err)
 }
 
@@ -292,16 +292,16 @@ func unreachableRespondNode(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
 	block := WebhookBlock("answer", `"response":{"mode":"RESPOND_NODE","waitTimeout":"PT30S"}`)
-	id := e.newFlow(e.orgA, e.projA, "answers", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: block}}}))
-	p := e.publish(e.orgA, id)
+	id := e.newFlow(e.scopeA, e.projA, "answers", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: block}}}))
+	p := e.publish(e.scopeA, id)
 	if !p.Report.Has(trigger.CodeTV5, flow.SeverityWarning) || len(p.Version.Warnings) == 0 {
 		t.Fatalf("a RESPOND_NODE trigger with no respond node did not warn: %v", p.Report.Issues)
 	}
 	with := Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: block, Next: "respond"}},
 		Extra:      []string{`{"id":"respond","name":"Respond","element":"task","type":"orcon.respond@1","parameters":{}}`},
 		ExtraEdges: []string{`{"id":"e-respond","from":{"node":"respond","port":"main"},"to":{"node":"end"},"kind":"SEQUENCE"}`}})
-	e.saveDraft(e.orgA, id, with)
-	if p = e.publish(e.orgA, id); p.Report.Has(trigger.CodeTV5, flow.SeverityWarning) {
+	e.saveDraft(e.scopeA, id, with)
+	if p = e.publish(e.scopeA, id); p.Report.Has(trigger.CodeTV5, flow.SeverityWarning) {
 		t.Fatalf("a reachable respond node still warns: %v", p.Report.Issues)
 	}
 }
@@ -309,17 +309,17 @@ func unreachableRespondNode(t *testing.T, f Factory) {
 func localFileInside(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{LocalFileEnabled: true, LocalFileAllowedPaths: []string{"/srv/inbox"}})
-	id := e.newFlow(e.orgA, e.projA, "files", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Type: TypeLocalFile, Block: `{"family":"LISTEN","listen":{"localPath":"/srv/inbox/orders"}}`}}}))
-	e.publish(e.orgA, id)
+	id := e.newFlow(e.scopeA, e.projA, "files", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Type: TypeLocalFile, Block: `{"family":"LISTEN","listen":{"localPath":"/srv/inbox/orders"}}`}}}))
+	e.publish(e.scopeA, id)
 }
 
 func dryRun(t *testing.T, f Factory) {
 	t.Helper()
 	e := newEnv(t, f, trigger.Settings{})
-	owner := e.newFlow(e.orgA, e.projA, "owner", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("taken")}}}))
-	e.publish(e.orgA, owner)
-	id := e.newFlow(e.orgA, e.projA, "dry", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("taken")}}}))
-	report, err := e.svc.Validate(e.ctx(), e.orgA, id)
+	owner := e.newFlow(e.scopeA, e.projA, "owner", Build(DocSpec{Name: "a", Starts: []Node{{ID: "t", Block: WebhookBlock("taken")}}}))
+	e.publish(e.scopeA, owner)
+	id := e.newFlow(e.scopeA, e.projA, "dry", Build(DocSpec{Name: "b", Starts: []Node{{ID: "t", Block: WebhookBlock("taken")}}}))
+	report, err := e.svc.Validate(e.ctx(), e.scopeA, id)
 	must(t, "validate", err)
 	if !report.Has(trigger.CodeTV1, flow.SeverityError) {
 		t.Fatalf("Validate missed the collision: %v", report.Issues)

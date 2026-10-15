@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"slices"
 	"sync"
 	"testing"
@@ -53,12 +54,9 @@ func TestMain(m *testing.M) {
 	// An unknown value of -store makes every test fail (eachStore reports it).
 	kinds, _ := storetest.KindsFor(storeFlag())
 	if slices.Contains(kinds, storetest.PostgreSQL) {
-		storetest.EnablePostgres()
 		// The container client keeps goroutines of its own for the whole run.
-		stop := storetest.StartPostgres()
-		defer stop()
-		m.Run()
-		return
+		storetest.EnablePostgres()
+		os.Exit(runWithPostgres(m)) //nolint:forbidigo // AL-8: TestMain ends the test process with the code of the run
 	}
 	goleak.VerifyTestMain(m)
 }
@@ -165,7 +163,7 @@ func waitFor(t *testing.T, what string, within time.Duration, cond func() bool) 
 
 // statusOf reads the status of an execution.
 func statusOf(env *storetest.EngineEnv, execID store.ExecutionID) execution.State {
-	ex, err := env.Store.GetExecution(env.T.Context(), env.Org, execID)
+	ex, err := env.Store.GetExecution(env.T.Context(), storetest.ScopeOf(env.Org), execID)
 	if err != nil {
 		return ""
 	}

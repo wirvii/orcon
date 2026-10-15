@@ -26,6 +26,7 @@ import (
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Kind names a store implementation the engine tests run against.
@@ -186,12 +187,12 @@ func (env *EngineEnv) Setup() {
 	ctx := context.Background()
 	now := env.Clock.Now()
 	slug := "o" + strings.ToLower(hex.EncodeToString(env.IDs.New().Bytes()[10:]))
-	o := flow.OrgRecord{ID: identity.OrgID(env.IDs.New()), Name: slug, Slug: slug, Status: flow.OrgActive, CreatedAt: now, UpdatedAt: now}
+	o := identity.OrgRecord{ID: identity.OrgID(env.IDs.New()), Name: slug, Slug: slug, Status: identity.OrgActive, CreatedAt: now, UpdatedAt: now}
 	if err := env.Store.CreateOrganization(ctx, o); err != nil {
 		env.T.Fatalf("create organization: %v", err)
 	}
-	p := flow.ProjectRecord{ID: identity.ProjectID(env.IDs.New()), OrgID: o.ID, Name: "engine", Slug: "engine", Environment: "development", IsProtected: true, CreatedAt: now, UpdatedAt: now}
-	if err := env.Store.CreateProject(ctx, p); err != nil {
+	p := identity.ProjectRecord{ID: identity.ProjectID(env.IDs.New()), OrgID: o.ID, Name: "engine", Slug: "engine", Handle: "engine-" + slug, Environment: "development", IsProtected: true, CreatedAt: now, UpdatedAt: now}
+	if err := env.Store.CreateProject(ctx, scopeOf(o.ID), p); err != nil {
 		env.T.Fatalf("create project: %v", err)
 	}
 	env.Org, env.Project = o.ID, p.ID
@@ -218,14 +219,14 @@ func (env *EngineEnv) Publish(doc *flow.Document) *Published {
 	env.mu.Unlock()
 	now := env.Clock.Now()
 	rec := flow.Record{ID: flow.FlowID(env.IDs.New()), OrgID: env.Org, ProjectID: env.Project, Name: name, Draft: data, CreatedAt: now, UpdatedAt: now}
-	if err := env.Store.CreateFlow(ctx, rec); err != nil {
+	if err := env.Store.CreateFlow(ctx, scopeOf(env.Org), rec); err != nil {
 		env.T.Fatalf("create flow: %v", err)
 	}
 	ver := flow.VersionRecord{
 		ID: flow.FlowVersionID(env.IDs.New()), OrgID: env.Org, FlowID: rec.ID, Number: 1, Document: data,
 		ContentHash: hex.EncodeToString(sum[:]), PublishedAt: now, CreatedAt: now,
 	}
-	if err := env.Store.PublishVersion(ctx, ver); err != nil {
+	if err := env.Store.PublishVersion(ctx, scopeOf(env.Org), ver); err != nil {
 		env.T.Fatalf("publish version: %v", err)
 	}
 	return &Published{Flow: rec.ID, Version: ver.ID}
@@ -301,7 +302,7 @@ func (env *EngineEnv) Drain(eng *durable.Engine) int {
 // Execution reads an execution.
 func (env *EngineEnv) Execution(execID store.ExecutionID) store.Execution {
 	env.T.Helper()
-	ex, err := env.Store.GetExecution(env.T.Context(), env.Org, execID)
+	ex, err := env.Store.GetExecution(env.T.Context(), scopeOf(env.Org), execID)
 	if err != nil {
 		env.T.Fatalf("get execution: %v", err)
 	}
@@ -324,7 +325,7 @@ func (env *EngineEnv) Events(execID store.ExecutionID) []store.Event {
 	var out []store.Event
 	var after int64
 	for {
-		page, err := env.Store.ListExecutionEvents(env.T.Context(), env.Org, execID, after, 500)
+		page, err := env.Store.ListExecutionEvents(env.T.Context(), scopeOf(env.Org), execID, after, 500)
 		if err != nil {
 			env.T.Fatalf("list events: %v", err)
 		}
@@ -469,7 +470,7 @@ func (env *EngineEnv) verify(execID store.ExecutionID, plan *execution.Plan, res
 			env.T.Errorf("token id %q: %v", rec.ID, err)
 			continue
 		}
-		got, err := env.Store.GetToken(env.T.Context(), env.Org, store.TokenID(tid))
+		got, err := env.Store.GetToken(env.T.Context(), scopeOf(env.Org), store.TokenID(tid))
 		if err != nil {
 			env.T.Errorf("get token %s: %v", rec.ID, err)
 			continue
@@ -498,3 +499,8 @@ func (env *EngineEnv) verify(execID store.ExecutionID, plan *execution.Plan, res
 		env.T.Errorf("stored events differ from the persisted ones of the commits:\nwant %v\n got %v", want, got)
 	}
 }
+
+// ScopeOf returns the scope of an organization for the tests of the engine and the
+// fault matrix, which work with ids; production code gets its scope from the
+// authorization context or from engine rows.
+func ScopeOf(org identity.OrgID) orgscope.Org { return scopeOf(org) }

@@ -18,6 +18,8 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // revisionStore is a fake of the pinned revisions: it counts reads.
@@ -40,7 +42,7 @@ func (r *revisionStore) add(hash string, document []byte) flow.FlowVersionID {
 	return version
 }
 
-func (r *revisionStore) GetVersion(_ context.Context, _ identity.OrgID, v flow.FlowVersionID) (flow.VersionRecord, error) {
+func (r *revisionStore) GetVersion(_ context.Context, _ orgscope.Org, v flow.FlowVersionID) (flow.VersionRecord, error) {
 	r.reads.Add(1)
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -51,7 +53,7 @@ func (r *revisionStore) GetVersion(_ context.Context, _ identity.OrgID, v flow.F
 	return rec, nil
 }
 
-func (r *revisionStore) GetSnapshot(context.Context, identity.OrgID, flow.FlowSnapshotID) (flow.SnapshotRecord, error) {
+func (r *revisionStore) GetSnapshot(context.Context, orgscope.Org, flow.FlowSnapshotID) (flow.SnapshotRecord, error) {
 	return flow.SnapshotRecord{}, flow.ErrSnapshotNotFound
 }
 
@@ -94,7 +96,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 		stored := []byte("document-a")
 		v := revisions.add("hash-a", stored)
 		reader := &countingReader{docs: map[string]flow.Document{"document-a": tinyFlow("a")}, version: 1}
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{})
 		first, err := plans.For(t.Context(), execOf(v))
 		if err != nil {
 			t.Fatal(err)
@@ -121,7 +123,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 		revisions := newRevisionStore()
 		v1, v2 := revisions.add("same-hash", []byte("document-a")), revisions.add("same-hash", []byte("document-a"))
 		reader := &countingReader{docs: map[string]flow.Document{"document-a": tinyFlow("a")}, version: 1}
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{})
 		for _, v := range []flow.FlowVersionID{v1, v2, v1} {
 			if _, err := plans.For(t.Context(), execOf(v)); err != nil {
 				t.Fatal(err)
@@ -142,7 +144,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 			versions = append(versions, revisions.add(fmt.Sprintf("hash-%d", i), []byte(name)))
 		}
 		reader := &countingReader{docs: docs, version: 1}
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{Entries: 2})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{Entries: 2})
 		load := func(i int) {
 			t.Helper()
 			if _, err := plans.For(t.Context(), execOf(versions[i])); err != nil {
@@ -184,7 +186,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 		docs[huge] = tinyFlow("huge")
 		hugeVersion := revisions.add("hash-huge", []byte(huge))
 		reader := &countingReader{docs: docs, version: 1}
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{Bytes: 100})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{Bytes: 100})
 		for _, v := range versions {
 			if _, err := plans.For(t.Context(), execOf(v)); err != nil {
 				t.Fatal(err)
@@ -212,7 +214,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 		revisions := newRevisionStore()
 		v := revisions.add("hash-a", []byte("document-a"))
 		reader := &countingReader{docs: map[string]flow.Document{"document-a": tinyFlow("a")}, version: 1}
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{})
 		var wg sync.WaitGroup
 		for range 32 {
 			wg.Add(1)
@@ -234,7 +236,7 @@ func TestUpgradedDocumentCache(t *testing.T) {
 		v := revisions.add("hash-a", []byte("document-a"))
 		reader := &countingReader{docs: map[string]flow.Document{"document-a": tinyFlow("a")}, version: 1}
 		reader.fail.Store(true)
-		plans := durable.NewPlans(revisions, reader, durable.PlanLimits{})
+		plans := durable.NewPlans(revisions, testScopes{}, reader, durable.PlanLimits{})
 		if _, err := plans.For(t.Context(), execOf(v)); err == nil {
 			t.Fatal("a document that cannot be read loaded")
 		}
@@ -248,10 +250,17 @@ func TestUpgradedDocumentCache(t *testing.T) {
 	})
 
 	t.Run("an unknown revision is an error", func(t *testing.T) {
-		plans := durable.NewPlans(newRevisionStore(), &countingReader{version: 1}, durable.PlanLimits{})
+		plans := durable.NewPlans(newRevisionStore(), testScopes{}, &countingReader{version: 1}, durable.PlanLimits{})
 		_, err := plans.For(t.Context(), execOf(flow.FlowVersionID(id.NewSequence().New())))
 		if !errors.Is(err, flow.ErrVersionNotFound) {
 			t.Errorf("error %v, want flow.ErrVersionNotFound", err)
 		}
 	})
+}
+
+// testScopes issues the scopes of the test organizations (tests may build scopes; production code gets them from the store).
+type testScopes struct{}
+
+func (testScopes) ScopeOf(org identity.OrgID) (orgscope.Org, error) {
+	return issue.New(id.UUID(org))
 }

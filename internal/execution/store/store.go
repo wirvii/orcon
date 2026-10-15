@@ -25,6 +25,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Errors of the ports. The errors of internal/flow (ErrNotFound, ErrConflict,
@@ -498,34 +499,42 @@ type ExecutionFilter struct {
 // Reader reads inside one organization.
 type Reader interface {
 	// GetExecution returns an execution, or flow.ErrNotFound.
-	GetExecution(ctx context.Context, org identity.OrgID, execution ExecutionID) (Execution, error)
+	GetExecution(ctx context.Context, org orgscope.Org, execution ExecutionID) (Execution, error)
 	// ListExecutions returns at most limit executions matching the filter,
 	// newest first, after the cursor. Exactly one filter field must be set.
-	ListExecutions(ctx context.Context, org identity.OrgID, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
+	ListExecutions(ctx context.Context, org orgscope.Org, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
 	// GetToken returns a token, or flow.ErrNotFound.
-	GetToken(ctx context.Context, org identity.OrgID, token TokenID) (Token, error)
+	GetToken(ctx context.Context, org orgscope.Org, token TokenID) (Token, error)
 	// ListExecutionEvents returns at most limit events of the execution with a
 	// sequence number greater than after, in order.
-	ListExecutionEvents(ctx context.Context, org identity.OrgID, execution ExecutionID, after int64, limit int) ([]Event, error)
+	ListExecutionEvents(ctx context.Context, org orgscope.Org, execution ExecutionID, after int64, limit int) ([]Event, error)
 	// GetExternalOperation returns one journal entry, or flow.ErrNotFound.
-	GetExternalOperation(ctx context.Context, org identity.OrgID, operation ExternalOperationID) (ExternalOperation, error)
+	GetExternalOperation(ctx context.Context, org orgscope.Org, operation ExternalOperationID) (ExternalOperation, error)
 	// ListExternalOperations returns the journal of a node execution from an
 	// item index on, in item order.
-	ListExternalOperations(ctx context.Context, org identity.OrgID, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
 }
 
 // EngineReader reads what a worker needs to open an execution.
 type EngineReader interface {
 	// LoadSnapshot reads the engine state and the live tokens of an execution in
 	// one consistent read, or returns flow.ErrNotFound.
+	//
+	//orcon:scope engine the engine reads the snapshot of the execution it claimed (ADR-0047 section 2)
 	LoadSnapshot(ctx context.Context, org identity.OrgID, execution ExecutionID) (EngineSnapshot, error)
 	// GetPayload returns the orcon/items@1 document of a stored batch, or
 	// flow.ErrNotFound.
+	//
+	//orcon:scope engine the engine reads the payloads of the execution it claimed (ADR-0047 section 2)
 	GetPayload(ctx context.Context, org identity.OrgID, payload PayloadID) ([]byte, error)
 	// ListTokenNondeterminism returns the environments recorded for the node
 	// executions of a token.
+	//
+	//orcon:scope engine the engine reads the recorded environments of the token it claimed (ADR-0047 section 2)
 	ListTokenNondeterminism(ctx context.Context, org identity.OrgID, token TokenID, limit int) ([]Nondeterminism, error)
 	// ListAttempts returns the attempts of a node execution, in attempt order.
+	//
+	//orcon:scope engine the engine reads the attempts of the node execution it claimed (ADR-0047 section 2)
 	ListAttempts(ctx context.Context, org identity.OrgID, node NodeExecutionID, limit int) ([]TaskAttempt, error)
 }
 
@@ -533,10 +542,14 @@ type EngineReader interface {
 type Inbox interface {
 	// ListAttentionRequests returns at most limit requests in one status,
 	// oldest first, after the cursor (the attention inbox, ADR-0073 section 9).
-	ListAttentionRequests(ctx context.Context, org identity.OrgID, status string, after Cursor, limit int) ([]AttentionRequest, error)
+	ListAttentionRequests(ctx context.Context, org orgscope.Org, status string, after Cursor, limit int) ([]AttentionRequest, error)
 	// GetTimer returns a timer, or flow.ErrNotFound.
-	GetTimer(ctx context.Context, org identity.OrgID, timer TimerID) (Timer, error)
-	// GetJoinInstance returns a join instance, or flow.ErrNotFound.
+	GetTimer(ctx context.Context, org orgscope.Org, timer TimerID) (Timer, error)
+	// GetJoinInstance returns a join instance, or flow.ErrNotFound. The engine
+	// reads the join of a token it has claimed; the key names the organization of
+	// that join, so the lookup is not a read of one organization by a person.
+	//
+	//orcon:scope engine the engine resumes a join of the organization its claimed token names (ADR-0047 section 2)
 	GetJoinInstance(ctx context.Context, key JoinKey) (JoinInstance, error)
 }
 
@@ -624,7 +637,7 @@ type Tx interface {
 // function may be run again after a serialization or busy failure, so it must
 // be safe to repeat; it holds no external call (AL-6.3).
 type Transactor interface {
-	InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx Tx) error) error
+	InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
 }
 
 // ClaimRequest asks for runnable tokens across organizations.
@@ -727,14 +740,20 @@ type WaitLookup struct {
 type WorkQueue interface {
 	// ClaimTokens leases up to Limit runnable tokens in fairness order. A token
 	// is claimed by one worker only, however many claim at once.
+	//
+	//orcon:scope engine the engine claims work of every organization (ADR-0047 section 2)
 	ClaimTokens(ctx context.Context, r ClaimRequest) ([]Claimed, error)
 	// RenewLeases extends every lease of the worker that has not expired. A
 	// lease the worker held and that is not returned was lost.
+	//
+	//orcon:scope engine the engine renews the leases of its worker across organizations (ADR-0047 section 2)
 	RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]Renewed, error)
 	// FireDueTimers marks up to limit due timers FIRED and, in the same
 	// transaction, wakes the WAITING token of each (RUNNABLE, counters and status
 	// of the execution refreshed, event timer.fired); concurrent callers never
 	// fire the same timer.
+	//
+	//orcon:scope engine the timer scan covers the due timers of every organization (ADR-0047 section 2)
 	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
 }
 
@@ -748,32 +767,44 @@ type LeaseRecovery interface {
 	// the same transaction appends the events lease.expired and token.poisoned,
 	// opens the attention request of a poisoned token (cause POISON_TOKEN) and
 	// refreshes the counters and status of the execution.
+	//
+	//orcon:scope engine the reaper sweeps expired leases of every organization (ADR-0047 section 2)
 	ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]Reaped, error)
 	// ReleaseWorkerLeases returns every lease of the worker that is still held to
 	// RUNNABLE (graceful shutdown, ADR-0013 section 9): the owner gives the tokens
 	// back, so the abandon count does not grow, no lease.expired event is appended
 	// and the started attempts of their node executions become ABANDONED.
+	//
+	//orcon:scope engine the leases of one worker can name tokens of several organizations (ADR-0047 section 2)
 	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
 	// ReleaseLostLeases gives up the leases a previous incarnation of the worker
 	// left behind. Nobody returned them, so each counts as an abandonment, like an
 	// expired lease: the token goes back to RUNNABLE, or to SUSPENDED with reason
 	// POISON at the threshold.
+	//
+	//orcon:scope engine the leases a previous incarnation of the worker left can name tokens of several organizations (ADR-0047 section 2)
 	ReleaseLostLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
 	// ClaimLastChanceToken leases the one runnable token that is one abandonment
 	// short of the poison threshold, if there is one (same order as ClaimTokens).
 	// The caller must hold no other token and claim nothing else while it holds this
 	// one: the abandonment that reaches the threshold then happens with the token
 	// alone in its process (SPEC-001 Enmienda 12 section 12-1).
+	//
+	//orcon:scope engine the engine claims work of every organization (ADR-0047 section 2)
 	ClaimLastChanceToken(ctx context.Context, r ClaimRequest) ([]Claimed, error)
 	// LastChanceWaiting reports since when a runnable token one abandonment short
 	// of the threshold has been claimable, for the worker to decide that it must
 	// empty itself to take it.
+	//
+	//orcon:scope engine the engine looks for runnable work of every organization (ADR-0047 section 2)
 	LastChanceWaiting(ctx context.Context, poisonThreshold int64) (since time.Time, found bool, err error)
 	// ReleaseTokenLease gives up the lease of one token the worker could not go on
 	// with (the engine failed on a step of it). It counts as an abandonment, like an
 	// expired lease, but at once: renewing by worker would keep the lease alive for
 	// as long as the worker holds any other. It reports false when the fence no
 	// longer holds (the lease was lost or already released).
+	//
+	//orcon:scope engine the fence names one token; the engine returns the lease of a token it worked on (ADR-0047 section 2)
 	ReleaseTokenLease(ctx context.Context, f Fence, poisonThreshold int64, now time.Time) (Reaped, bool, error)
 }
 
@@ -783,10 +814,20 @@ type Work interface {
 	LeaseRecovery
 }
 
+// Scopes issues the scope of an organization from the id of a row the engine
+// read (ADR-0046 section 2). Only the storage adapters implement it: they wrap the
+// engine functions, so the engine's ids reach the scoped methods through them.
+type Scopes interface {
+	//orcon:scope engine the engine turns the organization of the rows it read into a scope (ADR-0047 section 2)
+	ScopeOf(org identity.OrgID) (orgscope.Org, error)
+}
+
 // Deliveries leases outbox rows to dispatchers (ADR-0013 section 8).
 type Deliveries interface {
 	// ClaimOutbox leases up to limit undelivered rows whose lease is free or
 	// expired and counts the attempt.
+	//
+	//orcon:scope engine the dispatchers lease outbox rows of every organization (ADR-0047 section 2)
 	ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, now time.Time) ([]ClaimedOutbox, error)
 }
 
@@ -795,5 +836,7 @@ type Deliveries interface {
 type WaitResolver interface {
 	// ResolveWaitSecret returns the wait and its organization, or
 	// flow.ErrNotFound. The caller compares SecretHash in constant time.
+	//
+	//orcon:scope engine the organization of a wait is unknown until the wait is found (ADR-0010 section 8)
 	ResolveWaitSecret(ctx context.Context, wait WaitID) (WaitLookup, error)
 }

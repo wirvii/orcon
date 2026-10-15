@@ -14,12 +14,14 @@ import (
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Store is what the engine needs from storage: the reads of an execution, the
 // transaction of a step, the work that crosses organizations, the outbox and the
 // registry of workers. The adapters of SQLite and PostgreSQL implement it.
-type Store interface {
+type Store interface { //nolint:interfacebloat // the engine works through every port it needs of the store (ADR-0013)
+	store.Scopes
 	store.Reader
 	store.EngineReader
 	store.Transactor
@@ -31,8 +33,8 @@ type Store interface {
 // Revisions reads the pinned flow revisions an execution runs (ADR-0007
 // section 7: a running execution keeps the revision it started with).
 type Revisions interface {
-	GetVersion(ctx context.Context, org identity.OrgID, version flow.FlowVersionID) (flow.VersionRecord, error)
-	GetSnapshot(ctx context.Context, org identity.OrgID, snapshot flow.FlowSnapshotID) (flow.SnapshotRecord, error)
+	GetVersion(ctx context.Context, org orgscope.Org, version flow.FlowVersionID) (flow.VersionRecord, error)
+	GetSnapshot(ctx context.Context, org orgscope.Org, snapshot flow.FlowSnapshotID) (flow.SnapshotRecord, error)
 }
 
 // DocumentReader turns the stored bytes of a revision into the document of the

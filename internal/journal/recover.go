@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/execution/store"
-	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // listPage is the page size of the recovery scan.
@@ -27,7 +27,7 @@ const listPage = 512
 //
 // A resend that fails with a transport error keeps the item in DISPATCHING for
 // the next recovery.
-func (j *Journal) Recover(ctx context.Context, org identity.OrgID, node store.NodeExecutionID, c Contract) (Summary, error) {
+func (j *Journal) Recover(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, c Contract) (Summary, error) {
 	var sum Summary
 	from := int64(0)
 	for {
@@ -51,7 +51,7 @@ func (j *Journal) Recover(ctx context.Context, org identity.OrgID, node store.No
 }
 
 // settle decides one stale DISPATCHING item.
-func (j *Journal) settle(ctx context.Context, org identity.OrgID, op store.ExternalOperation, c Contract, sum *Summary) error {
+func (j *Journal) settle(ctx context.Context, org orgscope.Org, op store.ExternalOperation, c Contract, sum *Summary) error {
 	now := j.clock.Now()
 	if !op.DispatchDeadlineAt.IsZero() && now.Before(op.DispatchDeadlineAt.Add(j.cfg.Grace)) {
 		sum.Pending++

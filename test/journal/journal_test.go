@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -23,9 +24,9 @@ import (
 	"github.com/wirvii/orcon/internal/execution/executiontest"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
-	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/journal"
 	"github.com/wirvii/orcon/internal/platform/clock"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 func TestMain(m *testing.M) {
@@ -33,10 +34,7 @@ func TestMain(m *testing.M) {
 	kinds, _ := storetest.KindsFor(executiontest.StoreFlag("auto"))
 	if slices.Contains(kinds, storetest.PostgreSQL) {
 		storetest.EnablePostgres()
-		stop := storetest.StartPostgres()
-		defer stop()
-		m.Run()
-		return
+		os.Exit(runWithPostgres(m)) //nolint:forbidigo // AL-8: TestMain ends the test process with the code of the run
 	}
 	goleak.VerifyTestMain(m)
 }
@@ -60,7 +58,7 @@ type countingStore struct {
 	txs atomic.Int64
 }
 
-func (c *countingStore) InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error {
+func (c *countingStore) InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error {
 	c.txs.Add(1)
 	return c.Store.InTx(ctx, org, fn)
 }
@@ -77,7 +75,7 @@ type provider struct {
 }
 
 func (p *provider) Send(ctx context.Context, a *journal.Attempt) (journal.Reply, error) {
-	got, err := p.env.Store.GetExternalOperation(ctx, p.env.Org, a.Operation.ID)
+	got, err := p.env.Store.GetExternalOperation(ctx, storetest.ScopeOf(p.env.Org), a.Operation.ID)
 	if err != nil || got.State != journal.StateDispatching {
 		p.t.Errorf("a send for an operation the store does not hold as DISPATCHING (state %q, err %v)", got.State, err)
 	}
@@ -140,7 +138,7 @@ func newScenario(t *testing.T, env *storetest.EngineEnv) scenario {
 		CreatedAt:   env.Clock.Now(),
 		UpdatedAt:   env.Clock.Now(),
 	}
-	err := env.Store.InTx(ctx, env.Org, func(ctx context.Context, tx store.Tx) error {
+	err := env.Store.InTx(ctx, storetest.ScopeOf(env.Org), func(ctx context.Context, tx store.Tx) error {
 		return tx.InsertNodeExecution(ctx, node)
 	})
 	if err != nil {
@@ -168,7 +166,7 @@ func (s scenario) ops(n int) []store.ExternalOperation {
 
 func (s scenario) state(t *testing.T, id store.ExternalOperationID) string {
 	t.Helper()
-	got, err := s.env.Store.GetExternalOperation(t.Context(), s.env.Org, id)
+	got, err := s.env.Store.GetExternalOperation(t.Context(), storetest.ScopeOf(s.env.Org), id)
 	if err != nil {
 		t.Fatalf("get operation: %v", err)
 	}
@@ -202,10 +200,10 @@ func TestDispatchRecordsOutcomes(t *testing.T) {
 		}}
 		j := newJournal(t, env.Store, p, env.Clock, journal.Config{})
 		ops := s.ops(9)
-		if err := j.Prepare(t.Context(), env.Org, ops); err != nil {
+		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
 		}
-		sum, err := j.Dispatch(t.Context(), env.Org, ops, journal.Contract{Idempotency: journal.IdempotencyNone})
+		sum, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, journal.Contract{Idempotency: journal.IdempotencyNone})
 		if err != nil {
 			t.Fatalf("Dispatch: %v", err)
 		}
@@ -229,10 +227,10 @@ func TestGroupCommitBudget(t *testing.T) {
 		}}
 		j := newJournal(t, counting, p, env.Clock, journal.Config{Concurrency: 64})
 		ops := s.ops(n)
-		if err := j.Prepare(t.Context(), env.Org, ops); err != nil {
+		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
 		}
-		sum, err := j.Dispatch(t.Context(), env.Org, ops, journal.Contract{Idempotency: journal.IdempotencyNone})
+		sum, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, journal.Contract{Idempotency: journal.IdempotencyNone})
 		if err != nil {
 			t.Fatalf("Dispatch: %v", err)
 		}
@@ -259,11 +257,11 @@ func TestRecoverDispatching(t *testing.T) {
 		contract := journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: time.Hour}
 		j := newJournal(t, env.Store, failing, clk, journal.Config{AttemptTimeout: timeout, Grace: grace})
 		ops := s.ops(3)
-		if err := j.Prepare(t.Context(), env.Org, ops); err != nil {
+		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
 		}
 		// A provider key keeps a transport failure in DISPATCHING for recovery.
-		sum, err := j.Dispatch(t.Context(), env.Org, ops, contract)
+		sum, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, contract)
 		if err != nil || sum.Pending != 3 {
 			t.Fatalf("dispatch = %+v, %v", sum, err)
 		}
@@ -273,12 +271,12 @@ func TestRecoverDispatching(t *testing.T) {
 		}}
 		j = newJournal(t, env.Store, healthy, clk, journal.Config{AttemptTimeout: timeout, Grace: grace})
 		clk.Set(start.Add(timeout + grace - time.Second))
-		sum, err = j.Recover(t.Context(), env.Org, s.nodeID, contract)
+		sum, err = j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil || sum.Pending != 3 || healthy.total() != 0 {
 			t.Fatalf("early recovery acted: %+v sends=%d err=%v", sum, healthy.total(), err)
 		}
 		clk.Set(start.Add(timeout + grace + time.Second))
-		sum, err = j.Recover(t.Context(), env.Org, s.nodeID, contract)
+		sum, err = j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil || sum.Succeeded != 3 {
 			t.Fatalf("recovery = %+v err=%v", sum, err)
 		}
@@ -298,15 +296,15 @@ func TestUncertainSuspends(t *testing.T) {
 		}}
 		j := newJournal(t, env.Store, p, clk, journal.Config{})
 		ops := s.ops(2)
-		if err := j.Prepare(t.Context(), env.Org, ops); err != nil {
+		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
 		}
-		sum, err := j.Dispatch(t.Context(), env.Org, ops, journal.Contract{Idempotency: journal.IdempotencyNone})
+		sum, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, journal.Contract{Idempotency: journal.IdempotencyNone})
 		if err != nil || sum.Uncertain != 2 {
 			t.Fatalf("dispatch = %+v, %v", sum, err)
 		}
 		clk.Advance(time.Hour)
-		if _, err := j.Recover(t.Context(), env.Org, s.nodeID, journal.Contract{Idempotency: journal.IdempotencyNone}); err != nil {
+		if _, err := j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, journal.Contract{Idempotency: journal.IdempotencyNone}); err != nil {
 			t.Fatal(err)
 		}
 		if p.total() != 2 {
@@ -330,14 +328,14 @@ func TestKeyTTLExpired(t *testing.T) {
 		contract := journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: time.Hour}
 		j := newJournal(t, env.Store, failing, clk, journal.Config{AttemptTimeout: 30 * time.Second, Grace: 5 * time.Second})
 		ops := s.ops(2)
-		if err := j.Prepare(t.Context(), env.Org, ops); err != nil {
+		if err := j.Prepare(t.Context(), storetest.ScopeOf(env.Org), ops); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := j.Dispatch(t.Context(), env.Org, ops, contract); err != nil {
+		if _, err := j.Dispatch(t.Context(), storetest.ScopeOf(env.Org), ops, contract); err != nil {
 			t.Fatal(err)
 		}
 		clk.Set(now)
-		sum, err := j.Recover(t.Context(), env.Org, s.nodeID, contract)
+		sum, err := j.Recover(t.Context(), storetest.ScopeOf(env.Org), s.nodeID, contract)
 		if err != nil {
 			t.Fatal(err)
 		}

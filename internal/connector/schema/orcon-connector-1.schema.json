@@ -3,7 +3,7 @@
   "$id": "urn:orcon:schema:connector:1",
   "$comment": "SPDX-FileCopyrightText: The Orcon Authors. SPDX-License-Identifier: Apache-2.0.",
   "title": "orcon/connector@1",
-  "description": "Orcon connector manifest (ADR-0029). This schema checks the shape of the manifest: member names, JSON types, closed UPPER_SNAKE value sets, ranges and patterns. Rules that need the whole document (node types that match the connector id, operations named by safety contracts and credentials, the safety contract rules of ADR-0029 section 5, a changelog entry for the version, the reserved orcon. namespace) are checked by the validator in internal/connector and are not expressible here.",
+  "description": "Orcon connector manifest (ADR-0029). This schema checks the shape of the manifest: member names, JSON types, closed UPPER_SNAKE value sets, ranges and patterns. Rules that need the whole document (node types that match the connector id, operations named by safety contracts and credentials, the safety contract rules of ADR-0029 section 5, a changelog entry for the version, the reserved orcon. namespace, the reserved parameter names operation and resource) are checked by the validator in internal/connector and are not expressible here.",
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "id", "version", "kind", "displayName", "description", "publisher", "license", "compat", "nodes", "permissions", "changelog"],

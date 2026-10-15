@@ -13,6 +13,7 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // TestSingleProcessLockReleasesLeases: the process lock guarantees that no
@@ -25,23 +26,27 @@ func TestSingleProcessLockReleasesLeases(t *testing.T) {
 	ids := id.NewSequence()
 	now := time.Now().UTC()
 	org := identity.OrgID(ids.New())
-	if err := s.CreateOrganization(ctx, flow.OrgRecord{ID: org, Name: "A", Slug: "a", Status: flow.OrgActive, CreatedAt: now, UpdatedAt: now}); err != nil {
+	scope, err := issue.New(id.UUID(org))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateOrganization(ctx, identity.OrgRecord{ID: org, Name: "A", Slug: "a", Status: identity.OrgActive, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	project := identity.ProjectID(ids.New())
-	if err := s.CreateProject(ctx, flow.ProjectRecord{ID: project, OrgID: org, Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := s.CreateProject(ctx, scope, identity.ProjectRecord{ID: project, OrgID: org, Name: "P", Slug: "p", IsProtected: true, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	rec := flow.Record{ID: flow.FlowID(ids.New()), OrgID: org, ProjectID: project, Name: "f", Draft: []byte(`{}`), CreatedAt: now, UpdatedAt: now}
-	if err := s.CreateFlow(ctx, rec); err != nil {
+	if err := s.CreateFlow(ctx, scope, rec); err != nil {
 		t.Fatal(err)
 	}
 	ver := flow.VersionRecord{ID: flow.FlowVersionID(ids.New()), OrgID: org, FlowID: rec.ID, Number: 1, Document: []byte(`{}`), ContentHash: "h", PublishedAt: now, CreatedAt: now}
-	if err := s.PublishVersion(ctx, ver); err != nil {
+	if err := s.PublishVersion(ctx, scope, ver); err != nil {
 		t.Fatal(err)
 	}
 	ex := store.Execution{ID: store.ExecutionID(ids.New()), OrgID: org, ProjectID: project, FlowID: rec.ID, FlowVersionID: ver.ID, Status: "RUNNING", Mode: "MANUAL", CreatedAt: now, UpdatedAt: now}
-	err := s.InTx(ctx, org, func(ctx context.Context, tx store.Tx) error {
+	err = s.InTx(ctx, scope, func(ctx context.Context, tx store.Tx) error {
 		if err := tx.InsertExecution(ctx, &ex); err != nil {
 			return err
 		}
@@ -68,7 +73,7 @@ func TestSingleProcessLockReleasesLeases(t *testing.T) {
 	}
 	restarted := open(t, path)
 	for _, c := range claimed {
-		got, err := restarted.GetToken(ctx, org, c.TokenID)
+		got, err := restarted.GetToken(ctx, scope, c.TokenID)
 		if err != nil {
 			t.Fatal(err)
 		}

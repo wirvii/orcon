@@ -28,6 +28,11 @@ func (f *fixture) pkg(connectorID, version string, n int) connector.PackageRecor
 	}
 }
 
+// insertGrant stores a grant under the scope of the organization the grant names.
+func (f *fixture) insertGrant(g connector.GrantRecord) error {
+	return f.s.InsertGrant(f.ctx(), scopeOf(g.OrgID), g)
+}
+
 func (f *fixture) insertPackage(p connector.PackageRecord) connector.PackageRecord {
 	f.t.Helper()
 	if err := f.s.InsertPackage(f.ctx(), p); err != nil {
@@ -38,7 +43,7 @@ func (f *fixture) insertPackage(p connector.PackageRecord) connector.PackageReco
 
 func (f *fixture) principal() identity.PrincipalID {
 	f.t.Helper()
-	p := flow.PrincipalRecord{ID: next[identity.PrincipalID](f.ids), Kind: flow.PrincipalUser, CreatedAt: base, UpdatedAt: base}
+	p := identity.PrincipalRecord{ID: next[identity.PrincipalID](f.ids), Kind: identity.PrincipalUser, CreatedAt: base, UpdatedAt: base}
 	if err := f.s.CreatePrincipal(f.ctx(), p); err != nil {
 		f.t.Fatalf("create principal: %v", err)
 	}
@@ -206,11 +211,11 @@ func connectorGrantsCase(t *testing.T, newStore Factory) {
 	}
 	st.orgWide = f.grantOf(f.orgA, st.p1, identity.ProjectID{}, 1)
 	st.orgWide.GrantedByPrincipalID = f.principal()
-	if err := f.s.InsertGrant(f.ctx(), st.orgWide); err != nil {
+	if err := f.insertGrant(st.orgWide); err != nil {
 		t.Fatalf("insert an organization-wide grant: %v", err)
 	}
 	st.scoped = f.grantOf(f.orgA, st.p2, f.projA, 2)
-	if err := f.s.InsertGrant(f.ctx(), st.scoped); err != nil {
+	if err := f.insertGrant(st.scoped); err != nil {
 		t.Fatalf("insert a project grant: %v", err)
 	}
 	t.Run("an organization-wide grant covers every project", st.orgWideCovers)
@@ -222,7 +227,7 @@ func connectorGrantsCase(t *testing.T, newStore Factory) {
 func (st *grantState) orgWideCovers(t *testing.T) {
 	f := st.f
 	for _, project := range []identity.ProjectID{f.projA, st.otherProj} {
-		got, err := f.s.FindGrant(f.ctx(), f.orgA, st.p1.ID, project)
+		got, err := f.s.FindGrant(f.ctx(), scopeOf(f.orgA), st.p1.ID, project)
 		if err != nil {
 			t.Fatalf("FindGrant for project %s: %v", project, err)
 		}
@@ -236,44 +241,44 @@ func (st *grantState) orgWideCovers(t *testing.T) {
 
 func (st *grantState) projectOnly(t *testing.T) {
 	f := st.f
-	got, err := f.s.FindGrant(f.ctx(), f.orgA, st.p2.ID, f.projA)
+	got, err := f.s.FindGrant(f.ctx(), scopeOf(f.orgA), st.p2.ID, f.projA)
 	if err != nil || got.ID != st.scoped.ID || got.ProjectID != f.projA {
 		t.Errorf("FindGrant(own project) = %+v, %v", got, err)
 	}
-	_, err = f.s.FindGrant(f.ctx(), f.orgA, st.p2.ID, st.otherProj)
+	_, err = f.s.FindGrant(f.ctx(), scopeOf(f.orgA), st.p2.ID, st.otherProj)
 	wantErr(t, "another project of the organization", err, connector.ErrNotFound)
-	_, err = f.s.FindGrant(f.ctx(), f.orgA, st.p2.ID, identity.ProjectID{})
+	_, err = f.s.FindGrant(f.ctx(), scopeOf(f.orgA), st.p2.ID, identity.ProjectID{})
 	wantErr(t, "no project", err, connector.ErrNotFound)
 }
 
 func (st *grantState) otherOrganization(t *testing.T) {
 	f := st.f
-	_, err := f.s.FindGrant(f.ctx(), f.orgB, st.p1.ID, f.projB)
+	_, err := f.s.FindGrant(f.ctx(), scopeOf(f.orgB), st.p1.ID, f.projB)
 	wantErr(t, "the other organization's view of an organization-wide grant", err, connector.ErrNotFound)
 	own := f.grantOf(f.orgB, st.p3, identity.ProjectID{}, 3)
-	if err := f.s.InsertGrant(f.ctx(), own); err != nil {
+	if err := f.insertGrant(own); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.s.FindGrant(f.ctx(), f.orgA, st.p3.ID, f.projA)
+	_, err = f.s.FindGrant(f.ctx(), scopeOf(f.orgA), st.p3.ID, f.projA)
 	wantErr(t, "organization A looking for organization B's grant", err, connector.ErrNotFound)
-	if got, err := f.s.FindGrant(f.ctx(), f.orgB, st.p3.ID, f.projB); err != nil || got.ID != own.ID {
+	if got, err := f.s.FindGrant(f.ctx(), scopeOf(f.orgB), st.p3.ID, f.projB); err != nil || got.ID != own.ID {
 		t.Errorf("organization B's own grant = %+v, %v", got, err)
 	}
 }
 
 func (st *grantState) constraints(t *testing.T) {
 	f := st.f
-	wantErr(t, "a second organization-wide grant", f.s.InsertGrant(f.ctx(), f.grantOf(f.orgA, st.p1, identity.ProjectID{}, 4)), connector.ErrConflict)
-	wantErr(t, "a second grant for the same project", f.s.InsertGrant(f.ctx(), f.grantOf(f.orgA, st.p2, f.projA, 5)), connector.ErrConflict)
+	wantErr(t, "a second organization-wide grant", f.insertGrant(f.grantOf(f.orgA, st.p1, identity.ProjectID{}, 4)), connector.ErrConflict)
+	wantErr(t, "a second grant for the same project", f.insertGrant(f.grantOf(f.orgA, st.p2, f.projA, 5)), connector.ErrConflict)
 	unknownPackage := f.grantOf(f.orgA, connector.PackageRecord{ID: next[connector.PackageID](f.ids)}, identity.ProjectID{}, 6)
-	wantErr(t, "an unknown package", f.s.InsertGrant(f.ctx(), unknownPackage), connector.ErrReference)
-	wantErr(t, "a project of another organization", f.s.InsertGrant(f.ctx(), f.grantOf(f.orgA, st.p3, f.projB, 7)), connector.ErrReference)
+	wantErr(t, "an unknown package", f.insertGrant(unknownPackage), connector.ErrReference)
+	wantErr(t, "a project of another organization", f.insertGrant(f.grantOf(f.orgA, st.p3, f.projB, 7)), connector.ErrReference)
 	badDigest := f.grantOf(f.orgA, st.p3, identity.ProjectID{}, 8)
 	badDigest.PermissionsDigest = "sha256:short"
-	wantErr(t, "a short permissions digest", f.s.InsertGrant(f.ctx(), badDigest), connector.ErrInvalidRecord)
+	wantErr(t, "a short permissions digest", f.insertGrant(badDigest), connector.ErrInvalidRecord)
 	ghost := f.grantOf(f.orgA, st.p3, identity.ProjectID{}, 9)
 	ghost.GrantedByPrincipalID = next[identity.PrincipalID](f.ids)
-	wantErr(t, "an unknown principal", f.s.InsertGrant(f.ctx(), ghost), connector.ErrReference)
+	wantErr(t, "an unknown principal", f.insertGrant(ghost), connector.ErrReference)
 }
 
 func (f *fixture) reference(connectorID, version string) flow.ConnectorReference {
@@ -296,7 +301,7 @@ type referenceState struct {
 
 func (st *referenceState) draft(t *testing.T, org identity.OrgID) []string {
 	t.Helper()
-	got, err := st.f.s.ListDraftConnectorReferences(st.f.ctx(), org, st.rec.ID, flow.ConnectorReferenceID{}, 100)
+	got, err := st.f.s.ListDraftConnectorReferences(st.f.ctx(), scopeOf(org), st.rec.ID, flow.ConnectorReferenceID{}, 100)
 	if err != nil {
 		t.Fatalf("list draft references: %v", err)
 	}
@@ -305,7 +310,7 @@ func (st *referenceState) draft(t *testing.T, org identity.OrgID) []string {
 
 func (st *referenceState) version(t *testing.T, org identity.OrgID, v flow.VersionRecord) []string {
 	t.Helper()
-	got, err := st.f.s.ListVersionConnectorReferences(st.f.ctx(), org, v.ID, flow.ConnectorReferenceID{}, 100)
+	got, err := st.f.s.ListVersionConnectorReferences(st.f.ctx(), scopeOf(org), v.ID, flow.ConnectorReferenceID{}, 100)
 	if err != nil {
 		t.Fatalf("list version references: %v", err)
 	}
@@ -338,7 +343,7 @@ func (st *referenceState) replace(t *testing.T) {
 	f := st.f
 	save := func(n int64, revision int64, refs ...flow.ConnectorReference) {
 		t.Helper()
-		got, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, st.rec.ID, []byte(fmt.Sprintf(`{"n":%d}`, n)), revision, refs, base.Add(time.Duration(n)*time.Second))
+		got, err := f.s.UpdateFlowDraft(f.ctx(), scopeOf(f.orgA), st.rec.ID, []byte(fmt.Sprintf(`{"n":%d}`, n)), revision, refs, base.Add(time.Duration(n)*time.Second))
 		if err != nil || got != revision+1 {
 			t.Fatalf("save %d = revision %d, %v", n, got, err)
 		}
@@ -359,10 +364,10 @@ func (st *referenceState) replace(t *testing.T) {
 
 func (st *referenceState) stale(t *testing.T) {
 	f := st.f
-	if _, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, st.rec.ID, []byte(`{"n":4}`), 3, []flow.ConnectorReference{f.reference("acme.shop", "3.0.0")}, base.Add(3*time.Second)); err != nil {
+	if _, err := f.s.UpdateFlowDraft(f.ctx(), scopeOf(f.orgA), st.rec.ID, []byte(`{"n":4}`), 3, []flow.ConnectorReference{f.reference("acme.shop", "3.0.0")}, base.Add(3*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	_, err := f.s.UpdateFlowDraft(f.ctx(), f.orgA, st.rec.ID, []byte(`{"n":5}`), 0, []flow.ConnectorReference{f.reference("stale.one", "9.9.9")}, base.Add(4*time.Second))
+	_, err := f.s.UpdateFlowDraft(f.ctx(), scopeOf(f.orgA), st.rec.ID, []byte(`{"n":5}`), 0, []flow.ConnectorReference{f.reference("stale.one", "9.9.9")}, base.Add(4*time.Second))
 	wantErr(t, "a stale revision", err, flow.ErrDraftConflict)
 	if diff := cmp.Diff([]string{"acme.shop@3.0.0"}, st.draft(t, f.orgA)); diff != "" {
 		t.Errorf("a failed save changed the references (-want +got):\n%s", diff)
@@ -371,16 +376,16 @@ func (st *referenceState) stale(t *testing.T) {
 
 func (st *referenceState) badDraft(t *testing.T) {
 	f := st.f
-	before, err := f.s.GetFlow(f.ctx(), f.orgA, st.rec.ID)
+	before, err := f.s.GetFlow(f.ctx(), scopeOf(f.orgA), st.rec.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	twice := f.reference("acme.shop", "4.0.0")
 	again := twice
 	again.ID = next[flow.ConnectorReferenceID](f.ids)
-	_, err = f.s.UpdateFlowDraft(f.ctx(), f.orgA, st.rec.ID, []byte(`{"n":6}`), before.DraftRevision, []flow.ConnectorReference{twice, again}, base.Add(5*time.Second))
+	_, err = f.s.UpdateFlowDraft(f.ctx(), scopeOf(f.orgA), st.rec.ID, []byte(`{"n":6}`), before.DraftRevision, []flow.ConnectorReference{twice, again}, base.Add(5*time.Second))
 	wantErr(t, "the same pin twice", err, flow.ErrConflict)
-	after, err := f.s.GetFlow(f.ctx(), f.orgA, st.rec.ID)
+	after, err := f.s.GetFlow(f.ctx(), scopeOf(f.orgA), st.rec.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +400,7 @@ func (st *referenceState) badDraft(t *testing.T) {
 func (st *referenceState) publish(t *testing.T) {
 	f := st.f
 	v := st.versionOf(1, f.reference("acme.shop", "3.0.0"), f.reference("other.tool", "0.1.0"))
-	if err := f.s.PublishVersion(f.ctx(), v); err != nil {
+	if err := f.s.PublishVersion(f.ctx(), scopeOf(v.OrgID), v); err != nil {
 		t.Fatal(err)
 	}
 	if diff := cmp.Diff([]string{"acme.shop@3.0.0", "other.tool@0.1.0"}, st.version(t, f.orgA, v)); diff != "" {
@@ -419,11 +424,11 @@ func (st *referenceState) refusedPublication(t *testing.T) {
 	again := dup
 	again.ID = next[flow.ConnectorReferenceID](f.ids)
 	v := st.versionOf(2, dup, again)
-	wantErr(t, "the same pin twice in a version", f.s.PublishVersion(f.ctx(), v), flow.ErrConflict)
-	if _, err := f.s.GetVersion(f.ctx(), f.orgA, v.ID); err == nil {
+	wantErr(t, "the same pin twice in a version", f.s.PublishVersion(f.ctx(), scopeOf(v.OrgID), v), flow.ErrConflict)
+	if _, err := f.s.GetVersion(f.ctx(), scopeOf(f.orgA), v.ID); err == nil {
 		t.Error("the version was stored although its references were refused")
 	}
-	got, err := f.s.GetFlow(f.ctx(), f.orgA, st.rec.ID)
+	got, err := f.s.GetFlow(f.ctx(), scopeOf(f.orgA), st.rec.ID)
 	if err != nil || got.ActiveVersionID == v.ID {
 		t.Errorf("the flow points at the refused version: %+v, %v", got, err)
 	}
@@ -436,7 +441,7 @@ func (st *referenceState) missingFlow(t *testing.T) {
 	f := st.f
 	ghost := st.versionOf(1, f.reference("acme.shop", "1.0.0"))
 	ghost.FlowID = next[flow.FlowID](f.ids)
-	if err := f.s.PublishVersion(f.ctx(), ghost); err == nil {
+	if err := f.s.PublishVersion(f.ctx(), scopeOf(ghost.OrgID), ghost); err == nil {
 		t.Error("a version of a flow that does not exist was published")
 	}
 }

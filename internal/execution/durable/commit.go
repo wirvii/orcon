@@ -52,7 +52,7 @@ type committed struct {
 func (e *Engine) commit(ctx context.Context, s *step) (committed, error) {
 	org := s.exec.OrgID
 	var out committed
-	err := e.store.InTx(ctx, org, func(ctx context.Context, tx store.Tx) error {
+	err := e.inTx(ctx, org, func(ctx context.Context, tx store.Tx) error {
 		out = committed{}
 		now := e.cfg.Clock.Now()
 		state, err := tx.LockExecution(ctx, org, s.exec.ID)

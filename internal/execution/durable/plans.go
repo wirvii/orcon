@@ -28,6 +28,7 @@ import (
 // even read the stored document.
 type Plans struct {
 	revisions Revisions
+	scopes    store.Scopes
 	reader    DocumentReader
 	maxEntry  int
 	maxBytes  int
@@ -73,8 +74,9 @@ type PlanLimits struct {
 	Bytes int
 }
 
-// NewPlans returns a loader over a revision store and a document reader.
-func NewPlans(revisions Revisions, reader DocumentReader, limits PlanLimits) *Plans {
+// NewPlans returns a loader over a revision store, the scopes of its organizations
+// and a document reader.
+func NewPlans(revisions Revisions, scopes store.Scopes, reader DocumentReader, limits PlanLimits) *Plans {
 	if limits.Entries <= 0 {
 		limits.Entries = 256
 	}
@@ -82,6 +84,7 @@ func NewPlans(revisions Revisions, reader DocumentReader, limits PlanLimits) *Pl
 		limits.Bytes = 64 << 20
 	}
 	return &Plans{
+		scopes:    scopes,
 		revisions: revisions, reader: reader, maxEntry: limits.Entries, maxBytes: limits.Bytes,
 		byHash: make(map[planKey]*list.Element), lru: list.New(), ids: make(map[revisionKey]string),
 		loading: make(map[planKey]*pendingLoad),
@@ -156,13 +159,21 @@ func (p *Plans) load(ctx context.Context, org identity.OrgID, rk revisionKey) (*
 // fetch reads the stored revision.
 func (p *Plans) fetch(ctx context.Context, org identity.OrgID, rk revisionKey) (hash string, document []byte, err error) {
 	if rk.snapshot {
-		rec, err := p.revisions.GetSnapshot(ctx, org, flow.FlowSnapshotID(rk.id))
+		scope, err := engineScope(p.scopes, org)
+		if err != nil {
+			return "", nil, err
+		}
+		rec, err := p.revisions.GetSnapshot(ctx, scope, flow.FlowSnapshotID(rk.id))
 		if err != nil {
 			return "", nil, fmt.Errorf("load snapshot %s: %w", flow.FlowSnapshotID(rk.id), err)
 		}
 		return rec.ContentHash, rec.Document, nil
 	}
-	rec, err := p.revisions.GetVersion(ctx, org, flow.FlowVersionID(rk.id))
+	scope, err := engineScope(p.scopes, org)
+	if err != nil {
+		return "", nil, err
+	}
+	rec, err := p.revisions.GetVersion(ctx, scope, flow.FlowVersionID(rk.id))
 	if err != nil {
 		return "", nil, fmt.Errorf("load version %s: %w", flow.FlowVersionID(rk.id), err)
 	}

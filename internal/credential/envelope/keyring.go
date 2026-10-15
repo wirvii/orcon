@@ -245,11 +245,18 @@ func (k *Keyring) activeID(ctx context.Context, scope Scope) (KeyID, error) {
 // it through the master key provider unless a fresh copy is cached.
 func (k *Keyring) unwrappedKey(ctx context.Context, id KeyID) (Key, error) {
 	now := k.clock.Now()
+	// The copy is made under the lock: remember wipes the entry it replaces,
+	// so reading the cached bytes after unlocking races with that wipe and can
+	// copy zeros.
 	k.mu.Lock()
 	c, ok := k.keys[id]
-	k.mu.Unlock()
+	var hit Key
 	if ok && now.Before(c.expires) {
-		return c.key.clone(), nil
+		hit = c.key.clone()
+	}
+	k.mu.Unlock()
+	if hit.get != nil {
+		return hit, nil
 	}
 	stored, err := k.store.Key(ctx, id)
 	if err != nil {

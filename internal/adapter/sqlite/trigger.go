@@ -14,6 +14,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
 
@@ -25,14 +26,20 @@ const addressPage = 1000
 
 // Atomic implements [trigger.Store]: fn runs in the writer, under the group
 // commit, and rolls back alone when it fails.
-func (s *Store) Atomic(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
+func (s *Store) Atomic(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
+	if org.IsZero() {
+		return identity.ErrNoScope
+	}
 	return s.write(ctx, "run a trigger transaction", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return fn(ctx, &triggerTx{q: q, org: org})
 	})
 }
 
 // Read implements [trigger.Store]: fn runs on one read connection.
-func (s *Store) Read(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx trigger.Tx) error) error {
+func (s *Store) Read(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx trigger.Tx) error) error {
+	if org.IsZero() {
+		return identity.ErrNoScope
+	}
 	return s.read(ctx, "run a trigger read", func(ctx context.Context, q *sqlcgen.Queries) error {
 		return fn(ctx, &triggerTx{q: q, org: org})
 	})
@@ -41,12 +48,15 @@ func (s *Store) Read(ctx context.Context, org identity.OrgID, fn func(ctx contex
 // triggerTx is one trigger transaction bound to an organization.
 type triggerTx struct {
 	q   *sqlcgen.Queries
-	org identity.OrgID
+	org orgscope.Org
 }
 
-var _ trigger.Tx = (*triggerTx)(nil)
+// triggerTx is not asserted to implement [trigger.Tx] with a variable declaration:
+// the orgscope analyzer (rule 3) reads such assertions as store ports, and the
+// methods of a transaction act on the organization that Atomic or Read scoped.
+// Atomic and Read pass the value as the interface, so the compiler still checks it.
 
-func (t *triggerTx) orgBytes() []byte { return uuidBytes(t.org) }
+func (t *triggerTx) orgBytes() []byte { return uuidBytes(t.org.UUID()) }
 
 func stateFrom(id flow.FlowID, name string, project, activeVersion []byte, activation string, revision int64, deletedAt sql.NullInt64) (trigger.FlowState, error) {
 	var out trigger.FlowState

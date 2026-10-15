@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -169,7 +170,8 @@ func newHarness(t *testing.T, mutate func(*Deps)) *harness {
 		Authenticator: fakeAuthn{
 			"token-a": userA, "token-b": userB, "cookie-c": web,
 		},
-		Authorizer: authzFunc(func(r authz.Request) authz.Decision { return h.decide(r) }),
+		Authorizer:  authzFunc(func(r authz.Request) authz.Decision { return h.decide(r) }),
+		Idempotency: idempotency.NewMemoryStore(h.clk),
 	}
 	if mutate != nil {
 		mutate(deps)
@@ -216,3 +218,6 @@ func problemOf(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 	}
 	return doc
 }
+
+// memStore is an explicit in-memory idempotency store for tests: the router has no default.
+func memStore() *idempotency.MemoryStore { return idempotency.NewMemoryStore(clock.System{}) }

@@ -195,7 +195,7 @@ func TestTimerWakesItsToken(t *testing.T) {
 		c := claimed[0]
 		// The token waits for a timer that is already due. The wait nodes are cut C8; the rows are the ones C8 will write.
 		fence := store.Fence{OrgID: env.Org, Token: c.TokenID, Epoch: c.LeaseEpoch, Owner: eng.Worker()}
-		err = env.Store.InTx(ctx, env.Org, func(ctx context.Context, tx store.Tx) error {
+		err = env.Store.InTx(ctx, storetest.ScopeOf(env.Org), func(ctx context.Context, tx store.Tx) error {
 			now := time.Now()
 			timer := store.Timer{
 				ID: store.TimerID(env.IDs.New()), OrgID: env.Org, ExecutionID: execID, TokenID: c.TokenID, Kind: "WAIT",

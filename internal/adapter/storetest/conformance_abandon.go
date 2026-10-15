@@ -65,7 +65,7 @@ func (e *execFixture) expiredData(ex store.ExecutionID) []struct {
 	AbandonedCount int64  `json:"abandonedCount"`
 } {
 	e.t.Helper()
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex, 0, 100)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex, 0, 100)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func (e *execFixture) wantExpired(ex store.ExecutionID, cause string) {
 
 func (e *execFixture) eventCount(ex store.ExecutionID, typ string) int {
 	e.t.Helper()
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex, 0, 100)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex, 0, 100)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -319,14 +319,14 @@ func SeedLeftLeased(t *testing.T, s Store) LeftLeased {
 // opening it released the lease and counted one abandonment: nobody returned it.
 func CheckStartupRelease(t *testing.T, s Store, l LeftLeased) {
 	t.Helper()
-	got, err := s.GetToken(t.Context(), l.Org, l.Token)
+	got, err := s.GetToken(t.Context(), scopeOf(l.Org), l.Token)
 	if err != nil {
 		t.Fatalf("get token: %v", err)
 	}
 	if got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() || got.AbandonedCount != 1 {
 		t.Fatalf("token after the reopen = %+v; want RUNNABLE, released, abandoned once", got)
 	}
-	events, err := s.ListExecutionEvents(t.Context(), l.Org, l.Execution, 0, 100)
+	events, err := s.ListExecutionEvents(t.Context(), scopeOf(l.Org), l.Execution, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}

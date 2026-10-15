@@ -3,20 +3,105 @@
 
 package storetest_test
 
+// The PostgreSQL half of the suite needs a server; see the same helper in
+// internal/adapter/postgres/pgtest_test.go for the environment variables. The
+// container is started here, in a test file, and handed to storetest, which creates
+// a database per test (pgserver.go). test/isolation has the same starter in its own
+// test files.
+
 import (
+	"context"
+	"fmt"
+	"net"
+	"os"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
 )
 
-// The PostgreSQL server of the suites lives in the storetest package, so that
-// the engine tests of other packages share it.
+const defaultImage = "postgres:17"
 
-func enablePostgres()              { storetest.EnablePostgres() }
-func postgresEnabled() bool        { return storetest.PostgresEnabled() }
-func runWithPostgres(m *testing.M) { storetest.RunWithPostgres(m) }
+func enablePostgres()       { storetest.EnablePostgres() }
+func postgresEnabled() bool { return storetest.PostgresEnabled() }
 
 func newPostgresDatabase(tb testing.TB) string {
 	tb.Helper()
 	return storetest.NewPostgresDatabase(tb)
+}
+
+// runWithPostgres starts the server when the PostgreSQL tests are on, runs the tests and
+// stops the server. Use it as the body of TestMain; it returns the exit code of m.Run.
+func runWithPostgres(m *testing.M) int {
+	if os.Getenv("ORCON_TEST_POSTGRES") == "1" {
+		storetest.EnablePostgres()
+	}
+	if !storetest.PostgresEnabled() {
+		return m.Run()
+	}
+	stop := func() {}
+	if dsn := os.Getenv("ORCON_TEST_POSTGRES_DSN"); dsn != "" {
+		storetest.UsePostgresServer(dsn, nil)
+		announce(dsn)
+	} else {
+		dsn, terminate, err := startContainer(os.Getenv("ORCON_TEST_POSTGRES_IMAGE"))
+		storetest.UsePostgresServer(dsn, err)
+		if terminate != nil {
+			stop = terminate
+		}
+	}
+	code := m.Run()
+	stop()
+	return code
+}
+
+func startContainer(image string) (dsn string, terminate func(), err error) {
+	if image == "" {
+		image = defaultImage
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	c, err := testcontainers.Run(ctx, image,
+		testcontainers.WithExposedPorts("5432/tcp"),
+		testcontainers.WithEnv(map[string]string{"POSTGRES_PASSWORD": "postgres"}),
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(3*time.Minute)),
+	)
+	if err != nil {
+		if c != nil {
+			_ = testcontainers.TerminateContainer(c)
+		}
+		return "", nil, fmt.Errorf("start %s: %w", image, err)
+	}
+	terminate = func() {
+		if err := testcontainers.TerminateContainer(c); err != nil {
+			fmt.Fprintf(os.Stderr, "pgserver: terminate %s: %v\n", image, err)
+		}
+	}
+	host, err := c.Host(ctx)
+	if err != nil {
+		return "", terminate, err
+	}
+	port, err := c.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		return "", terminate, err
+	}
+	return "postgres://postgres:postgres@" + net.JoinHostPort(host, port.Port()) + "/postgres?sslmode=disable", terminate, nil
+}
+
+func announce(dsn string) {
+	cfg, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "pgserver: ORCON_TEST_POSTGRES_DSN is set but cannot be parsed")
+		return
+	}
+	version := "unknown version"
+	if conn, err := pgx.ConnectConfig(context.Background(), cfg); err == nil {
+		_ = conn.QueryRow(context.Background(), "SHOW server_version").Scan(&version)
+		_ = conn.Close(context.Background())
+	}
+	fmt.Fprintf(os.Stderr, "pgserver: using the existing PostgreSQL server %s:%d (%s) from ORCON_TEST_POSTGRES_DSN; this is a local convenience and not container evidence\n", cfg.Host, cfg.Port, version)
 }

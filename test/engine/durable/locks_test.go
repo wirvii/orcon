@@ -47,7 +47,7 @@ func TestRecoveryLockOrder(t *testing.T) {
 				c := claimed[0]
 				time.Sleep(300 * time.Millisecond) // the lease has expired and nobody reaped it yet
 				recovered := make(chan error, 1)
-				err = env.Store.InTx(ctx, env.Org, func(ctx context.Context, tx store.Tx) error {
+				err = env.Store.InTx(ctx, storetest.ScopeOf(env.Org), func(ctx context.Context, tx store.Tx) error {
 					if _, err := tx.LockExecution(ctx, env.Org, c.ExecutionID); err != nil { // what a commit does first
 						return err
 					}

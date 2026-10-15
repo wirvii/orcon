@@ -30,6 +30,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 )
 
@@ -309,7 +310,8 @@ func annotate(op string, err error) error {
 		return nil
 	}
 	if errors.Is(err, flow.ErrNotFound) || errors.Is(err, flow.ErrConflict) || errors.Is(err, flow.ErrReference) ||
-		errors.Is(err, flow.ErrInvalidRecord) || errors.Is(err, flow.ErrDraftConflict) || errors.Is(err, ErrClosed) {
+		errors.Is(err, flow.ErrInvalidRecord) || errors.Is(err, flow.ErrDraftConflict) || errors.Is(err, ErrClosed) ||
+		errors.Is(err, identity.ErrNoScope) || errors.Is(err, identity.ErrScopeMismatch) {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	return mapError(op, err)

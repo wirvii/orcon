@@ -70,7 +70,7 @@ func engineStateCase(t *testing.T, newStore Factory) {
 	if snap.Status != "RUNNING" || snap.Revision != 2 || string(snap.Document) != `{"v":1}` || len(snap.Tokens) != 3 {
 		t.Fatalf("snapshot = %+v, want RUNNING at revision 2 with the first document and 3 tokens", snap)
 	}
-	got, err := e.s.GetExecution(e.ctx(), e.orgA, ex.ID)
+	got, err := e.s.GetExecution(e.ctx(), e.scopeA, ex.ID)
 	if err != nil || got.Status != "RUNNING" || got.StartedAt.IsZero() {
 		t.Fatalf("execution = %+v, %v; want RUNNING with a start instant", got, err)
 	}
@@ -290,7 +290,7 @@ func claimStartsCase(t *testing.T, newStore Factory) {
 	e.token(ex, "a", 0, realNow().Add(-time.Hour))
 	e.token(ex, "b", 0, realNow().Add(-time.Hour))
 	w := worker(e)
-	if got, err := e.s.GetExecution(e.ctx(), e.orgA, ex.ID); err != nil || got.Status != "QUEUED" {
+	if got, err := e.s.GetExecution(e.ctx(), e.scopeA, ex.ID); err != nil || got.Status != "QUEUED" {
 		t.Fatalf("new execution = %+v, %v", got, err)
 	}
 	for range 2 {
@@ -298,12 +298,12 @@ func claimStartsCase(t *testing.T, newStore Factory) {
 			t.Fatalf("claim = %+v, %v", c, err)
 		}
 	}
-	got, err := e.s.GetExecution(e.ctx(), e.orgA, ex.ID)
+	got, err := e.s.GetExecution(e.ctx(), e.scopeA, ex.ID)
 	if err != nil || got.Status != "RUNNING" || got.StartedAt.IsZero() {
 		t.Fatalf("execution after its first claim = %+v, %v; want RUNNING with a start instant", got, err)
 	}
 	started := 0
-	events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, ex.ID, 0, 10)
+	events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func abandonmentCase(t *testing.T, newStore Factory) { //nolint:gocognit // a co
 	}
 	countEvents := func(execID store.ExecutionID, typ string) int {
 		t.Helper()
-		events, err := e.s.ListExecutionEvents(e.ctx(), e.orgA, execID, 0, 50)
+		events, err := e.s.ListExecutionEvents(e.ctx(), e.scopeA, execID, 0, 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -407,7 +407,7 @@ func abandonmentCase(t *testing.T, newStore Factory) { //nolint:gocognit // a co
 	if got := countEvents(ex.ID, "token.poisoned"); got != 1 {
 		t.Errorf("%d token.poisoned events, want 1", got)
 	}
-	requests, err := e.s.ListAttentionRequests(e.ctx(), e.orgA, "OPEN", store.Cursor{}, 10)
+	requests, err := e.s.ListAttentionRequests(e.ctx(), e.scopeA, "OPEN", store.Cursor{}, 10)
 	if err != nil || len(requests) != 1 {
 		t.Fatalf("attention requests = %+v, %v; want one", requests, err)
 	}
@@ -418,13 +418,13 @@ func abandonmentCase(t *testing.T, newStore Factory) { //nolint:gocognit // a co
 	if want := store.AttentionRequestID(id.Derive("attention", "POISON_TOKEN", tok.ID.String())); request.ID != want {
 		t.Errorf("attention request id = %s, want the deterministic %s (both stores derive it the same way)", request.ID, want)
 	}
-	if got, err := e.s.GetExecution(e.ctx(), e.orgA, ex.ID); err != nil || got.Status != "SUSPENDED" {
+	if got, err := e.s.GetExecution(e.ctx(), e.scopeA, ex.ID); err != nil || got.Status != "SUSPENDED" {
 		t.Errorf("execution = %+v, %v; want SUSPENDED once its only token is suspended", got, err)
 	}
 	if got := e.mustToken(e.orgA, untouched.ID); got.Status != "RUNNABLE" || got.AbandonedCount != 1 {
 		t.Errorf("token of the other execution = %+v, want it as the first release left it", got)
 	}
-	if got, err := e.s.GetExecution(e.ctx(), e.orgA, other.ID); err != nil || got.Status == "SUSPENDED" {
+	if got, err := e.s.GetExecution(e.ctx(), e.scopeA, other.ID); err != nil || got.Status == "SUSPENDED" {
 		t.Errorf("the other execution = %+v, %v; want it unaffected", got, err)
 	}
 }
@@ -508,14 +508,14 @@ func timerWakeCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conf
 		if fired[x.tm] != 1 {
 			t.Errorf("timer %s fired %d times, want once", x.tm, fired[x.tm])
 		}
-		timer, err := e.s.GetTimer(e.ctx(), e.orgA, x.tm)
+		timer, err := e.s.GetTimer(e.ctx(), e.scopeA, x.tm)
 		if err != nil || timer.Status != "FIRED" {
 			t.Fatalf("timer = %+v, %v", timer, err)
 		}
 		if got := e.mustToken(e.orgA, x.tok.ID); got.Status != "RUNNABLE" {
 			t.Errorf("token of timer %s is %s after the timer fired, want RUNNABLE: a fired timer must never leave a waiting token", x.tm, got.Status)
 		}
-		ex, err := e.s.GetExecution(e.ctx(), e.orgA, x.ex.ID)
+		ex, err := e.s.GetExecution(e.ctx(), e.scopeA, x.ex.ID)
 		if err != nil || ex.RunnableCount != 1 || ex.WaitingCount != 0 {
 			t.Errorf("execution counters = %+v, %v; want one runnable token and none waiting", ex, err)
 		}
@@ -523,7 +523,7 @@ func timerWakeCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conf
 	if got := e.mustToken(e.orgA, laterTok.ID); got.Status != "WAITING" {
 		t.Errorf("token whose timer is not due is %s, want WAITING", got.Status)
 	}
-	if timer, err := e.s.GetTimer(e.ctx(), e.orgA, laterTimer); err != nil || timer.Status != "SCHEDULED" {
+	if timer, err := e.s.GetTimer(e.ctx(), e.scopeA, laterTimer); err != nil || timer.Status != "SCHEDULED" {
 		t.Errorf("timer that is not due = %+v, %v; want SCHEDULED", timer, err)
 	}
 }

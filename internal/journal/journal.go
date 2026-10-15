@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/execution/store"
-	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // States of an external operation (ADR-0012 section 2). They are the values of
@@ -120,8 +120,8 @@ type Summary struct {
 // Store is the set of store operations the journal uses. The storage adapters
 // implement it; each call is one transaction of its own.
 type Store interface {
-	InTx(ctx context.Context, org identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error
-	ListExternalOperations(ctx context.Context, org identity.OrgID, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error)
+	InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error)
 }
 
 // Journal writes and recovers the operations of one store.
@@ -166,7 +166,7 @@ func CorrelationKey(executionID, nodeID, scopePath, tokenID string, itemIndex, r
 // sent. Groups of at most 1000 operations share one transaction. A repeated
 // correlation key fails with the error of the store and nothing of that group
 // is written.
-func (j *Journal) Prepare(ctx context.Context, org identity.OrgID, ops []store.ExternalOperation) error {
+func (j *Journal) Prepare(ctx context.Context, org orgscope.Org, ops []store.ExternalOperation) error {
 	for start := 0; start < len(ops); start += intentGroup {
 		group := ops[start:min(start+intentGroup, len(ops))]
 		err := j.db.InTx(ctx, org, func(ctx context.Context, tx store.Tx) error {
@@ -185,7 +185,7 @@ func (j *Journal) Prepare(ctx context.Context, org identity.OrgID, ops []store.E
 // recorded in groups of at most 512 afterwards. Sends inside a window run with
 // the configured concurrency. A send that would start after the guard of the
 // dispatch deadline is not started (ADR-0012 section 5).
-func (j *Journal) Dispatch(ctx context.Context, org identity.OrgID, ops []store.ExternalOperation, c Contract) (Summary, error) {
+func (j *Journal) Dispatch(ctx context.Context, org orgscope.Org, ops []store.ExternalOperation, c Contract) (Summary, error) {
 	var sum Summary
 	for start := 0; start < len(ops); start += markGroup {
 		window := ops[start:min(start+markGroup, len(ops))]
@@ -199,7 +199,7 @@ func (j *Journal) Dispatch(ctx context.Context, org identity.OrgID, ops []store.
 	return sum, nil
 }
 
-func (j *Journal) dispatchWindow(ctx context.Context, org identity.OrgID, window []store.ExternalOperation, c Contract, sum *Summary) error {
+func (j *Journal) dispatchWindow(ctx context.Context, org orgscope.Org, window []store.ExternalOperation, c Contract, sum *Summary) error {
 	ids := make([]store.ExternalOperationID, len(window))
 	for i := range window {
 		ids[i] = window[i].ID
@@ -287,7 +287,7 @@ func classify(id store.ExternalOperationID, c Contract, reply Reply, err error) 
 // record writes the outcomes in groups of at most 512, each in one transaction,
 // and returns how many were applied. An outcome whose operation is no longer
 // DISPATCHING is not applied and not counted.
-func (j *Journal) record(ctx context.Context, org identity.OrgID, outcomes []outcome, now time.Time, sum *Summary) (int, error) {
+func (j *Journal) record(ctx context.Context, org orgscope.Org, outcomes []outcome, now time.Time, sum *Summary) (int, error) {
 	applied := 0
 	for start := 0; start < len(outcomes); start += outcomeGroup {
 		group := outcomes[start:min(start+outcomeGroup, len(outcomes))]

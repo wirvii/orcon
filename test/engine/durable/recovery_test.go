@@ -136,7 +136,7 @@ func TestFencingStoreWrites(t *testing.T) {
 				"move":    func(tx store.Tx) error { return tx.MoveHeldToken(ctx, f, upd, time.Now()) },
 			}
 			for name, write := range writes {
-				err := env.Store.InTx(ctx, env.Org, func(ctx context.Context, tx store.Tx) error {
+				err := env.Store.InTx(ctx, storetest.ScopeOf(env.Org), func(ctx context.Context, tx store.Tx) error {
 					if _, err := tx.AppendEvent(ctx, store.Event{
 						ID: store.EventID(env.IDs.New()), OrgID: env.Org, ExecutionID: execID, OccurredAt: time.Now(), Type: "lost",
 						SchemaVersion: 1, Reference: []byte(`{}`), CreatedAt: time.Now(),
@@ -253,7 +253,7 @@ func TestReaper(t *testing.T) {
 		if got := countEvents(env, poisoned, "token.poisoned"); got != 1 {
 			t.Errorf("%d token.poisoned events, want 1", got)
 		}
-		requests, err := env.Store.ListAttentionRequests(ctx, env.Org, "OPEN", store.Cursor{}, 10)
+		requests, err := env.Store.ListAttentionRequests(ctx, storetest.ScopeOf(env.Org), "OPEN", store.Cursor{}, 10)
 		if err != nil || len(requests) != 1 || requests[0].Cause != "POISON_TOKEN" || requests[0].ExecutionID != poisoned {
 			t.Errorf("attention requests = %+v, %v; want one POISON_TOKEN for the suspended execution", requests, err)
 		}

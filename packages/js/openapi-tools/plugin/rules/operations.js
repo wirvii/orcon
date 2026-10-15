@@ -245,6 +245,13 @@ export function permissionNames(value) {
   return undefined;
 }
 
+/**
+ * The only non-protocol operations that may declare the anonymous permission: the sign-in, the sign-in
+ * state read and the first-run setup (ADR-0080 section 4, as amended by SPEC-016). The list is closed; a
+ * new anonymous operation needs an amendment of that section before it can be added here.
+ */
+const ANONYMOUS_OPERATION_IDS = Object.freeze(['createSession', 'getSetupState', 'createSetupSession']);
+
 export const permission = defineRule((model, report, options) => {
   const catalog = typeof options.permissionsFile === 'string' ? loadPermissions(options.permissionsFile) : undefined;
   for (const entry of model.pathOperations) {
@@ -270,7 +277,8 @@ export const permission = defineRule((model, report, options) => {
     }
     for (const name of names) {
       if (name === 'anonymous') {
-        if (!entry.protocol || typeof value !== 'string') report('CHAN-7', 'anonymous is allowed only on protocol operations.', loc);
+        const allowed = entry.protocol || ANONYMOUS_OPERATION_IDS.includes(entry.op.operationId);
+        if (!allowed || typeof value !== 'string') report('CHAN-7', 'anonymous is allowed only on protocol operations.', loc);
       } else if (name !== 'authenticated' && catalog?.names && !catalog.names.has(name)) {
         report('CHAN-7', `Permission "${name}" is not in the permission catalog.`, loc);
       }
@@ -279,6 +287,11 @@ export const permission = defineRule((model, report, options) => {
 });
 
 const AUDIT_ACTION = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+/**
+ * The single-word audit actions of Annex B (docs/reference/audit-actions.md). The list is closed: a new
+ * one-word action is an amendment of the annex, not a change of this rule.
+ */
+const SINGLE_WORD_AUDIT_ACTIONS = Object.freeze(['logout']);
 
 export const audit = defineRule((model, report) => {
   for (const entry of model.pathOperations) {
@@ -287,7 +300,7 @@ export const audit = defineRule((model, report) => {
       report('CHAN-8', `${entry.method.toUpperCase()} ${entry.key} declares x-orcon-audit (an action like flow.published, or none).`, entry.loc);
       continue;
     }
-    if (value !== 'none' && !AUDIT_ACTION.test(value)) {
+    if (value !== 'none' && !AUDIT_ACTION.test(value) && !SINGLE_WORD_AUDIT_ACTIONS.includes(value)) {
       report('CHAN-8', `Audit action "${value}" is <area>.<event> in lowercase.`, entry.loc.child(['x-orcon-audit']));
     }
     if (value === 'none' && MUTATING.includes(entry.method)) {

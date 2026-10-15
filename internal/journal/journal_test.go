@@ -18,12 +18,15 @@ import (
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 var (
-	testOrg  = identity.OrgID(id.Derive("org"))
-	testNode = store.NodeExecutionID(id.Derive("node"))
-	t0       = time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	testOrg   = identity.OrgID(id.Derive("org"))
+	testScope = scopeFor(testOrg)
+	testNode  = store.NodeExecutionID(id.Derive("node"))
+	t0        = time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 )
 
 // fakeDB is an in-memory journal store. It counts committed transactions and
@@ -41,7 +44,7 @@ func newFakeDB() *fakeDB {
 	return &fakeDB{rows: map[store.ExternalOperationID]*store.ExternalOperation{}, keys: map[string]bool{}}
 }
 
-func (f *fakeDB) InTx(ctx context.Context, _ identity.OrgID, fn func(ctx context.Context, tx store.Tx) error) error {
+func (f *fakeDB) InTx(ctx context.Context, _ orgscope.Org, fn func(ctx context.Context, tx store.Tx) error) error {
 	f.mu.Lock()
 	f.open++
 	f.mu.Unlock()
@@ -55,7 +58,7 @@ func (f *fakeDB) InTx(ctx context.Context, _ identity.OrgID, fn func(ctx context
 	return err
 }
 
-func (f *fakeDB) ListExternalOperations(_ context.Context, _ identity.OrgID, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (f *fakeDB) ListExternalOperations(_ context.Context, _ orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []store.ExternalOperation
@@ -253,10 +256,10 @@ func TestPrepareRejectsDuplicateKeysAndWritesNothingOfTheGroup(t *testing.T) {
 	db := newFakeDB()
 	j := newJournal(t, db, newFakeProvider(t, db, nil), clock.NewFake(t0), Config{})
 	ops := makeOps(3)
-	if err := j.Prepare(t.Context(), testOrg, ops); err != nil {
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	if err := j.Prepare(t.Context(), testOrg, ops[:1]); !errors.Is(err, flow.ErrConflict) {
+	if err := j.Prepare(t.Context(), testScope, ops[:1]); !errors.Is(err, flow.ErrConflict) {
 		t.Fatalf("duplicate prepare = %v, want flow.ErrConflict", err)
 	}
 	for _, op := range ops {
@@ -281,10 +284,10 @@ func TestDispatchRecordsOutcomesAndNeverSendsBeforeTheMark(t *testing.T) {
 	})
 	j := newJournal(t, db, p, clk, Config{})
 	ops := makeOps(9)
-	if err := j.Prepare(t.Context(), testOrg, ops); err != nil {
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
 		t.Fatal(err)
 	}
-	sum, err := j.Dispatch(t.Context(), testOrg, ops, Contract{Idempotency: IdempotencyNone})
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
 	if err != nil {
 		t.Fatalf("Dispatch: %v", err)
 	}
@@ -305,10 +308,10 @@ func TestGroupCommitBudget(t *testing.T) {
 	})
 	j := newJournal(t, db, p, clk, Config{Concurrency: 64})
 	ops := makeOps(n)
-	if err := j.Prepare(t.Context(), testOrg, ops); err != nil {
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
 		t.Fatal(err)
 	}
-	sum, err := j.Dispatch(t.Context(), testOrg, ops, Contract{Idempotency: IdempotencyNone})
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
 	if err != nil {
 		t.Fatalf("Dispatch: %v", err)
 	}
@@ -331,10 +334,10 @@ func TestUncertainSuspends(t *testing.T) {
 	})
 	j := newJournal(t, db, p, clk, Config{})
 	ops := makeOps(2)
-	if err := j.Prepare(t.Context(), testOrg, ops); err != nil {
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
 		t.Fatal(err)
 	}
-	sum, err := j.Dispatch(t.Context(), testOrg, ops, Contract{Idempotency: IdempotencyNone})
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +346,7 @@ func TestUncertainSuspends(t *testing.T) {
 	}
 	// A recovery well after the deadline must not resend an unsafe operation.
 	clk.Advance(time.Hour)
-	rsum, err := j.Recover(t.Context(), testOrg, testNode, Contract{Idempotency: IdempotencyNone})
+	rsum, err := j.Recover(t.Context(), testScope, testNode, Contract{Idempotency: IdempotencyNone})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +370,7 @@ func TestRecoverDispatching(t *testing.T) {
 
 	// Before the deadline plus grace, nothing is touched: the worker may be alive.
 	clk.Set(deadline.Add(grace - time.Second))
-	sum, err := j.Recover(t.Context(), testOrg, testNode, contract)
+	sum, err := j.Recover(t.Context(), testScope, testNode, contract)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,7 +380,7 @@ func TestRecoverDispatching(t *testing.T) {
 
 	// After it, a key still inside its TTL is resent with the same key.
 	clk.Set(deadline.Add(grace + time.Second))
-	sum, err = j.Recover(t.Context(), testOrg, testNode, contract)
+	sum, err = j.Recover(t.Context(), testScope, testNode, contract)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +407,7 @@ func TestKeyTTLExpired(t *testing.T) {
 	db.seed(ops, StateDispatching, dispatched.Add(timeout), dispatched)
 	clk.Set(t0)
 
-	sum, err := j.Recover(t.Context(), testOrg, testNode, Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour})
+	sum, err := j.Recover(t.Context(), testScope, testNode, Contract{Idempotency: IdempotencyProviderKey, KeyTTL: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +427,7 @@ func TestDispatchFailsClosedWhenItemIsNotPrepared(t *testing.T) {
 	j := newJournal(t, db, p, clock.NewFake(t0), Config{})
 	ops := makeOps(2)
 	// Never prepared: the mark moves nothing and nothing is sent.
-	_, err := j.Dispatch(t.Context(), testOrg, ops, Contract{Idempotency: IdempotencyNone})
+	_, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
 	if !errors.Is(err, ErrNotPrepared) {
 		t.Fatalf("err = %v, want ErrNotPrepared", err)
 	}
@@ -441,15 +444,24 @@ func TestSendGuardKeepsLateItemsInDispatching(t *testing.T) {
 	})
 	j := newJournal(t, db, p, clk, Config{AttemptTimeout: time.Second})
 	ops := makeOps(1)
-	if err := j.Prepare(t.Context(), testOrg, ops); err != nil {
+	if err := j.Prepare(t.Context(), testScope, ops); err != nil {
 		t.Fatal(err)
 	}
 	// A timeout of one second leaves no room before the guard: nothing is sent.
-	sum, err := j.Dispatch(t.Context(), testOrg, ops, Contract{Idempotency: IdempotencyNone})
+	sum, err := j.Dispatch(t.Context(), testScope, ops, Contract{Idempotency: IdempotencyNone})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if p.totalSends() != 0 || sum.Pending != 1 {
 		t.Fatalf("sends=%d summary=%+v", p.totalSends(), sum)
 	}
+}
+
+// scopeFor issues the scope of a test organization; tests may build scopes, production code may not.
+func scopeFor(org identity.OrgID) orgscope.Org {
+	o, err := issue.New(id.UUID(org))
+	if err != nil {
+		panic(err)
+	}
+	return o
 }

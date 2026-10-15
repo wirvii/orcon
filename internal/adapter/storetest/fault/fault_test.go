@@ -226,7 +226,7 @@ func (w *world) finish(extra ...string) {
 func (w *world) verifyExecution(execID store.ExecutionID, wantNodes int) {
 	const wantStatus = execution.ExecSucceeded
 	w.t.Helper()
-	ex, err := w.store.GetExecution(w.t.Context(), w.env.Org, execID)
+	ex, err := w.store.GetExecution(w.t.Context(), storetest.ScopeOf(w.env.Org), execID)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -446,11 +446,11 @@ func poisonNextToHealthy(t *testing.T) {
 	if got := countType(w, poison, "token.poisoned"); got != 1 {
 		t.Errorf("%d token.poisoned events, want 1", got)
 	}
-	requests, err := w.store.ListAttentionRequests(t.Context(), w.env.Org, "OPEN", store.Cursor{}, 10)
+	requests, err := w.store.ListAttentionRequests(t.Context(), storetest.ScopeOf(w.env.Org), "OPEN", store.Cursor{}, 10)
 	if err != nil || len(requests) != 1 || requests[0].Cause != "POISON_TOKEN" {
 		t.Errorf("attention requests = %+v, %v; want one POISON_TOKEN", requests, err)
 	}
-	if ex, err := w.store.GetExecution(t.Context(), w.env.Org, poison); err != nil || ex.Status != string(execution.ExecSuspended) {
+	if ex, err := w.store.GetExecution(t.Context(), storetest.ScopeOf(w.env.Org), poison); err != nil || ex.Status != string(execution.ExecSuspended) {
 		t.Errorf("poison execution = %+v, %v; want SUSPENDED", ex, err)
 	}
 	for _, id := range others {
@@ -555,7 +555,7 @@ func TestDiskFull(t *testing.T) {
 	w.integrity()
 	done := 0
 	for _, id := range ids {
-		if ex, err := w.store.GetExecution(t.Context(), w.env.Org, id); err == nil && ex.Status == string(execution.ExecSucceeded) {
+		if ex, err := w.store.GetExecution(t.Context(), storetest.ScopeOf(w.env.Org), id); err == nil && ex.Status == string(execution.ExecSucceeded) {
 			done++
 		}
 	}

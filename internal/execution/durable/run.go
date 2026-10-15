@@ -251,7 +251,7 @@ func (e *Engine) Dispatch(ctx context.Context, limit int) (int, error) {
 				slog.String("outbox", row.OutboxID.String()), slog.String("topic", row.Topic), slog.Int64("attempt", row.AttemptCount), slog.Any("error", err))
 			continue
 		}
-		err := e.store.InTx(ctx, row.OrgID, func(ctx context.Context, tx store.Tx) error {
+		err := e.inTx(ctx, row.OrgID, func(ctx context.Context, tx store.Tx) error {
 			ok, err := tx.MarkOutboxDelivered(ctx, row.OutboxID, e.cfg.Worker, e.cfg.Clock.Now())
 			if err != nil {
 				return err

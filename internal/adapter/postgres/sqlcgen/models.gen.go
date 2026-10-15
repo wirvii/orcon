@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApplicationUser struct {
+	ID              pgtype.UUID
+	PrincipalID     pgtype.UUID
+	EmailNormalized string
+	DisplayName     string
+	Status          string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 type AttentionRequest struct {
 	ID                        pgtype.UUID
 	OrgID                     pgtype.UUID
@@ -377,6 +387,16 @@ type LimitBucket struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type Membership struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ApplicationUserID    pgtype.UUID
+	Status               string
+	InvitedByPrincipalID pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
 type MergeTracker struct {
 	ID                      pgtype.UUID
 	OrgID                   pgtype.UUID
@@ -540,6 +560,7 @@ type Project struct {
 	IsProtected bool
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+	Handle      pgtype.Text
 }
 
 type SchemaMigration struct {

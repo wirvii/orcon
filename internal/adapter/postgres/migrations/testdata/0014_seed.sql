@@ -1,0 +1,4 @@
+-- SPDX-FileCopyrightText: The Orcon Authors
+-- SPDX-License-Identifier: Apache-2.0
+INSERT INTO token_input (id, org_id, execution_id, item_count, encoding, inline_document, inline_document_format, created_at, updated_at) VALUES ('00000028-0000-7000-8000-000100000001', '00000003-0000-7000-8000-000100000001', '0000000b-0000-7000-8000-000100000001', 0, 'encoding-1-1', '\x7b7d', 'orcon/items@1', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
+INSERT INTO token_input (id, org_id, execution_id, item_count, encoding, inline_document, inline_document_format, created_at, updated_at) VALUES ('00000028-0000-7000-8000-000200000001', '00000003-0000-7000-8000-000200000001', '0000000b-0000-7000-8000-000200000001', 0, 'encoding-2-1', '\x7b7d', 'orcon/items@1', '2026-10-09T08:53:20Z', '2026-10-09T08:53:20Z');
