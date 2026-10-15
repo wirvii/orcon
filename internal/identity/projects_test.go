@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -31,9 +32,17 @@ type fakeStore struct {
 	projects []identity.ProjectRecord
 	// failWith, when set, is returned by CreateProject instead of writing.
 	failWith error
+	// lastGrant and lastEntries are what the last CreateProjectWithGrant call was given.
+	lastGrant   identity.RoleBindingRecord
+	lastEntries []audit.Entry
 }
 
 func newFakeStore() *fakeStore { return &fakeStore{orgs: map[identity.OrgID]identity.OrgRecord{}} }
+
+// CreateOrganizationWithAdmin is CreateOrganization: the fake keeps no memberships or bindings.
+func (f *fakeStore) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.OrgKeyRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+	return f.CreateOrganization(ctx, o)
+}
 
 func (f *fakeStore) CreateOrganization(_ context.Context, o identity.OrgRecord) error {
 	f.orgs[o.ID] = o
@@ -48,7 +57,13 @@ func (f *fakeStore) GetOrganization(_ context.Context, org orgscope.Org) (identi
 	return o, nil
 }
 
-func (f *fakeStore) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+// CreateProjectWithGrant is CreateProject: the fake keeps no role bindings, only the last grant and entries it was given.
+func (f *fakeStore) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, grant identity.RoleBindingRecord, entries []audit.Entry) error {
+	f.lastGrant, f.lastEntries = grant, entries
+	return f.CreateProject(ctx, org, p, entries[0])
+}
+
+func (f *fakeStore) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord, _ audit.Entry) error {
 	if f.failWith != nil {
 		return f.failWith
 	}
@@ -256,5 +271,68 @@ func TestOrgIDMatchesScope(t *testing.T) {
 	}
 	if identity.OrgIDOf(scope) != identity.OrgID(u) {
 		t.Error("OrgIDOf returns the organization of the scope")
+	}
+}
+
+// TestCreateProjectWithCreatorBindsProjectAdminAndAuditsIt (R-SH-PRJ-03): a creator becomes Project
+// Admin of the project in the write that creates it, with a role_binding.created entry beside
+// project.created; the project is protected whatever else is asked; without a creator no binding is written.
+func TestCreateProjectWithCreatorBindsProjectAdminAndAuditsIt(t *testing.T) {
+	w := newWorld(t)
+	org := w.org("Acme", "acme")
+	creator := identity.UserID(w.ids.New())
+	rec, err := w.projects.Create(t.Context(), org, identity.NewProject{Name: "Ops", Slug: "ops", Creator: creator})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !rec.IsProtected {
+		t.Errorf("project = %+v, want protected", rec)
+	}
+	g := w.store.lastGrant
+	if g.UserID != creator || g.ProjectID != rec.ID || g.RoleName != identity.RoleProjectAdmin || g.ScopeKind != identity.RoleScopeProject {
+		t.Errorf("grant = %+v, want Project Admin of the new project for the creator", g)
+	}
+	var actions []string
+	for _, e := range w.store.lastEntries {
+		actions = append(actions, e.Action)
+		if e.Action == "role_binding.created" && !strings.Contains(string(e.Body), creator.String()) {
+			t.Errorf("the role_binding.created entry does not name the user: %s", e.Body)
+		}
+	}
+	if strings.Join(actions, ",") != "project.created,role_binding.created" {
+		t.Errorf("actions = %v, want project.created then role_binding.created", actions)
+	}
+
+	w.store.lastGrant, w.store.lastEntries = identity.RoleBindingRecord{}, nil
+	if _, err := w.projects.Create(t.Context(), org, identity.NewProject{Name: "Plain", Slug: "plain"}); err != nil {
+		t.Fatalf("create without a creator: %v", err)
+	}
+	if !w.store.lastGrant.ID.IsZero() || len(w.store.lastEntries) != 0 {
+		t.Errorf("a creation without a creator wrote a grant %+v", w.store.lastGrant)
+	}
+}
+
+// TestProjectFilterMatches: each field narrows the list; a zero filter keeps everything; the name
+// prefix ignores case.
+func TestProjectFilterMatches(t *testing.T) {
+	p := identity.ProjectRecord{Name: "Billing Prod", Handle: "billing", Environment: "prod"}
+	cases := []struct {
+		name   string
+		filter identity.ProjectFilter
+		want   bool
+	}{
+		{"zero", identity.ProjectFilter{}, true},
+		{"prefix", identity.ProjectFilter{NamePrefix: "bill"}, true},
+		{"prefix ignores case", identity.ProjectFilter{NamePrefix: "BILLING p"}, true},
+		{"prefix miss", identity.ProjectFilter{NamePrefix: "prod"}, false},
+		{"environment", identity.ProjectFilter{Environment: "prod"}, true},
+		{"environment miss", identity.ProjectFilter{Environment: "test"}, false},
+		{"handle", identity.ProjectFilter{Handle: "billing"}, true},
+		{"handle is exact", identity.ProjectFilter{Handle: "bill"}, false},
+	}
+	for _, c := range cases {
+		if got := c.filter.Match(p); got != c.want {
+			t.Errorf("%s: Match = %v, want %v", c.name, got, c.want)
+		}
 	}
 }

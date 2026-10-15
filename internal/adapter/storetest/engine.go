@@ -192,7 +192,7 @@ func (env *EngineEnv) Setup() {
 		env.T.Fatalf("create organization: %v", err)
 	}
 	p := identity.ProjectRecord{ID: identity.ProjectID(env.IDs.New()), OrgID: o.ID, Name: "engine", Slug: "engine", Handle: "engine-" + slug, Environment: "development", IsProtected: true, CreatedAt: now, UpdatedAt: now}
-	if err := env.Store.CreateProject(ctx, scopeOf(o.ID), p); err != nil {
+	if err := env.Store.CreateProject(ctx, scopeOf(o.ID), p, projectCreated(env.T, o.ID)); err != nil {
 		env.T.Fatalf("create project: %v", err)
 	}
 	env.Org, env.Project = o.ID, p.ID

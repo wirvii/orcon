@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -65,7 +66,7 @@ func (f *fixture) org(name string) identity.OrgID {
 func (f *fixture) project(org identity.OrgID, slug string) identity.ProjectID {
 	f.t.Helper()
 	p := identity.ProjectRecord{ID: next[identity.ProjectID](f), OrgID: org, Name: "Project " + slug, Slug: slug, Handle: slug + "-" + org.String(), IsProtected: true, CreatedAt: base, UpdatedAt: base}
-	if err := f.s.CreateProject(f.ctx(), scopeOf(org), p); err != nil {
+	if err := f.s.CreateProject(f.ctx(), scopeOf(org), p, audittest.Org(f.t, id.UUID(org), "project.created")); err != nil {
 		f.t.Fatalf("create project %s: %v", slug, err)
 	}
 	return p.ID

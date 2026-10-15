@@ -49,7 +49,17 @@ func checkStretch(t *testing.T, sb *wazero.Sandbox, cfg expr.SandboxConfig, src 
 // TestSandboxIsolationStretch measures, for every case of abandonCases (the
 // interpreted loop among them) and every covered native, the longest time the
 // guest goes without calling the host.
+//
+// The bounds are enforced only without the race detector: under it a stretch is
+// logged and never fails, while the run costs minutes (a fresh runtime per case,
+// up to three times each) and, with the rest of the suite sharing the machine,
+// pushed the package past the ten-minute limit of go test.
+// TestSandboxIsolationAbandon and TestSandboxIsolationAbandonNatives still drive
+// every one of these cases past its deadline under the race detector.
 func TestSandboxIsolationStretch(t *testing.T) {
+	if defaultTestTimeout >= time.Second {
+		t.Skip("stretch bounds are not enforced under the race detector; the abandon tests cover these cases there")
+	}
 	ev := evaluatorIn(t, wazero.ModeCooperativeAbandon, expr.Options{Timeout: abandonDeadline, MemoryLimit: 64 << 20})
 	sb := sharedSandbox(wazero.ModeCooperativeAbandon)
 	for _, tc := range abandonCases {
