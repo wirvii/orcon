@@ -1,0 +1,90 @@
+{
+  "name": "Follow-up reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 15 },
+            { "field": "days", "daysInterval": 1, "triggerAtHour": 9, "triggerAtMinute": 30 }
+          ]
+        }
+      },
+      "id": "22222222-0000-4000-8000-000000000001",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": { "rule": { "interval": [ { "field": "cronExpression", "expression": "0 8 * * 1-5" } ] } },
+      "id": "22222222-0000-4000-8000-000000000002",
+      "name": "Weekday morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 200]
+    },
+    {
+      "parameters": { "rule": { "interval": [ { "field": "weeks", "weeksInterval": 1, "triggerAtDay": [1], "triggerAtHour": 10 } ] } },
+      "id": "22222222-0000-4000-8000-000000000003",
+      "name": "Weekly digest",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400]
+    },
+    {
+      "parameters": { "amount": 2, "unit": "days" },
+      "id": "22222222-0000-4000-8000-000000000004",
+      "name": "Wait two days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [ { "id": "b1", "name": "reminder", "value": "Pending follow-up", "type": "string" } ] },
+        "options": {}
+      },
+      "id": "22222222-0000-4000-8000-000000000005",
+      "name": "Build reminder",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {},
+      "id": "22222222-0000-4000-8000-000000000006",
+      "name": "Manual start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 600]
+    },
+    {
+      "parameters": { "mode": "append" },
+      "id": "22222222-0000-4000-8000-000000000007",
+      "name": "Join reminders",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [660, 300]
+    },
+    {
+      "parameters": { "mode": "append" },
+      "id": "22222222-0000-4000-8000-000000000008",
+      "name": "Notify owner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": { "main": [[{ "node": "Wait two days", "type": "main", "index": 0 }]] },
+    "Wait two days": { "main": [[{ "node": "Build reminder", "type": "main", "index": 0 }]] },
+    "Build reminder": { "main": [[{ "node": "Join reminders", "type": "main", "index": 0 }]] },
+    "Manual start": { "main": [[{ "node": "Join reminders", "type": "main", "index": 1 }]] },
+    "Weekday morning": { "main": [[{ "node": "Join reminders", "type": "main", "index": 1 }]] },
+    "Weekly digest": { "main": [[{ "node": "Notify owner", "type": "main", "index": 0 }]] },
+    "Join reminders": { "main": [[{ "node": "Notify owner", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "America/Bogota" },
+  "active": false
+}
