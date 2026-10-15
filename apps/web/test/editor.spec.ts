@@ -318,6 +318,8 @@ test.describe('on a computer', () => {
     await page.getByRole('link', { name: 'Settings' }).first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
     await goInApp(page, FLOW);
+    // The address is loaded through the signed-in frame, so wait for the editor itself before reading its nodes.
+    await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
     await page.waitForSelector('[data-fitted="true"]');
     await expect(page.getByRole('group', { name: /^Slack,.*disabled/ })).toBeVisible();
     expect(await banner(page)).not.toContain('Unsaved');
