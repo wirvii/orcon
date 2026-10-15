@@ -20,6 +20,7 @@ import (
 // outcomes.
 type fakeWebhookIngress struct {
 	ingestErr    error
+	ignored      bool
 	challenge    string
 	handshakeErr error
 	got          trigger.IngressRequest
@@ -30,7 +31,24 @@ func (f *fakeWebhookIngress) Ingest(_ context.Context, req trigger.IngressReques
 	if f.ingestErr != nil {
 		return trigger.Accepted{}, f.ingestErr
 	}
+	if f.ignored {
+		return trigger.Accepted{Ignored: true}, nil
+	}
 	return trigger.Accepted{ExecutionID: "exec-1"}, nil
+}
+
+// TestWebhookAcknowledgesAnIgnoredRequestAs200: an authentic request with no
+// events is answered 200 with status ignored and no execution id.
+func TestWebhookAcknowledgesAnIgnoredRequestAs200(t *testing.T) {
+	in := &fakeWebhookIngress{ignored: true}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/hooks/p/inbound", strings.NewReader(`{}`))
+	rec := serveWebhook(in, r)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"status":"ignored"`) || rec.Header().Get("Orcon-Execution-Id") != "" {
+		t.Fatalf("body = %s, header id = %q", rec.Body.String(), rec.Header().Get("Orcon-Execution-Id"))
+	}
 }
 
 func (f *fakeWebhookIngress) Handshake(_ context.Context, req trigger.IngressRequest) (string, error) {

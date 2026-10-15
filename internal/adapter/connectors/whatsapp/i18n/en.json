@@ -2,6 +2,7 @@
   "connector.displayName": "WhatsApp Cloud API",
   "connector.description": "Send WhatsApp messages and mark them as read through the WhatsApp Cloud API of Meta.",
   "node.whatsapp.displayName": "WhatsApp Cloud API",
+  "node.whatsappTrigger.displayName": "WhatsApp message received",
   "parameter.whatsapp.phoneNumberId.description": "The ID of the WhatsApp Business phone number that sends or works with the message.",
   "parameter.whatsapp.to.description": "Recipient phone number in international format, digits only, such as 573001234567.",
   "parameter.whatsapp.text.description": "The Meta text object, such as {\"body\": \"Hello\"}. Optional field: preview_url.",

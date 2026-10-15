@@ -192,7 +192,7 @@ func (v *validator) response(base string, op Operation) {
 	if referencesCredentials(rs.Select) {
 		v.addf(base+"/select", "$credentials is not visible in response mapping")
 	}
-	if _, err := parsePath(rs.Select); rs.Select != "" && err != nil {
+	if err := checkPlainPath(rs.Select); rs.Select != "" && err != nil {
 		v.addf(base+"/select", "unsupported path: %v", err)
 	}
 	if !slices.Contains(validEmpty, rs.Empty) {
@@ -228,17 +228,19 @@ func (v *validator) errorRule(p string, op Operation, rule ErrorRule) {
 }
 
 // responseMap checks the keys and paths of a response map: each output key is
-// named and each path starts with $ and is supported by the interpreter.
+// named and each alternative of each path starts with $ and is supported.
 func (v *validator) responseMap(base string, mapping map[string]string) {
 	for _, k := range slices.Sorted(maps.Keys(mapping)) {
 		if k == "" {
 			v.addf(base, "output keys must not be empty")
 		}
 		p := base + "/" + k
-		if !strings.HasPrefix(mapping[k], "$") {
-			v.addf(p, "must be a path starting with $")
-		} else if _, err := parsePath(mapping[k]); err != nil {
-			v.addf(p, "unsupported path: %v", err)
+		for _, alt := range alternatives(mapping[k]) {
+			if !strings.HasPrefix(alt, "$") {
+				v.addf(p, "must be a path starting with $")
+			} else if err := checkPlainPath(alt); err != nil {
+				v.addf(p, "unsupported path: %v", err)
+			}
 		}
 	}
 }
@@ -246,7 +248,7 @@ func (v *validator) responseMap(base string, mapping map[string]string) {
 // bodyMatch checks the path and the scalars of a body condition of an error
 // rule. Objects and arrays cannot be compared, so they are refused.
 func (v *validator) bodyMatch(base string, m BodyMatch) {
-	if _, err := parsePath(m.Path); err != nil {
+	if err := checkPlainPath(m.Path); err != nil {
 		v.addf(base+"/path", "unsupported path: %v", err)
 	}
 	if len(m.In) == 0 {
@@ -295,7 +297,7 @@ func (v *validator) pagination(base string, op Operation) {
 			v.addf(base+"/path", "NEXT_URL needs the path to the next URL")
 		}
 	}
-	if _, err := parsePath(pg.Path); pg.Path != "" && err != nil {
+	if err := checkPlainPath(pg.Path); pg.Path != "" && err != nil {
 		v.addf(base+"/path", "unsupported path: %v", err)
 	}
 	if pg.MaxPages < 0 {

@@ -202,7 +202,7 @@ func decodeBody(t *testing.T, data []byte) declarative.Definition {
 	if tv, ok := top.value("triggers"); ok {
 		def.Triggers = map[string]declarative.Trigger{}
 		for _, m := range tv.Members() {
-			o := objectOf(t, m.Value, "triggers/"+m.Key, "family", "verify", "handshake")
+			o := objectOf(t, m.Value, "triggers/"+m.Key, "family", "verify", "handshake", "decode")
 			tr := declarative.Trigger{Family: o.str("family")}
 			if v := o.child("verify", "type", "header", "prefix", "field"); len(v.members) > 0 {
 				tr.Verify = &declarative.Verify{Type: v.str("type"), Header: v.str("header"), Prefix: v.str("prefix"), Field: v.str("field")}
@@ -212,6 +212,9 @@ func decodeBody(t *testing.T, data []byte) declarative.Definition {
 					Type: h.str("type"), ModeParam: h.str("modeParam"), TokenParam: h.str("tokenParam"),
 					ChallengeParam: h.str("challengeParam"), Field: h.str("field"),
 				}
+			}
+			if d := o.child("decode", "items", "map"); len(d.members) > 0 {
+				tr.Decode = &declarative.Decode{Items: d.str("items"), Map: d.strMap("map")}
 			}
 			def.Triggers[m.Key] = tr
 		}
@@ -324,10 +327,24 @@ func TestManifestMatchesBody(t *testing.T) {
 	}
 	m := pkg.Manifest()
 	def := loadDefinition(t)
-	if len(m.Nodes) != 1 {
-		t.Fatalf("want one action node, got %d", len(m.Nodes))
+	if len(m.Nodes) != 2 {
+		t.Fatalf("want one action node and one trigger node, got %d nodes", len(m.Nodes))
 	}
-	node := m.Nodes[0]
+	var node connector.Node
+	var trig *connector.Trigger
+	for _, n := range m.Nodes {
+		if n.Group == connector.GroupTrigger {
+			trig = n.Trigger
+			continue
+		}
+		node = n
+	}
+	if trig == nil || trig.Family != connector.FamilyWebhook {
+		t.Fatalf("the trigger node is missing its WEBHOOK declaration: %+v", trig)
+	}
+	if body := def.Triggers["whatsappTrigger"]; body.Family != declarative.FamilyWebhook {
+		t.Fatalf("manifest declares WEBHOOK, body declares %s", body.Family)
+	}
 	if len(node.Operations) != len(def.Operations) {
 		t.Fatalf("manifest declares %d operations, the body %d", len(node.Operations), len(def.Operations))
 	}
@@ -388,8 +405,8 @@ const (
 	documentBody = `{"messaging_product":"whatsapp","recipient_type":"individual","to":"573001234567","type":"document","document":{"link":"https://cdn.example.com/a.pdf","filename":"cotizacion.pdf"}}`
 	readBody     = `{"messaging_product":"whatsapp","status":"read","message_id":"wamid.HBgLMTIzNDU2"}`
 	messagesPath = "/v25.0/" + phoneNumberID + "/messages"
-	// The sentItem constant is the output of a send: the message id and the
-	// recipient the provider resolved, as the mock provider answers them.
+	// The sentItem constant is the output of a send: the provider's reply as the
+	// mock provider answers it, with the message id and the resolved recipient added.
 	sentItem = `{"contacts":[{"input":"` + mockprovider.MockContact + `","wa_id":"` + mockprovider.MockContact + `"}],` +
 		`"id":"wamid.mock-1","messages":[{"id":"wamid.mock-1"}],"messaging_product":"whatsapp",` +
 		`"recipient":"` + mockprovider.MockContact + `"}`

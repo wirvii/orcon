@@ -35,7 +35,7 @@ func loadFixture(t *testing.T) []byte {
 // echoes the challenge for the verify token.
 func TestInboundTriggerIsDeclared(t *testing.T) {
 	def := loadDefinition(t)
-	tr, ok := def.Triggers["inbound"]
+	tr, ok := def.Triggers["whatsappTrigger"]
 	if !ok {
 		t.Fatal("the connector declares no inbound trigger")
 	}
@@ -53,7 +53,7 @@ func TestInboundTriggerIsDeclared(t *testing.T) {
 // TestInboundSignatureOfAMetaEvent: the signature of a real event is accepted
 // under the app secret and refused under any other secret or changed bytes.
 func TestInboundSignatureOfAMetaEvent(t *testing.T) {
-	tr := loadDefinition(t).Triggers["inbound"]
+	tr := loadDefinition(t).Triggers["whatsappTrigger"]
 	body := loadFixture(t)
 	header := map[string][]string{"X-Hub-Signature-256": {fixtureSignature}}
 
@@ -73,7 +73,7 @@ func TestInboundSignatureOfAMetaEvent(t *testing.T) {
 // hub.mode, hub.verify_token and hub.challenge; the challenge is echoed only
 // for the right token.
 func TestInboundSubscriptionHandshake(t *testing.T) {
-	tr := loadDefinition(t).Triggers["inbound"]
+	tr := loadDefinition(t).Triggers["whatsappTrigger"]
 	query := map[string]string{"hub.mode": "subscribe", "hub.verify_token": fixtureHandshakeKey, "hub.challenge": "1158201444"}
 
 	got, err := declarative.CheckHandshake(*tr.Handshake, query, fixtureHandshakeKey)
@@ -88,7 +88,7 @@ func TestInboundSubscriptionHandshake(t *testing.T) {
 // TestInboundSignatureHeaderIsReadWhateverItsCase: the header arrives from the
 // transport with its canonical or its lower-case name.
 func TestInboundSignatureHeaderIsReadWhateverItsCase(t *testing.T) {
-	tr := loadDefinition(t).Triggers["inbound"]
+	tr := loadDefinition(t).Triggers["whatsappTrigger"]
 	header := http.Header{}
 	header.Set("x-hub-signature-256", fixtureSignature)
 	if err := declarative.VerifySignature(*tr.Verify, header, loadFixture(t), fixtureSecret); err != nil {

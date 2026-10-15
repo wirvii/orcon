@@ -170,7 +170,7 @@
     }
   },
   "triggers": {
-    "inbound": {
+    "whatsappTrigger": {
       "family": "WEBHOOK",
       "verify": {
         "type": "HMAC_SHA256",
@@ -184,6 +184,19 @@
         "tokenParam": "hub.verify_token",
         "challengeParam": "hub.challenge",
         "field": "verifyToken"
+      },
+      "decode": {
+        "items": "$.entry[*].changes[*].value.messages[*]",
+        "map": {
+          "id": "$.item.id",
+          "from": "$.item.from",
+          "timestamp": "$.item.timestamp",
+          "type": "$.item.type",
+          "text": "$.item.text.body|$.item.button.text|$.item.interactive.button_reply.title|$.item.interactive.list_reply.title",
+          "mediaId": "$.item.image.id|$.item.audio.id|$.item.video.id|$.item.document.id|$.item.sticker.id",
+          "contactName": "$.parent.contacts[0].profile.name",
+          "phoneNumberId": "$.parent.metadata.phone_number_id"
+        }
       }
     }
   }

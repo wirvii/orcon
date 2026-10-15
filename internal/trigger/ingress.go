@@ -32,12 +32,15 @@ type IngressRequest struct {
 }
 
 // Verifier authenticates public requests against the verification a trigger
-// declares. The request is checked before the acceptance is read, so a refused
-// request never starts an execution.
+// declares, and turns the body into the input of the execution. The request is
+// checked before the acceptance is read, so a refused request never starts an
+// execution.
 type Verifier interface {
-	// Verify returns an error wrapping [ErrUnauthorized] unless the request
-	// carries the signature the route's trigger declares.
-	Verify(ctx context.Context, r Resolved, req IngressRequest) error
+	// Admit authenticates the request and returns the JSON input of the
+	// execution it starts. It returns start false when the request carries no
+	// events, so it is acknowledged without an execution. A request that is not
+	// authentic is an error wrapping [ErrUnauthorized].
+	Admit(ctx context.Context, r Resolved, req IngressRequest) (input []byte, start bool, err error)
 	// Challenge answers a subscription handshake: it returns the text to echo,
 	// or an error wrapping [ErrUnauthorized] when the token is wrong or the
 	// trigger declares no handshake.
@@ -46,8 +49,11 @@ type Verifier interface {
 
 // Accepted is a request the ingress accepted: the execution it started. The
 // execution runs on the version the registry named when the request arrived.
+// Ignored is set when the request was authentic but carried no events to run,
+// so nothing was started and ExecutionID is empty.
 type Accepted struct {
 	ExecutionID string
+	Ignored     bool
 }
 
 // Ingest accepts one public request for a webhook trigger (SPEC-002 T2, first
@@ -71,10 +77,16 @@ func (s *Service) Ingest(ctx context.Context, req IngressRequest) (Accepted, err
 	if err != nil {
 		return Accepted{}, fmt.Errorf("resolve %s %s: %w", req.Method, req.Path, err)
 	}
+	input := req.Body
 	if s.verifier != nil {
-		if err := s.verifier.Verify(ctx, r, req); err != nil {
+		admitted, start, err := s.verifier.Admit(ctx, r, req)
+		if err != nil {
 			return Accepted{}, fmt.Errorf("%w: %w", ErrUnauthorized, err)
 		}
+		if !start {
+			return Accepted{Ignored: true}, nil
+		}
+		input = admitted
 	}
 	acc, err := s.Accept(ctx, r.Org, r.FlowID, r.NodeID)
 	if err != nil {
@@ -83,7 +95,7 @@ func (s *Service) Ingest(ctx context.Context, req IngressRequest) (Accepted, err
 	id, err := s.starter.StartTriggered(ctx, TriggeredRun{
 		Org: r.Org, ProjectID: r.ProjectID, FlowID: r.FlowID, Node: r.NodeID,
 		Version: acc.FlowVersionID, Trigger: acc.TriggerID,
-	}, req.Body)
+	}, input)
 	if err != nil {
 		return Accepted{}, fmt.Errorf("start the execution of node %q: %w", r.NodeID, err)
 	}

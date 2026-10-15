@@ -27,15 +27,20 @@ func (s routedStore) ResolveRoute(_ context.Context, _, _ string) (trigger.Resol
 
 // fakeVerifier records the requests it sees and answers with a fixed outcome.
 type fakeVerifier struct {
-	verifyErr    error
-	challenge    string
+	admitErr  error
+	noEvents  bool
+	challenge string
+	// challengeErr is the answer of the handshake.
 	challengeErr error
 	verified     int
 }
 
-func (v *fakeVerifier) Verify(context.Context, trigger.Resolved, trigger.IngressRequest) error {
+func (v *fakeVerifier) Admit(context.Context, trigger.Resolved, trigger.IngressRequest) ([]byte, bool, error) {
 	v.verified++
-	return v.verifyErr
+	if v.admitErr != nil {
+		return nil, false, v.admitErr
+	}
+	return []byte(`[]`), !v.noEvents, nil
 }
 
 func (v *fakeVerifier) Challenge(context.Context, trigger.Resolved, trigger.IngressRequest) (string, error) {
@@ -65,7 +70,7 @@ func newIngress(t *testing.T, v trigger.Verifier) (*trigger.Service, *triggertes
 // TestIngestRefusesAnUnverifiedRequestBeforeAnyExecution: a request the
 // verifier refuses is answered as unauthenticated and starts nothing.
 func TestIngestRefusesAnUnverifiedRequestBeforeAnyExecution(t *testing.T) {
-	v := &fakeVerifier{verifyErr: errors.New("signature does not match")}
+	v := &fakeVerifier{admitErr: errors.New("signature does not match")}
 	svc, starter := newIngress(t, v)
 
 	_, err := svc.Ingest(t.Context(), trigger.IngressRequest{Method: "POST", Path: "/hooks/p/x", Body: []byte(`{}`)})
@@ -77,6 +82,22 @@ func TestIngestRefusesAnUnverifiedRequestBeforeAnyExecution(t *testing.T) {
 	}
 	if len(starter.Triggered) != 0 {
 		t.Fatalf("%d executions started for a refused request", len(starter.Triggered))
+	}
+}
+
+// TestIngestAcknowledgesAnAuthenticRequestWithoutEvents: a signed status
+// update with no messages is accepted, answered as ignored, and starts nothing.
+func TestIngestAcknowledgesAnAuthenticRequestWithoutEvents(t *testing.T) {
+	svc, starter := newIngress(t, &fakeVerifier{noEvents: true})
+	acc, err := svc.Ingest(t.Context(), trigger.IngressRequest{Method: "POST", Path: "/hooks/p/x", Body: []byte(`{}`)})
+	if err != nil {
+		t.Fatalf("Ingest() = %v, want an acknowledgement", err)
+	}
+	if !acc.Ignored || acc.ExecutionID != "" {
+		t.Fatalf("Accepted = %+v, want ignored without an execution", acc)
+	}
+	if len(starter.Triggered) != 0 {
+		t.Fatalf("%d executions started for a request without events", len(starter.Triggered))
 	}
 }
 

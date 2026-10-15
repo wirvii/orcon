@@ -58,6 +58,14 @@ func webhookHandler(in WebhookIngress, logger *slog.Logger) http.Handler {
 			writeIngressProblem(w, r, logger, err)
 			return
 		}
+		if acc.Ignored {
+			// Authentic but without events to run (for example a status update):
+			// acknowledged so the provider does not resend it.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ignored"})
+			return
+		}
 		w.Header().Set("Orcon-Execution-Id", acc.ExecutionID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusAccepted)

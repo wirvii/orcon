@@ -286,7 +286,7 @@ func enrich(item jsonvalue.Value, mapping map[string]string) (jsonvalue.Value, e
 	}
 	out := item
 	for _, k := range slices.Sorted(maps.Keys(mapping)) {
-		v, ok, err := lookup(item, mapping[k])
+		v, ok, err := firstFound(item, mapping[k])
 		if err != nil {
 			return jsonvalue.Value{}, err
 		}
@@ -295,6 +295,35 @@ func enrich(item jsonvalue.Value, mapping map[string]string) (jsonvalue.Value, e
 		}
 	}
 	return out, nil
+}
+
+// project builds the output object of one event from a decode map: each key
+// takes the value at its path, and a path that finds nothing is left out.
+// Unlike [enrich], the record is not kept.
+func project(item jsonvalue.Value, mapping map[string]string) (jsonvalue.Value, error) {
+	keys := slices.Sorted(maps.Keys(mapping))
+	members := make([]jsonvalue.Member, 0, len(keys))
+	for _, k := range keys {
+		v, ok, err := firstFound(item, mapping[k])
+		if err != nil {
+			return jsonvalue.Value{}, err
+		}
+		if ok {
+			members = append(members, jsonvalue.Member{Key: k, Value: v})
+		}
+	}
+	return jsonvalue.Object(members...)
+}
+
+// firstFound returns the value of the first alternative of expr that finds one.
+func firstFound(item jsonvalue.Value, expr string) (jsonvalue.Value, bool, error) {
+	for _, alt := range alternatives(expr) {
+		v, ok, err := lookup(item, alt)
+		if err != nil || ok {
+			return v, ok, err
+		}
+	}
+	return jsonvalue.Value{}, false, nil
 }
 
 func (w *walk) emptyItems() []jsonvalue.Value {

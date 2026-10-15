@@ -8,7 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"maps"
+	"slices"
 	"strings"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 // FamilyWebhook is the trigger family a declarative connector may declare
@@ -35,6 +40,81 @@ type Trigger struct {
 	Family    string     `json:"family"`
 	Verify    *Verify    `json:"verify,omitempty"`
 	Handshake *Handshake `json:"handshake,omitempty"`
+	Decode    *Decode    `json:"decode,omitempty"`
+}
+
+// Decode turns the body of an accepted webhook request into events, one per
+// selected item (ADR-0030 §8). Items is a path that ends in "<key>[*]", such as
+// "$.entry[*].changes[*].value.messages[*]": every array named <key> found at
+// the path before it is walked, and each of its members is one event.
+//
+// Map builds the output of each event from three scopes: "$.item" is the
+// member, "$.parent" is the object that holds the array, and "$.root" is the
+// whole body. A map value may list alternatives separated by "|"; the first one
+// that finds a value is used, so one key can read several message types. A path
+// that finds nothing leaves its key out.
+type Decode struct {
+	Items string            `json:"items"`
+	Map   map[string]string `json:"map"`
+}
+
+// alternatives splits a map value into its "|" alternatives, trimmed.
+func alternatives(expr string) []string {
+	parts := strings.Split(expr, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+// splitItems separates an items path into the path of the holders of the array
+// and the name of the array. It refuses a path that does not end in "<key>[*]".
+func splitItems(path string) (holders, key string, err error) {
+	trimmed, ok := strings.CutSuffix(path, "[*]")
+	if !ok {
+		return "", "", fmt.Errorf("%w: items must end in an array wildcard", ErrTemplate)
+	}
+	i := strings.LastIndex(trimmed, ".")
+	if i < 0 || trimmed[i+1:] == "" {
+		return "", "", fmt.Errorf("%w: items must name the array before [*]", ErrTemplate)
+	}
+	return trimmed[:i], trimmed[i+1:], nil
+}
+
+// Events returns the events of one accepted body. Each event holds the keys of
+// Map whose paths found a value, so an event is a normalized object.
+func (d Decode) Events(body jsonvalue.Value) ([]jsonvalue.Value, error) {
+	holders, key, err := splitItems(d.Items)
+	if err != nil {
+		return nil, err
+	}
+	parents, err := selectAll(body, holders)
+	if err != nil {
+		return nil, err
+	}
+	var out []jsonvalue.Value
+	for _, parent := range parents {
+		arr, ok := parent.Get(key)
+		if !ok {
+			continue
+		}
+		for _, item := range arr.Items() {
+			scope, err := jsonvalue.Object(
+				jsonvalue.Member{Key: "item", Value: item},
+				jsonvalue.Member{Key: "parent", Value: parent},
+				jsonvalue.Member{Key: "root", Value: body},
+			)
+			if err != nil {
+				return nil, err
+			}
+			event, err := project(scope, d.Map)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, event)
+		}
+	}
+	return out, nil
 }
 
 // Verify is the signature check of a webhook request (HMAC_SHA256): the
@@ -160,6 +240,40 @@ func (v *validator) trigger(base string, t Trigger) {
 		}
 		if h.Field == "" {
 			v.addf(base+"/handshake/field", "needs the credential field of the verify token")
+		}
+	}
+	if t.Decode != nil {
+		v.decode(base+"/decode", *t.Decode)
+	}
+}
+
+// decode checks the items path and the event map of a webhook trigger. Each map
+// alternative must read from one of the three scopes of an event.
+func (v *validator) decode(base string, d Decode) {
+	holders, _, err := splitItems(d.Items)
+	if err != nil {
+		v.addf(base+"/items", "%v", err)
+	} else if _, err := parsePath(holders); err != nil {
+		v.addf(base+"/items", "unsupported path: %v", err)
+	}
+	if len(d.Map) == 0 {
+		v.addf(base+"/map", "needs at least one output member")
+	}
+	for _, k := range slices.Sorted(maps.Keys(d.Map)) {
+		p := base + "/map/" + k
+		if k == "" {
+			v.addf(base+"/map", "output keys must not be empty")
+		}
+		for _, alt := range alternatives(d.Map[k]) {
+			steps, err := parsePath(alt)
+			switch {
+			case err != nil:
+				v.addf(p, "unsupported path: %v", err)
+			case checkPlainPath(alt) != nil:
+				v.addf(p, "a wildcard is not allowed in an event map")
+			case len(steps) == 0 || steps[0].isIndex || !slices.Contains([]string{"item", "parent", "root"}, steps[0].key):
+				v.addf(p, "a path must start with $.item, $.parent or $.root")
+			}
 		}
 	}
 }

@@ -216,6 +216,20 @@
         "/parameters/image",
         "/parameters/document"
       ]
+    },
+    {
+      "name": "whatsappTrigger",
+      "type": "orcon.whatsapp.whatsappTrigger@1",
+      "displayName": "WhatsApp message received",
+      "group": "TRIGGER",
+      "trigger": {
+        "family": "WEBHOOK",
+        "delivery": "AT_LEAST_ONCE",
+        "maxPayload": 1048576
+      },
+      "outputs": [
+        "main"
+      ]
     }
   ],
   "credentials": [
