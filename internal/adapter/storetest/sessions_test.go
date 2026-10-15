@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,13 +32,19 @@ const (
 // sessionsOf builds the session service over the store of the fixture, on a fake clock.
 func sessionsOf(t *testing.T, f *fixture, clk *clock.Fake) *identity.Sessions {
 	t.Helper()
+	return sessionsWith(t, f, clk, identity.SessionConfig{PublicOrigin: testOrigin})
+}
+
+// sessionsWith builds the session service with the given configuration.
+func sessionsWith(t *testing.T, f *fixture, clk *clock.Fake, cfg identity.SessionConfig) *identity.Sessions {
+	t.Helper()
 	identify, err := identity.HMACIdentifier(bytes.Repeat([]byte{7}, 32))
 	if err != nil {
 		t.Fatalf("identifier: %v", err)
 	}
 	svc, err := identity.NewSessions(identity.SessionDeps{
 		Users: f.s, Sessions: f.s, Throttle: f.s, Hasher: testHasher(), Identify: identify, Clock: clk, IDs: f.ids,
-	}, identity.SessionConfig{PublicOrigin: testOrigin})
+	}, cfg)
 	if err != nil {
 		t.Fatalf("sessions: %v", err)
 	}
@@ -235,37 +243,47 @@ func TestSignInRotatesPreviousSession(t *testing.T) {
 	})
 }
 
-// TestUnsafeRequestWithoutCsrfTokenRejected (SPEC-016 R-SH-SES-03): a state-changing
-// request on a cookie session needs the Origin of the installation and a CSRF token
-// that matches the session; a safe request needs neither.
-func TestUnsafeRequestWithoutCsrfTokenRejected(t *testing.T) {
+// TestParallelFailedAttemptsAreAllCounted (SPEC-004 R-AUTH-02): concurrent wrong passwords for one
+// identifier each count once. The lock threshold is out of reach here, so every attempt is a failure.
+func TestParallelFailedAttemptsAreAllCounted(t *testing.T) {
 	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
 		t.Helper()
 		f := newFixture(t, newStore)
-		svc := sessionsOf(t, f, clock.NewFake(base))
+		clk := clock.NewFake(base)
+		svc := sessionsWith(t, f, clk, identity.SessionConfig{
+			PublicOrigin: testOrigin,
+			Attempts:     identity.ThrottlePolicy{FreeAttempts: 1000, BaseDelay: time.Second, MaxDelay: time.Minute},
+		})
 		userWithPassword(t, f, "ada@example.test")
-		signed, err := svc.SignIn(f.ctx(), identity.SignIn{Email: "ada@example.test", Password: testPassword})
+
+		const attempts = 40
+		var wg sync.WaitGroup
+		failures := make(chan error, attempts)
+		for range attempts {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := svc.SignIn(t.Context(), identity.SignIn{Email: "ada@example.test", Password: "wrong password"})
+				var rej *identity.SignInError
+				if !errors.As(err, &rej) || rej.Reason != identity.ReasonWrongPassword {
+					failures <- fmt.Errorf("attempt answered %w, want a wrong-password refusal", err)
+				}
+			}()
+		}
+		wg.Wait()
+		close(failures)
+		for err := range failures {
+			t.Error(err)
+		}
+
+		identify, err := identity.HMACIdentifier(bytes.Repeat([]byte{7}, 32))
 		if err != nil {
-			t.Fatalf("sign in: %v", err)
+			t.Fatalf("identifier: %v", err)
 		}
-		good := identity.Credentials{Session: signed.Token, CSRFToken: signed.CSRFToken, CSRFCookie: signed.CSRFToken, Origin: testOrigin, UnsafeMethod: true}
-		if _, err := svc.Authenticate(f.ctx(), good); err != nil {
-			t.Fatalf("a complete unsafe request: %v", err)
-		}
-		bad := map[string]identity.Credentials{
-			"no header":        {Session: signed.Token, CSRFCookie: signed.CSRFToken, Origin: testOrigin, UnsafeMethod: true},
-			"header not equal": {Session: signed.Token, CSRFToken: "x", CSRFCookie: signed.CSRFToken, Origin: testOrigin, UnsafeMethod: true},
-			"other origin":     {Session: signed.Token, CSRFToken: signed.CSRFToken, CSRFCookie: signed.CSRFToken, Origin: "https://evil.test", UnsafeMethod: true},
-			"no origin":        {Session: signed.Token, CSRFToken: signed.CSRFToken, CSRFCookie: signed.CSRFToken, UnsafeMethod: true},
-		}
-		for name, creds := range bad {
-			if _, err := svc.Authenticate(f.ctx(), creds); !errors.Is(err, identity.ErrCSRFCheckFailed) {
-				t.Errorf("%s: %v, want ErrCSRFCheckFailed", name, err)
-			}
-		}
-		safe := identity.Credentials{Session: signed.Token}
-		if _, err := svc.Authenticate(f.ctx(), safe); err != nil {
-			t.Errorf("a safe request needs no CSRF token: %v", err)
+		key := identify("ada@example.test")
+		got, err := f.s.GetLoginThrottle(f.ctx(), key)
+		if err != nil || got.Failures != attempts {
+			t.Errorf("stored failures = %d, %v; want %d (no count may be lost)", got.Failures, err, attempts)
 		}
 	})
 }

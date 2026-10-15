@@ -386,11 +386,11 @@ type LimitBucket struct {
 }
 
 type LoginThrottle struct {
-	ID          []byte
-	Failures    int64
-	LockedUntil pgtype.Timestamptz
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID            []byte
+	Failures      int64
+	LockedUntilAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 }
 
 type Membership struct {

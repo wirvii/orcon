@@ -146,18 +146,32 @@ WHERE id = sqlc.arg(id) AND application_user_id = sqlc.arg(application_user_id) 
 
 -- name: GetLoginThrottle :one
 -- orcon:scope instance
-SELECT id, failures, locked_until, created_at, updated_at
+SELECT id, failures, locked_until_at, created_at, updated_at
 FROM login_throttle
 WHERE id = sqlc.arg(id);
 
 -- name: UpsertLoginThrottle :exec
 -- orcon:scope instance
-INSERT INTO login_throttle (id, failures, locked_until, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(failures), sqlc.arg(locked_until), sqlc.arg(created_at), sqlc.arg(updated_at))
-ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until = excluded.locked_until, updated_at = excluded.updated_at;
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(failures), sqlc.arg(locked_until_at), sqlc.arg(created_at), sqlc.arg(updated_at))
+ON CONFLICT (id) DO UPDATE SET failures = excluded.failures, locked_until_at = excluded.locked_until_at, updated_at = excluded.updated_at;
 
 -- name: DeleteLoginThrottle :execrows
 -- orcon:scope instance
 -- orcon:delete bookkeeping:the throttle record of an identifier ends when that identifier signs in
 DELETE FROM login_throttle
+WHERE id = sqlc.arg(id);
+
+-- The failure count moves in one statement: concurrent failed attempts never lose a count (SPEC-004 R-AUTH-02).
+-- name: UpsertLoginThrottleFailure :one
+-- orcon:scope instance
+INSERT INTO login_throttle (id, failures, locked_until_at, created_at, updated_at)
+VALUES (sqlc.arg(id), 1, sqlc.arg(created_at), sqlc.arg(created_at), sqlc.arg(created_at))
+ON CONFLICT (id) DO UPDATE SET failures = login_throttle.failures + 1, updated_at = excluded.updated_at
+RETURNING failures;
+
+-- name: MarkLoginThrottleLocked :execrows
+-- orcon:scope instance
+UPDATE login_throttle
+SET locked_until_at = sqlc.arg(locked_until_at), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);

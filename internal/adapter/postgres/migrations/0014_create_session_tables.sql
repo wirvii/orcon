@@ -38,11 +38,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON session TO orcon_engine;
 
 -- Failed sign-in attempts per identifier. id is the keyed identifier of the normalized address: the HMAC-SHA-256
 -- with the instance key, truncated to 16 bytes, so the address itself never reaches the table (SPEC-004 R-AUTH-02).
--- locked_until is the instant before which the identifier is refused.
+-- locked_until_at is the instant before which the identifier is refused.
 CREATE TABLE login_throttle (
   id bytea NOT NULL,
   failures bigint NOT NULL,
-  locked_until timestamptz NOT NULL,
+  locked_until_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   CONSTRAINT pk_login_throttle PRIMARY KEY (id),

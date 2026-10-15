@@ -386,11 +386,11 @@ type LimitBucket struct {
 }
 
 type LoginThrottle struct {
-	ID          []byte
-	Failures    int64
-	LockedUntil int64
-	CreatedAt   int64
-	UpdatedAt   int64
+	ID            []byte
+	Failures      int64
+	LockedUntilAt int64
+	CreatedAt     int64
+	UpdatedAt     int64
 }
 
 type Membership struct {
