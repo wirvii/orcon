@@ -34,10 +34,13 @@ export interface CreateFlowDialogProps {
   onOpenChange: (open: boolean) => void;
   orgId: string;
   projectId: string;
+  /** The address parts of the project: the editor address carries both (SPEC-016 Q1 = A). */
+  orgSlug: string;
+  projectHandle: string;
 }
 
 /** Creates a flow in the project and opens it in the editor. Failures are shown above the form. */
-export function CreateFlowDialog({ open, onOpenChange, orgId, projectId }: CreateFlowDialogProps) {
+export function CreateFlowDialog({ open, onOpenChange, orgId, projectId, orgSlug, projectHandle }: CreateFlowDialogProps) {
   const intl = useIntl();
   const navigate = useNavigate();
   const create = useCreateFlow(orgId, projectId);
@@ -55,7 +58,7 @@ export function CreateFlowDialog({ open, onOpenChange, orgId, projectId }: Creat
     try {
       const flow = await create.mutateAsync(values.name);
       onOpenChange(false);
-      await navigate({ to: '/flows/$flowId', params: { flowId: flow.id } });
+      await navigate({ to: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId', params: { orgSlug, projectHandle, flowId: flow.id } });
     } catch (error) {
       setFailure(toProblemDetails(error));
     }

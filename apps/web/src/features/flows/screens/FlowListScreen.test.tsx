@@ -46,7 +46,7 @@ describe('FlowListScreen', () => {
     server.use(...beforeFlows(), productApi.flows([flow]));
     renderRoute(address);
     const name = await screen.findByRole('link', { name: 'Order notifications' });
-    expect(name).toHaveAttribute('href', `/flows/${flow.id}`);
+    expect(name).toHaveAttribute('href', `/orgs/acme/projects/ventas/flows/${flow.id}`);
     // The state is words, never color alone; on a phone the label precedes it.
     expect(screen.getByText(/Inactive$/)).toBeVisible();
   });

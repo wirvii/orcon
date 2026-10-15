@@ -16,7 +16,8 @@ import { editorMessages } from '../components/messages';
 import { createEditorStore } from '../store/editor-store';
 import { EditorStoreProvider } from '../store/editor-context';
 
-const route = getRouteApi('/flows/$flowId');
+const route = getRouteApi('/_session/orgs/$orgSlug/projects/$projectHandle/flows/$flowId');
+const EDITOR_ROUTE = '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId';
 
 /** The store of one open flow lives as long as the screen shows it; a different flow gets a different store. */
 function OpenFlow({ flowId, draft }: { flowId: string; draft: LoadedDraft }) {
@@ -25,7 +26,7 @@ function OpenFlow({ flowId, draft }: { flowId: string; draft: LoadedDraft }) {
   const [store] = useState(() => createEditorStore({ document: draft.document, revision: draft.revision }));
 
   useEffect(() => {
-    markFirstUsefulScreen('/flows/$flowId');
+    markFirstUsefulScreen(EDITOR_ROUTE);
   }, []);
 
   const reload = async () => {

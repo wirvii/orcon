@@ -4,13 +4,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { goInApp, isFlowDataRequest, mockDraftApi } from './draft-api';
+import { goInApp, isFlowDataRequest, isFrameRequest, mockDraftApi } from './draft-api';
 
 // The flow editor in a real browser, against the production build: the design system's canvas
 // measures nodes and draws connections, which jsdom cannot do. The preview opens a sample flow kept
 // in memory, so no request leaves the page.
 
-const FLOW = '/flows/01930000-0000-7000-8000-00000000ed5a';
+const FLOW = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-00000000ed5a';
 const wcag = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 const viewports = [
@@ -110,7 +110,7 @@ test('the editor reads its flow and draft from the API and asks for nothing else
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
   expect(requests.length).toBeGreaterThan(0);
-  expect(requests.every(isFlowDataRequest)).toBe(true);
+  expect(requests.every((url) => isFlowDataRequest(url) || isFrameRequest(url))).toBe(true);
 });
 
 test.describe('on a phone the flow is read-only', () => {
