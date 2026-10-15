@@ -44,11 +44,12 @@ export function CredentialListScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={intl.formatMessage(credentialMessages.title)} description={intl.formatMessage(credentialMessages.description)} actions={newCredential} />
+      <PageHeader headingLevel={2} title={intl.formatMessage(credentialMessages.title)} description={intl.formatMessage(credentialMessages.description)} actions={newCredential} />
       {usesLocalCredentials() ? <Banner tone="warning" title={intl.formatMessage(credentialMessages.previewNotice)} /> : null}
       {remove.isError ? <Banner tone="danger" title={intl.formatMessage(credentialMessages.deleteFailed)} /> : null}
       <QueryState
         query={credentials}
+        unavailable={{ title: intl.formatMessage(credentialMessages.unavailableTitle), description: intl.formatMessage(credentialMessages.unavailableText) }}
         empty={{
           title: intl.formatMessage(credentialMessages.emptyTitle),
           description: intl.formatMessage(credentialMessages.emptyDescription),

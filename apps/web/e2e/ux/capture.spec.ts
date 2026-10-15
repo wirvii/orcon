@@ -53,7 +53,7 @@ async function seed(page: Page) {
       const ventas = await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Ventas WhatsApp' });
       await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Soporte' });
       await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Operaciones' });
-      for (const name of ['Agente de ventas', 'Recordatorio de pago', 'Calificar leads de Meta Ads']) {
+      for (const name of ['Agente de ventas', 'Recordatorio de pago', 'Calificar leads de Meta Ads', 'Confirmación de pedido', 'Seguimiento de carrito', 'Encuesta de satisfacción', 'Alta de cliente nuevo']) {
         await create(`/api/v1/projects/${ventas.id}/flows`, { name });
       }
     },
@@ -330,6 +330,42 @@ const screens: Screen[] = [
     },
   },
   {
+    name: 'overview',
+    mockup: { id: 'overview' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}/overview`);
+      await expect(page.getByRole('link', { name: 'Agente de ventas' })).toBeVisible();
+    },
+  },
+  {
+    name: 'overview-credentials',
+    mockup: { id: 'overview' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}/overview?tab=credentials`);
+      await expect(page.locator('[data-coming-soon]')).toBeVisible();
+    },
+  },
+  {
+    name: 'project',
+    mockup: { id: 'project', variant: 'ventas' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}/projects/ventas-whatsapp/flows`);
+      await expect(page.getByRole('link', { name: 'Agente de ventas' })).toBeVisible();
+    },
+  },
+  {
+    name: 'project-empty',
+    mockup: { id: 'project', variant: 'ops' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}/projects/operaciones/flows`);
+      await expect(page.locator('[data-mascot-pose="thinking"]')).toBeVisible();
+    },
+  },
+  {
     name: 'settings',
     mockup: { id: 'settings', variant: 'apariencia' },
     product: async (page) => {
@@ -357,7 +393,7 @@ test.describe('product', () => {
             },
             { value: theme },
           );
-          if (!screen.name.startsWith('editor')) await installApiDouble(page);
+          if (!screen.name.startsWith('editor')) await installApiDouble(page, { demo: true });
           await screen.product(page, device.name);
           await page.waitForTimeout(400);
           const dir = join(out, label);

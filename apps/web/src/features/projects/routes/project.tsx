@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
+import { createFileRoute, notFound } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
 import { projectHandleSchema } from '../../../app/route-params';
 import { projectByHandleQueryOptions } from '../api/queries';
+import { ProjectScreen } from '../screens/ProjectScreen';
 
 /**
  * The project disposition: the handle in the address must name a project the person can read in
- * this organization. Otherwise the page does not exist for them (SPEC-016 R-SH-URL-04).
+ * this organization. Otherwise the page does not exist for them (SPEC-016 R-SH-URL-04). The screen draws the
+ * name and the tabs of the project around its four section pages (SPEC-019 UX3).
  */
 export const Route = createFileRoute('/_session/orgs/$orgSlug/projects/$projectHandle')({
   params: {
@@ -28,5 +30,5 @@ export const Route = createFileRoute('/_session/orgs/$orgSlug/projects/$projectH
     return { project };
   },
   errorComponent: RouteError,
-  component: () => <Outlet />,
+  component: ProjectScreen,
 });

@@ -41,6 +41,7 @@ export function ExecutionListScreen() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        headingLevel={2}
         title={intl.formatMessage(runMessages.title)}
         description={intl.formatMessage(flowId === undefined ? messages.notRunning : runMessages.titleOfFlow)}
         actions={

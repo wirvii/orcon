@@ -6,14 +6,14 @@ import userEvent from '@testing-library/user-event';
 import { HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
-import { flow, productApi, project } from '../../../../test/product-fixtures';
+import { flow, listedFlow, productApi, project } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, signedIn } from '../../../../test/session-fixtures';
 
 const address = '/orgs/acme/projects/ventas/flows';
 const newFlowId = '0195f1a0-0000-7000-8000-0000000000e2';
 
-const beforeChooser = () => [signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([project]), productApi.flows([flow])];
+const beforeChooser = () => [signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([project]), productApi.orgFlows([listedFlow])];
 
 async function openChooser(path = address) {
   server.use(...beforeChooser());

@@ -4,10 +4,14 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
+import { overviewSearchSchema } from '../model/params';
 import { OverviewScreen } from '../screens/OverviewScreen';
 
-/** Home: the first page of an organization (SPEC-019 Q1). It lists the flows of every project the person can read. */
+/**
+ * Home: the first page of an organization (SPEC-019 Q1). The tab, the search and the filters live in the address.
+ */
 export const Route = createFileRoute('/_session/orgs/$orgSlug/overview')({
+  validateSearch: overviewSearchSchema,
   errorComponent: RouteError,
   component: OverviewScreen,
 });
