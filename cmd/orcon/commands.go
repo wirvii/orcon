@@ -30,6 +30,7 @@ func commands() []command {
 		configCommand(),
 		docsCommand(),
 		n8nCommand(),
+		orgsCommand(),
 		serveCommand(),
 		versionCommand(),
 	}

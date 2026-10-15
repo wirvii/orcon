@@ -155,7 +155,7 @@ func Authorize(a authz.Authorizer, logger *slog.Logger, need authz.Requirement, 
 				unauthenticated(w, r)
 				return
 			}
-			decision, err := a.Authorize(r.Context(), authz.Request{
+			decision, scope, err := a.Authorize(r.Context(), authz.Request{
 				Principal:   principal,
 				Requirement: need,
 				Resource:    resource(r),
@@ -168,6 +168,9 @@ func Authorize(a authz.Authorizer, logger *slog.Logger, need authz.Requirement, 
 			}
 			switch decision {
 			case authz.DecisionAllow:
+				if !scope.UUID().IsZero() {
+					r = r.WithContext(authz.WithOrgScope(r.Context(), scope))
+				}
 				next.ServeHTTP(w, r)
 			case authz.DecisionHidden:
 				problem.Write(w, r, problem.NotFound)

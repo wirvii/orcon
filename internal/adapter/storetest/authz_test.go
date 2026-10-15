@@ -44,16 +44,16 @@ VALUES (?, ?, 'PROJECT', ?, ?, 'Operator', ?, ?)`, r.id([16]byte(bindingID)), r.
 
 		projA := f.projA.String()
 		projB := f.projB.String()
-		if d, err := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:retry")); err != nil || d != authz.DecisionAllow {
+		if d, _, err := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:retry")); err != nil || d != authz.DecisionAllow {
 			t.Errorf("Operator retries in its project: %v, %v; want allow", d, err)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:read-data")); d != authz.DecisionForbidden {
+		if d, _, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:read-data")); d != authz.DecisionForbidden {
 			t.Errorf("Operator reads data: %v; want forbidden", d)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projB, "flow:read")); d != authz.DecisionHidden {
+		if d, _, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projB, "flow:read")); d != authz.DecisionHidden {
 			t.Errorf("a project of another organization: %v; want hidden", d)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(bea.ID, f.orgA, projA, "flow:read")); d != authz.DecisionHidden {
+		if d, _, _ := ev.Authorize(ctx, requestAs(bea.ID, f.orgA, projA, "flow:read")); d != authz.DecisionHidden {
 			t.Errorf("a non-member: %v; want hidden", d)
 		}
 
@@ -71,7 +71,7 @@ VALUES (?, ?, 'PROJECT', ?, ?, ?, ?, ?)`, r.id([16]byte(next[identity.Membership
 		if err != nil {
 			t.Fatalf("epoch: %v", err)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:read-data")); d != authz.DecisionForbidden {
+		if d, _, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:read-data")); d != authz.DecisionForbidden {
 			t.Errorf("before the epoch moves the grant is still the cached one: %v", d)
 		}
 
@@ -81,10 +81,10 @@ VALUES (?, ?, 'PROJECT', ?, ?, ?, ?, ?)`, r.id([16]byte(next[identity.Membership
 		if next, _ := f.s.Epoch(ctx, scopeOf(f.orgA)); next != epoch+1 {
 			t.Errorf("epoch = %d after the change, want %d", next, epoch+1)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "flow:read")); d != authz.DecisionAllow {
+		if d, _, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "flow:read")); d != authz.DecisionAllow {
 			t.Errorf("the custom role still lets Ana read the project: %v", d)
 		}
-		if d, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:retry")); d != authz.DecisionForbidden {
+		if d, _, _ := ev.Authorize(ctx, requestAs(ana.ID, f.orgA, projA, "execution:retry")); d != authz.DecisionForbidden {
 			t.Errorf("the revoked Operator permission: %v; want forbidden (Ana can still see the project)", d)
 		}
 	})
