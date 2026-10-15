@@ -5,7 +5,7 @@
 
 Status: Informational
 
-Every merge to `main` deploys a preview of Orcon to Cloud Run so maintainers can look at the current state of the product. The preview is not a release, not a demo for the public and not a supported way to run Orcon.
+Every merge to `main` deploys a preview of Orcon to Cloud Run so maintainers can look at the current state of the product. The preview is not a release, not a public demo and not a supported way to run Orcon.
 
 ## What it is
 
@@ -13,9 +13,9 @@ Every merge to `main` deploys a preview of Orcon to Cloud Run so maintainers can
 - It is reachable at `https://orcon-preview.wirvii.com`.
 - It scales to zero and runs at most one instance, so the first request after a quiet period is slow.
 
-## It is protected
+## Access
 
-The preview is not public. The service accepts traffic only from its load balancer, and the load balancer requires Google Identity-Aware Proxy (IAP) sign-in. Only the Google accounts that maintainers explicitly authorize can open it. Anonymous requests are redirected to the Google sign-in page or rejected.
+The preview is public behind its load balancer. The Cloud Run service accepts traffic only from the load balancer (ingress `internal-and-cloud-load-balancing`) and has the invoker IAM check disabled (`--no-invoker-iam-check`, kept on every deploy), and the load balancer backend no longer uses Google Identity-Aware Proxy. Orcon's own sign-in protects it: accounts are created by an operator and there is no self-signup, so an anonymous visitor reaches only the sign-in page.
 
 ## Data
 
