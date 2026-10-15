@@ -16,5 +16,8 @@ func BuildRegistry() *Registry {
 	if err := addEditorCases(r); err != nil {
 		panic("isolation: " + err.Error()) // the editor cases of SPEC-014 ED2, same rule as the store cases
 	}
+	if err := addCredentialCases(r); err != nil {
+		panic("isolation: " + err.Error())
+	}
 	return r
 }
