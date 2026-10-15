@@ -11,6 +11,58 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AiBudget struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ScopeKey              pgtype.UUID
+	ScopeKind             string
+	ExecutionID           pgtype.UUID
+	FlowID                pgtype.UUID
+	ProjectID             pgtype.UUID
+	Period                string
+	LimitMicrodollars     int64
+	AlertThresholdPercent int32
+	ExceededAction        string
+	UnknownPriceAction    string
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+}
+
+type AiBudgetAlert struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	AiBudgetID        pgtype.UUID
+	PeriodStartedAt   pgtype.Timestamptz
+	Kind              string
+	ThresholdPercent  int32
+	SpentMicrodollars int64
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+type AiUsageRollup struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ScopeKey             pgtype.UUID
+	ScopeKind            string
+	ExecutionID          pgtype.UUID
+	FlowID               pgtype.UUID
+	ProjectID            pgtype.UUID
+	Grain                string
+	PeriodStartedAt      pgtype.Timestamptz
+	Purpose              string
+	InputTokenCount      int64
+	OutputTokenCount     int64
+	CacheReadTokenCount  int64
+	CacheWriteTokenCount int64
+	ReasoningTokenCount  int64
+	CostMicrodollars     int64
+	UnpricedCallCount    int64
+	CallCount            int64
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
 type AttentionRequest struct {
 	ID                        pgtype.UUID
 	OrgID                     pgtype.UUID

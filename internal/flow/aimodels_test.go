@@ -12,6 +12,13 @@ import (
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
+// The provider names of these tests are placeholders: the publication rules
+// read capabilities, not names, so the flow package never spells a vendor name.
+const (
+	provA = "provider-a"
+	provB = "provider-b"
+)
+
 // modelCatalog is a node-type catalog that knows a fixed set of models and
 // the capabilities each one declares (SPEC-006 R-PRV-05).
 type modelCatalog struct {
@@ -63,12 +70,12 @@ func publishWith(t *testing.T, doc *flow.Document, cat flow.NodeTypes) error {
 func TestPublishRejectsMissingModelCapability(t *testing.T) {
 	t.Parallel()
 	params := obj(
-		jsonvalue.Member{Key: "model", Value: modelRef("openai", "plain")},
+		jsonvalue.Member{Key: "model", Value: modelRef(provA, "plain")},
 		jsonvalue.Member{Key: "tools", Value: jsonvalue.Array(obj(jsonvalue.Member{Key: "name", Value: jsonvalue.String("lookup")}))},
 	)
 	doc := llmDoc(t, params)
 	cat := modelCatalog{caps: map[flow.ModelRef]flow.ModelCaps{
-		{Provider: "openai", Name: "plain"}: {JSONSchema: true},
+		{Provider: provA, Name: "plain"}: {JSONSchema: true},
 	}}
 
 	err := publishWith(t, doc, cat)
@@ -77,7 +84,7 @@ func TestPublishRejectsMissingModelCapability(t *testing.T) {
 	}
 
 	capable := modelCatalog{caps: map[flow.ModelRef]flow.ModelCaps{
-		{Provider: "openai", Name: "plain"}: {Tools: true},
+		{Provider: provA, Name: "plain"}: {Tools: true},
 	}}
 	if err := publishWith(t, doc, capable); err != nil {
 		t.Errorf("publish with a capable model failed: %v", err)
@@ -89,14 +96,14 @@ func TestPublishRejectsMissingModelCapability(t *testing.T) {
 func TestPublishRejectsFallbackCapabilityMismatch(t *testing.T) {
 	t.Parallel()
 	params := obj(
-		jsonvalue.Member{Key: "model", Value: modelRef("openai", "strong")},
-		jsonvalue.Member{Key: "fallbacks", Value: jsonvalue.Array(modelRef("anthropic", "weak"))},
+		jsonvalue.Member{Key: "model", Value: modelRef(provA, "strong")},
+		jsonvalue.Member{Key: "fallbacks", Value: jsonvalue.Array(modelRef(provB, "weak"))},
 		jsonvalue.Member{Key: "responseFormat", Value: jsonvalue.String("JSON_SCHEMA")},
 	)
 	doc := llmDoc(t, params)
 	cat := modelCatalog{caps: map[flow.ModelRef]flow.ModelCaps{
-		{Provider: "openai", Name: "strong"}:  {JSONSchema: true},
-		{Provider: "anthropic", Name: "weak"}: {Tools: true},
+		{Provider: provA, Name: "strong"}: {JSONSchema: true},
+		{Provider: provB, Name: "weak"}:   {Tools: true},
 	}}
 
 	r := flow.ValidateWithTypes(t.Context(), doc, cat)
@@ -116,7 +123,7 @@ func TestPublishRejectsFallbackCapabilityMismatch(t *testing.T) {
 func TestPublishModelRulesNeedCatalog(t *testing.T) {
 	t.Parallel()
 	params := obj(
-		jsonvalue.Member{Key: "model", Value: modelRef("openai", "unknown")},
+		jsonvalue.Member{Key: "model", Value: modelRef(provA, "unknown")},
 		jsonvalue.Member{Key: "tools", Value: jsonvalue.Array(obj(jsonvalue.Member{Key: "name", Value: jsonvalue.String("lookup")}))},
 	)
 	doc := llmDoc(t, params)
@@ -124,7 +131,7 @@ func TestPublishModelRulesNeedCatalog(t *testing.T) {
 		t.Errorf("publish with an unknown model = %v, want a model-unknown error", err)
 	}
 
-	plain := obj(jsonvalue.Member{Key: "model", Value: modelRef("openai", "unknown")})
+	plain := obj(jsonvalue.Member{Key: "model", Value: modelRef(provA, "unknown")})
 	if err := publishWith(t, llmDoc(t, plain), modelCatalog{caps: map[flow.ModelRef]flow.ModelCaps{}}); err != nil {
 		t.Errorf("publish of a node that needs no capability = %v, want success", err)
 	}

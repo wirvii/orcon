@@ -25,8 +25,8 @@ type ModelNodeTypes interface {
 	ModelCapabilities(ctx context.Context, ref ModelRef) (ModelCaps, bool)
 }
 
-// ModelRef names a model: the provider as the catalog spells it (for example
-// "openai") and the model name the provider serves.
+// ModelRef names a model: the provider as the catalog spells it and the model
+// name the provider serves.
 type ModelRef struct {
 	Provider string
 	Name     string

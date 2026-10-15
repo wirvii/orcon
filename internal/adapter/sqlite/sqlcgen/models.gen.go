@@ -11,6 +11,58 @@ import (
 	"database/sql"
 )
 
+type AiBudget struct {
+	ID                    []byte
+	OrgID                 []byte
+	ScopeKey              []byte
+	ScopeKind             string
+	ExecutionID           []byte
+	FlowID                []byte
+	ProjectID             []byte
+	Period                string
+	LimitMicrodollars     int64
+	AlertThresholdPercent int64
+	ExceededAction        string
+	UnknownPriceAction    string
+	CreatedAt             int64
+	UpdatedAt             int64
+}
+
+type AiBudgetAlert struct {
+	ID                []byte
+	OrgID             []byte
+	AiBudgetID        []byte
+	PeriodStartedAt   int64
+	Kind              string
+	ThresholdPercent  int64
+	SpentMicrodollars int64
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+type AiUsageRollup struct {
+	ID                   []byte
+	OrgID                []byte
+	ScopeKey             []byte
+	ScopeKind            string
+	ExecutionID          []byte
+	FlowID               []byte
+	ProjectID            []byte
+	Grain                string
+	PeriodStartedAt      int64
+	Purpose              string
+	InputTokenCount      int64
+	OutputTokenCount     int64
+	CacheReadTokenCount  int64
+	CacheWriteTokenCount int64
+	ReasoningTokenCount  int64
+	CostMicrodollars     int64
+	UnpricedCallCount    int64
+	CallCount            int64
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
 type AttentionRequest struct {
 	ID                        []byte
 	OrgID                     []byte
