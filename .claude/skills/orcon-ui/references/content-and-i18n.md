@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Content and i18n
 
-Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.3.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. The UI is translatable from day one (owner decision Q9). Messages use react-intl / FormatJS with ICU MessageFormat.
 
@@ -65,7 +65,8 @@ Use these terms consistently in both languages:
 | execution | ejecución | One run of a flow |
 | node | nodo | One step of a flow |
 | item | elemento | One unit of data processed by a node |
-| uncertain | incierto | The external system may or may not have applied an operation |
+| uncertain (status label) | para revisar | The external system may or may not have applied an operation; a person must review it |
+| uncertain (adjective in descriptions) | incierto | The external system may or may not have applied an operation |
 | awaiting a person | esperando a una persona | Work paused until someone decides |
 | needs action | requiere acción | A suspended execution that needs a decision |
 | approval | aprobación | A decision to allow or deny a tool call or step |

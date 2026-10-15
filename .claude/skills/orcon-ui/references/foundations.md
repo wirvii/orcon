@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Foundations
 
-Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.3.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Visual values (colors, sizes, durations) live only in this file, [tokens.md](tokens.md), [canvas.md](canvas.md) and the generated [contrast-report.md](contrast-report.md). Code never uses these values directly: it uses the tokens that carry them ([tokens.md#usage-in-code](tokens.md#usage-in-code)).
 
@@ -108,8 +108,9 @@ The exact shade of every status color is defined once in [tokens.md#semantic-col
    - Rendered with `<img>`, never as inline SVG, so catalog content never executes in the page.
    - `alt` is the connector display name.
    - Catalog admission: square SVG, no scripts, no external references, at most 8 KiB.
-5. Third-party logos are used only to identify the corresponding service, inside `ConnectorIcon`. They MUST NOT be recolored, combined with the Orcon mark, or used decoratively.
+5. Third-party logos are used only to identify the corresponding service, inside `ConnectorIcon`. They MUST NOT be recolored, combined with the Orcon mark, or used decoratively. A connector may ship `icons/icon-dark.svg` only when it is a variant published by the brand itself (usually a white monochrome mark); `ConnectorIcon` picks it in the dark theme. Inventing a variant is recolouring.
 6. n8n icons and node artwork MUST NOT be used or imitated. Inside canvas nodes a connector logo is shown through `ConnectorIcon variant="tile"` (the bare `<img>` in the 40 px icon box, no inner frame); built-in nodes use Lucide icons ([canvas.md#node-tile](canvas.md#node-tile)).
+7. Brand icon source: each connector's `icons/icon.svg`, preferably copied from Simple Icons (CC0-1.0, pinned version) or from the brand's own press kit, with its origin recorded in `icons/SOURCE` (orcon-connector IC-6). Third-party names and logos are trademarks of their owners and are used only to identify the service (nominative use). A connector without an icon shows the Lucide `Plug` glyph inside the frame.
 
 ## Mascot
 
