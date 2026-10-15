@@ -67,8 +67,8 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
 
   // 4. A new flow opens in the editor at its own address.
-  await page.getByRole('button', { name: 'New flow' }).first().click();
-  await page.getByLabel(/^Name/).fill('Refunds');
+  await page.getByRole('button', { name: 'Create flow' }).first().click();
+  await page.getByLabel(/^Flow name/).fill('Refunds');
   await page.getByRole('button', { name: 'Create and open' }).click();
   await expect(page).toHaveURL(/\/flows\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Refunds' })).toBeVisible();
