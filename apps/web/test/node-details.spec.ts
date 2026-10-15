@@ -257,7 +257,7 @@ test.describe('on a computer', () => {
     await openDetails(page, 'slack', 'dialog');
     await page.getByRole('dialog', { name: 'Slack details' }).getByRole('textbox', { name: /URL/ }).fill('https://kept.example.test/hook');
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved$/ })).toBeVisible({ timeout: 6_000 });
     await page.getByRole('link', { name: 'Settings' }).first().click();
     await goInApp(page, FLOW);
     await page.waitForSelector('[data-fitted="true"]');
