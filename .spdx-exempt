@@ -28,6 +28,7 @@ packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has
 packages/js/ui/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/perf/fixtures/*.json  # the reference flow of the editor performance test; JSON has no comment syntax
+internal/adapter/llm/*/testdata/*.json  # recorded provider answers replayed by the adapter tests; JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 docs/reference/configuration.schema.json  # generated JSON Schema; the licence is stated in its $comment member
 internal/connector/schema/*.json  # JSON Schema; the licence is stated in its $comment member
