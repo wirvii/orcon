@@ -24,8 +24,9 @@ const (
 )
 
 // Assignment is one field the Set node writes: its name and the value it gets.
-// A value that is a top-level string starting with "=" is an expression and is
-// evaluated per item by the [Evaluator]; any other value is literal.
+// Every string inside the value that starts with "=" is an expression template
+// (ADR-0018 section 1) and is evaluated per item by the [Evaluator]; every
+// other string, number, boolean or null is literal.
 type Assignment struct {
 	Name  string
 	Value jsonvalue.Value
@@ -40,11 +41,12 @@ type SetParams struct {
 	IncludeOtherFields bool
 }
 
-// Evaluator evaluates an expression of a parameter value against one item
-// (ADR-0018). The expression language belongs to another package; this port
-// lets the Set node run without knowing it.
+// Evaluator evaluates one parameter string that starts with "=" against one
+// item (ADR-0018). The string is passed whole, prefix included, because the
+// template syntax is defined on the whole string. The language belongs to
+// another package; this port lets the Set node run without knowing it.
 type Evaluator interface {
-	Evaluate(ctx context.Context, expression string, item jsonvalue.Value) (jsonvalue.Value, error)
+	Evaluate(ctx context.Context, template string, item jsonvalue.Value) (jsonvalue.Value, error)
 }
 
 // ParseSet reads the parameters of orcon.set@1 and reports the first problem.
@@ -147,13 +149,43 @@ func ApplySet(ctx context.Context, p SetParams, ev Evaluator, item jsonvalue.Val
 	return out, nil
 }
 
+// valueOf returns the value an assignment writes for one item: expressions
+// are evaluated wherever they appear inside the value, literals are kept.
 func valueOf(ctx context.Context, v jsonvalue.Value, ev Evaluator, item jsonvalue.Value) (jsonvalue.Value, error) {
-	s, ok := v.Str()
-	if !ok || !strings.HasPrefix(s, expressionPrefix) {
+	switch v.Kind() {
+	case jsonvalue.KindString:
+		s, _ := v.Str()
+		if !strings.HasPrefix(s, expressionPrefix) {
+			return v, nil
+		}
+		if ev == nil {
+			return jsonvalue.Value{}, errors.New("an expression needs an evaluator, none is configured")
+		}
+		return ev.Evaluate(ctx, s, item)
+	case jsonvalue.KindArray:
+		elems := v.Items()
+		out := make([]jsonvalue.Value, 0, len(elems))
+		for _, e := range elems {
+			ve, err := valueOf(ctx, e, ev, item)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, ve)
+		}
+		return jsonvalue.Array(out...), nil
+	case jsonvalue.KindObject:
+		members := v.Members()
+		out := make([]jsonvalue.Member, 0, len(members))
+		for _, m := range members {
+			vm, err := valueOf(ctx, m.Value, ev, item)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, jsonvalue.Member{Key: m.Key, Value: vm})
+		}
+		return jsonvalue.Object(out...)
+	case jsonvalue.KindInvalid, jsonvalue.KindNull, jsonvalue.KindBool, jsonvalue.KindNumber:
 		return v, nil
 	}
-	if ev == nil {
-		return jsonvalue.Value{}, errors.New("an expression needs an evaluator, none is configured")
-	}
-	return ev.Evaluate(ctx, strings.TrimPrefix(s, expressionPrefix), item)
+	return v, nil
 }

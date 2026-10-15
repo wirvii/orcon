@@ -137,7 +137,7 @@ func TestCoreNodesSetApply(t *testing.T) {
 		}
 	})
 
-	t.Run("expression goes to the evaluator with the prefix removed", func(t *testing.T) {
+	t.Run("expression goes to the evaluator whole, prefix included", func(t *testing.T) {
 		ev := &fakeEval{value: mustParse(t, `42`)}
 		p, _ := ParseSet(mustParse(t, `{"assignments":[{"name":"n","value":"=$json.id"}]}`))
 		out, err := ApplySet(ctx, p, ev, item)
@@ -147,7 +147,7 @@ func TestCoreNodesSetApply(t *testing.T) {
 		if got := marshal(t, out); got != `{"n":42}` {
 			t.Errorf("got %s", got)
 		}
-		if len(ev.got) != 1 || ev.got[0] != "$json.id" {
+		if len(ev.got) != 1 || ev.got[0] != "=$json.id" {
 			t.Errorf("evaluator got %v", ev.got)
 		}
 	})
@@ -167,14 +167,18 @@ func TestCoreNodesSetApply(t *testing.T) {
 		}
 	})
 
-	t.Run("nested expression strings stay literal", func(t *testing.T) {
-		p, _ := ParseSet(mustParse(t, `{"assignments":[{"name":"o","value":{"x":"=1"}}]}`))
-		out, err := ApplySet(ctx, p, nil, item)
+	t.Run("expressions nested in objects and lists are evaluated", func(t *testing.T) {
+		ev := &fakeEval{value: mustParse(t, `"v"`)}
+		p, _ := ParseSet(mustParse(t, `{"assignments":[{"name":"o","value":{"x":"=a","y":[1,"=b","plain"]}}]}`))
+		out, err := ApplySet(ctx, p, ev, item)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := marshal(t, out); got != `{"o":{"x":"=1"}}` {
+		if got := marshal(t, out); got != `{"o":{"x":"v","y":[1,"v","plain"]}}` {
 			t.Errorf("got %s", got)
+		}
+		if len(ev.got) != 2 || ev.got[0] != "=a" || ev.got[1] != "=b" {
+			t.Errorf("evaluator got %v", ev.got)
 		}
 	})
 
