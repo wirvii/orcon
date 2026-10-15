@@ -45,6 +45,9 @@ type Deps struct {
 	Authenticator identity.Authenticator
 	// Authorizer decides permissions; nil means authz.DenyAll.
 	Authorizer authz.Authorizer
+	// OrgSelector checks the membership behind the Orcon-Org header; nil means authz.DenyAll,
+	// which refuses every organization named in a header.
+	OrgSelector authz.OrgSelector
 	// Catalog, when set, makes New fail if the contract names a permission
 	// that is not in it.
 	Catalog *authz.Catalog
@@ -63,7 +66,11 @@ type Deps struct {
 	// a store in the memory of the process survives neither a restart nor a second api
 	// process. The composition root wires the durable store, or
 	// idempotency.UnavailableStore while there is none.
-	Idempotency idempotency.Store
+	Idempotency identity.IdempotencyStore
+	// Rebuilds answers the repeats of an in-progress idempotency record left by a crash, by
+	// operation identifier (for example "createProject"). An operation without one answers 409
+	// idempotency-in-progress to such a repeat.
+	Rebuilds map[string]idempotency.Rebuild
 	// Reference is the file system of the reference site; nil means the
 	// embedded one.
 	Reference fs.FS
@@ -209,6 +216,9 @@ func (d *Deps) withDefaults() *Deps {
 	if d.Authenticator == nil {
 		d.Authenticator = identity.RejectAll{}
 	}
+	if d.OrgSelector == nil {
+		d.OrgSelector = authz.DenyAll{}
+	}
 	if d.Authorizer == nil {
 		d.Authorizer = authz.DenyAll{}
 	}
@@ -278,6 +288,7 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body
 	if !op.Public {
 		chain = append(chain,
 			middleware.Authenticate(deps.Authenticator, deps.Logger, deps.Auth),
+			middleware.SelectOrganization(deps.OrgSelector, deps.Logger, deps.Auth),
 			middleware.LimitPrincipal(limiter, op.Class),
 		)
 	}
@@ -293,7 +304,8 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body
 	}
 	if !op.Public && op.IdempotencyKey != "" {
 		chain = append(chain, idempotency.Middleware(idempotency.Config{
-			Store: deps.Idempotency, Logger: deps.Logger, Required: op.IdempotencyKey == "required",
+			Store: deps.Idempotency, Clock: deps.Clock, IDs: deps.IDs, Rebuild: deps.Rebuilds[op.ID],
+			Logger: deps.Logger, Required: op.IdempotencyKey == "required",
 			IssuesSecret: op.IssuesSecret, Route: op.Pattern,
 		}))
 	}

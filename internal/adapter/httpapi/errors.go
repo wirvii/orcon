@@ -17,6 +17,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/idempotencyclaim"
 )
 
 // unavailableRetry is the Retry-After of an operation that has no handler yet.
@@ -94,6 +95,14 @@ func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error
 		problem.Write(w, r, problem.ValidationFailed)
 	case errors.Is(err, errInvalidPageToken):
 		problem.Write(w, r, problem.InvalidPageToken)
+	case errors.Is(err, idempotencyclaim.ErrTaken):
+		problem.Write(w, r, problem.IdempotencyInProgress, problem.RetryAfter(time.Second),
+			problem.Detail("A request with this Idempotency-Key is still running."))
+	case errors.Is(err, identity.ErrHandleUnavailable), errors.Is(err, identity.ErrConflict):
+		// The message of a conflict names nothing of anyone else (SPEC-004 R-ID-11).
+		problem.Write(w, r, problem.Conflict)
+	case errors.Is(err, identity.ErrReference):
+		problem.Write(w, r, problem.NotFound)
 	default:
 		h.logger.ErrorContext(r.Context(), "request failed",
 			"request_id", middleware.RequestIDFrom(r.Context()), "error", err)

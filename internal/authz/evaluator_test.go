@@ -138,7 +138,7 @@ func TestOwnerReachesEveryProject(t *testing.T) {
 	for _, p := range []string{projectOne, projectTwo} {
 		req := request("flow:publish")
 		req.Resource.ID = p
-		if d, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionAllow {
+		if d, _, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionAllow {
 			t.Errorf("Owner in %s: %v, %v; want allow", p, d, err)
 		}
 	}
@@ -152,20 +152,20 @@ func TestOperatorOnlyInItsProject(t *testing.T) {
 	ev := authz.NewEvaluator(st, testCatalog(t))
 
 	req := request("execution:retry")
-	if d, _ := ev.Authorize(t.Context(), req); d != authz.DecisionAllow {
+	if d, _, _ := ev.Authorize(t.Context(), req); d != authz.DecisionAllow {
 		t.Errorf("retry in its project: %v, want allow", d)
 	}
 	req = request("execution:read-data")
-	if d, _ := ev.Authorize(t.Context(), req); d != authz.DecisionForbidden {
+	if d, _, _ := ev.Authorize(t.Context(), req); d != authz.DecisionForbidden {
 		t.Errorf("data in its project: %v, want forbidden (it can read, not read data)", d)
 	}
 	req = request("flow:update")
-	if d, _ := ev.Authorize(t.Context(), req); d != authz.DecisionForbidden {
+	if d, _, _ := ev.Authorize(t.Context(), req); d != authz.DecisionForbidden {
 		t.Errorf("edit in its project: %v, want forbidden", d)
 	}
 	req = request("flow:read")
 	req.Resource.ID = projectTwo
-	if d, _ := ev.Authorize(t.Context(), req); d != authz.DecisionHidden {
+	if d, _, _ := ev.Authorize(t.Context(), req); d != authz.DecisionHidden {
 		t.Errorf("another project: %v, want hidden", d)
 	}
 }
@@ -177,7 +177,7 @@ func TestCustomRoleCarriesDataPermission(t *testing.T) {
 	st.bindings = []authz.Binding{{Role: "custom-operator-data", Project: projectOne}}
 	st.custom["custom-operator-data"] = []authz.Permission{"project:read", "flow:read", "execution:read", "execution:read-data"}
 	ev := authz.NewEvaluator(st, testCatalog(t))
-	if d, _ := ev.Authorize(t.Context(), request("execution:read-data")); d != authz.DecisionAllow {
+	if d, _, _ := ev.Authorize(t.Context(), request("execution:read-data")); d != authz.DecisionAllow {
 		t.Errorf("custom role with data: %v, want allow", d)
 	}
 }
@@ -190,12 +190,37 @@ func TestForeignAndNonMembersAreHidden(t *testing.T) {
 	ev := authz.NewEvaluator(st, testCatalog(t))
 	req := request("flow:read")
 	req.Resource.ID = foreign
-	if d, _ := ev.Authorize(t.Context(), req); d != authz.DecisionHidden {
+	if d, _, _ := ev.Authorize(t.Context(), req); d != authz.DecisionHidden {
 		t.Errorf("project of another organization: %v, want hidden", d)
 	}
 	st.active = false
-	if d, _ := ev.Authorize(t.Context(), request("flow:read")); d != authz.DecisionHidden {
+	if d, _, _ := ev.Authorize(t.Context(), request("flow:read")); d != authz.DecisionHidden {
 		t.Errorf("inactive membership: %v, want hidden", d)
+	}
+}
+
+// TestSelectOrganizationNeedsAnActiveMembership (ADR-0038 section 6, SPEC-004 SE6-http): a user
+// is a member of the organization named in the header only with an ACTIVE membership there, and
+// a zero user or organization is never a member.
+func TestSelectOrganizationNeedsAnActiveMembership(t *testing.T) {
+	st := baseStore()
+	ev := authz.NewEvaluator(st, testCatalog(t))
+	if ok, err := ev.SelectOrganization(t.Context(), testUser, testOrg); err != nil || !ok {
+		t.Errorf("active member: %v, %v; want true, nil", ok, err)
+	}
+	st.active = false
+	if ok, err := ev.SelectOrganization(t.Context(), testUser, testOrg); err != nil || ok {
+		t.Errorf("inactive membership: %v, %v; want false, nil", ok, err)
+	}
+	st.active = true
+	if ok, _ := ev.SelectOrganization(t.Context(), identity.UserID{}, testOrg); ok {
+		t.Error("a zero user is a member")
+	}
+	if ok, _ := ev.SelectOrganization(t.Context(), testUser, identity.OrgID{}); ok {
+		t.Error("a zero organization is a member")
+	}
+	if ok, err := (authz.DenyAll{}).SelectOrganization(t.Context(), testUser, testOrg); err != nil || ok {
+		t.Errorf("DenyAll: %v, %v; want false, nil", ok, err)
 	}
 }
 
@@ -206,7 +231,7 @@ func TestUnknownProjectIsHidden(t *testing.T) {
 	ev := authz.NewEvaluator(st, testCatalog(t))
 	req := request("flow:read")
 	req.Resource.ID = testSeq.New().String()
-	if d, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionHidden {
+	if d, _, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionHidden {
 		t.Errorf("unknown project: %v, %v; want hidden", d, err)
 	}
 }
@@ -217,15 +242,15 @@ func TestGrantCacheFollowsTheEpoch(t *testing.T) {
 	st := baseStore()
 	st.bindings = []authz.Binding{{Role: authz.RoleOwner}}
 	ev := authz.NewEvaluator(st, testCatalog(t))
-	if d, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionAllow {
+	if d, _, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionAllow {
 		t.Fatalf("first request: %v", d)
 	}
-	if d, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionAllow || st.bindCalls != 1 {
+	if d, _, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionAllow || st.bindCalls != 1 {
 		t.Fatalf("second request reused the cache: %v, bindings read %d times; want one read", d, st.bindCalls)
 	}
 	st.bindings = nil
 	st.epoch++
-	if d, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionHidden {
+	if d, _, _ := ev.Authorize(t.Context(), request("flow:publish")); d != authz.DecisionHidden {
 		t.Errorf("after the revocation and the epoch move: %v, want hidden (no project access)", d)
 	}
 }
@@ -234,7 +259,7 @@ func TestGrantCacheFollowsTheEpoch(t *testing.T) {
 func TestAnonymousAndAuthenticatedNeedNoDecision(t *testing.T) {
 	ev := authz.NewEvaluator(baseStore(), testCatalog(t))
 	req := authz.Request{Requirement: authz.Requirement{Mode: authz.ModeAuthenticated}}
-	if d, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionAllow {
+	if d, _, err := ev.Authorize(t.Context(), req); err != nil || d != authz.DecisionAllow {
 		t.Errorf("authenticated: %v, %v", d, err)
 	}
 }
@@ -263,7 +288,7 @@ func TestStoreFailureIsNotAnAllow(t *testing.T) {
 	ev := authz.NewEvaluator(&errStore{fakeStore{active: true}}, testCatalog(t))
 	req := request("org:read")
 	req.Resource = authz.ResourceRef{}
-	d, err := ev.Authorize(t.Context(), req)
+	d, _, err := ev.Authorize(t.Context(), req)
 	if err == nil || d == authz.DecisionAllow {
 		t.Errorf("a failed read: %v, %v; want an error and no allow", d, err)
 	}

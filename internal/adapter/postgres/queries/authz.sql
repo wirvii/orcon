@@ -27,3 +27,14 @@ JOIN custom_role_permission AS p ON p.org_id = r.org_id AND p.custom_role_id = r
 WHERE r.org_id = sqlc.arg(org_id)
 ORDER BY p.id
 LIMIT sqlc.arg(row_limit);
+
+-- name: InsertRoleBinding :exec
+-- orcon:scope org
+INSERT INTO role_binding (id, org_id, scope_kind, project_id, application_user_id, role_name, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(scope_kind), sqlc.narg(project_id), sqlc.arg(application_user_id), sqlc.arg(role_name), sqlc.arg(created_at), sqlc.arg(updated_at));
+
+-- name: UpdateAuthorizationEpoch :execrows
+-- orcon:scope instance
+UPDATE org
+SET authorization_epoch = authorization_epoch + 1
+WHERE id = sqlc.arg(id);

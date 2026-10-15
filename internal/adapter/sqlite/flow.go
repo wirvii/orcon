@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
@@ -55,6 +57,28 @@ func (s *Store) CreateFlow(ctx context.Context, org orgscope.Org, f flow.Record)
 			Name: f.Name, DraftDocument: f.Draft,
 			CreatedAt: micros(f.CreatedAt), UpdatedAt: micros(f.UpdatedAt),
 		})
+	})
+}
+
+// CreateFlowWithEntry implements [flow.Store]: the flow, the creation entry and the
+// idempotency claim of the context, when there is one, in one transaction.
+func (s *Store) CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f flow.Record, entry audit.Entry) error {
+	return s.write(ctx, "create flow", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scopedRecord(org, f.OrgID)
+		if err != nil {
+			return err
+		}
+		if err := claimIdempotency(ctx, q, org, "flow:"+id.UUID(f.ID).String(), f.CreatedAt); err != nil {
+			return err
+		}
+		if err := q.InsertFlow(ctx, sqlcgen.InsertFlowParams{
+			ID: uuidBytes(f.ID), OrgID: scope, ProjectID: uuidBytes(f.ProjectID),
+			Name: f.Name, DraftDocument: f.Draft,
+			CreatedAt: micros(f.CreatedAt), UpdatedAt: micros(f.UpdatedAt),
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 }
 

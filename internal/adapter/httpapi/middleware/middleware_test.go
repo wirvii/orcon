@@ -20,6 +20,7 @@ import (
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 var quiet = slog.New(slog.DiscardHandler)
@@ -199,8 +200,8 @@ type stubAuthz struct {
 	err error
 }
 
-func (s stubAuthz) Authorize(context.Context, authz.Request) (authz.Decision, error) {
-	return s.d, s.err
+func (s stubAuthz) Authorize(context.Context, authz.Request) (authz.Decision, orgscope.Org, error) {
+	return s.d, orgscope.Org{}, s.err
 }
 
 func TestAuthorizeOutcomes(t *testing.T) {

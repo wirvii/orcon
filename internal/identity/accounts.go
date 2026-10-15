@@ -135,13 +135,19 @@ func (a *Accounts) SetPassword(ctx context.Context, email, password string) erro
 // systemActor returns the actor of the installation, creating its SYSTEM principal the first
 // time it is needed (the schema allows one).
 func (a *Accounts) systemActor(ctx context.Context) (audit.Actor, error) {
-	p, err := a.store.GetSystemPrincipal(ctx)
+	return installationActor(ctx, a.store, a.clock, a.ids)
+}
+
+// installationActor returns the SYSTEM principal of the installation as the actor of an
+// operator action, creating it the first time (the schema allows one).
+func installationActor(ctx context.Context, store PrincipalStore, clk clock.Clock, ids id.Generator) (audit.Actor, error) {
+	p, err := store.GetSystemPrincipal(ctx)
 	if errors.Is(err, ErrNotFound) {
-		p = PrincipalRecord{ID: PrincipalID(a.ids.New()), Kind: PrincipalSystem, CreatedAt: clock.Micros(a.clock.Now()), UpdatedAt: clock.Micros(a.clock.Now())}
-		if err := a.store.CreatePrincipal(ctx, p); err != nil && !errors.Is(err, ErrConflict) {
+		p = PrincipalRecord{ID: PrincipalID(ids.New()), Kind: PrincipalSystem, CreatedAt: clock.Micros(clk.Now()), UpdatedAt: clock.Micros(clk.Now())}
+		if err := store.CreatePrincipal(ctx, p); err != nil && !errors.Is(err, ErrConflict) {
 			return audit.Actor{}, fmt.Errorf("system principal: %w", err)
 		}
-		p, err = a.store.GetSystemPrincipal(ctx)
+		p, err = store.GetSystemPrincipal(ctx)
 	}
 	if err != nil {
 		return audit.Actor{}, fmt.Errorf("system principal: %w", err)

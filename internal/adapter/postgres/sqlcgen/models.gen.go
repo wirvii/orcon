@@ -384,6 +384,25 @@ type HumanTask struct {
 	UpdatedAt              pgtype.Timestamptz
 }
 
+type IdempotencyRecord struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	Requester           string
+	IdempotencyKey      string
+	Fingerprint         []byte
+	Status              string
+	ResourceReference   pgtype.Text
+	ResponseStatus      pgtype.Int4
+	ResponseContentType pgtype.Text
+	ResponseLocation    pgtype.Text
+	ResponseEtag        pgtype.Text
+	ResponseBody        []byte
+	IsSecretIssued      bool
+	ExpiresAt           pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
 type InstanceAlert struct {
 	ID                              pgtype.UUID
 	Kind                            string

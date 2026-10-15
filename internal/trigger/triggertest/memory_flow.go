@@ -112,6 +112,23 @@ func (m *Memory) ListProjects(_ context.Context, org orgscope.Org, after identit
 	return out, nil
 }
 
+// CreateProjectWithGrant implements [identity.ProjectStore]. The fake keeps no role bindings.
+func (m *Memory) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, _ identity.RoleBindingRecord, entries []audit.Entry) error {
+	return m.CreateProject(ctx, org, p, entries[0])
+}
+
+// CreateOrganizationWithAdmin implements [identity.OrgStore]. The fake keeps no memberships,
+// role bindings or audit entries.
+func (m *Memory) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+	return m.CreateOrganization(ctx, o)
+}
+
+// CreateFlowWithEntry implements [flow.Store]. The in-memory fake keeps no audit chain, so
+// the entry is accepted and dropped; the storage adapters write it.
+func (m *Memory) CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f flow.Record, _ audit.Entry) error {
+	return m.CreateFlow(ctx, org, f)
+}
+
 // CreateFlow implements [flow.Store].
 func (m *Memory) CreateFlow(_ context.Context, org orgscope.Org, f flow.Record) error {
 	m.mu.Lock()
