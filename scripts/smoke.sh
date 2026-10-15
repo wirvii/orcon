@@ -17,6 +17,21 @@ fi
 
 data="$(mktemp -d)"
 export ORCON_DATA_DIR="$data"
+# A first start needs a master key file and the fingerprint that confirms its backup
+# (keys.master.backupAcknowledgement). The script makes a throwaway key and reads its
+# fingerprint from the refusal of a first start that names none.
+mkdir -p "$data/keys"
+head -c 32 /dev/urandom | base64 >"$data/keys/master.key"
+chmod 600 "$data/keys/master.key"
+refusal="$("$bin" serve --role=standalone --http-address="127.0.0.1:${port}" 2>&1 || true)"
+fingerprint="$(printf '%s\n' "$refusal" | sed -n 's/.*master key fingerprint \([0-9a-f]*\).*/\1/p' | head -n 1)"
+if [ -z "$fingerprint" ]; then
+  echo "smoke: the first start did not name the master key fingerprint; it said:" >&2
+  printf '%s\n' "$refusal" >&2
+  rm -rf "$data"
+  exit 1
+fi
+export ORCON_MASTER_KEY_BACKUP_ACK="$fingerprint"
 "$bin" serve --role=standalone --http-address="127.0.0.1:${port}" >/dev/null 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$data"' EXIT
