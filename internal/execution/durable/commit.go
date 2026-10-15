@@ -131,7 +131,7 @@ func (e *Engine) recompute(ctx context.Context, tx store.Tx, s *step) (execution
 	for _, a := range s.delta.Activations {
 		oracle[a.NodeExecution] = a
 	}
-	sess, err := e.interp.OpenSession(s.plan, esnap, execution.SessionOptions{Known: known, Oracle: oracle})
+	sess, err := e.interp.OpenSession(s.plan, esnap, execution.SessionOptions{Org: s.exec.OrgID, Known: known, Oracle: oracle})
 	if err != nil {
 		return execution.Delta{}, execution.WorkResult{}, fmt.Errorf("reopen execution %s: %w", s.exec.ID, err)
 	}

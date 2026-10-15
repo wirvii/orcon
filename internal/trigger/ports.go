@@ -27,6 +27,16 @@ type Store interface {
 	Atomic(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
 	// Read runs fn on one consistent read-only view scoped to org.
 	Read(ctx context.Context, org orgscope.Org, fn func(ctx context.Context, tx Tx) error) error
+	// ResolveRoute finds the active production address that answers a request
+	// with the method and the exact path, in any organization. It is the one
+	// read that runs before the organization of a request is known (ADR-0077
+	// section 6; SPEC-002 R-ADDR-08); the caller continues in the organization
+	// it returns. It returns ErrNoRoute when no address matches. It reads
+	// nothing but the answer, and it runs outside a transaction of an
+	// organization.
+	//
+	//orcon:scope engine the one read before the organization of a request is known (ADR-0077 section 6)
+	ResolveRoute(ctx context.Context, method, path string) (Resolved, error)
 }
 
 // Tx is one transaction of a [Store], bound to an organization. Every method
@@ -222,10 +232,38 @@ type ManualRun struct {
 	Mode     RunMode
 }
 
-// Starter starts an execution. The engine implements it; the durable engine
-// arrives with the execution storage (SPEC-001 C2b and C4).
+// Resolved is the answer of [Store.ResolveRoute]: the organization, project,
+// flow and node a public request starts, and the registry entries it used.
+type Resolved struct {
+	Org identity.OrgID
+	// Scope is the scope of Org, issued by the store that read the route (ADR-0047
+	// section 2): the engine's ids reach the scoped methods only through the store.
+	Scope     orgscope.Org
+	ProjectID identity.ProjectID
+	FlowID    flow.FlowID
+	NodeID    flow.NodeID
+	TriggerID ID
+	AddressID AddressID
+}
+
+// TriggeredRun is an execution a trigger starts for an accepted event. It is
+// pinned to the version the registry names for the node at acceptance time.
+type TriggeredRun struct {
+	Org       identity.OrgID
+	ProjectID identity.ProjectID
+	FlowID    flow.FlowID
+	Node      flow.NodeID
+	Version   flow.FlowVersionID
+	Trigger   ID
+}
+
+// Starter starts an execution. The engine implements it (SPEC-001 C4).
 type Starter interface {
 	// StartManual starts the run with the given input and returns the
 	// identity of the execution.
 	StartManual(ctx context.Context, run ManualRun, input []byte) (executionID string, err error)
+	// StartTriggered starts an execution for an accepted event. The input is
+	// the JSON body of the event: an array is one item per element, any other
+	// value is one item.
+	StartTriggered(ctx context.Context, run TriggeredRun, input []byte) (executionID string, err error)
 }

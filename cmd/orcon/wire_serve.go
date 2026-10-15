@@ -50,6 +50,7 @@ func serveCommand() command {
 				newSandbox: productionSandbox,
 				environ:    os.Environ(),
 				reloadPoll: cli.ReloadPollInterval,
+				openEngine: productionEngine,
 			})
 		},
 	}
@@ -61,6 +62,36 @@ type serveDeps struct {
 	environ    []string
 	// reloadPoll is how often the server looks for a reload request.
 	reloadPoll time.Duration
+	// openEngine opens the database and wires the execution engine of a role
+	// that serves executions or public addresses. Nil means the process runs no
+	// engine (tests that need no database).
+	openEngine engineOpener
+}
+
+// engineOpener opens the execution engine of the process. The returned function
+// closes the database and runs after the engine has stopped.
+type engineOpener func(ctx context.Context, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, func() error, error)
+
+// productionEngine is the engine opener of the server: the database the
+// configuration names, the engine over it, and the process version.
+func productionEngine(ctx context.Context, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, func() error, error) {
+	st, closeStore, err := openStore(ctx, cfg, version)
+	if err != nil {
+		return nil, nil, err
+	}
+	eng, err := newEngine(st, engineOptions{role: cfg.Role(), logger: logger, version: version, sandbox: sandbox})
+	if err != nil {
+		_ = closeStore()
+		return nil, nil, err
+	}
+	return eng, closeStore, nil
+}
+
+// servesEngine reports whether a role opens the engine. Only standalone does for
+// now: the api role runs on PostgreSQL in several processes, and its public
+// webhook addresses arrive with that topology's wiring (SPEC-002 T2 follow-up).
+func servesEngine(role config.Role) bool {
+	return role == config.RoleStandalone
 }
 
 // exprSandbox is what the composition root keeps of the expression sandbox:
@@ -158,6 +189,8 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer, deps
 		shutdownTimeout: cfg.Value("http.shutdownTimeout").Duration(),
 		maxAbandoned:    maxAbandoned,
 		slots:           slots,
+		cfg:             cfg,
+		openEngine:      deps.openEngine,
 	}, deps.newSandbox)
 }
 
@@ -245,6 +278,8 @@ type serveSettings struct {
 	shutdownTimeout time.Duration
 	maxAbandoned    int
 	slots           int
+	cfg             *config.Config
+	openEngine      engineOpener
 }
 
 // serveWithSandbox runs the HTTP server with the expression sandbox beside it.
@@ -255,6 +290,26 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 	sb := newSandbox(s.maxAbandoned, s.slots, logger)
 	effective := min(s.maxAbandoned, s.slots)
 	defer func() { _ = sb.Close(context.WithoutCancel(ctx)) }()
+
+	var eng *engine
+	if s.openEngine != nil && servesEngine(s.role) {
+		var closeStore func() error
+		var err error
+		var exprSB expr.Sandbox
+		if es, ok := sb.(expr.Sandbox); ok {
+			exprSB = es
+		}
+		eng, closeStore, err = s.openEngine(ctx, s.cfg, exprSB, logger)
+		if err != nil {
+			logger.ErrorContext(ctx, "the execution engine could not start", "error", err)
+			return exitError
+		}
+		defer func() {
+			if err := closeStore(); err != nil {
+				logger.ErrorContext(ctx, "closing the database failed", "error", err)
+			}
+		}()
+	}
 	// The abandoned evaluations of a process can hold this much memory at most.
 	logger.InfoContext(ctx, "expression sandbox limits",
 		"slots", s.slots, "max_abandoned", effective, "memory_bound_bytes", uint64(s.slots)*uint64(expr.DefaultMemoryLimit)) //nolint:gosec // slots is validated to 1..GOMAXPROCS-1 by runServe
@@ -278,9 +333,29 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 		}
 	}()
 
-	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout)
+	var ingress httpapi.WebhookIngress
+	var engineErr chan error
+	if eng != nil {
+		ingress = eng.ingress()
+		engineErr = make(chan error, 1)
+		go func() {
+			err := eng.run(serveCtx)
+			if err != nil {
+				cancel()
+			}
+			engineErr <- err
+		}()
+	}
+
+	err := serve(serveCtx, logger, s.role, s.addr, s.shutdownTimeout, ingress)
 	cancel()
 	<-watched
+	if engineErr != nil {
+		if err2 := <-engineErr; err2 != nil {
+			logger.ErrorContext(ctx, "the execution engine stopped with error", "error", err2)
+			err = errors.Join(err, fmt.Errorf("execution engine: %w", err2))
+		}
+	}
 	switch {
 	case err != nil:
 		logger.ErrorContext(ctx, "server stopped with error", "role", s.role, "error", err)
@@ -294,13 +369,18 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 
 // newHandler assembles the HTTP routes served by the standalone and api roles.
 func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
+	return newHandlerWith(role, logger, nil)
+}
+
+// newHandlerWith is newHandler with the public trigger addresses served by webhooks.
+func newHandlerWith(role config.Role, logger *slog.Logger, webhooks httpapi.WebhookIngress) (http.Handler, error) {
 	assets, err := webui.Assets()
 	if err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux := http.NewServeMux()
 	mux.Handle(httpapi.HealthPath, httpapi.HealthHandler())
-	if err := mountAPI(mux, role, logger); err != nil {
+	if err := mountAPIWith(mux, role, logger, webhooks); err != nil {
 		return nil, fmt.Errorf("build handler: %w", err)
 	}
 	mux.Handle("/", webui.Handler(assets))
@@ -309,8 +389,8 @@ func newHandler(role config.Role, logger *slog.Logger) (http.Handler, error) {
 
 // serve listens on addr and serves HTTP until ctx is canceled, then drains
 // in-flight requests for at most shutdownTimeout.
-func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration) error {
-	handler, err := newHandler(role, logger)
+func serve(ctx context.Context, logger *slog.Logger, role config.Role, addr string, shutdownTimeout time.Duration, webhooks httpapi.WebhookIngress) error {
+	handler, err := newHandlerWith(role, logger, webhooks)
 	if err != nil {
 		return err
 	}

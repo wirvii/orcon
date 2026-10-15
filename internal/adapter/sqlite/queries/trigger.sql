@@ -179,3 +179,17 @@ FROM flow_trigger t
 JOIN flow f ON f.org_id = t.org_id AND f.id = t.flow_id
 JOIN flow_version v ON v.org_id = t.org_id AND v.id = t.flow_version_id
 WHERE t.org_id = sqlc.arg(org_id) AND t.flow_id = sqlc.arg(flow_id) AND t.node_id = sqlc.arg(node_id);
+
+-- name: ResolveTriggerRoute :one
+-- orcon:scope engine
+-- Reads across organizations on purpose: a public request does not know its organization yet (SPEC-002 R-ADDR-08).
+-- It returns the organization and the flow the address starts; nothing else of another organization leaves the statement.
+SELECT a.org_id, f.project_id, t.flow_id, t.node_id, a.flow_trigger_id, a.id AS trigger_address_id
+FROM trigger_address_method m
+JOIN trigger_address a ON a.org_id = m.org_id AND a.id = m.trigger_address_id
+JOIN flow_trigger t ON t.org_id = a.org_id AND t.id = a.flow_trigger_id
+JOIN flow f ON f.org_id = t.org_id AND f.id = t.flow_id
+WHERE a.scope = 'PRODUCTION' AND a.status = 'ACTIVE' AND a.pattern = sqlc.arg(pattern)
+  AND m.method = sqlc.arg(method) AND f.deleted_at IS NULL
+ORDER BY a.id
+LIMIT 1;

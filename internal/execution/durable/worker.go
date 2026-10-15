@@ -188,7 +188,7 @@ func (e *Engine) segment(ctx context.Context, l *heldLease, execID store.Executi
 	if err != nil {
 		return false, err
 	}
-	sess, err := e.interp.OpenSession(plan, esnap, execution.SessionOptions{Known: known})
+	sess, err := e.interp.OpenSession(plan, esnap, execution.SessionOptions{Org: org, Known: known})
 	if err != nil {
 		return false, fmt.Errorf("open execution %s: %w", execID, err)
 	}

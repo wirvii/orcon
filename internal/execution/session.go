@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // A Session is the durable face of the interpreter. The in-memory interpreter
@@ -59,6 +60,10 @@ type Snapshot struct {
 
 // SessionOptions carry what earlier work recorded about the execution.
 type SessionOptions struct {
+	// Org is the organization of the execution. A restored session names it in
+	// the requests its activations carry (the dispatcher's rate buckets and
+	// credentials are per organization).
+	Org identity.OrgID
 	// Known holds the environments (activation instant and seed) recorded for
 	// node executions that were activated before; an activation uses its record
 	// instead of making a new one.
@@ -158,7 +163,7 @@ func (in *Interpreter) OpenSession(plan *Plan, snap Snapshot, opt SessionOptions
 
 func (in *Interpreter) newSession(plan *Plan, exec ID, opt SessionOptions) *Session {
 	pl := newSessionPayloads(in.deps.Payloads)
-	r := newRun(in, plan, Request{Execution: exec})
+	r := newRun(in, plan, Request{Org: opt.Org, Execution: exec})
 	r.payloads, r.owned = pl, pl
 	r.rec = newRecorder(plan, in.deps.Clock, opt)
 	return &Session{r: r, base: make(map[TokenID]TokenRow), baseState: ExecQueued}
