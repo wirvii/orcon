@@ -396,6 +396,8 @@ components:
       $ref: ./schemas/node-type.yaml#/NodeTypeOperation
     NodeType:
       $ref: ./schemas/node-type.yaml#/NodeType
+    NodeTypeIcon:
+      $ref: ./schemas/node-type.yaml#/NodeTypeIcon
     NodeTypeList:
       $ref: ./schemas/node-type.yaml#/NodeTypeList
   responses:

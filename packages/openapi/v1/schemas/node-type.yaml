@@ -108,6 +108,8 @@ NodeType:
       description: Id of the installed connector that provides the type; absent for built-in types.
       examples:
         - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a6a
+    icon:
+      $ref: ../openapi.yaml#/components/schemas/NodeTypeIcon
     operations:
       type: array
       description: The operations of the type with their purity and safety level.
@@ -139,3 +141,32 @@ NodeTypeList:
       examples:
         - example-page-token-2
       maxLength: 1024
+NodeTypeIcon:
+  type: object
+  description: >-
+    The brand icon of a node type, inline. The markup is sanitized when the connector is loaded: no scripts, no
+    event attributes, no external references. The client shows it through an img element only.
+  required:
+    - svg
+    - source
+  properties:
+    svg:
+      type: string
+      description: The icon of the service in its official colour, as an SVG document of at most 8 KiB.
+      maxLength: 8192
+      examples:
+        - '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20z"/></svg>'
+    darkSvg:
+      type: string
+      description: >-
+        The variant the brand itself publishes for dark backgrounds, same limits as svg. Absent unless the brand
+        publishes one.
+      examples:
+        - '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#FFFFFF" d="M1 1h22v22H1z"/></svg>'
+      maxLength: 8192
+    source:
+      type: string
+      description: Where the icon came from, one line such as simple-icons@16.35.0:whatsapp, brand-kit:<url> or orcon-fallback.
+      examples:
+        - simple-icons@16.35.0:whatsapp
+      maxLength: 300
