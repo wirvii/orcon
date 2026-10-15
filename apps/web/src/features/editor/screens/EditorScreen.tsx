@@ -35,7 +35,7 @@ function OpenFlow({ flowId, draft }: { flowId: string; draft: LoadedDraft }) {
 
   return (
     <EditorStoreProvider store={store}>
-      <EditorWorkspace save={save} reload={reload} preview={usesLocalDrafts} />
+      <EditorWorkspace save={save} reload={reload} preview={usesLocalDrafts} flowId={usesLocalDrafts ? undefined : flowId} />
     </EditorStoreProvider>
   );
 }

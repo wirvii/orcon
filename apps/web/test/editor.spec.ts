@@ -4,7 +4,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { goInApp, mockDraftApi } from './draft-api';
+import { goInApp, isFlowDataRequest, mockDraftApi } from './draft-api';
 
 // The flow editor in a real browser, against the production build: the design system's canvas
 // measures nodes and draws connections, which jsdom cannot do. The preview opens a sample flow kept
@@ -101,7 +101,7 @@ test('the dialogs and the outline have no accessibility violations either', asyn
   expect(results.violations.map((violation) => violation.id)).toEqual([]);
 });
 
-test('the editor reads its draft from the API and asks for nothing else', async ({ page }) => {
+test('the editor reads its flow and draft from the API and asks for nothing else', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (request) => {
     // The files of the page are not requests of the editor; a data request (fetch, XHR, a socket or a stream) would be.
@@ -110,7 +110,7 @@ test('the editor reads its draft from the API and asks for nothing else', async 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
   expect(requests.length).toBeGreaterThan(0);
-  expect(requests.every((url) => url.endsWith(`/api/v1/flows/${FLOW.split('/').pop() ?? ''}/draft`))).toBe(true);
+  expect(requests.every(isFlowDataRequest)).toBe(true);
 });
 
 test.describe('on a phone the flow is read-only', () => {
