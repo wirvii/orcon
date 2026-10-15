@@ -169,40 +169,43 @@ type EffectPreview struct {
 }
 
 type Execution struct {
-	ID                      pgtype.UUID
-	OrgID                   pgtype.UUID
-	ProjectID               pgtype.UUID
-	FlowID                  pgtype.UUID
-	FlowVersionID           pgtype.UUID
-	FlowSnapshotID          pgtype.UUID
-	Status                  string
-	Mode                    string
-	Priority                int64
-	ParentExecutionID       pgtype.UUID
-	ParentTokenID           pgtype.UUID
-	RootExecutionID         pgtype.UUID
-	CallDepth               int64
-	CallChainDocument       []byte
-	CallChainDocumentFormat pgtype.Text
-	RetriedExecutionID      pgtype.UUID
-	RunGeneration           int64
-	CancelRequestedAt       pgtype.Timestamptz
-	UndoRequestedAt         pgtype.Timestamptz
-	RunnableCount           int64
-	LeasedCount             int64
-	WaitingCount            int64
-	SuspendedCount          int64
-	ActiveMilliseconds      int64
-	ThrottleKind            pgtype.Text
-	ErrorDocument           []byte
-	ErrorDocumentFormat     pgtype.Text
-	SummaryDocument         []byte
-	SummaryDocumentFormat   pgtype.Text
-	DataKeyWrapped          []byte
-	StartedAt               pgtype.Timestamptz
-	FinishedAt              pgtype.Timestamptz
-	CreatedAt               pgtype.Timestamptz
-	UpdatedAt               pgtype.Timestamptz
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	FlowID                    pgtype.UUID
+	FlowVersionID             pgtype.UUID
+	FlowSnapshotID            pgtype.UUID
+	Status                    string
+	Mode                      string
+	Priority                  int64
+	ParentExecutionID         pgtype.UUID
+	ParentTokenID             pgtype.UUID
+	RootExecutionID           pgtype.UUID
+	CallDepth                 int64
+	CallChainDocument         []byte
+	CallChainDocumentFormat   pgtype.Text
+	RetriedExecutionID        pgtype.UUID
+	RunGeneration             int64
+	CancelRequestedAt         pgtype.Timestamptz
+	UndoRequestedAt           pgtype.Timestamptz
+	RunnableCount             int64
+	LeasedCount               int64
+	WaitingCount              int64
+	SuspendedCount            int64
+	ActiveMilliseconds        int64
+	ThrottleKind              pgtype.Text
+	ErrorDocument             []byte
+	ErrorDocumentFormat       pgtype.Text
+	SummaryDocument           []byte
+	SummaryDocumentFormat     pgtype.Text
+	DataKeyWrapped            []byte
+	StartedAt                 pgtype.Timestamptz
+	FinishedAt                pgtype.Timestamptz
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+	EngineStateDocument       []byte
+	EngineStateDocumentFormat pgtype.Text
+	EngineStateRevision       int64
 }
 
 type ExecutionEvent struct {
@@ -723,6 +726,18 @@ type Token struct {
 	SuspendReason             pgtype.Text
 	CreatedAt                 pgtype.Timestamptz
 	UpdatedAt                 pgtype.Timestamptz
+}
+
+type TokenInput struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ExecutionID          pgtype.UUID
+	ItemCount            int64
+	Encoding             string
+	InlineDocument       []byte
+	InlineDocumentFormat string
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
 }
 
 type TriggerAddress struct {

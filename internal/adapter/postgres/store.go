@@ -16,12 +16,14 @@ import (
 	"io/fs"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -66,6 +68,9 @@ type Store struct {
 	opts  Options
 	clock clock.Clock
 	pool  *pgxpool.Pool
+
+	// rule routes the events the engine functions append to the outbox.
+	rule atomic.Pointer[store.OutboxRule]
 
 	// mu orders Close after the operations in flight: every operation holds a
 	// read lock for its whole duration, Close takes the write lock.
@@ -171,6 +176,12 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 // inOrg runs fn in a READ COMMITTED transaction whose organization context is
 // org (orcon-db TI-6: a transaction-local setting, never a session one).
 func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
+	return s.inOrgIso(ctx, op, org, pgx.ReadCommitted, readOnly, fn)
+}
+
+// inOrgIso is inOrg at an isolation level of the caller's choosing: a read
+// that must see one snapshot of several statements asks for REPEATABLE READ.
+func (s *Store) inOrgIso(ctx context.Context, op string, org fmt.Stringer, iso pgx.TxIsoLevel, readOnly bool, fn func(ctx context.Context, q *sqlcgen.Queries) error) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
@@ -180,7 +191,7 @@ func (s *Store) inOrg(ctx context.Context, op string, org fmt.Stringer, readOnly
 	if readOnly {
 		mode = pgx.ReadOnly
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: mode})
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: iso, AccessMode: mode})
 	if err != nil {
 		return mapError(op, err)
 	}
@@ -284,6 +295,23 @@ func assertFreshSession(ctx context.Context, tx pgx.Tx) error {
 	}
 	if orgContext != "" {
 		return fmt.Errorf("%w: the organization context is %q at the start of a transaction, want empty", ErrSession, orgContext)
+	}
+	return nil
+}
+
+// RouteEvents implements [store.EventRouter].
+func (s *Store) RouteEvents(rule store.OutboxRule) {
+	if rule == nil {
+		s.rule.Store(nil)
+		return
+	}
+	s.rule.Store(&rule)
+}
+
+// outboxRule returns the rule in force, nil when none is.
+func (s *Store) outboxRule() store.OutboxRule {
+	if r := s.rule.Load(); r != nil {
+		return *r
 	}
 	return nil
 }

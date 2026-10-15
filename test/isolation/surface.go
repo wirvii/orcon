@@ -45,6 +45,12 @@ var UncoveredStoreMethods = []string{
 	"ListDraftConnectorReferences", "ListExecutionEvents", "ListExecutions", "ListExternalOperations",
 	"ListPackageVersions", "ListPackages", "ListVersionConnectorReferences", "Read", "ReleaseExpiredLeases",
 	"ReleaseWorkerLeases", "RenewLeases", "ResolveWaitSecret",
+	// Added by the durable engine (SPEC-001 C4a: payloads, snapshots, lost leases, token
+	// attempts and nondeterminism reads), by its last-chance tokens, and by the outbox
+	// routing. They take the organization as well (ScopeOf, the scope itself); their cases
+	// are owed by BL-100 like the rest of this list.
+	"ClaimLastChanceToken", "GetPayload", "LastChanceWaiting", "ListAttempts", "ListTokenNondeterminism",
+	"LoadSnapshot", "ReleaseLostLeases", "ReleaseTokenLease", "RouteEvents", "ScopeOf",
 }
 
 // EngineStoreMethods are the methods that the adapters implement for the engine's retention and that cross

@@ -29,7 +29,7 @@ describe('CreateFlowDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create and open' }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(`/flows/${newFlowId}`);
+      expect(router.state.location.pathname).toBe(`/orgs/acme/projects/ventas/flows/${newFlowId}`);
     });
   });
 });
