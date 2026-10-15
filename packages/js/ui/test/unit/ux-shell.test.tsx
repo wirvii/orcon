@@ -11,6 +11,7 @@ import { AppShell } from '../../src/components/app-shell/AppShell';
 import { ActiveToggle } from '../../src/components/active-toggle/ActiveToggle';
 import { BottomTabBar } from '../../src/components/bottom-tab-bar/BottomTabBar';
 import { ComingSoon } from '../../src/components/coming-soon/ComingSoon';
+import { ErrorSummary } from '../../src/components/error-summary/ErrorSummary';
 import { ConnectorIcon } from '../../src/components/connector-icon/ConnectorIcon';
 import { Link } from '../../src/components/link/Link';
 import { SidebarNav } from '../../src/components/sidebar-nav/SidebarNav';
@@ -220,4 +221,10 @@ it('AppShell without sections draws no sidebar, no bottom bar and no menu button
   expect(screen.queryByRole('navigation')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull();
   expect(screen.getByRole('main')).toHaveTextContent('A page outside an organization');
+});
+
+it('the links of an error summary are destinations, not running text, so they are not underlined', () => {
+  renderWithProviders(<ErrorSummary errors={[{ fieldId: 'field-email', message: 'Enter a valid email address.' }]} />);
+  const link = screen.getByRole('link', { name: 'Enter a valid email address.' });
+  expect(link.className).not.toMatch(/(^|\s)underline(\s|$)/);
 });
