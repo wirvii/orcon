@@ -4,6 +4,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { goInApp, mockDraftApi } from './draft-api';
+
 // The flow editor in a real browser, against the production build: the design system's canvas
 // measures nodes and draws connections, which jsdom cannot do. The preview opens a sample flow kept
 // in memory, so no request leaves the page.
@@ -18,6 +20,7 @@ const viewports = [
 ] as const;
 
 async function openEditor(page: Page, options: { theme?: 'light' | 'dark'; density?: 'comfortable' | 'compact' } = {}) {
+  await mockDraftApi(page);
   await page.addInitScript(
     ({ theme, density }) => {
       window.localStorage.setItem('orcon.locale', 'en');
@@ -47,6 +50,7 @@ test('the editor opens at its stable address', async ({ page }) => {
     window.localStorage.setItem('orcon.locale', 'en');
   });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await mockDraftApi(page);
   await page.goto(FLOW);
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`));
   await expect(page.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
@@ -97,7 +101,7 @@ test('the dialogs and the outline have no accessibility violations either', asyn
   expect(results.violations.map((violation) => violation.id)).toEqual([]);
 });
 
-test('the editor asks nothing from the network: the sample flow is in the page', async ({ page }) => {
+test('the editor reads its draft from the API and asks for nothing else', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (request) => {
     // The files of the page are not requests of the editor; a data request (fetch, XHR, a socket or a stream) would be.
@@ -105,7 +109,8 @@ test('the editor asks nothing from the network: the sample flow is in the page',
   });
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
-  expect(requests).toEqual([]);
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every((url) => url.endsWith(`/api/v1/flows/${FLOW.split('/').pop() ?? ''}/draft`))).toBe(true);
 });
 
 test.describe('on a phone the flow is read-only', () => {
@@ -196,7 +201,7 @@ test.describe('on a computer', () => {
     // The store followed: the flow is saved with its nodes, and history still goes back through the delete.
     await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible({ timeout: 6_000 });
     await page.getByRole('link', { name: 'Settings' }).first().click();
-    await page.getByRole('link', { name: 'Flow editor' }).first().click();
+    await goInApp(page, FLOW);
     await page.waitForSelector('[data-fitted="true"]');
     await expect(tiles(page)).toHaveCount(6);
   });
@@ -312,7 +317,7 @@ test.describe('on a computer', () => {
     // Leave for another page and come back: the saved draft is what opens.
     await page.getByRole('link', { name: 'Settings' }).first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
-    await page.getByRole('link', { name: 'Flow editor' }).first().click();
+    await goInApp(page, FLOW);
     await page.waitForSelector('[data-fitted="true"]');
     await expect(page.getByRole('group', { name: /^Slack,.*disabled/ })).toBeVisible();
     expect(await banner(page)).not.toContain('Unsaved');

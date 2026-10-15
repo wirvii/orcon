@@ -10,7 +10,7 @@ import { markFirstUsefulScreen } from '../../../app/perf/marks';
 import { QueryState } from '../../../app/query-state/QueryState';
 import type { LoadedDraft } from '../api/draft-source';
 import { useSaveDraft } from '../api/mutations';
-import { draftQueryOptions } from '../api/queries';
+import { draftQueryOptions, usesLocalDrafts } from '../api/queries';
 import { EditorWorkspace } from '../components/EditorWorkspace';
 import { editorMessages } from '../components/messages';
 import { createEditorStore } from '../store/editor-store';
@@ -35,7 +35,7 @@ function OpenFlow({ flowId, draft }: { flowId: string; draft: LoadedDraft }) {
 
   return (
     <EditorStoreProvider store={store}>
-      <EditorWorkspace save={save} reload={reload} preview />
+      <EditorWorkspace save={save} reload={reload} preview={usesLocalDrafts} />
     </EditorStoreProvider>
   );
 }

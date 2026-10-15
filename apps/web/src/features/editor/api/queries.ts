@@ -10,6 +10,7 @@ import type { DraftSource } from './draft-source';
 import type { FlowTargetSource } from './flow-target-source';
 import { createLocalCredentialSource } from './local-credential-source';
 import { createLocalDraftSource, type DraftSeed } from './local-draft-source';
+import { createServerDraftSource } from './server-draft-source';
 import { createLocalFlowTargetSource } from './local-flow-target-source';
 
 /**
@@ -36,11 +37,13 @@ if (import.meta.env.MODE === 'perf') {
 }
 
 /**
- * The one place that chooses where drafts come from. The preview reads and writes in memory
- * (`createLocalDraftSource`); connecting the editor to the server means returning the SDK-backed
- * source here (ED5a part 2). Nothing else in the editor names a source.
+ * The one place that chooses where drafts come from. The application reads and saves drafts through
+ * the API (`createServerDraftSource`). The performance build has no server: it keeps the drafts in
+ * memory, seeded with the reference flow, so the measurements do not depend on the network.
  */
-export const draftSource: DraftSource = createLocalDraftSource(seeds);
+export const usesLocalDrafts = import.meta.env.MODE === 'perf';
+
+export const draftSource: DraftSource = usesLocalDrafts ? createLocalDraftSource(seeds) : createServerDraftSource();
 
 /** Where the credential widget reads and creates credentials: the same seam as `draftSource` (ED5a part 2 swaps it). */
 export const credentialSource: CredentialSource = createLocalCredentialSource();
