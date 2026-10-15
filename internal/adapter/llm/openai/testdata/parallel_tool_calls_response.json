@@ -1,0 +1,27 @@
+{
+  "id": "chatcmpl-rec-002",
+  "object": "chat.completion",
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "tool_calls": [
+          {"id": "call_a1", "type": "function", "function": {"name": "crm_lookup", "arguments": "{\"sku\":\"A-1\"}"}},
+          {"id": "call_b2", "type": "function", "function": {"name": "stock.check", "arguments": "{\"sku\":"}}
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 200,
+    "completion_tokens": 30,
+    "total_tokens": 230,
+    "prompt_tokens_details": {"cached_tokens": 0},
+    "completion_tokens_details": {"reasoning_tokens": 10}
+  }
+}
