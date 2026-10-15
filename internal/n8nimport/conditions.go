@@ -181,6 +181,9 @@ func operandJS(c jsonvalue.Value, key string) (string, error) {
 	switch v.Kind() {
 	case jsonvalue.KindString:
 		s, _ := v.Str()
+		if _, changed := redactText(s); changed {
+			return "", errSecretLiteral
+		}
 		return templateJS(s)
 	case jsonvalue.KindNumber:
 		text, _ := v.NumberText()

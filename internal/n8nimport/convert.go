@@ -265,7 +265,7 @@ func (c *converter) convertNode(n *Node) *built {
 	}
 	b.node = res.node
 	if b.node.Ext.IsZero() {
-		b.node.Ext = importMembers(n, false)
+		b.node.Ext = importMembers(n)
 	}
 	b.ports = res.ports
 	b.routed = res.routed
@@ -337,11 +337,19 @@ func (c *converter) unsupported(n *Node, findings []Finding, element flow.Elemen
 		findings = []Finding{{Code: FindUnmappedType, NodeID: n.ID, Node: n.Name, Field: "type",
 			Message: "no Orcon counterpart is available for " + n.Type}}
 	}
+	// The original node is kept without its secrets; each replaced field is a
+	// finding of its own.
+	clean, secretFindings := redactNode(n)
+	ext := importMembers(n)
+	if !clean.IsZero() {
+		inner, _ := ext.Get(flow.ImportExtKey)
+		ext = ext.With(flow.ImportExtKey, inner.With("original", clean))
+	}
 	return convResult{
 		node: flow.Node{Element: element, Type: unsupportedType, Parameters: emptyObject(),
-			Ext: importMembers(n, true)},
+			Ext: ext},
 		outcome:  OutcomeUnsupported,
-		findings: findings,
+		findings: append(findings, secretFindings...),
 	}
 }
 
@@ -373,9 +381,10 @@ func elementFor(n *Node) flow.Element {
 	return flow.ElementTask
 }
 
-// importMembers builds ext["orcon.import"] for a node. With original set it
-// keeps the n8n node object too; only nodes of the unsupported type may.
-func importMembers(n *Node, original bool) jsonvalue.Value {
+// importMembers builds ext["orcon.import"] for a node: the n8n type, its
+// version and its id. [converter.unsupported] adds the original node, the only
+// node type that keeps one.
+func importMembers(n *Node) jsonvalue.Value {
 	version, _ := jsonvalue.Number(n.TypeVersion)
 	members := []jsonvalue.Member{
 		{Key: "n8nType", Value: jsonvalue.String(n.Type)},
@@ -383,9 +392,6 @@ func importMembers(n *Node, original bool) jsonvalue.Value {
 	}
 	if n.ID != "" {
 		members = append(members, jsonvalue.Member{Key: "n8nNodeId", Value: jsonvalue.String(n.ID)})
-	}
-	if original && !n.Source.IsZero() {
-		members = append(members, jsonvalue.Member{Key: "original", Value: n.Source})
 	}
 	inner, _ := jsonvalue.Object(members...)
 	ext, _ := jsonvalue.Object(jsonvalue.Member{Key: flow.ImportExtKey, Value: inner})
@@ -476,9 +482,20 @@ func (c *converter) portFor(src *built, srcName string, k int) (string, bool) {
 // collectSticky keeps the sticky notes for the editor data and reports the
 // ones it had to trim. Sticky notes are not nodes (ADR-0007 section 2).
 func (c *converter) collectSticky() {
-	notes, findings := StickyNotes(&Template{Nodes: c.wf.nodes})
-	c.stickyNotes = notes
-	c.out = append(c.out, findings...)
+	for i := range c.wf.nodes {
+		n := &c.wf.nodes[i]
+		if !IsStickyNote(n.Type) {
+			continue
+		}
+		note, findings := StickyNoteOf(n)
+		c.out = append(c.out, findings...)
+		if clean, changed := redactText(note.Content); changed {
+			note.Content = clean
+			c.out = append(c.out, Finding{Code: FindSecretValue, NodeID: n.ID, Node: n.Name, Field: "parameters.content",
+				Message: "the note holds a value that looks like a secret and is not kept; it is replaced by " + SecretMarker})
+		}
+		c.stickyNotes = append(c.stickyNotes, note)
+	}
 }
 
 // editor builds the editor data: node positions and sticky notes.

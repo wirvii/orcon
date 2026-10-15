@@ -61,6 +61,17 @@ func (c *converter) convertCore(n *Node, row CoreNode) convResult {
 	return c.unsupported(n, []Finding{{Code: FindNotOnMain, NodeID: n.ID, Node: n.Name, Field: "type", Message: msg}}, element)
 }
 
+// filterFinding reports a condition the converter cannot translate. A
+// comparison value that looks like a secret gets its own code and never shows
+// the value.
+func filterFinding(n *Node, field string, err error) Finding {
+	if errors.Is(err, errSecretLiteral) {
+		return Finding{Code: FindSecretValue, NodeID: n.ID, Node: n.Name, Field: field,
+			Message: "a comparison value of " + field + " looks like a secret and is not kept; the node is unsupported until the value is a reference to a credential"}
+	}
+	return paramFinding(n, field, err.Error())
+}
+
 // paramFinding reports a parameter the converter cannot translate.
 func paramFinding(n *Node, field, msg string) Finding {
 	return Finding{Code: FindUnsupportedParameter, NodeID: n.ID, Node: n.Name, Field: field, Message: msg}
@@ -118,11 +129,11 @@ func (c *converter) convertIf(n *Node) convResult {
 	}
 	js, err := filterJS(cond)
 	if err != nil {
-		return c.unsupported(n, []Finding{paramFinding(n, "parameters.conditions", err.Error())}, flow.ElementTask)
+		return c.unsupported(n, []Finding{filterFinding(n, "parameters.conditions", err)}, flow.ElementTask)
 	}
 	rule := caseRule("case:true", js)
 	return convResult{
-		node:      routingNode(flow.ElementExclusiveGateway, typeOrconIf, flow.RoutingExclusive, []jsonvalue.Value{rule}, importMembers(n, false)),
+		node:      routingNode(flow.ElementExclusiveGateway, typeOrconIf, flow.RoutingExclusive, []jsonvalue.Value{rule}, importMembers(n)),
 		orconType: typeOrconIf,
 		ports:     []string{"case:true", "main"},
 		routed:    true,
@@ -167,7 +178,7 @@ func (c *converter) convertSwitch(n *Node) convResult {
 		}
 		js, err := filterJS(cond)
 		if err != nil {
-			return c.unsupported(n, []Finding{paramFinding(n, fmt.Sprintf("parameters.rules.values[%d].conditions", i), err.Error())}, flow.ElementTask)
+			return c.unsupported(n, []Finding{filterFinding(n, fmt.Sprintf("parameters.rules.values[%d].conditions", i), err)}, flow.ElementTask)
 		}
 		port := "case:" + strconv.Itoa(i)
 		rules = append(rules, caseRule(port, js))
@@ -181,7 +192,7 @@ func (c *converter) convertSwitch(n *Node) convResult {
 		routing, element = flow.RoutingInclusive, flow.ElementInclusiveGateway
 	}
 	return convResult{
-		node:      routingNode(element, typeOrconSwitch, routing, rules, importMembers(n, false)),
+		node:      routingNode(element, typeOrconSwitch, routing, rules, importMembers(n)),
 		orconType: typeOrconSwitch,
 		ports:     ports,
 		routed:    true,
@@ -200,7 +211,7 @@ func (c *converter) convertMerge(n *Node) convResult {
 		node: flow.Node{
 			Element: flow.ElementTask, Type: typeOrconMerge, Parameters: emptyObject(),
 			Join: &flow.Join{Mode: flow.JoinActivated, Data: flow.JoinDataAppend},
-			Ext:  importMembers(n, false),
+			Ext:  importMembers(n),
 		},
 		orconType: typeOrconMerge,
 		findings: []Finding{{Code: FindAdapted, NodeID: n.ID, Node: n.Name, Field: "parameters.mode",
@@ -248,7 +259,7 @@ func (c *converter) convertWait(n *Node) convResult {
 		node: flow.Node{
 			Element: flow.ElementIntermediateCatchEvent, Type: typeOrconWait, Parameters: emptyObject(),
 			Wait: &flow.Wait{Kind: flow.WaitTimer, Timer: &flow.Timer{Duration: duration}},
-			Ext:  importMembers(n, false),
+			Ext:  importMembers(n),
 		},
 		orconType: typeOrconWait,
 	}
@@ -261,7 +272,7 @@ func (c *converter) convertManual(n *Node) convResult {
 		node: flow.Node{
 			Element: flow.ElementStartEvent, Type: typeOrconManual, Parameters: emptyObject(),
 			Trigger: &flow.Trigger{Family: flow.TriggerInternal},
-			Ext:     importMembers(n, false),
+			Ext:     importMembers(n),
 		},
 		orconType: typeOrconManual,
 	}
@@ -301,7 +312,7 @@ func (c *converter) convertWebhook(n *Node) convResult {
 				Addresses: []flow.TriggerAddress{addr},
 				Response:  &flow.TriggerResponse{Mode: mode},
 			},
-			Ext: importMembers(n, false),
+			Ext: importMembers(n),
 		},
 		orconType: typeOrconWebhook,
 		findings:  findings,
@@ -371,7 +382,7 @@ func (c *converter) convertSchedule(n *Node) convResult {
 				Family:   flow.TriggerSchedule,
 				Schedule: &flow.TriggerScheduleSpec{TimeZone: c.scheduleZone(), Rules: rules},
 			},
-			Ext: importMembers(n, false),
+			Ext: importMembers(n),
 		},
 		orconType: typeOrconSchedule,
 	}
