@@ -323,7 +323,6 @@ BEGIN
         AND NOT EXISTS (SELECT 1 FROM test_run_seed s WHERE s.org_id = n.org_id AND s.node_test_data_id = n.id)
       ORDER BY n.created_at, n.id
       LIMIT p_limit
-      FOR UPDATE SKIP LOCKED
     ),
     deleted AS (
       DELETE FROM node_test_data AS d
@@ -355,4 +354,9 @@ BEGIN
 END;
 $$;
 
+-- Ownership and grants of the engine function, as migration 0008 does for its functions (ADR-0047, TI-9):
+-- the function runs as orcon_engine, which the row-level security policies let past the organization
+-- context; PUBLIC gets nothing; the application may call it.
+ALTER FUNCTION orcon_engine.prune_batch(text, integer, timestamptz) OWNER TO orcon_engine;
+REVOKE ALL ON FUNCTION orcon_engine.prune_batch(text, integer, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION orcon_engine.prune_batch(text, integer, timestamptz) TO orcon_application;
