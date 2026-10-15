@@ -4,7 +4,7 @@
 import { Banner, Checkbox, FormField, Input, Link as UiLink, Select, Skeleton, Switch } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useParams } from '@tanstack/react-router';
 import { ExternalLink } from 'lucide-react';
 import { useIntl } from 'react-intl';
 
@@ -48,6 +48,9 @@ const choice = 'text-fg bg-surface hover:bg-surface-sunken aria-pressed:bg-surfa
 export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unknown }) {
   const intl = useIntl();
   const actions = useNodeActions(nodeId);
+  // The called flow is in the same project, so its editor address takes this one's organization and project.
+  const { orgSlug, projectHandle } = useParams({ strict: false });
+  const project = orgSlug !== undefined && projectHandle !== undefined ? { orgSlug, projectHandle } : undefined;
   const query = useQuery(flowTargetsQueryOptions());
   const ownId = useEditorStore((state) => state.document.id);
   const formulaGroup = useFieldGroup('call-formula');
@@ -150,10 +153,10 @@ export function FlowTargetField({ nodeId, value }: { nodeId: string; value: unkn
       {!formula && call.target === ownId ? <Banner tone="warning" title={intl.formatMessage(configMessages.callSelf)} /> : null}
       {!formula && chosen && !chosen.published && call.version === 'CURRENT' ? <Banner tone="warning" title={intl.formatMessage(configMessages.callUnpublished, { name: chosen.name })} /> : null}
 
-      {!formula && call.target !== '' ? (
+      {!formula && call.target !== '' && project !== undefined ? (
         <div className="flex flex-col gap-1">
           <UiLink asChild className="self-start text-sm">
-            <Link to="/flows/$flowId" params={{ flowId: call.target }}>
+            <Link to="/orgs/$orgSlug/projects/$projectHandle/flows/$flowId" params={{ ...project, flowId: call.target }}>
               {intl.formatMessage(configMessages.callOpen)}
               <ExternalLink aria-hidden className="size-icon-16" />
             </Link>

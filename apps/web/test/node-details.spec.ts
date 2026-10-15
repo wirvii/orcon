@@ -4,13 +4,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { goInApp, isFlowDataRequest, mockDraftApi } from './draft-api';
+import { goInApp, isFlowDataRequest, isFrameRequest, mockDraftApi } from './draft-api';
 
 // The node details view in a real browser, against the production build: the dialog and the docked
 // panel are laid out by the browser, and the lists of the Select fields open in a layer above the
 // dialog, which jsdom cannot show. The draft of the sample flow comes from a page-level API answer.
 
-const FLOW = '/flows/01930000-0000-7000-8000-00000000ed5a';
+const FLOW = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-00000000ed5a';
 const wcag = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 async function openEditor(page: Page, options: { theme?: 'light' | 'dark'; density?: 'comfortable' | 'compact' } = {}) {
@@ -241,7 +241,7 @@ test.describe('on a computer', () => {
     await form.getByRole('button', { name: 'Create credential' }).click();
     await expect(form).toHaveCount(0);
     // The only data the editor asks for is its flow and draft; a credential is created in the page, without a request.
-    expect(requests.filter((url) => !isFlowDataRequest(url))).toEqual([]);
+    expect(requests.filter((url) => !isFlowDataRequest(url) && !isFrameRequest(url))).toEqual([]);
   });
 
   test('says test runs come later when a pane or the header offers the run', async ({ page }) => {

@@ -154,7 +154,7 @@ describe('the sub-flow widget', () => {
   it('shows the flow that is called, links to it and warns when it has no published version', async () => {
     renderWithStore(<Call id="call" />, withCall({ target: archive.id, version: 'CURRENT', mode: 'WAIT', perItem: false }));
     expect(await screen.findByRole('combobox', { name: /Flow/ })).toHaveTextContent('Archive order');
-    expect(screen.getByRole('link', { name: /Open sub-flow/ })).toHaveAttribute('href', `/flows/${archive.id}`);
+    expect(screen.getByRole('link', { name: /Open sub-flow/ })).toHaveAttribute('href', `/orgs/acme/projects/ventas/flows/${archive.id}`);
     expect(screen.getByText(/Publish Archive order first/)).toBeInTheDocument();
   });
 

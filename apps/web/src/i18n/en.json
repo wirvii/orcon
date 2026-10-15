@@ -5,7 +5,6 @@
   "app.live.paused.text": "The page reconnects by itself and refreshes what it shows.",
   "app.live.paused.title": "Live updates are paused",
   "app.nav.api": "API reference",
-  "app.nav.editor": "Flow editor",
   "app.nav.settings": "Settings",
   "app.notFound.home": "Go to the start page",
   "app.notFound.text": "The page you asked for does not exist or was moved. Check the address, or go back to the start page.",

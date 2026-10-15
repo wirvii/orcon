@@ -17,12 +17,16 @@ import type { FlowDocument } from '../model/flow-document';
 
 import { EditorScreen } from './EditorScreen';
 
-/** The editor opens where the app opens it: `/flows/<id>`. The route here has no loader, so the screen itself shows every state. */
-function renderEditor(path = `/flows/${EXAMPLE_FLOW_ID}`) {
+/**
+ * The editor opens where the app opens it: under the signed-in layout and the project, at
+ * `/orgs/<slug>/projects/<handle>/flows/<id>`. The route here has no loader, so the screen itself shows every state.
+ */
+function renderEditor(path = `/orgs/acme/projects/main/flows/${EXAMPLE_FLOW_ID}`) {
   const queryClient = createQueryClient();
   const root = createRootRouteWithContext<RouterContext>()({ component: Outlet });
-  const flow = createRoute({ getParentRoute: () => root, path: '/flows/$flowId', component: EditorScreen });
-  const router = createRouter({ routeTree: root.addChildren([flow]), history: createMemoryHistory({ initialEntries: [path] }), context: { queryClient } });
+  const session = createRoute({ getParentRoute: () => root, id: '_session', component: Outlet });
+  const flow = createRoute({ getParentRoute: () => session, path: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId', component: EditorScreen });
+  const router = createRouter({ routeTree: root.addChildren([session.addChildren([flow])]), history: createMemoryHistory({ initialEntries: [path] }), context: { queryClient } });
   return renderInApp(<RouterProvider router={router} />, { queryClient });
 }
 
@@ -125,7 +129,7 @@ describe('the editor screen', () => {
       expect(screen.getByRole('region', { name: 'Flow canvas: 6 nodes' })).toBeVisible();
       for (const name of [/^Webhook,/, /^Validate order,/, /^HTTP Request,/, /^Slack,/, /^Ignore invalid order,/, /^Done,/]) expect(canvasNode(name)).toBeInTheDocument();
       expect(status()).toContain('Saved');
-      expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/flows/$flowId' } });
+      expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId' } });
     });
   });
 
