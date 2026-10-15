@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -25,17 +24,9 @@ import (
 
 func TestMain(m *testing.M) {
 	// The PostgreSQL test server runs for the whole package when it is on; the
-	// leak check runs after the tests and before the server stops.
+	// leak check runs after the tests and the server stops in the cleanup, after it.
 	stop := startPostgres()
-	code := m.Run()
-	if code == 0 {
-		if err := goleak.Find(); err != nil {
-			_, _ = fmt.Fprintln(os.Stderr, "goleak:", err)
-			code = 1
-		}
-	}
-	stop()
-	os.Exit(code)
+	goleak.VerifyTestMain(m, goleak.Cleanup(func(int) { stop() }))
 }
 
 // syncBuffer is a bytes.Buffer safe for concurrent use: run writes logs from
