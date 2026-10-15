@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // The interfaces below are the ports the interpreter consumes (go-style.md
@@ -70,6 +71,7 @@ type ItemRouter interface {
 
 // NodeCall is what a [NodeRunner] receives for one activation.
 type NodeCall struct {
+	Org           identity.OrgID
 	Execution     ID
 	Token         TokenID
 	NodeExecution NodeExecutionID

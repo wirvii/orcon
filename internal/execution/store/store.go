@@ -678,6 +678,34 @@ const (
 	PriorityLow    int64 = 2
 )
 
+// BucketRequest asks the bucket of one credential and service for permits.
+// Key names the bucket within the organization (the credential and the service).
+type BucketRequest struct {
+	Key             string
+	Capacity        int64
+	RefillPerSecond int64
+	Permits         int64
+	Now             time.Time
+}
+
+// BucketVerdict is the answer of a take: granted, or the instant of the retry.
+type BucketVerdict struct {
+	Granted bool
+	RetryAt time.Time
+}
+
+// LimitBuckets is the store of the shared rate buckets (ADR-0014 section 2.4).
+// Each call is one transaction: the bucket row is locked, its state is computed
+// with the arithmetic of internal/connector/limit and written back.
+type LimitBuckets interface {
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	TakeBucketPermits(ctx context.Context, org identity.OrgID, req BucketRequest) (BucketVerdict, error)
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	BlockBucket(ctx context.Context, org identity.OrgID, key string, until, now time.Time) error
+}
+
 // MaxRunnableRows bounds the claim snapshot: fairness keys times three classes.
 const MaxRunnableRows = 10000
 
@@ -792,6 +820,8 @@ type WorkQueue interface {
 	// RunnableCounts returns the claimable tokens grouped by fairness key and
 	// priority, at most a fixed number of rows. A worker plans its claims from
 	// it (ADR-0014 section 1); it is a snapshot, not a reservation.
+	//
+	//orcon:scope engine the engine reads the runnable tokens of every organization for fair claims (ADR-0047 section 2)
 	RunnableCounts(ctx context.Context, now time.Time) ([]RunnableCount, error)
 }
 
