@@ -216,6 +216,14 @@ linters:
           deny:
             - pkg: github.com/wirvii/orcon/internal/adapter/cli
               desc: only cmd/orcon wires adapters (AL-8)
+        adapter-private-connectors:
+          files:
+            - "$all"
+            - "!**/internal/adapter/connectors/**"
+            - "!**/cmd/**"
+          deny:
+            - pkg: github.com/wirvii/orcon/internal/adapter/connectors
+              desc: only cmd/orcon wires adapters (AL-8)
         adapter-private-egress:
           files:
             - "$all"
