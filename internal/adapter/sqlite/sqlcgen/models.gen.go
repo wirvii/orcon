@@ -19,6 +19,7 @@ type ApplicationUser struct {
 	Status          string
 	CreatedAt       int64
 	UpdatedAt       int64
+	PasswordHash    sql.NullString
 }
 
 type AttentionRequest struct {
@@ -68,6 +69,47 @@ type AttentionRouting struct {
 	Revision                   int64
 	CreatedAt                  int64
 	UpdatedAt                  int64
+}
+
+type AuditBlock struct {
+	ID                  []byte
+	OrgID               []byte
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           int64
+}
+
+type AuditEvent struct {
+	ID                 []byte
+	OrgID              []byte
+	SequenceNumber     int64
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          int64
+}
+
+type AuditPending struct {
+	ID                 []byte
+	OrgID              []byte
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type Blob struct {
@@ -142,6 +184,24 @@ type ConnectorReference struct {
 	ConnectorVersion string
 	CreatedAt        int64
 	UpdatedAt        int64
+}
+
+type CustomRole struct {
+	ID        []byte
+	OrgID     []byte
+	Name      string
+	ScopeKind string
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+type CustomRolePermission struct {
+	ID           []byte
+	OrgID        []byte
+	CustomRoleID []byte
+	Permission   string
+	CreatedAt    int64
+	UpdatedAt    int64
 }
 
 type Execution struct {
@@ -324,6 +384,25 @@ type HumanTask struct {
 	UpdatedAt              int64
 }
 
+type IdempotencyRecord struct {
+	ID                  []byte
+	OrgID               []byte
+	Requester           string
+	IdempotencyKey      string
+	Fingerprint         []byte
+	Status              string
+	ResourceReference   sql.NullString
+	ResponseStatus      sql.NullInt64
+	ResponseContentType sql.NullString
+	ResponseLocation    sql.NullString
+	ResponseEtag        sql.NullString
+	ResponseBody        []byte
+	IsSecretIssued      int64
+	ExpiresAt           int64
+	CreatedAt           int64
+	UpdatedAt           int64
+}
+
 type InstanceAlert struct {
 	ID                              []byte
 	Kind                            string
@@ -340,6 +419,64 @@ type InstanceAlert struct {
 	ClosedReason                    sql.NullString
 	CreatedAt                       int64
 	UpdatedAt                       int64
+}
+
+type InstanceAuditBlock struct {
+	ID                  []byte
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           int64
+}
+
+type InstanceAuditEvent struct {
+	ID                 []byte
+	SequenceNumber     int64
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          int64
+}
+
+type InstanceAuditPending struct {
+	ID                 []byte
+	OccurredAt         int64
+	ActorPrincipalID   []byte
+	ActorKind          sql.NullString
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
+type InstanceKey struct {
+	ID                 []byte
+	KeyLevel           string
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
+type InstanceKeyCanary struct {
+	ID         []byte
+	KeyLevel   string
+	KeyVersion int64
+	Probe      []byte
+	CreatedAt  int64
+	UpdatedAt  int64
 }
 
 type JoinArrival struct {
@@ -385,6 +522,14 @@ type LimitBucket struct {
 	BlockedUntilAt  sql.NullInt64
 	CreatedAt       int64
 	UpdatedAt       int64
+}
+
+type LoginThrottle struct {
+	ID            []byte
+	Failures      int64
+	LockedUntilAt int64
+	CreatedAt     int64
+	UpdatedAt     int64
 }
 
 type Membership struct {
@@ -528,6 +673,19 @@ type Org struct {
 	DeletionScheduledAt sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64
+	AuthorizationEpoch  int64
+}
+
+type OrgKey struct {
+	ID                 []byte
+	OrgID              []byte
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	Probe              []byte
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type Outbox struct {
@@ -563,6 +721,17 @@ type Project struct {
 	Handle      sql.NullString
 }
 
+type RoleBinding struct {
+	ID                []byte
+	OrgID             []byte
+	ScopeKind         string
+	ProjectID         []byte
+	ApplicationUserID []byte
+	RoleName          string
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
 type SchemaMigration struct {
 	Version            int64
 	Checksum           string
@@ -570,6 +739,19 @@ type SchemaMigration struct {
 	BinaryVersion      string
 	CompatibilityFloor string
 	CreatedAt          int64
+}
+
+type Session struct {
+	ID                []byte
+	ApplicationUserID []byte
+	TokenHash         []byte
+	AssuranceLevel    string
+	CreatedAt         int64
+	ExpiresAt         int64
+	IdleExpiresAt     int64
+	LastSeenAt        int64
+	RevokedAt         sql.NullInt64
+	UpdatedAt         int64
 }
 
 type TaskAttempt struct {

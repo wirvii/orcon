@@ -11,8 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
@@ -36,6 +38,24 @@ func (s *Store) CreateFlow(ctx context.Context, org orgscope.Org, f flow.Record)
 			Name: f.Name, DraftDocument: f.Draft,
 			CreatedAt: timestamp(f.CreatedAt), UpdatedAt: timestamp(f.UpdatedAt),
 		})
+	})
+}
+
+// CreateFlowWithEntry implements [flow.Store]: the flow, the creation entry and the
+// idempotency claim of the context, when there is one, in one transaction.
+func (s *Store) CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f flow.Record, entry audit.Entry) error {
+	return s.inScopeRecord(ctx, "create flow", org, f.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
+		if err := claimIdempotency(ctx, q, org, "flow:"+id.UUID(f.ID).String(), f.CreatedAt); err != nil {
+			return err
+		}
+		if err := q.InsertFlow(ctx, sqlcgen.InsertFlowParams{
+			ID: pgUUID(f.ID), OrgID: pgUUID(f.OrgID), ProjectID: pgUUID(f.ProjectID),
+			Name: f.Name, DraftDocument: f.Draft,
+			CreatedAt: timestamp(f.CreatedAt), UpdatedAt: timestamp(f.UpdatedAt),
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 }
 

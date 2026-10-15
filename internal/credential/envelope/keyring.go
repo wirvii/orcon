@@ -137,34 +137,62 @@ func (k *Keyring) CreateKey(ctx context.Context, scope Scope) (KeyID, error) {
 	case !errors.Is(err, ErrKeyNotFound):
 		return KeyID{}, fmt.Errorf("create key for %s: %w", scope.Level, err)
 	}
+	stored, key, err := k.newKey(ctx, scope)
+	if err != nil {
+		return KeyID{}, err
+	}
+	if err := k.store.PutKey(ctx, stored); err != nil {
+		key.Destroy()
+		return KeyID{}, fmt.Errorf("create key %s: %w", stored.ID, err)
+	}
+	k.remember(stored.ID, key)
+	key.Destroy()
+	return stored.ID, nil
+}
+
+// NewKey prepares version 1 of the key of scope without storing it, for a caller
+// that writes it in the same transaction as the row that needs it (an
+// organization is created together with its key, so no organization exists
+// without one). The caller stores the result; until it does, the key exists
+// nowhere but in the returned value.
+func (k *Keyring) NewKey(ctx context.Context, scope Scope) (StoredKey, error) {
+	if err := scope.Validate(); err != nil {
+		return StoredKey{}, fmt.Errorf("new key: %w", err)
+	}
+	stored, key, err := k.newKey(ctx, scope)
+	if err != nil {
+		return StoredKey{}, err
+	}
+	key.Destroy()
+	return stored, nil
+}
+
+// newKey generates version 1 of the key of scope and returns its stored form and
+// the key in clear; the caller destroys the key.
+func (k *Keyring) newKey(ctx context.Context, scope Scope) (StoredKey, Key, error) {
 	id := KeyID{Level: scope.Level, OrgID: scope.OrgID, Version: 1}
 	key, err := GenerateKey(k.random)
 	if err != nil {
-		return KeyID{}, fmt.Errorf("create key %s: %w", id, err)
+		return StoredKey{}, Key{}, fmt.Errorf("create key %s: %w", id, err)
 	}
 	wrapped, err := k.mk.Wrap(ctx, key.bytes()[:], keyAAD(purposeKeyWrap, id))
 	if err != nil {
-		return KeyID{}, fmt.Errorf("create key %s: %w", id, err)
+		key.Destroy()
+		return StoredKey{}, Key{}, fmt.Errorf("create key %s: %w", id, err)
 	}
 	canary, err := sealBlob(k.random, key, keyAAD(purposeCanary, id), []byte(canaryPlaintext))
 	if err != nil {
-		return KeyID{}, fmt.Errorf("create key %s: %w", id, err)
+		key.Destroy()
+		return StoredKey{}, Key{}, fmt.Errorf("create key %s: %w", id, err)
 	}
-	stored := StoredKey{
+	return StoredKey{
 		ID:                 id,
 		Wrapped:            wrapped,
 		MasterKeyReference: k.mk.Reference(),
 		Status:             KeyActive,
 		CreatedAt:          clock.Micros(k.clock.Now()),
 		Canary:             canary,
-	}
-	if err := k.store.PutKey(ctx, stored); err != nil {
-		key.Destroy()
-		return KeyID{}, fmt.Errorf("create key %s: %w", id, err)
-	}
-	k.remember(id, key)
-	key.Destroy()
-	return id, nil
+	}, key, nil
 }
 
 // GenerateDataKey creates a data key wrapped by the active key of scope.

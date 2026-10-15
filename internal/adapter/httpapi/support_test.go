@@ -20,6 +20,8 @@ import (
 	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/config"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
+	"github.com/wirvii/orcon/internal/platform/orgscope/issue"
 )
 
 // syntheticSpec is a small contract that exercises every branch of the
@@ -123,8 +125,22 @@ func (f fakeAuthn) Authenticate(_ context.Context, c identity.Credentials) (iden
 
 type authzFunc func(authz.Request) authz.Decision
 
-func (f authzFunc) Authorize(_ context.Context, r authz.Request) (authz.Decision, error) {
-	return f(r), nil
+// testOrg is the organization of the harness principals that name none.
+var testOrg = func() id.UUID { var u id.UUID; u[15] = 77; return u }()
+
+// Authorize issues the organization scope of an allowed request, as the evaluator does.
+func (f authzFunc) Authorize(_ context.Context, r authz.Request) (authz.Decision, orgscope.Org, error) {
+	d := f(r)
+	if d != authz.DecisionAllow {
+		return d, orgscope.Org{}, nil
+	}
+	// The harness principals belong to one test organization unless they name another.
+	org := id.UUID(r.Principal.OrgID)
+	if org.IsZero() {
+		org = testOrg
+	}
+	scope, err := issue.New(org)
+	return d, scope, err
 }
 
 // fakeHandlers registers the fake handler of each synthetic operation.
