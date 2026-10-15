@@ -100,16 +100,18 @@ type toolDecl struct {
 
 // params is the parsed parameter object of one agent node.
 type params struct {
-	model        flow.ModelRef
-	system       string
-	inputField   string
-	tools        []toolDecl
-	maxSteps     int
-	maxToolCalls int
-	maxParallel  int
-	memoryWindow int
-	maxSpend     int64
-	maxOutput    int
+	model      flow.ModelRef
+	system     string
+	inputField string
+	// conversationField is the item field that keys the conversation memory.
+	conversationField string
+	tools             []toolDecl
+	maxSteps          int
+	maxToolCalls      int
+	maxParallel       int
+	memoryWindow      int
+	maxSpend          int64
+	maxOutput         int
 }
 
 func parseParams(node *flow.Node) (params, error) {
@@ -126,6 +128,13 @@ func parseParams(node *flow.Node) (params, error) {
 	p.inputField = stringOf(raw, "inputField")
 	if p.inputField == "" {
 		p.inputField = "text"
+	}
+	// conversationField names the item field that keys the memory of the
+	// conversation: a messaging flow sets it to the sender, so each sender keeps
+	// its own memory.
+	p.conversationField = stringOf(raw, "conversationField")
+	if p.conversationField == "" {
+		p.conversationField = "conversationKey"
 	}
 	var err error
 	if p.maxSteps, err = intParam(raw, "maxSteps", DefaultMaxSteps); err != nil {
@@ -242,7 +251,7 @@ func (r *Runner) runItem(ctx context.Context, call execution.NodeCall, p params,
 		return jsonvalue.Value{}, &execution.NodeError{Code: CodeNodeInvalid, Class: execution.ClassPermanent,
 			Err: fmt.Errorf("the item has no text field %q", p.inputField)}
 	}
-	conversation := stringOf(item.JSON, "conversationKey")
+	conversation := stringOf(item.JSON, p.conversationField)
 
 	steps, err := r.cfg.Store.Steps(ctx, org, runID)
 	if err != nil {
