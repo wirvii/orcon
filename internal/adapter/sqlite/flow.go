@@ -146,6 +146,76 @@ func (s *Store) ListFlows(ctx context.Context, org orgscope.Org, project identit
 	return out, err
 }
 
+// ListFlowActivity implements [flow.Store] (SPEC-019 R-UX-BE-01): the flows of the page with their
+// latest execution and the executions of the last day, in one query.
+func (s *Store) ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, since time.Time, after flow.FlowID, limit int) ([]flow.Activity, error) {
+	var out []flow.Activity
+	err := s.read(ctx, "list flow activity", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		rows, err := q.ListFlowActivity(ctx, sqlcgen.ListFlowActivityParams{
+			OrgID: scope, ProjectID: uuidBytes(project), SinceAt: micros(since), AfterID: uuidBytes(after), PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			a, err := activityFrom(&rows[i])
+			if err != nil {
+				return err
+			}
+			out = append(out, a)
+		}
+		return nil
+	})
+	return out, err
+}
+
+// activityFrom converts a row of ListFlowActivity: the flow, and its latest execution when it ran.
+func activityFrom(row *sqlcgen.ListFlowActivityRow) (flow.Activity, error) {
+	var out flow.Activity
+	f, err := flowFrom(&sqlcgen.GetFlowRow{
+		ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision,
+		ActiveFlowVersionID: row.ActiveFlowVersionID, ActivationState: row.ActivationState,
+		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	})
+	if err != nil {
+		return out, err
+	}
+	out.Flow = f
+	out.ExecutionCountLast24h = row.ExecutionCountLast24h
+	if len(row.LastExecutionID) == 0 {
+		return out, nil
+	}
+	executionID, err := uuidOf[id.UUID](row.LastExecutionID)
+	if err != nil {
+		return out, fmt.Errorf("last execution id: %w", err)
+	}
+	out.LastExecution = &flow.LastExecution{
+		ID: executionID, Status: row.LastExecutionStatus.String,
+		HasUncertainOperation: row.LastExecutionHasUncertainOperation != 0,
+		CreatedAt:             nullInstant(row.LastExecutionCreatedAt),
+		FinishedAt:            nullInstant(row.LastExecutionFinishedAt),
+	}
+	return out, nil
+}
+
+// CountFlows implements [flow.Store].
+func (s *Store) CountFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) (int64, error) {
+	var n int64
+	err := s.read(ctx, "count flows", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		n, err = q.CountFlows(ctx, scope, uuidBytes(project))
+		return err
+	})
+	return n, err
+}
+
 // UpdateFlowDraft implements [flow.Store].
 func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
 	var revision int64

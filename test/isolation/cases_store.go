@@ -99,6 +99,8 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"GetFlow":             caseGetFlow,
 	"GetFlowByName":       caseGetFlowByName,
 	"ListFlows":           caseListFlows,
+	"ListFlowActivity":    caseListFlowActivity,
+	"CountFlows":          caseCountFlows,
 	"UpdateFlowDraft":     caseUpdateFlowDraft,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
@@ -493,6 +495,33 @@ func caseListFlows(ctx context.Context, tb testing.TB, env *Env) {
 		tb.Fatal(err)
 	}
 	noLeak(tb, "the page after B's cursor", own, err, &env.B)
+}
+
+// caseListFlowActivity: the activity list of B's project is empty for A, and a page after B's cursor
+// leaks nothing of B (SPEC-019 R-UX-BE-01: the flows and their executions are read under the scope).
+func caseListFlowActivity(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	since := seededAt.Add(-24 * time.Hour)
+	got, err := env.Stores.ListFlowActivity(ctx, env.A.Scope, env.B.Project.ID, since, flow.FlowID{}, 100)
+	if err != nil || len(got) != 0 {
+		tb.Errorf("flow activity of B's project listed for A: %d, %v", len(got), err)
+	}
+	noLeak(tb, "the activity list", got, err, &env.B)
+	own, err := env.Stores.ListFlowActivity(ctx, env.A.Scope, env.A.Project.ID, since, env.B.Flow.ID, 100)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	noLeak(tb, "the page after B's cursor", own, err, &env.B)
+}
+
+// caseCountFlows: the flows of B's project are not counted for A (SPEC-019 R-UX-BE-05).
+func caseCountFlows(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	n, err := env.Stores.CountFlows(ctx, env.A.Scope, env.B.Project.ID)
+	if err != nil || n != 0 {
+		tb.Errorf("flows of B's project counted for A: %d, %v", n, err)
+	}
+	noLeak(tb, "the count", nil, err, &env.B)
 }
 
 func caseUpdateFlowDraft(ctx context.Context, tb testing.TB, env *Env) {
