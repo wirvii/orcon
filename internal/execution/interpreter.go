@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/clock"
 )
 
 // Deps are the ports an [Interpreter] consumes. Each is needed only by the
@@ -27,6 +28,9 @@ type Deps struct {
 	// Events receives the execution events in order. When nil the events are
 	// only returned in [Result].
 	Events EventSink
+	// Clock gives each activation its start instant (ADR-0013 section 7). When
+	// nil, activations carry a zero Time.
+	Clock clock.Clock
 }
 
 // Interpreter runs compiled flows as token interpreters: tokens move through

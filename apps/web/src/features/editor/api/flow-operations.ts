@@ -9,6 +9,7 @@ import { ContractError } from '../../../app/errors/contract-error';
 /** The state of a flow the editor needs to publish and activate it (SPEC-005 `Flow`; the contract may add fields). */
 export const flowStateSchema = z.looseObject({
   id: z.uuid(),
+  projectId: z.uuid(),
   activationState: z.enum(['ACTIVE', 'INACTIVE']),
   activeVersion: z.number().int().min(1).nullish(),
   hasUnpublishedChanges: z.boolean(),

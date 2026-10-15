@@ -26,15 +26,15 @@ func MustCompile(tb testing.TB, b *Builder) *execution.Plan {
 	return plan
 }
 
-// Run compiles the flow, runs it once with the given ports and fails the test
-// on a run error. A failed execution is not a run error: inspect the result.
+// Run compiles the flow, runs it once with the given ports on the engine in
+// use (the in-memory interpreter unless a test selected another with
+// [UseEngine]) and fails the test on a run error. A failed execution is not a
+// run error: inspect the result.
 func Run(tb testing.TB, b *Builder, deps execution.Deps, input execution.Batch) execution.Result {
 	tb.Helper()
 	plan := MustCompile(tb, b)
-	res, err := execution.NewInterpreter(deps).Run(tb.Context(), plan, execution.Request{Execution: "exec-1", Input: input})
-	if err != nil {
-		tb.Fatalf("Run() = %v, want no error", err)
-	}
+	doc := b.Doc()
+	res := engine(tb, &doc, plan, deps, input)
 	for _, v := range Violations(res) {
 		tb.Errorf("run invariant broken: %s", v)
 	}
@@ -149,7 +149,7 @@ func Violations(res execution.Result) []string {
 			ended++
 		case execution.EventExecutionSucceeded, execution.EventExecutionFailed:
 			terminal++
-		case execution.EventExecutionStarted, execution.EventTokenForked, execution.EventTokenDeferred,
+		case execution.EventExecutionStarted, execution.EventExecutionResumed, execution.EventTokenForked, execution.EventTokenDeferred,
 			execution.EventTokenConsumed, execution.EventJoinFired, execution.EventJoinReset, execution.EventJoinFailed,
 			execution.EventLoopIterationStarted, execution.EventLoopLimitExceeded:
 		}

@@ -4,12 +4,10 @@
 package execution
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
 	"strconv"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/id"
 )
 
 // ID identifies one execution of a flow revision.
@@ -22,31 +20,8 @@ type TokenID string
 // NodeExecutionID identifies one execution of a node by a token in a scope.
 type NodeExecutionID string
 
-// hashID is the function H of ADR-0008 section 6: the first 128 bits of the
-// SHA-256 of the length-prefixed fields, written as a UUID.
-func hashID(fields ...string) string {
-	size := 0
-	for _, f := range fields {
-		size += 8 + len(f)
-	}
-	buf := make([]byte, 0, size)
-	for _, f := range fields {
-		buf = binary.BigEndian.AppendUint64(buf, uint64(len(f)))
-		buf = append(buf, f...)
-	}
-	sum := sha256.Sum256(buf)
-	var out [36]byte
-	hex.Encode(out[0:8], sum[0:4])
-	out[8] = '-'
-	hex.Encode(out[9:13], sum[4:6])
-	out[13] = '-'
-	hex.Encode(out[14:18], sum[6:8])
-	out[18] = '-'
-	hex.Encode(out[19:23], sum[8:10])
-	out[23] = '-'
-	hex.Encode(out[24:36], sum[10:16])
-	return string(out[:])
-}
+// hashID is the function H of ADR-0008 section 6, written as UUID text.
+func hashID(fields ...string) string { return id.Derive(fields...).String() }
 
 // rootTokenID is H(executionId, "root").
 func rootTokenID(exec ID) TokenID {

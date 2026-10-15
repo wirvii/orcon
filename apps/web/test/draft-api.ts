@@ -5,6 +5,35 @@ import type { Page } from '@playwright/test';
 
 import { EXAMPLE_FLOW_ID, exampleFlowDocument, SAMPLE_SUBFLOWS, subflowDocument } from '../src/features/editor/model/example-flow';
 
+import { acme, currentUser } from './session-fixtures';
+
+/** The project the editor address names: `/orgs/acme/projects/ventas/flows/<id>`. */
+export const EDITOR_PROJECT = {
+  id: '0195f1a0-0000-7000-8000-0000000000d1',
+  orgId: acme.id,
+  name: 'Ventas',
+  handle: 'ventas',
+  environment: null,
+  protected: true,
+  createdAt: '2026-10-01T00:00:00Z',
+  updatedAt: '2026-10-01T00:00:00Z',
+} as const;
+
+/**
+ * Signs the person in and gives the organization and its project, so the signed-in frame of the editor
+ * address (the session layout and the project check) resolves. Every editor test needs it.
+ */
+export async function mockSession(page: Page): Promise<void> {
+  const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  await page.route(/\/api\/v1\/users\/me$/, (route) => route.fulfill(json(currentUser)));
+  await page.route(/\/api\/v1\/orgs(\?.*)?$/, (route) => route.fulfill(json({ items: [acme] })));
+  await page.route(/\/api\/v1\/orgs\/[^/]+\/projects(\?.*)?$/, (route) => {
+    const handle = new URL(route.request().url()).searchParams.get('handle');
+    const items = handle === null || handle === EDITOR_PROJECT.handle ? [EDITOR_PROJECT] : [];
+    return route.fulfill(json({ items }));
+  });
+}
+
 interface StoredDraft {
   revision: number;
   document: unknown;
@@ -37,6 +66,7 @@ const flowIdOf = (url: string) => new URL(url).pathname.split('/')[4] ?? '';
  * tests, so the editor reads and changes its flows against this page-level answer.
  */
 export async function mockDraftApi(page: Page): Promise<void> {
+  await mockSession(page);
   const drafts = new Map<string, StoredDraft>([
     [EXAMPLE_FLOW_ID, { revision: 1, document: exampleFlowDocument() }],
     ...SAMPLE_SUBFLOWS.map((flow): [string, StoredDraft] => [flow.id, { revision: 1, document: subflowDocument(flow.id, flow.name) }]),
@@ -158,3 +188,9 @@ export async function goInApp(page: Page, path: string): Promise<void> {
 
 /** True for a request the editor makes for its own flow: its state or its draft. Anything else is not expected. */
 export const isFlowDataRequest = (url: string): boolean => /\/api\/v1\/flows\/[^/]+(\/draft)?$/.test(url);
+
+/**
+ * True for the reads of the signed-in frame around the editor (the person, the organization, the project
+ * of the address). They are not the editor's own data, so a test that counts the editor's requests skips them.
+ */
+export const isFrameRequest = (url: string): boolean => /\/api\/v1\/(users\/me|orgs(\/[^/]+\/projects)?)(\?.*)?$/.test(url);
