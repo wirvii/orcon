@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/codec/permissionsyaml"
+	"github.com/wirvii/orcon/internal/adapter/httpapi"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/kms/env"
 	"github.com/wirvii/orcon/internal/adapter/kms/file"
@@ -23,6 +24,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/credential/envelope"
+	execstore "github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -61,6 +63,8 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	envelope.KeyStore
 	identity.OrgKeyGapStore
 	audit.Store
+	httpapi.OrgAuditLog
+	execstore.NodeReader
 	engineStore
 	io.Closer
 }

@@ -108,6 +108,8 @@ func executionCases() []struct {
 		{"WaitSecretLookup", waitCase},
 		{"AttentionInbox", attentionCase},
 		{"ExecutionIsolation", executionIsolationCase},
+		{"NodeReads", nodeReadsCase},
+		{"OrgAuditAppend", orgAuditCase},
 		{"EventsAreOrderedUnderConcurrency", eventsCase},
 		{"ConcurrentStepsOnOneExecution", stepsCase},
 		{"OneJoinInstancePerSplitInstance", splitJoinCase},

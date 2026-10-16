@@ -61,6 +61,11 @@ var UncoveredStoreMethods = []string{
 	// T2): it runs before any organization is known, so it has no organization parameter. Its
 	// cases are owed by BL-100 with the rest of this list.
 	"ResolveRoute",
+	// Added by the read side of the executions API (the node runs and stored outputs of an execution,
+	// and the audit entry of a read of data). They take the scope of the organization like the other
+	// execution reads; storetest checks that another organization lists nothing (NodeReads,
+	// OrgAuditAppend), and their cases here are owed by BL-100 with the rest of this list.
+	"AppendOrgEntry", "ListNodeExecutions", "ListNodeOutputs",
 }
 
 // NoSurface is the surface of a tree without routes or store methods that handle

@@ -1592,6 +1592,153 @@ func (q *Queries) ListLiveTokens(ctx context.Context, arg ListLiveTokensParams) 
 	return items, nil
 }
 
+const listNodeExecutionsByExecution = `-- name: ListNodeExecutionsByExecution :many
+SELECT n.id AS id, n.org_id AS org_id, n.execution_id AS execution_id, n.token_id AS token_id, n.node_id AS node_id,
+       n.scope_path AS scope_path, n.status AS status,
+       CAST((SELECT count(*) FROM task_attempt a WHERE a.org_id = n.org_id AND a.node_execution_id = n.id) AS INTEGER) AS attempt_count,
+       n.started_at AS started_at, n.finished_at AS finished_at, n.created_at AS created_at, n.updated_at AS updated_at
+FROM node_execution n
+WHERE n.org_id = ?1 AND n.execution_id = ?2
+  AND (n.created_at, n.id) > (?3, CAST(?4 AS BLOB))
+ORDER BY n.created_at, n.id
+LIMIT ?5
+`
+
+type ListNodeExecutionsByExecutionParams struct {
+	OrgID          []byte
+	ExecutionID    []byte
+	AfterCreatedAt int64
+	AfterID        []byte
+	PageSize       int64
+}
+
+type ListNodeExecutionsByExecutionRow struct {
+	ID           []byte
+	OrgID        []byte
+	ExecutionID  []byte
+	TokenID      []byte
+	NodeID       string
+	ScopePath    string
+	Status       string
+	AttemptCount int64
+	StartedAt    sql.NullInt64
+	FinishedAt   sql.NullInt64
+	CreatedAt    int64
+	UpdatedAt    int64
+}
+
+// The node executions of one execution, oldest first, for the read side of the API (the run of every node).
+// orcon:scope org
+func (q *Queries) ListNodeExecutionsByExecution(ctx context.Context, arg ListNodeExecutionsByExecutionParams) ([]ListNodeExecutionsByExecutionRow, error) {
+	rows, err := q.db.QueryContext(ctx, listNodeExecutionsByExecution,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNodeExecutionsByExecutionRow{}
+	for rows.Next() {
+		var i ListNodeExecutionsByExecutionRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.TokenID,
+			&i.NodeID,
+			&i.ScopePath,
+			&i.Status,
+			&i.AttemptCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNodeOutputsByExecution = `-- name: ListNodeOutputsByExecution :many
+SELECT o.id AS id, o.node_execution_id AS node_execution_id, n.node_id AS node_id, o.port AS port, o.item_count AS item_count,
+       o.inline_document AS inline_document, o.created_at AS created_at
+FROM node_output o
+JOIN node_execution n ON n.org_id = o.org_id AND n.id = o.node_execution_id
+WHERE o.org_id = ?1 AND o.execution_id = ?2
+  AND (o.created_at, o.id) > (?3, CAST(?4 AS BLOB))
+ORDER BY o.created_at, o.id
+LIMIT ?5
+`
+
+type ListNodeOutputsByExecutionParams struct {
+	OrgID          []byte
+	ExecutionID    []byte
+	AfterCreatedAt int64
+	AfterID        []byte
+	PageSize       int64
+}
+
+type ListNodeOutputsByExecutionRow struct {
+	ID              []byte
+	NodeExecutionID []byte
+	NodeID          string
+	Port            string
+	ItemCount       int64
+	InlineDocument  []byte
+	CreatedAt       int64
+}
+
+// The stored output batches of one execution with the node each belongs to, oldest first.
+// orcon:scope org
+func (q *Queries) ListNodeOutputsByExecution(ctx context.Context, arg ListNodeOutputsByExecutionParams) ([]ListNodeOutputsByExecutionRow, error) {
+	rows, err := q.db.QueryContext(ctx, listNodeOutputsByExecution,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNodeOutputsByExecutionRow{}
+	for rows.Next() {
+		var i ListNodeOutputsByExecutionRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NodeExecutionID,
+			&i.NodeID,
+			&i.Port,
+			&i.ItemCount,
+			&i.InlineDocument,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaskAttempts = `-- name: ListTaskAttempts :many
 SELECT id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at
 FROM task_attempt

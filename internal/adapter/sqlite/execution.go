@@ -211,6 +211,65 @@ func (s *Store) ListExecutionEvents(ctx context.Context, org orgscope.Org, execI
 	return out, err
 }
 
+// ListNodeExecutions implements [store.Reader].
+func (s *Store) ListNodeExecutions(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeExecution, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeExecution
+	err := s.readOf(ctx, "list node executions", org, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeExecutionsByExecution(ctx, sqlcgen.ListNodeExecutionsByExecutionParams{
+			OrgID: uuidBytes(org.UUID()), ExecutionID: uuidBytes(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			var d decode
+			n := store.NodeExecution{
+				ID: uuidField[store.NodeExecutionID](&d, r.ID), OrgID: uuidField[identity.OrgID](&d, r.OrgID),
+				ExecutionID: uuidField[store.ExecutionID](&d, r.ExecutionID), TokenID: uuidField[store.TokenID](&d, r.TokenID),
+				NodeID: r.NodeID, ScopePath: r.ScopePath, Status: r.Status, AttemptCount: r.AttemptCount,
+				StartedAt: nullInstant(r.StartedAt), FinishedAt: nullInstant(r.FinishedAt),
+				CreatedAt: instant(r.CreatedAt), UpdatedAt: instant(r.UpdatedAt),
+			}
+			if d.err != nil {
+				return d.err
+			}
+			out = append(out, n)
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ListNodeOutputs implements [store.Reader].
+func (s *Store) ListNodeOutputs(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeOutputRecord, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeOutputRecord
+	err := s.readOf(ctx, "list node outputs", org, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeOutputsByExecution(ctx, sqlcgen.ListNodeOutputsByExecutionParams{
+			OrgID: uuidBytes(org.UUID()), ExecutionID: uuidBytes(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			var d decode
+			rec := store.NodeOutputRecord{
+				ID: uuidField[store.PayloadID](&d, r.ID), NodeExecutionID: uuidField[store.NodeExecutionID](&d, r.NodeExecutionID),
+				NodeID: r.NodeID, Port: r.Port, ItemCount: r.ItemCount, Document: r.InlineDocument, CreatedAt: instant(r.CreatedAt),
+			}
+			if d.err != nil {
+				return d.err
+			}
+			out = append(out, rec)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func operationFrom(row *sqlcgen.GetExternalOperationRow) (store.ExternalOperation, error) {
 	var d decode
 	o := store.ExternalOperation{

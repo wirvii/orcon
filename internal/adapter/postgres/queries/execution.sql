@@ -134,6 +134,31 @@ WHERE org_id = sqlc.arg(org_id) AND execution_id = sqlc.arg(execution_id) AND se
 ORDER BY sequence_number
 LIMIT sqlc.arg(page_size);
 
+-- The node executions of one execution, oldest first, for the read side of the API (the run of every node).
+-- name: ListNodeExecutionsByExecution :many
+-- orcon:scope org
+SELECT n.id AS id, n.org_id AS org_id, n.execution_id AS execution_id, n.token_id AS token_id, n.node_id AS node_id,
+       n.scope_path AS scope_path, n.status AS status,
+       CAST((SELECT count(*) FROM task_attempt a WHERE a.org_id = n.org_id AND a.node_execution_id = n.id) AS BIGINT) AS attempt_count,
+       n.started_at AS started_at, n.finished_at AS finished_at, n.created_at AS created_at, n.updated_at AS updated_at
+FROM node_execution n
+WHERE n.org_id = sqlc.arg(org_id) AND n.execution_id = sqlc.arg(execution_id)
+  AND (n.created_at, n.id) > (sqlc.arg(after_created_at)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY n.created_at, n.id
+LIMIT sqlc.arg(page_size);
+
+-- The stored output batches of one execution with the node each belongs to, oldest first.
+-- name: ListNodeOutputsByExecution :many
+-- orcon:scope org
+SELECT o.id AS id, o.node_execution_id AS node_execution_id, n.node_id AS node_id, o.port AS port, o.item_count AS item_count,
+       o.inline_document AS inline_document, o.created_at AS created_at
+FROM node_output o
+JOIN node_execution n ON n.org_id = o.org_id AND n.id = o.node_execution_id
+WHERE o.org_id = sqlc.arg(org_id) AND o.execution_id = sqlc.arg(execution_id)
+  AND (o.created_at, o.id) > (sqlc.arg(after_created_at)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY o.created_at, o.id
+LIMIT sqlc.arg(page_size);
+
 -- name: InsertExternalOperation :exec
 -- orcon:scope org
 -- orcon:hot
