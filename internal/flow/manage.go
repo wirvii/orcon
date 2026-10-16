@@ -38,15 +38,40 @@ func (m *Manager) Get(ctx context.Context, org orgscope.Org, flowID FlowID) (Rec
 	if err != nil {
 		return Record{}, fmt.Errorf("get flow: %w", err)
 	}
-	rec.HasUnpublishedChanges = true
-	if !rec.ActiveVersionID.IsZero() {
-		v, err := m.store.GetVersion(ctx, org, rec.ActiveVersionID)
-		if err != nil {
-			return Record{}, fmt.Errorf("get flow: read the active version: %w", err)
-		}
-		rec.HasUnpublishedChanges = DraftDiffers(rec.Draft, v.ContentHash)
+	rec.HasUnpublishedChanges, err = UnpublishedChanges(ctx, m.store, org, &rec)
+	if err != nil {
+		return Record{}, fmt.Errorf("get flow: %w", err)
 	}
 	return rec, nil
+}
+
+// DraftReader is what [UnpublishedChanges] reads: a flow with its draft and a version of it.
+type DraftReader interface {
+	// GetFlow returns a non-deleted flow, or [ErrNotFound].
+	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
+	// GetVersion returns a version by identity, or [ErrVersionNotFound].
+	GetVersion(ctx context.Context, org orgscope.Org, version FlowVersionID) (VersionRecord, error)
+}
+
+// UnpublishedChanges reports whether the draft of the flow differs from its active version, by
+// comparing content hashes (SPEC-002 R-ACT-01). A flow that was never published has changes. When
+// rec carries no draft (the activity reads leave it out), the draft is read from the store.
+func UnpublishedChanges(ctx context.Context, r DraftReader, org orgscope.Org, rec *Record) (bool, error) {
+	if rec.ActiveVersionID.IsZero() {
+		return true, nil
+	}
+	if len(rec.Draft) == 0 {
+		full, err := r.GetFlow(ctx, org, rec.ID)
+		if err != nil {
+			return false, fmt.Errorf("read the draft: %w", err)
+		}
+		rec.Draft = full.Draft
+	}
+	v, err := r.GetVersion(ctx, org, rec.ActiveVersionID)
+	if err != nil {
+		return false, fmt.Errorf("read the active version: %w", err)
+	}
+	return DraftDiffers(rec.Draft, v.ContentHash), nil
 }
 
 // DraftDiffers reports whether the draft, normalized the way publication normalizes it, has a

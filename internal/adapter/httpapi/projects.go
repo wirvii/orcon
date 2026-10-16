@@ -40,6 +40,7 @@ type Projects struct {
 	store     identity.ProjectStore
 	flows     *flow.Creator
 	flowStore flow.Store
+	drafts    flow.DraftReader // the flow store when it also reads versions; nil keeps the cheap rule
 	codec     *page.Codec
 	clock     clock.Clock
 }
@@ -53,7 +54,8 @@ type ProjectAccessResolver interface {
 // NewProjects returns the handlers over their services, the project access resolver and the
 // page-token codec.
 func NewProjects(access ProjectAccessResolver, projects *identity.Projects, store identity.ProjectStore, flows *flow.Creator, flowStore flow.Store, codec *page.Codec, clk clock.Clock) *Projects {
-	return &Projects{access: access, projects: projects, store: store, flows: flows, flowStore: flowStore, codec: codec, clock: clk}
+	drafts, _ := flowStore.(flow.DraftReader)
+	return &Projects{access: access, projects: projects, store: store, flows: flows, flowStore: flowStore, drafts: drafts, codec: codec, clock: clk}
 }
 
 // Sort fields of the listings (the allowlists of the contract, without the minus).
@@ -234,7 +236,11 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 
 	body := apigen.FlowList{Items: []apigen.Flow{}}
 	for _, it := range window {
-		body.Items = append(body.Items, flowActivityBody(&rows[it.idx]))
+		row := &rows[it.idx]
+		if err := p.markUnpublished(ctx, org, &row.Flow); err != nil {
+			return nil, err
+		}
+		body.Items = append(body.Items, flowActivityBody(row))
 	}
 	if more {
 		token, err := tokenFor(p.codec, org.String(), binding, last)
@@ -244,6 +250,23 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 		body.NextPageToken = &token
 	}
 	return apigen.ListFlows200JSONResponse{Body: body}, nil
+}
+
+// markUnpublished fills HasUnpublishedChanges of a published flow of the page exactly, by comparing
+// the content hash of its draft with the one of its active version. A flow whose draft was never
+// saved since creation cannot differ from what was published, so it costs no read. Only the flows of
+// the page pay for the reads, never the whole project.
+func (p *Projects) markUnpublished(ctx context.Context, org orgscope.Org, rec *flow.Record) error {
+	rec.HasUnpublishedChanges = rec.ActiveVersionID.IsZero() || rec.DraftRevision > 0
+	if p.drafts == nil || !rec.HasUnpublishedChanges || rec.ActiveVersionID.IsZero() {
+		return nil
+	}
+	changed, err := flow.UnpublishedChanges(ctx, p.drafts, org, rec)
+	if err != nil {
+		return err
+	}
+	rec.HasUnpublishedChanges = changed
+	return nil
 }
 
 // CreateFlow creates an inactive flow with an empty draft in the project (ADR-0080 section 3).
@@ -438,9 +461,10 @@ func projectBody(rec identity.ProjectRecord) apigen.Project {
 }
 
 // flowListBody is the flow as a list or a creation shows it. These reads do not compare content
-// hashes, which would cost a version read and a parse per row: a flow that was never published has
-// changes by definition, and a published one is taken to have them once its draft was saved at all
-// (the reads of one flow, [flow.Manager.Get], compare the hashes and are exact).
+// hashes, which would cost a version read and a parse: a flow that was never published has changes
+// by definition, and a published one is taken to have them once its draft was saved at all. The
+// reads of one flow ([flow.Manager.Get]) and the flows of a listed page ([Projects.markUnpublished])
+// compare the hashes and are exact.
 func flowListBody(rec flow.Record) apigen.Flow {
 	rec.HasUnpublishedChanges = rec.ActiveVersionID.IsZero() || rec.DraftRevision > 0
 	return flowBody(rec)
@@ -463,7 +487,7 @@ func flowBody(rec flow.Record) apigen.Flow {
 
 // flowActivityBody is a flow of a list with its latest execution and its executions of the last day.
 func flowActivityBody(a *flow.Activity) apigen.Flow {
-	body := flowListBody(a.Flow)
+	body := flowBody(a.Flow)
 	count := int(a.ExecutionCountLast24h)
 	body.ExecutionCountLast24h = &count
 	if a.LastExecution != nil {

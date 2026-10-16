@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
@@ -264,7 +265,23 @@ func UnpublishedChanges(t *testing.T, f Factory) {
 	check("a draft nobody published", true)
 	e.publish(e.scopeA, id)
 	check("right after publishing", false)
+	exact := func(step string, want bool) {
+		t.Helper()
+		rec, err := e.b.Flows.GetFlow(ctx, e.scopeA, id)
+		must(t, step, err)
+		got, err := flow.UnpublishedChanges(ctx, e.b.Flows, e.scopeA, &rec)
+		must(t, step, err)
+		if got != want {
+			t.Fatalf("%s: flow.UnpublishedChanges = %v, want %v", step, got, want)
+		}
+	}
+	// The same content saved again with other whitespace and key order is not a change, whatever
+	// bytes the store keeps (a PostgreSQL jsonb column reformats them).
+	e.saveDraft(e.scopeA, id, reformatted(t, doc("one")))
+	check("after saving the same content reformatted", false)
+	exact("after saving the same content reformatted", false)
 	e.saveDraft(e.scopeA, id, doc("two"))
+	exact("after editing the draft", true)
 	check("after editing the draft", true)
 	e.publish(e.scopeA, id)
 	check("after publishing the edit", false)
@@ -278,6 +295,39 @@ func UnpublishedChanges(t *testing.T, f Factory) {
 	_, err := e.svc.Rollback(ctx, trigger.RollbackCommand{Org: e.scopeA, Flow: id, By: e.user, ToVersion: 1})
 	must(t, "rollback", err)
 	check("after rolling back", false)
+}
+
+// reformatted returns the same JSON document with the members of every object in reverse order and
+// with extra whitespace around it, so its bytes differ from the input and its content does not.
+func reformatted(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	v, err := jsonvalue.Parse(raw)
+	must(t, "parse the document", err)
+	out, err := jsonvalue.Marshal(reversed(t, v))
+	must(t, "encode the document", err)
+	return append(append([]byte("\n  "), out...), "\n"...)
+}
+
+func reversed(t *testing.T, v jsonvalue.Value) jsonvalue.Value {
+	t.Helper()
+	if v.Kind() == jsonvalue.KindObject {
+		members := slices.Clone(v.Members())
+		slices.Reverse(members)
+		for i := range members {
+			members[i].Value = reversed(t, members[i].Value)
+		}
+		out, err := jsonvalue.Object(members...)
+		must(t, "rebuild the object", err)
+		return out
+	}
+	if v.Kind() == jsonvalue.KindArray {
+		items := slices.Clone(v.Items())
+		for i := range items {
+			items[i] = reversed(t, items[i])
+		}
+		return jsonvalue.Array(items...)
+	}
+	return v
 }
 
 // RecoveryPlusADay is a little more than the recovery window of a deleted flow.
