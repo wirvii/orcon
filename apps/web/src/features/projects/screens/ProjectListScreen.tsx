@@ -3,7 +3,7 @@
 
 import { Button, Link, Mascot, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi, Link as RouterLink } from '@tanstack/react-router';
+import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
@@ -37,6 +37,7 @@ const messages = defineMessages({
 });
 
 const route = getRouteApi('/_session/orgs/$orgSlug');
+const listRoute = getRouteApi('/_session/orgs/$orgSlug/projects');
 
 /** The projects of the organization the person can read. Each name leads to the project's flows. */
 export function ProjectListScreen() {
@@ -44,7 +45,14 @@ export function ProjectListScreen() {
   const { organization } = route.useRouteContext();
   const { orgSlug } = route.useParams();
   const projects = useQuery(projectsQueryOptions(organization.id));
-  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
+  const { create } = listRoute.useSearch();
+  // `?create` opens the dialog on arrival; closing it drops the parameter so a reload does not open it again.
+  const [creating, setCreating] = useState(create === true);
+  useEffect(() => {
+    // The address can ask for the dialog while the page is already open (the key N, the sidebar).
+    if (create === true) setCreating(true);
+  }, [create]);
 
   useEffect(() => {
     markFirstUsefulScreen('/orgs/$orgSlug/projects');
@@ -99,7 +107,15 @@ export function ProjectListScreen() {
           </Table>
         )}
       </QueryState>
-      <CreateProjectDialog open={creating} onOpenChange={setCreating} orgId={organization.id} orgSlug={orgSlug} />
+      <CreateProjectDialog
+        open={creating}
+        onOpenChange={(open) => {
+          setCreating(open);
+          if (!open && create === true) void navigate({ to: '/orgs/$orgSlug/projects', params: { orgSlug }, search: {}, replace: true });
+        }}
+        orgId={organization.id}
+        orgSlug={orgSlug}
+      />
     </div>
   );
 }

@@ -1,0 +1,239 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { expect, test, type Page } from '@playwright/test';
+
+import { account, installApiDouble, org } from '../journeys/api-double';
+
+// Visual evidence for a pull request (SPEC-019 §8): the screens of the product at 1440x900 and 390x844, in the
+// dark and light themes, next to the same screens of the approved mockup. It is not a pass/fail check, so it
+// runs only through its own config (`playwright.ux-review.config.ts`) and never in `make check`.
+//
+//   ORCON_CAPTURE_LABEL=before|after   folder name under the output directory (default "after")
+//   ORCON_CAPTURE_OUT                  output directory (default ".playwright-mcp/ux-progress" at the repository root)
+//   ORCON_MOCKUP_URL                   address of the mockup index.html; when set, the mockup is captured instead
+//   ORCON_CAPTURE_ONLY                 comma-separated screen names to capture
+
+const label = process.env['ORCON_CAPTURE_LABEL'] ?? 'after';
+const out = process.env['ORCON_CAPTURE_OUT'] ?? join(process.cwd(), '..', '..', '.playwright-mcp', 'ux-progress');
+const mockupUrl = process.env['ORCON_MOCKUP_URL'];
+const only = process.env['ORCON_CAPTURE_ONLY']?.split(',').filter(Boolean);
+
+const themes = ['dark', 'light'] as const;
+const devices = [
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+] as const;
+
+type Device = (typeof devices)[number]['name'];
+
+/** The screens of the mockup (its own tab id and variant) and how the product reaches the same state. */
+interface Screen {
+  name: string;
+  mockup: { id: string; variant?: string };
+  /** Skipped on a device when the screen does not exist there. */
+  devices?: readonly Device[];
+  product: (page: Page, device: Device) => Promise<void>;
+}
+
+async function seed(page: Page) {
+  // Three projects and a few flows, created through the same API the screens use.
+  await page.evaluate(
+    async ({ orgId }) => {
+      const create = async (path: string, body: unknown) => {
+        const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        return (await response.json()) as { id: string };
+      };
+      const ventas = await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Ventas WhatsApp' });
+      await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Soporte' });
+      await create(`/api/v1/orgs/${orgId}/projects`, { name: 'Operaciones' });
+      for (const name of ['Agente de ventas', 'Recordatorio de pago', 'Calificar leads de Meta Ads']) {
+        await create(`/api/v1/projects/${ventas.id}/flows`, { name });
+      }
+    },
+    { orgId: org.id },
+  );
+}
+
+async function signIn(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel(/^(Email|Correo)/).fill(account.email);
+  await page.getByLabel(/^(Password|Contraseña)/).fill(account.password);
+  await page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ }).click();
+  await page.waitForURL(/\/orgs\//);
+  await seed(page);
+}
+
+/** Opens one of the menus of the sidebar: `account` (the last button that opens a menu), `organization` (the first) or `help`. */
+async function openMenu(page: Page, which: 'account' | 'organization' | 'help') {
+  const sidebar = page.getByRole('navigation', { name: /^(Main navigation|Navegación principal)$/ }).first();
+  if (which === 'help') await sidebar.getByRole('button', { name: /^(Help|Ayuda)$/ }).click();
+  else await sidebar.locator('button[aria-haspopup="menu"]').filter({ hasNot: page.locator('[data-nothing]') })[which === 'account' ? 'last' : 'first']().click();
+  await expect(page.getByRole('menu')).toBeVisible();
+}
+
+const screens: Screen[] = [
+  {
+    name: 'sign-in',
+    mockup: { id: 'login', variant: 'normal' },
+    product: async (page) => {
+      await page.goto('/login');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    },
+  },
+  {
+    name: 'sign-in-error',
+    mockup: { id: 'login', variant: 'error' },
+    product: async (page) => {
+      await page.goto('/login');
+      await page.getByLabel(/^(Email|Correo)/).fill(account.email);
+      await page.getByLabel(/^(Password|Contraseña)/).fill('not-the-password-1234');
+      await page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ }).click();
+      await expect(page.getByRole('alert')).toBeVisible();
+    },
+  },
+  {
+    name: 'sign-in-forgot-password',
+    mockup: { id: 'login', variant: 'forgot' },
+    product: async (page) => {
+      await page.goto('/login?step=forgot-password');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    },
+  },
+  {
+    name: 'shell',
+    mockup: { id: 'overview' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    },
+  },
+  {
+    name: 'shell-menus',
+    mockup: { id: 'sidebar', variant: 'menus' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await openMenu(page, 'account');
+    },
+  },
+  {
+    name: 'shell-org-menu',
+    mockup: { id: 'sidebar', variant: 'menus' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await openMenu(page, 'organization');
+    },
+  },
+  {
+    name: 'shell-help-menu',
+    mockup: { id: 'sidebar', variant: 'menus' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await openMenu(page, 'help');
+    },
+  },
+  {
+    name: 'shell-collapsed',
+    mockup: { id: 'sidebar', variant: 'collapsed' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await signIn(page);
+      await page.goto(`/orgs/${org.slug}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await page.keyboard.press('[');
+    },
+  },
+  ...(['blank', 'template', 'import', 'ai'] as const).map(
+    (mode): Screen => ({
+      name: `create-flow-${mode}`,
+      mockup: { id: 'newflow', variant: mode },
+      devices: ['desktop'],
+      product: async (page) => {
+        await signIn(page);
+        // Before the chooser the address knew only `?create=true`, which opened the name dialog.
+        await page.goto(`/orgs/${org.slug}/projects/ventas-whatsapp/flows?create=${label === 'before' ? 'true' : mode}`);
+        await expect(page.getByRole('dialog')).toBeVisible();
+      },
+    }),
+  ),
+  {
+    name: 'settings',
+    mockup: { id: 'settings', variant: 'apariencia' },
+    product: async (page) => {
+      await signIn(page);
+      await page.goto('/settings/appearance');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    },
+  },
+];
+
+const selected = screens.filter((screen) => only === undefined || only.includes(screen.name));
+
+test.describe('product', () => {
+  test.skip(mockupUrl !== undefined, 'The mockup is being captured.');
+  for (const screen of selected) {
+    for (const device of devices) {
+      if (screen.devices !== undefined && !screen.devices.includes(device.name)) continue;
+      for (const theme of themes) {
+        test(`${screen.name} ${device.name} ${theme}`, async ({ page }) => {
+          await page.setViewportSize({ width: device.width, height: device.height });
+          await page.addInitScript(
+            ({ value }) => {
+              window.localStorage.setItem('orcon.theme', value);
+              window.localStorage.setItem('orcon.locale', 'es');
+            },
+            { value: theme },
+          );
+          await installApiDouble(page);
+          await screen.product(page, device.name);
+          await page.waitForTimeout(400);
+          const dir = join(out, label);
+          mkdirSync(dir, { recursive: true });
+          await page.screenshot({ path: join(dir, `${screen.name}-${device.name}-${theme}.png`) });
+        });
+      }
+    }
+  }
+});
+
+test.describe('mockup', () => {
+  test.skip(mockupUrl === undefined, 'Set ORCON_MOCKUP_URL to capture the mockup.');
+  for (const screen of selected) {
+    for (const device of devices) {
+      if (screen.devices !== undefined && !screen.devices.includes(device.name)) continue;
+      for (const theme of themes) {
+        test(`${screen.name} ${device.name} ${theme}`, async ({ page }) => {
+          // The mockup scales its stage to fit the window: a window larger than the device keeps the scale at 1.
+          await page.setViewportSize({ width: 1600, height: 1200 });
+          await page.goto(`${mockupUrl ?? ''}#${screen.mockup.id}${screen.mockup.variant === undefined ? '' : `:${screen.mockup.variant}`}`);
+          await page.evaluate(
+            ({ value, phone }) => {
+              document.body.classList.add('no-notes');
+              document.documentElement.dataset['theme'] = value;
+              const button = document.querySelector<HTMLButtonElement>(`[data-dev="${phone ? 'phone' : 'desktop'}"]`);
+              button?.click();
+            },
+            { value: theme, phone: device.name === 'phone' },
+          );
+          await page.waitForTimeout(500);
+          const dir = join(out, 'mockup');
+          mkdirSync(dir, { recursive: true });
+          await page.locator('#device').screenshot({ path: join(dir, `${screen.name}-${device.name}-${theme}.png`) });
+        });
+      }
+    }
+  }
+});

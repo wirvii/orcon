@@ -3,7 +3,7 @@
 
 import { queryOptions } from '@tanstack/react-query';
 
-import { getCurrentUser, listOrganizations } from './operations';
+import { listOrganizations } from './operations';
 
 /**
  * Keys of the data read before an organization is active (orcon-web DT-4): they start with the
@@ -11,21 +11,9 @@ import { getCurrentUser, listOrganizations } from './operations';
  */
 export const sessionKeys = {
   all: ['session'] as const,
-  currentUser: () => [...sessionKeys.all, 'current-user'] as const,
   organizations: () => [...sessionKeys.all, 'organizations'] as const,
   organizationList: (slug: string | undefined) => [...sessionKeys.organizations(), { slug: slug ?? null }] as const,
 };
-
-/**
- * The signed-in person. It keeps the default freshness, so a session that ended on the server is noticed
- * by the next request, and a 401 from any request sends the person to sign-in (see `onUnauthenticated`).
- */
-export function currentUserQueryOptions() {
-  return queryOptions({
-    queryKey: sessionKeys.currentUser(),
-    queryFn: getCurrentUser,
-  });
-}
 
 /**
  * The organizations of the caller, first page. The landing only needs to know whether there are

@@ -18,6 +18,10 @@
     },
     "inverse": {
       "$value": "{color.slate.50}"
+    },
+    "hover": {
+      "$value": "{color.navy.900}",
+      "$description": "Background of a hovered or current row, menu item or navigation entry. Text on it keeps the contrast of text on the sunken surface."
     }
   },
   "mascot": {
@@ -83,6 +87,10 @@
     },
     "control": {
       "$value": "{color.slate.500}"
+    },
+    "strong": {
+      "$value": "{color.slate.700}",
+      "$description": "Outline of a card, dialog or segmented control that sits above the plain divider; the divider stays border.default."
     }
   },
   "focus": {

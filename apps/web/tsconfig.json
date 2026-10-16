@@ -6,5 +6,5 @@
     "resolveJsonModule": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "test", "build", "perf", "vite.config.ts", "vite.perf.config.ts", "vitest.config.ts", "playwright.config.ts", "playwright.perf.config.ts", "playwright.journeys.config.ts", "e2e"]
+  "include": ["src", "test", "build", "perf", "vite.config.ts", "vite.perf.config.ts", "vitest.config.ts", "playwright.config.ts", "playwright.perf.config.ts", "playwright.journeys.config.ts", "playwright.ux-review.config.ts", "e2e"]
 }

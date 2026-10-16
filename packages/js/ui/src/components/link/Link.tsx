@@ -18,6 +18,11 @@ const messages = defineMessages({
 
 export interface LinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   ref?: Ref<HTMLAnchorElement> | undefined;
+  /**
+   * `plain` (the default) is never underlined: navigation, rows, menus and actions. `prose` is underlined and
+   * belongs only inside running text. A link inside `inText` text is `prose` unless said otherwise.
+   */
+  variant?: 'plain' | 'prose' | undefined;
   /** Opens in a new tab, shows an external icon and tells assistive technology. */
   external?: boolean | undefined;
   /**
@@ -29,11 +34,13 @@ export interface LinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   asChild?: boolean | undefined;
 }
 
-export function Link({ className, external = false, inText = false, asChild = false, children, ref, ...props }: LinkProps) {
+export function Link({ className, variant, external = false, inText = false, asChild = false, children, ref, ...props }: LinkProps) {
   const intl = useIntl();
   const Component = asChild ? Slot.Root : 'a';
+  const prose = (variant ?? (inText ? 'prose' : 'plain')) === 'prose';
   const classes = cn(
-    'text-fg-link rounded-sm underline underline-offset-2 transition-colors hover:text-fg active:text-fg',
+    'text-fg-link rounded-sm transition-colors hover:text-fg active:text-fg',
+    prose ? 'underline underline-offset-2' : 'no-underline',
     inText ? 'inline' : 'inline-flex min-h-target min-w-target items-center gap-1',
     className,
   );
@@ -41,13 +48,13 @@ export function Link({ className, external = false, inText = false, asChild = fa
 
   if (asChild) {
     return (
-      <Component ref={ref} className={classes} {...externalProps} {...props}>
+      <Component ref={ref} data-variant={prose ? 'prose' : 'plain'} className={classes} {...externalProps} {...props}>
         {children}
       </Component>
     );
   }
   return (
-    <Component ref={ref} className={classes} {...externalProps} {...props}>
+    <Component ref={ref} data-variant={prose ? 'prose' : 'plain'} className={classes} {...externalProps} {...props}>
       {children}
       {external ? (
         <>

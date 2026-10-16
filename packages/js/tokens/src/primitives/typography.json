@@ -23,6 +23,10 @@
     },
     "size": {
       "$type": "dimension",
+      "2xs": {
+        "$value": "11px",
+        "$description": "Counts, keys and the small uppercase headings of a navigation section."
+      },
       "xs": {
         "$value": "12px"
       },
@@ -46,10 +50,17 @@
       },
       "mono": {
         "$value": "13px"
+      },
+      "display": {
+        "$value": "28px",
+        "$description": "The heading of a form card on the sign-in page."
       }
     },
     "line-height": {
       "$type": "dimension",
+      "2xs": {
+        "$value": "16px"
+      },
       "xs": {
         "$value": "16px"
       },
@@ -73,6 +84,9 @@
       },
       "mono": {
         "$value": "20px"
+      },
+      "display": {
+        "$value": "36px"
       }
     },
     "weight": {

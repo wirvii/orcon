@@ -80,6 +80,14 @@
   min-height: max(var(--orcon-size-control), var(--orcon-size-target-min));
 }
 
+/*
+ * The brand gradient. It is for the logo and for the marker of the current section of the sidebar, never for
+ * text or for a background behind text (orcon-ui rule 2). The three stops are brand-exact colors.
+ */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(135deg, var(--orcon-brand-green-light) 0%, var(--orcon-brand-green) 55%, var(--orcon-brand-cyan) 100%);
+}
+
 /* Floating content sizes from the trigger and the space the browser leaves it. */
 @utility min-w-trigger {
   min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, var(--radix-dropdown-menu-trigger-width, 0px)));

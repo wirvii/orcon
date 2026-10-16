@@ -64,6 +64,7 @@ describe('token layers', () => {
       'brand.cyan',
       'brand.green',
       'brand.green-dark',
+      'brand.green-light',
       'brand.navy',
       'brand.slate',
     ]);

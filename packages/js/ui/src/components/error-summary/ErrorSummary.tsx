@@ -65,7 +65,7 @@ export function ErrorSummary({ errors, focusOnMount = false, className }: ErrorS
             <a
               href={`#${error.fieldId}`}
               onClick={(event) => focusField(event, error.fieldId)}
-              className="inline-flex min-h-target items-center rounded-sm underline underline-offset-2"
+              className="hover:text-fg inline-flex min-h-target items-center rounded-sm font-medium"
             >
               {error.message}
             </a>
