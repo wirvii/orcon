@@ -9,14 +9,14 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
 import { QueryState } from '../../../app/query-state/QueryState';
-import { useDeleteCredential } from '../api/mutations';
-import { credentialsQueryOptions, serviceIconsQueryOptions } from '../api/queries';
-import type { Credential } from '../model/credential';
+import { useDeleteCredential } from '../../../app/credentials/api/mutations';
+import { credentialsQueryOptions, serviceIconsQueryOptions } from '../../../app/credentials/api/queries';
+import type { Credential } from '../../../app/credentials/model/credential';
 import { CredentialRow } from '../components/CredentialRow';
-import { CreateCredentialDialog } from '../forms/CreateCredentialDialog';
+import { CreateCredentialDialog } from '../../../app/credentials/forms/CreateCredentialDialog';
 import { EditHostsDialog } from '../forms/EditHostsDialog';
 import { ReplaceSecretDialog } from '../forms/ReplaceSecretDialog';
-import { credentialMessages } from '../model/messages';
+import { credentialMessages } from '../../../app/credentials/model/messages';
 
 const route = getRouteApi('/_session/orgs/$orgSlug/projects/$projectHandle/credentials');
 

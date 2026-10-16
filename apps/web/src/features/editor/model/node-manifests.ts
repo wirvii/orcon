@@ -61,8 +61,10 @@ export interface ParamDef {
 
 export interface CredentialSlot {
   readonly slot: string;
-  /** The credential types that fit the slot (ADR-0057 §4 binds by name; the type must match). */
+  /** The connector references that fit the slot: the `type` of the stored credentials it lists. */
   readonly types: readonly string[];
+  /** Where in the node's `parameters` the identifier of the chosen credential is kept, where the engine reads it. */
+  readonly parameter: readonly string[];
   readonly required?: boolean;
 }
 
@@ -187,7 +189,7 @@ const HTTP: NodeManifest = {
     { name: 'responseFormat', type: 'OPTIONS', default: 'auto', options: ['auto', 'json', 'text', 'file'], since: '1.1.0' },
     { name: 'followRedirects', type: 'BOOLEAN', default: false, since: '1.2.0' },
   ],
-  credentials: [{ slot: 'auth', types: ['httpHeaderAuth'] }],
+  credentials: [{ slot: 'auth', types: ['orcon.http@1'], parameter: ['credential'] }],
   effect: 'by-method',
   operations: ['op.request'],
   catalog: {

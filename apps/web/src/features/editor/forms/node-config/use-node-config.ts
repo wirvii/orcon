@@ -46,8 +46,8 @@ export function useNodeActions(nodeId: string) {
       setNote: (text: string | undefined, group?: string) => {
         api.getState().setNodeNote(nodeId, text, group);
       },
-      setCredential: (slot: string, name: string | undefined) => {
-        api.getState().setCredential(nodeId, slot, name);
+      setCredential: (path: readonly string[], credentialId: string | undefined) => {
+        api.getState().setCredential(nodeId, path, credentialId);
       },
       updateConnector: (version: string, digest: string) => {
         api.getState().updateConnector(nodeId, version, digest);

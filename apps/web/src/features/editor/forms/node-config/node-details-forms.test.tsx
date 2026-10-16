@@ -5,7 +5,13 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EXAMPLE_FLOW_ID, exampleFlowDocument, SAMPLE_SUBFLOWS } from '../../model/example-flow';
+import { http, HttpResponse } from 'msw';
+
+import { project } from '../../../../../test/product-fixtures';
+import { server } from '../../../../../test/screen-harness';
+import { problem } from '../../../../../test/session-fixtures';
+import { credentialApi, modelCredential, slackWebhook, whatsappCredential } from '../../../../app/credentials/api/fixtures';
+import { EXAMPLE_FLOW_ID, exampleFlowDocument, SAMPLE_SUBFLOWS, SLACK_CREDENTIAL_ID } from '../../model/example-flow';
 import { findNode, type FlowDocument } from '../../model/flow-document';
 import { manifestOf } from '../../model/node-manifests';
 
@@ -54,7 +60,7 @@ const withCall = (call: Record<string, unknown>, extra: Record<string, unknown> 
 };
 
 describe('credentials', () => {
-  it('lists the credentials of a matching type with the one the node uses chosen', async () => {
+  it('lists the credentials of the project that fit the step, with the one the node uses chosen', async () => {
     renderWithStore(<NodeConfigForm nodeId="slack" />);
     const select = await screen.findByRole('combobox', { name: /Authentication/ });
     await waitFor(() => {
@@ -62,78 +68,77 @@ describe('credentials', () => {
     });
     // Secret values are never shown, and the note says so.
     expect(screen.getByText(/Its value is never shown/)).toBeInTheDocument();
+    // Only what fits: the WhatsApp and the model credentials of the same project are not offered to an HTTP step.
+    await userEvent.click(select);
+    const options = within(await screen.findByRole('listbox')).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([expect.stringMatching(/No credential/), expect.stringMatching(/^Slack incoming webhook/)]);
   });
 
-  it('says a credential the project does not have is missing and offers two ways out', async () => {
+  it('keeps the identifier of the chosen credential in the parameters, not its name', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />);
+    await user.click(await screen.findByRole('combobox', { name: /Authentication/ }));
+    await user.click(await screen.findByRole('option', { name: /No credential/ }));
+    expect(nodeOf(store.getState().document, 'slack').parameters).not.toHaveProperty('credential');
+    await user.click(screen.getByRole('combobox', { name: /Authentication/ }));
+    await user.click(await screen.findByRole('option', { name: /^Slack incoming webhook/ }));
+    expect(nodeOf(store.getState().document, 'slack').parameters['credential']).toBe(SLACK_CREDENTIAL_ID);
+    expect(nodeOf(store.getState().document, 'slack')).not.toHaveProperty('credentials');
+  });
+
+  it('says a credential the project does not have is missing and offers a way out', async () => {
     const user = userEvent.setup();
     const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />);
     await screen.findByRole('combobox', { name: /Authentication/ });
     act(() => {
-      store.getState().setCredential('slack', 'auth', 'Gone');
+      store.getState().setCredential('slack', ['credential'], '0195f1a0-0000-7000-8000-0000000000ff');
     });
-    expect(await screen.findByText('Missing credential: Gone')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
+    expect(await screen.findByText('The credential of this step is not in this project')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Choose another' }));
-    expect(nodeOf(store.getState().document, 'slack')).not.toHaveProperty('credentials');
+    expect(nodeOf(store.getState().document, 'slack').parameters).not.toHaveProperty('credential');
     await waitFor(() => {
-      expect(screen.queryByText('Missing credential: Gone')).not.toBeInTheDocument();
+      expect(screen.queryByText('The credential of this step is not in this project')).not.toBeInTheDocument();
     });
+  });
+
+  it('says the credentials could not be read, with a way to try again', async () => {
+    renderWithStore(<NodeConfigForm nodeId="slack" />);
+    server.use(credentialApi.listWith(() => problem(500, 'internal', 'internal')));
+    expect(await screen.findByText('The credentials could not be loaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('creates a credential from the node, chooses it and keeps no secret anywhere', async () => {
     const user = userEvent.setup();
+    let body: unknown;
+    server.use(
+      http.post(`/api/v1/projects/${project.id}/credentials`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...slackWebhook, id: '0195f1a0-0000-7000-8000-0000000000c9', name: 'Billing key' }, { status: 201, headers: { ETag: '"1-1"' } });
+      }),
+    );
     const { store, channel, queryClient } = renderWithStore(<NodeConfigForm nodeId="slack" />);
     await user.click(await screen.findByRole('button', { name: 'Create new credential' }));
     const dialog = await screen.findByRole('dialog', { name: 'Create credential' });
-    // The type is fixed by the slot, and the fields come from the type.
-    expect(within(dialog).getByRole('textbox', { name: /Header name/ })).toHaveValue('Authorization');
-    const secret = within(dialog).getByLabelText(/Header value/);
+    // An HTTP step takes any of the three HTTP services.
+    expect(within(dialog).getAllByRole('button', { pressed: true })).toHaveLength(1);
+    await user.click(within(dialog).getByRole('button', { name: 'API key in a header' }));
+    const secret = within(dialog).getByLabelText(/^Key/);
     expect(secret).toHaveAttribute('type', 'password');
     expect(secret).toHaveValue('');
-    await user.type(within(dialog).getByRole('textbox', { name: /^Name/ }), 'Billing key');
+    await user.type(within(dialog).getByLabelText(/^Credential name/), 'Billing key');
     await user.type(secret, 'hunter2');
+    await user.type(within(dialog).getByLabelText(/Send only to these domains/), 'billing.example.com{Enter}');
     await user.click(within(dialog).getByRole('button', { name: 'Create credential' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    expect(nodeOf(store.getState().document, 'slack')['credentials']).toEqual({ auth: { name: 'Billing key' } });
+    expect(body).toMatchObject({ name: 'Billing key', type: 'orcon.http@1', allowedHosts: ['billing.example.com'] });
+    expect(nodeOf(store.getState().document, 'slack').parameters['credential']).toBe('0195f1a0-0000-7000-8000-0000000000c9');
     expect(channel.current()?.message).toBe('Credential Billing key created and chosen.');
     // The mutation holds no variables after it ends, and no draft carries the secret.
     expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
     expect(JSON.stringify(store.getState().document)).not.toContain('hunter2');
-  });
-
-  it('asks for the fields that are required before it creates anything', async () => {
-    const user = userEvent.setup();
-    const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />);
-    await user.click(await screen.findByRole('button', { name: 'Create new credential' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Create credential' });
-    await user.click(within(dialog).getByRole('button', { name: 'Create credential' }));
-    expect((await within(dialog).findAllByText('This field is required.')).length).toBeGreaterThanOrEqual(2);
-    expect(nodeOf(store.getState().document, 'slack')['credentials']).toEqual({ auth: { name: 'Slack incoming webhook' } });
-  });
-
-  it('says the name is taken when the project already has it', async () => {
-    const user = userEvent.setup();
-    renderWithStore(<NodeConfigForm nodeId="slack" />);
-    await user.click(await screen.findByRole('button', { name: 'Create new credential' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Create credential' });
-    await user.type(within(dialog).getByRole('textbox', { name: /^Name/ }), 'Inventory API key');
-    await user.type(within(dialog).getByLabelText(/Header value/), 'x');
-    await user.click(within(dialog).getByRole('button', { name: 'Create credential' }));
-    expect(await within(dialog).findByText('The project already has a credential with this name.')).toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('starts the form with the missing name when "Create" answers a missing credential', async () => {
-    const user = userEvent.setup();
-    const { store } = renderWithStore(<NodeConfigForm nodeId="slack" />);
-    await screen.findByRole('combobox', { name: /Authentication/ });
-    act(() => {
-      store.getState().setCredential('slack', 'auth', 'Gone');
-    });
-    await user.click(await screen.findByRole('button', { name: 'Create' }));
-    expect(await screen.findByRole('textbox', { name: /^Name/ })).toHaveValue('Gone');
   });
 
   it('closes the form without creating anything when it is cancelled', async () => {
@@ -145,6 +150,98 @@ describe('credentials', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     expect(store.getState().history.past).toHaveLength(0);
+  });
+});
+
+describe('the credential of the WhatsApp and the AI steps', () => {
+  const withNodes = (): FlowDocument => {
+    const flow = exampleFlowDocument();
+    flow.nodes.push(
+      { id: 'inbound', name: 'WhatsApp trigger', element: 'startEvent', type: 'orcon.whatsapp.whatsappTrigger@1', parameters: {} },
+      { id: 'reply', name: 'WhatsApp', element: 'serviceTask', type: 'orcon.whatsapp.whatsapp@1', parameters: { phoneNumberId: '1234567890' } },
+      { id: 'agent', name: 'Sales agent', element: 'serviceTask', type: 'orcon.ai.agent@1', parameters: { model: { provider: 'acme', name: 'big-1' } } },
+      { id: 'llm', name: 'Classify', element: 'serviceTask', type: 'orcon.ai.llm@1', parameters: { model: { provider: 'acme', name: 'small-1', credential: modelCredential.id }, prompt: 'Say hi' } },
+    );
+    return flow;
+  };
+
+  it.each([
+    ['inbound', 'WhatsApp credential', 'Ventas WhatsApp', 'Agent model key'],
+    ['reply', 'WhatsApp credential', 'Ventas WhatsApp', 'Agent model key'],
+  ])('%s offers the WhatsApp credentials of the project and no other', async (nodeId, label, offered, notOffered) => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<NodeConfigForm nodeId={nodeId} />, withNodes());
+    const select = await screen.findByRole('combobox', { name: new RegExp(label) });
+    await user.click(select);
+    const names = within(await screen.findByRole('listbox')).getAllByRole('option').map((option) => option.textContent);
+    expect(names.some((name) => name.startsWith(offered))).toBe(true);
+    expect(names.some((name) => name.startsWith(notOffered))).toBe(false);
+    await user.click(await screen.findByRole('option', { name: new RegExp(`^${offered}`) }));
+    // The trigger and the send step both read it from `credential`; a send step keeps its other parameters.
+    expect(nodeOf(store.getState().document, nodeId).parameters['credential']).toBe(whatsappCredential.id);
+    expect(nodeOf(store.getState().document, nodeId)).not.toHaveProperty('credentials');
+  });
+
+  it('keeps the rest of the parameters of the send step when the credential changes', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<NodeConfigForm nodeId="reply" />, withNodes());
+    await user.click(await screen.findByRole('combobox', { name: /WhatsApp credential/ }));
+    await user.click(await screen.findByRole('option', { name: /^Ventas WhatsApp/ }));
+    expect(nodeOf(store.getState().document, 'reply').parameters).toEqual({ phoneNumberId: '1234567890', credential: whatsappCredential.id });
+    // The raw parameters show the choice too: the text restarts from the document.
+    await waitFor(() => {
+      expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: /Parameters/ }).value).toContain(whatsappCredential.id);
+    });
+  });
+
+  it('puts the model credential inside the model reference and keeps its provider and name', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<NodeConfigForm nodeId="agent" />, withNodes());
+    await user.click(await screen.findByRole('combobox', { name: /Model credential/ }));
+    const names = within(await screen.findByRole('listbox')).getAllByRole('option').map((option) => option.textContent);
+    expect(names.some((name) => name.startsWith('Agent model key'))).toBe(true);
+    expect(names.some((name) => name.startsWith('Ventas WhatsApp'))).toBe(false);
+    await user.click(await screen.findByRole('option', { name: /^Agent model key/ }));
+    expect(nodeOf(store.getState().document, 'agent').parameters['model']).toEqual({ provider: 'acme', name: 'big-1', credential: modelCredential.id });
+  });
+
+  it('shows the model credential a step already has and clears only that member', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<NodeConfigForm nodeId="llm" />, withNodes());
+    const select = await screen.findByRole('combobox', { name: /Model credential/ });
+    await waitFor(() => {
+      expect(select).toHaveTextContent('Agent model key');
+    });
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: /No credential/ }));
+    expect(nodeOf(store.getState().document, 'llm').parameters).toEqual({ model: { provider: 'acme', name: 'small-1' }, prompt: 'Say hi' });
+  });
+
+  it('creates a WhatsApp credential from the step with the Meta guide and chooses it', async () => {
+    const user = userEvent.setup();
+    let body: unknown;
+    server.use(
+      http.post(`/api/v1/projects/${project.id}/credentials`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...whatsappCredential, id: '0195f1a0-0000-7000-8000-0000000000c8', name: 'Second line' }, { status: 201, headers: { ETag: '"1-1"' } });
+      }),
+    );
+    const { store } = renderWithStore(<NodeConfigForm nodeId="inbound" />, withNodes());
+    await user.click(await screen.findByRole('button', { name: 'Create new credential' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Create credential' });
+    expect(within(dialog).queryByRole('list', { name: 'Service' })).toBeNull();
+    expect(within(dialog).getByRole('complementary', { name: 'How to get these details' })).toBeVisible();
+    await user.type(within(dialog).getByLabelText(/^Credential name/), 'Second line');
+    await user.type(within(dialog).getByLabelText(/^Access token/), 'EAAB');
+    await user.type(within(dialog).getByLabelText(/^App secret/), 'secret');
+    await user.type(within(dialog).getByLabelText(/^Verify token/), 'verify');
+    await user.click(within(dialog).getByRole('button', { name: 'Create credential' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(body).toMatchObject({ type: 'orcon.whatsapp@1', allowedHosts: ['graph.facebook.com'], secretFields: { token: 'EAAB', appSecret: 'secret', verifyToken: 'verify' } });
+    expect(nodeOf(store.getState().document, 'inbound').parameters['credential']).toBe('0195f1a0-0000-7000-8000-0000000000c8');
+    expect(JSON.stringify(store.getState().document)).not.toContain('EAAB');
   });
 });
 

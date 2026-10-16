@@ -5,6 +5,7 @@
   "common.banner.danger": "word spelled the same in both languages",
   "common.field.errorPrefix": "word spelled the same in both languages",
   "credentials.service.bearer.field.token": "word spelled the same in both languages",
+  "credentials.service.whatsapp.name": "proper noun",
   "editor.catalog.group.apps": "word spelled the same in both languages",
   "editor.data.fileSize": "unit",
   "editor.data.view.json": "acronym or symbol",

@@ -16,7 +16,7 @@ import {
   removeNodes,
   renameNode,
   pinConnector,
-  setCredentialBinding,
+  setCredentialParameter,
   setDisabled,
   setNodeBlock,
   setNodeNote,
@@ -83,8 +83,8 @@ export interface EditorState {
   setNodeBlock: (id: string, block: NodeBlock, value: unknown, group?: string) => void;
   /** Sets or removes the note of a node (`editor.nodes[<id>].note`). Edits with the same `group` in a row are one history entry. */
   setNodeNote: (id: string, text: string | undefined, group?: string) => void;
-  /** Binds a credential slot of a node to a credential by name; `undefined` unbinds it. */
-  setCredential: (id: string, slot: string, name: string | undefined) => void;
+  /** Chooses the credential of a node by identifier, at `path` of its parameters; `undefined` clears it. */
+  setCredential: (id: string, path: readonly string[], credentialId: string | undefined) => void;
   /** Pins a node to another version of its connector; one history entry. */
   updateConnector: (id: string, version: string, digest: string) => void;
   addNote: (at: Point) => string;
@@ -250,8 +250,8 @@ export function createEditorStore(initial: EditorInit): EditorStore {
         commit('configureNode', (draft) => setNodeNote(draft, id, text), { rebuild: false, ...(group === undefined ? {} : { group }) });
       },
 
-      setCredential: (id, slot, name) => {
-        commit('configureNode', (draft) => setCredentialBinding(draft, id, slot, name), { rebuild: false });
+      setCredential: (id, path, credentialId) => {
+        commit('configureNode', (draft) => setCredentialParameter(draft, id, path, credentialId), { rebuild: false });
       },
 
       updateConnector: (id, version, digest) => {

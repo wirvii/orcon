@@ -5,14 +5,15 @@ import { createMemoryHistory, createRootRouteWithContext, createRoute, createRou
 import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 
-import { renderInApp } from '../../../../../test/screen-harness';
+import { project } from '../../../../../test/product-fixtures';
+import { renderInApp, server } from '../../../../../test/screen-harness';
+import { acme } from '../../../../../test/session-fixtures';
+import { credentialApi, modelCredential, slackWebhook, whatsappCredential } from '../../../../app/credentials/api/fixtures';
 import { writeStored } from '../../../../app/boundary/storage';
 import { createQueryClient } from '../../../../app/query-client';
 import type { RouterContext } from '../../../../app/router-context';
-import { createLocalCredentialStore } from '../../../../app/credential-store/store';
-import { createLocalCredentialSource } from '../../api/local-credential-source';
 import { createLocalFlowTargetSource } from '../../api/local-flow-target-source';
-import { credentialSource, flowTargetSource } from '../../api/queries';
+import { flowTargetSource } from '../../api/queries';
 import { createNoticeChannel, NoticeContext, type NoticeChannel } from '../../components/notice-channel';
 import { exampleFlowDocument } from '../../model/example-flow';
 import type { FlowDocument } from '../../model/flow-document';
@@ -32,9 +33,8 @@ export interface Harness {
 export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument(), expressionView: 'chips' | 'raw' = 'raw'): Harness & ReturnType<typeof renderInApp> {
   // The tests of the form type into formulas as text; the ones about chips ask for them.
   writeStored('orcon.editor.expression-view', expressionView);
-  const fresh = createLocalCredentialSource(createLocalCredentialStore());
-  vi.spyOn(credentialSource, 'list').mockImplementation(fresh.list);
-  vi.spyOn(credentialSource, 'create').mockImplementation(fresh.create);
+  // The credentials of the project, as the credential service lists them; a test that needs others puts its own handler first.
+  server.use(credentialApi.list([slackWebhook, whatsappCredential, modelCredential]), credentialApi.nodeTypes([]));
   const flows = createLocalFlowTargetSource();
   vi.spyOn(flowTargetSource, 'list').mockImplementation(flows.list);
 
@@ -46,6 +46,8 @@ export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleF
     getParentRoute: () => root,
     // The editor sits under its project, so the sub-flow widget finds the organization and project of the address.
     path: '/orgs/$orgSlug/projects/$projectHandle',
+    // The project route of the app puts the organization and the project in the context of everything under it.
+    beforeLoad: () => ({ organization: acme, project }),
     component: () => (
       <NoticeContext.Provider value={channel}>
         <EditorStoreProvider store={store}>{ui}</EditorStoreProvider>

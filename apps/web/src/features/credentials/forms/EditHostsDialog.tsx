@@ -7,12 +7,12 @@ import { useId, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 import { problemStatus, toProblemDetails } from '../../../app/errors/to-problem-details';
-import { useUpdateAllowedHosts } from '../api/mutations';
-import { credentialQueryOptions } from '../api/queries';
-import type { Credential } from '../model/credential';
-import { AllowedHostsField } from '../components/AllowedHostsField';
+import { useUpdateAllowedHosts } from '../../../app/credentials/api/mutations';
+import { credentialQueryOptions } from '../../../app/credentials/api/queries';
+import type { Credential } from '../../../app/credentials/model/credential';
+import { AllowedHostsField } from '../../../app/credentials/components/AllowedHostsField';
 
-import { changeMessages, credentialMessages, hostMessages } from '../model/messages';
+import { changeMessages, credentialMessages, hostMessages } from '../../../app/credentials/model/messages';
 
 export interface EditHostsDialogProps {
   orgId: string;

@@ -184,21 +184,37 @@ export function setNodeNote(document: FlowDocument, id: string, text: string | u
   return true;
 }
 
-/** Binds a credential slot of a node to a credential by name (`credentials: { <slot>: { name } }`); `undefined` unbinds it. */
-export function setCredentialBinding(document: FlowDocument, id: string, slot: string, name: string | undefined): boolean {
+/**
+ * The credential a node holds at `path` of its parameters: the identifier of a stored credential, which the
+ * engine reads from there when the step runs (`credential` for most steps, `model.credential` for a model).
+ */
+export function credentialAt(node: Pick<FlowNode, 'parameters'>, path: readonly string[]): string | undefined {
+  let value: unknown = node.parameters;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * Chooses the credential of a node by identifier at `path` of its parameters; `undefined` clears it. The object a
+ * path goes through keeps its other members (a model keeps its provider and name), and is dropped when clearing
+ * leaves it empty. Choosing what the node already holds is not an edit. Returns false when the node does not exist.
+ */
+export function setCredentialParameter(document: FlowDocument, id: string, path: readonly string[], value: string | undefined): boolean {
   const node = findNode(document, id);
   if (!node) return false;
-  const held = node['credentials'];
-  const bindings: Record<string, unknown> = typeof held === 'object' && held !== null && !Array.isArray(held) ? { ...(held as Record<string, unknown>) } : {};
-  const current = bindings[slot];
-  const currentName = typeof current === 'object' && current !== null ? (current as Record<string, unknown>)['name'] : undefined;
-  // Binding the name the slot already has, or unbinding a slot that has none, changes nothing: it is not an edit.
-  if (currentName === name) return true;
-  if (name === undefined) Reflect.deleteProperty(bindings, slot);
-  else bindings[slot] = { name };
-  if (Object.keys(bindings).length === 0) delete node['credentials'];
-  else node['credentials'] = bindings;
-  return true;
+  const [head, ...rest] = path;
+  if (head === undefined) return false;
+  if (credentialAt(node, path) === value) return true;
+  if (rest.length === 0) return setParameter(document, id, head, value);
+  const held = node.parameters[head];
+  const object: Record<string, unknown> = typeof held === 'object' && held !== null && !Array.isArray(held) ? { ...(held as Record<string, unknown>) } : {};
+  const last = rest[rest.length - 1] ?? head;
+  if (value === undefined) Reflect.deleteProperty(object, last);
+  else object[last] = value;
+  return setParameter(document, id, head, Object.keys(object).length === 0 ? undefined : object);
 }
 
 /** Pins a node to another version of its connector: one edit, whatever the version range holds. */

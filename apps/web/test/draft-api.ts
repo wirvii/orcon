@@ -3,7 +3,7 @@
 
 import type { Page } from '@playwright/test';
 
-import { EXAMPLE_FLOW_ID, exampleFlowDocument, SAMPLE_SUBFLOWS, subflowDocument } from '../src/features/editor/model/example-flow';
+import { EXAMPLE_FLOW_ID, exampleFlowDocument, SAMPLE_SUBFLOWS, SLACK_CREDENTIAL_ID, subflowDocument } from '../src/features/editor/model/example-flow';
 
 import { acme, currentUser } from './session-fixtures';
 
@@ -88,6 +88,47 @@ export async function mockDraftApi(page: Page, options: DraftApiOptions = {}): P
 
   // The runs of the project: none yet, so the logs panel of the editor says the flow has not run.
   await page.route(/\/api\/v1\/projects\/[^/]+\/executions(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [] }) }));
+
+  // The credentials of the project, as the credential service lists them: one the example's Slack step names, and the ones a test creates.
+  const credentials: Record<string, unknown>[] = [
+    {
+      id: SLACK_CREDENTIAL_ID,
+      projectId: EDITOR_PROJECT.id,
+      owned: true,
+      name: 'Slack incoming webhook',
+      type: 'orcon.http@1',
+      status: 'OK',
+      allowedHosts: ['hooks.slack.example.test'],
+      versionCount: 1,
+      secret: { set: true },
+      createdAt: '2026-10-10T09:00:00Z',
+      updatedAt: '2026-10-12T15:04:05Z',
+    },
+  ];
+  await page.route(/\/api\/v1\/projects\/[^/]+\/credentials(\?.*)?$/, async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: credentials }) });
+      return;
+    }
+    const input = JSON.parse(route.request().postData() ?? '{}') as { name: string; type: string; allowedHosts: string[] };
+    const created = {
+      id: `0195f1a0-0000-7000-8000-${String(credentials.length + 100).padStart(12, '0')}`,
+      projectId: EDITOR_PROJECT.id,
+      owned: true,
+      name: input.name,
+      type: input.type,
+      status: 'OK',
+      allowedHosts: input.allowedHosts,
+      versionCount: 1,
+      secret: { set: true },
+      createdAt: '2026-10-14T10:00:00Z',
+      updatedAt: '2026-10-14T10:00:00Z',
+    };
+    credentials.push(created);
+    await route.fulfill({ status: 201, contentType: 'application/json', headers: { ETag: '"1-1"' }, body: JSON.stringify(created) });
+  });
+  // The brand icons of the services: the catalog of node types of these tests is empty, so the services keep the plug glyph.
+  await page.route(/\/api\/v1\/projects\/[^/]+\/node-types(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [] }) }));
 
   // The documents of the published versions, by `<flowId>@<version>`.
   const versions = new Map<string, unknown>();
@@ -232,8 +273,12 @@ export async function goInApp(page: Page, path: string): Promise<void> {
   }, path);
 }
 
-/** True for a request the editor makes for its own flow: its state, its draft, the published version it compares with and the last run its logs show. Anything else is not expected. */
-export const isFlowDataRequest = (url: string): boolean => /\/api\/v1\/flows\/[^/]+(\/draft|\/versions\/\d+)?$/.test(url) || /\/api\/v1\/projects\/[^/]+\/executions(\?.*)?$/.test(url);
+/**
+ * True for a request the editor makes for its own flow: its state, its draft, the published version it compares with,
+ * the last run its logs show, and the credentials and icons its credential choice reads. Anything else is not expected.
+ */
+export const isFlowDataRequest = (url: string): boolean =>
+  /\/api\/v1\/flows\/[^/]+(\/draft|\/versions\/\d+)?$/.test(url) || /\/api\/v1\/projects\/[^/]+\/(executions|credentials|node-types)(\?.*)?$/.test(url);
 
 /**
  * True for the reads of the signed-in frame around the editor (the person, the organization, the project

@@ -10,8 +10,8 @@ import { useForm } from 'react-hook-form';
 import { useIntl, type IntlShape } from 'react-intl';
 import { z } from 'zod';
 
-import { formatIssue } from '../../../app/forms/zod-messages';
-import { problemStatus, toProblemDetails } from '../../../app/errors/to-problem-details';
+import { formatIssue } from '../../forms/zod-messages';
+import { problemStatus, toProblemDetails } from '../../errors/to-problem-details';
 import { useCreateCredential } from '../api/mutations';
 import { serviceIconsQueryOptions } from '../api/queries';
 import { AllowedHostsField } from '../components/AllowedHostsField';
@@ -21,7 +21,8 @@ import { ServiceList } from '../components/ServiceList';
 
 import { MAX_ALLOWED_HOSTS } from '../model/hosts';
 import { createMessages, credentialMessages, hostMessages } from '../model/messages';
-import { SERVICES, defaultFieldValues, serviceById, type Service } from '../model/services';
+import type { Credential } from '../model/credential';
+import { SERVICES, defaultFieldValues, iconTypeOf, serviceById, type Service } from '../model/services';
 
 export interface CreateCredentialDialogProps {
   open: boolean;
@@ -30,6 +31,12 @@ export interface CreateCredentialDialogProps {
   projectId: string;
   /** The project's name, said in the text so nobody wonders where the credential goes. */
   projectName: string;
+  /** The services offered; all of them by default. The editor passes the ones that fit the step it opened the dialog from. */
+  services?: readonly Service[] | undefined;
+  /** A name to start the form with, when the dialog answers a credential a step names but the project does not have. */
+  initialName?: string | undefined;
+  /** Called with the credential the server answered, before the dialog closes. */
+  onCreated?: ((credential: Credential) => void) | undefined;
   /**
    * Checks a credential before it is saved. The contract has no such operation yet, so the screen passes none and
    * the button is not drawn: a button that cannot work is worse than none.
@@ -60,7 +67,10 @@ function CreateForm({
   orgId,
   projectId,
   service,
+  services,
+  initialName,
   onService,
+  onCreated,
   onClose,
   onBusy,
 }: {
@@ -68,7 +78,10 @@ function CreateForm({
   orgId: string;
   projectId: string;
   service: Service;
+  services: readonly Service[];
+  initialName: string | undefined;
   onService: (id: string) => void;
+  onCreated: ((credential: Credential) => void) | undefined;
   onClose: () => void;
   onBusy: (busy: boolean) => void;
 }) {
@@ -82,10 +95,10 @@ function CreateForm({
         error: (issue) => formatIssue(intl, issue),
       })(values, context, options),
     defaultValues: {
-      name: '',
+      name: initialName ?? '',
       service: service.id,
       fields: defaultFieldValues(service),
-      allowedHosts: [],
+      allowedHosts: [...service.defaultHosts],
     },
   });
   const { errors } = form.formState;
@@ -97,7 +110,9 @@ function CreateForm({
     onService(id);
     form.setValue('service', id);
     form.setValue('fields', defaultFieldValues(next));
-    form.clearErrors('fields');
+    // Where the secret of the service is meant to go starts filled in; a service that cannot know it starts empty.
+    form.setValue('allowedHosts', [...next.defaultHosts]);
+    form.clearErrors(['fields', 'allowedHosts']);
   };
 
   const submit = form.handleSubmit(async (values) => {
@@ -109,10 +124,12 @@ function CreateForm({
       const publicFields: Record<string, string> = {};
       for (const field of chosen.fields) {
         const value = (values.fields[field.name] ?? '').trim();
-        if (field.secret) secretFields[field.name] = values.fields[field.name] ?? '';
-        else if (value !== '') publicFields[field.name] = value;
+        // A field left empty is not sent: an optional secret is simply not stored.
+        if (field.secret) {
+          if (value !== '') secretFields[field.name] = values.fields[field.name] ?? '';
+        } else if (value !== '') publicFields[field.name] = value;
       }
-      await create.mutateAsync({
+      const created = await create.mutateAsync({
         name: values.name.trim(),
         type: chosen.connector,
         allowedHosts: values.allowedHosts,
@@ -120,6 +137,7 @@ function CreateForm({
         secretFields,
       });
       create.reset();
+      onCreated?.(created);
       onClose();
     } catch (error) {
       create.reset();
@@ -134,14 +152,17 @@ function CreateForm({
   });
 
   return (
-    <form id={formId} noValidate onSubmit={(event) => void submit(event)} className="grid gap-6 lg:grid-cols-4">
-      <div className="lg:col-span-1">
-        <ServiceList services={SERVICES} selectedId={service.id} onSelect={choose} icons={icons.data} />
-      </div>
+    <form id={formId} noValidate onSubmit={(event) => void submit(event)} className={`grid gap-6 ${services.length > 1 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+      {/* A step that fits one service has nothing to choose between, so the list is not drawn. */}
+      {services.length > 1 ? (
+        <div className="lg:col-span-1">
+          <ServiceList services={services} selectedId={service.id} onSelect={choose} icons={icons.data} />
+        </div>
+      ) : null}
       <section aria-label={intl.formatMessage(createMessages.formHeading)} className="flex flex-col gap-3 lg:col-span-2">
         <div className="flex items-center gap-3">
           <span aria-hidden className="shrink-0">
-            <ServiceIcon connector={service.connector} name={intl.formatMessage(service.name)} icons={icons.data} />
+            <ServiceIcon connector={iconTypeOf(service)} name={intl.formatMessage(service.name)} icons={icons.data} />
           </span>
           <div className="flex min-w-0 flex-col">
             <h3 className="font-semibold wrap-anywhere">{intl.formatMessage(service.name)}</h3>
@@ -202,12 +223,12 @@ function CreateForm({
  * the middle and the guide to get its details on the right. Secret fields are write-only and the form lives only
  * while the dialog is open, so nothing typed outlives it. Allowed domains are required: the secret goes only there.
  */
-export function CreateCredentialDialog({ open, onOpenChange, orgId, projectId, projectName, onTestConnection }: CreateCredentialDialogProps) {
+export function CreateCredentialDialog({ open, onOpenChange, orgId, projectId, projectName, services = SERVICES, initialName, onCreated, onTestConnection }: CreateCredentialDialogProps) {
   const intl = useIntl();
   const formId = useId();
   const [busy, setBusy] = useState(false);
-  const [serviceId, setServiceId] = useState(SERVICES[0]?.id ?? '');
-  const service = serviceById(serviceId) ?? SERVICES[0];
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? '');
+  const service = services.find((candidate) => candidate.id === serviceId) ?? services[0];
   return (
     <Dialog
       open={open}
@@ -242,6 +263,9 @@ export function CreateCredentialDialog({ open, onOpenChange, orgId, projectId, p
           orgId={orgId}
           projectId={projectId}
           service={service}
+          services={services}
+          initialName={initialName}
+          onCreated={onCreated}
           onService={setServiceId}
           onBusy={setBusy}
           onClose={() => {

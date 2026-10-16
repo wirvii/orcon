@@ -16,7 +16,8 @@ import {
   positionOf,
   removeNodes,
   renameNode,
-  setCredentialBinding,
+  credentialAt,
+  setCredentialParameter,
   setDisabled,
   setNodeBlock,
   setNodeNote,
@@ -24,7 +25,7 @@ import {
   setPosition,
   updateStickyNote,
 } from './document-ops';
-import { exampleFlowDocument } from './example-flow';
+import { exampleFlowDocument, SLACK_CREDENTIAL_ID } from './example-flow';
 import { findNode } from './flow-document';
 import { typeDefBySlug } from './node-types';
 
@@ -203,17 +204,31 @@ describe('configuring a node', () => {
     expect(setNodeBlock(document, 'ghost', 'retry', {})).toBe(false);
   });
 
-  it('binds a credential slot by name and unbinds it, dropping the block when it is empty', () => {
+  it('chooses a credential by identifier at the path of the slot and clears it', () => {
     const document = exampleFlowDocument();
-    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Slack incoming webhook' } });
-    expect(setCredentialBinding(document, 'slack', 'auth', 'Other')).toBe(true);
-    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Other' } });
-    expect(setCredentialBinding(document, 'slack', 'second', 'Two')).toBe(true);
-    expect(findNode(document, 'slack')?.['credentials']).toEqual({ auth: { name: 'Other' }, second: { name: 'Two' } });
-    expect(setCredentialBinding(document, 'slack', 'auth', undefined)).toBe(true);
-    expect(setCredentialBinding(document, 'slack', 'second', undefined)).toBe(true);
-    expect(findNode(document, 'slack')).not.toHaveProperty('credentials');
-    expect(setCredentialBinding(document, 'ghost', 'auth', 'x')).toBe(false);
+    expect(credentialAt(findNode(document, 'slack') ?? { parameters: {} }, ['credential'])).toBe(SLACK_CREDENTIAL_ID);
+    expect(setCredentialParameter(document, 'slack', ['credential'], 'other-id')).toBe(true);
+    expect(findNode(document, 'slack')?.parameters['credential']).toBe('other-id');
+    expect(setCredentialParameter(document, 'slack', ['credential'], undefined)).toBe(true);
+    expect(findNode(document, 'slack')?.parameters).not.toHaveProperty('credential');
+    expect(setCredentialParameter(document, 'ghost', ['credential'], 'x')).toBe(false);
+    expect(setCredentialParameter(document, 'slack', [], 'x')).toBe(false);
+  });
+
+  it('keeps the other members of the object a nested path goes through, and drops the object when it empties', () => {
+    const document = exampleFlowDocument();
+    expect(setCredentialParameter(document, 'slack', ['model', 'credential'], 'key-1')).toBe(true);
+    expect(findNode(document, 'slack')?.parameters['model']).toEqual({ credential: 'key-1' });
+    const slack = findNode(document, 'slack');
+    if (!slack) throw new Error('no node slack');
+    slack.parameters['model'] = { provider: 'acme', name: 'big-1', credential: 'key-1' };
+    expect(setCredentialParameter(document, 'slack', ['model', 'credential'], 'key-2')).toBe(true);
+    expect(findNode(document, 'slack')?.parameters['model']).toEqual({ provider: 'acme', name: 'big-1', credential: 'key-2' });
+    expect(setCredentialParameter(document, 'slack', ['model', 'credential'], undefined)).toBe(true);
+    expect(findNode(document, 'slack')?.parameters['model']).toEqual({ provider: 'acme', name: 'big-1' });
+    slack.parameters['model'] = { credential: 'key-2' };
+    expect(setCredentialParameter(document, 'slack', ['model', 'credential'], undefined)).toBe(true);
+    expect(findNode(document, 'slack')?.parameters).not.toHaveProperty('model');
   });
 
   it('pins a node to another connector version', () => {
