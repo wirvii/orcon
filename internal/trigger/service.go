@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -86,6 +87,10 @@ type PublishCommand struct {
 	// ExpectedDraftRevision, when set, makes the publication fail with
 	// flow.ErrDraftConflict unless the draft is still at that revision.
 	ExpectedDraftRevision *int64
+	// Actor is the actor of the audit entry flow.published; the zero Actor is an anonymous caller.
+	Actor audit.Actor
+	// Note is the release note recorded with the version (at most 500 characters); empty for none.
+	Note string
 	// AllowImportedAddressChange confirms, for rule T-V4, that the author means
 	// to remove or change an address imported from n8n.
 	AllowImportedAddressChange bool
@@ -99,6 +104,13 @@ type RollbackCommand struct {
 	By   identity.PrincipalID
 	// ToVersion is the number of the version whose content is republished.
 	ToVersion int64
+	// ExpectedRevision, when set, makes the rollback fail with flow.ErrRevisionConflict unless the
+	// flow row is still at that revision (the ETag of the flow).
+	ExpectedRevision *int64
+	// Actor is the actor of the audit entry flow.rolled_back; the zero Actor is an anonymous caller.
+	Actor audit.Actor
+	// Note is the release note recorded with the version (at most 500 characters); empty for none.
+	Note string
 	// AllowImportedAddressChange is the T-V4 confirmation, as in [PublishCommand].
 	AllowImportedAddressChange bool
 }
@@ -135,7 +147,7 @@ func (s *Service) Publish(ctx context.Context, cmd PublishCommand) (Published, e
 	return s.publish(ctx, &publication{
 		org: cmd.Org, flowID: cmd.Flow, by: cmd.By, rec: rec, content: draft,
 		draftRevision: rec.DraftRevision, allowImported: cmd.AllowImportedAddressChange,
-		event: EventFlowPublished,
+		event: EventFlowPublished, actor: cmd.Actor, note: cmd.Note,
 	})
 }
 
@@ -159,6 +171,7 @@ func (s *Service) Rollback(ctx context.Context, cmd RollbackCommand) (Published,
 		org: cmd.Org, flowID: cmd.Flow, by: cmd.By, rec: rec, content: content,
 		draftRevision: rec.DraftRevision, allowImported: cmd.AllowImportedAddressChange,
 		event: EventFlowRolledBack, rolledBackTo: cmd.ToVersion, replaceDraft: true,
+		expectedRevision: cmd.ExpectedRevision, actor: cmd.Actor, note: cmd.Note,
 	})
 }
 
@@ -175,6 +188,10 @@ type publication struct {
 	rolledBackTo  int64
 	// replaceDraft makes the content the new draft, in the same transaction.
 	replaceDraft bool
+	// expectedRevision, when set, is the revision the flow row must be at (rollback).
+	expectedRevision *int64
+	actor            audit.Actor
+	note             string
 }
 
 // prepared is a draft that passed every check that needs no transaction.
@@ -253,6 +270,9 @@ func (s *Service) publishTx(ctx context.Context, tx Tx, p *publication, pre *pre
 	if state.IsDeleted() {
 		return Published{}, fmt.Errorf("flow %s: %w", p.flowID, flow.ErrNotFound)
 	}
+	if p.expectedRevision != nil && *p.expectedRevision != state.Revision {
+		return Published{}, fmt.Errorf("flow %s at revision %d: %w", p.flowID, *p.expectedRevision, flow.ErrRevisionConflict)
+	}
 	if state.DraftRevision != p.draftRevision {
 		return Published{}, fmt.Errorf("flow %s: %w", p.flowID, flow.ErrDraftConflict)
 	}
@@ -289,10 +309,56 @@ func (s *Service) publishTx(ctx context.Context, tx Tx, p *publication, pre *pre
 	if err := s.appendEvent(ctx, tx, p.org, p.flowID, "", p.event, now, data); err != nil {
 		return Published{}, err
 	}
+	changed := &changeRecord{org: p.org, actor: p.actor, action: "flow.published", flowID: p.flowID, now: now, version: version.Number, contentHash: version.ContentHash}
+	if p.event == EventFlowRolledBack {
+		changed.action, changed.rolledBackFrom = "flow.rolled_back", p.rolledBackTo
+	}
+	if err := s.recordChange(ctx, tx, changed); err != nil {
+		return Published{}, err
+	}
 	if err := tx.NotifyRoutesChanged(ctx, p.flowID); err != nil {
 		return Published{}, err
 	}
 	return Published{Version: version, Report: full, Live: live}, nil
+}
+
+// changeRecord describes the audit entry of a change of a flow.
+type changeRecord struct {
+	org    orgscope.Org
+	actor  audit.Actor
+	action string
+	flowID flow.FlowID
+	now    time.Time
+	// version and contentHash describe a publication or rollback; zero for the other changes.
+	version        int64
+	contentHash    string
+	rolledBackFrom int64
+}
+
+// recordChange writes the audit entry of a change, and the idempotency claim of the request, in
+// the transaction of the change (SPEC-004 R-AUD-02).
+func (s *Service) recordChange(ctx context.Context, tx Tx, c *changeRecord) error {
+	members := []jsonvalue.Member{{Key: "flowId", Value: jsonvalue.String(c.flowID.String())}}
+	if c.version > 0 {
+		members = append(members,
+			jsonvalue.Member{Key: "version", Value: jsonvalue.Int(c.version)},
+			jsonvalue.Member{Key: "contentHash", Value: jsonvalue.String(c.contentHash)})
+	}
+	if c.rolledBackFrom > 0 {
+		members = append(members, jsonvalue.Member{Key: "rolledBackFromVersion", Value: jsonvalue.Int(c.rolledBackFrom)})
+	}
+	details, err := jsonvalue.Object(members...)
+	if err != nil {
+		return fmt.Errorf("audit %s: %w", c.action, err)
+	}
+	entry, err := audit.NewEntry(audit.EntryParams{
+		ID: s.ids.New(), Chain: audit.OrganizationChain(id.UUID(identity.OrgIDOf(c.org))), OccurredAt: c.now, Actor: c.actor,
+		Action: c.action, Outcome: audit.OutcomeSuccess, Details: details,
+	})
+	if err != nil {
+		return fmt.Errorf("audit %s: %w", c.action, err)
+	}
+	return tx.RecordChange(ctx, entry, "flow:"+c.flowID.String(), c.now)
 }
 
 // insertVersion inserts the next version of the flow and makes it the one the
@@ -307,6 +373,7 @@ func (s *Service) insertVersion(ctx context.Context, tx Tx, p *publication, pre 
 		Document: pre.document, ContentHash: pre.hash.String(),
 		PublishedByPrincipalID: p.by, PublishedAt: now, CreatedAt: now,
 		ConnectorReferences: s.connectorReferences(&pre.doc),
+		Note:                p.note, RolledBackFromVersion: p.rolledBackTo,
 	}
 	if w := report.WarningsValue(); !w.IsZero() {
 		if version.Warnings, err = jsonvalue.Marshal(w); err != nil {

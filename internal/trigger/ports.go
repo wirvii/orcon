@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
@@ -69,6 +70,11 @@ type Tx interface {
 	// PurgeFlow deletes the flow row for good, with its versions, snapshots,
 	// triggers, addresses and trigger events.
 	PurgeFlow(ctx context.Context, flowID flow.FlowID) error
+
+	// RecordChange writes the audit entry of a change in the transaction of the change (SPEC-004
+	// R-AUD-02) and, when the context carries an idempotency claim, the record of the claim with
+	// resourceRef (see internal/platform/idempotencyclaim). Only Atomic may call it.
+	RecordChange(ctx context.Context, entry audit.Entry, resourceRef string, now time.Time) error
 
 	// ListTriggers returns every registry entry of the flow, removed ones
 	// included, ordered by node id.

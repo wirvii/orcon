@@ -152,6 +152,8 @@ type FlowState struct {
 	// ActiveVersionID is the zero value while nothing is published.
 	ActiveVersionID flow.FlowVersionID
 	DraftRevision   int64
+	// Revision is the revision of the flow row, the value of the ETag of the flow.
+	Revision int64
 	// DeletedAt is the zero time while the flow is not deleted.
 	DeletedAt time.Time
 }

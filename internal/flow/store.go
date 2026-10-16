@@ -68,8 +68,15 @@ type Record struct {
 	Name          string
 	Draft         []byte
 	DraftRevision int64
+	// Revision is the revision of the flow row: it rises with every change of the row (name,
+	// activation state, active version, deletion) but not with a draft save. It is the value of
+	// the ETag of the flow (SPEC-005 Amendment 8 section 8-9).
+	Revision int64
 	// ActiveVersionID is the zero value while nothing is published.
 	ActiveVersionID FlowVersionID
+	// ActiveVersion is the number of the active version, or 0 while nothing is published. Only the
+	// reads fill it; the writes ignore it.
+	ActiveVersion int64
 	// ActivationState is [ActivationInactive] until the flow is activated.
 	// CreateFlow ignores it: a new flow is always inactive.
 	ActivationState ActivationState
@@ -132,6 +139,11 @@ type VersionRecord struct {
 	PublishedByPrincipalID identity.PrincipalID
 	PublishedAt            time.Time
 	CreatedAt              time.Time
+	// Note is the release note of the publication, empty when there is none (SPEC-014 A7).
+	Note string
+	// RolledBackFromVersion is the number of the version whose content a rollback published
+	// again, or 0 for a publication of the draft.
+	RolledBackFromVersion int64
 }
 
 // VersionStore persists published versions.
@@ -199,4 +211,16 @@ type DraftStore interface {
 	// UpdateFlowDraftWithEntry is [Store.UpdateFlowDraft] with the audit entry of the change in the
 	// same transaction (SPEC-004 R-AUD-02): a conflict or a missing flow writes neither.
 	UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, flow FlowID, draft []byte, expectedRevision int64, references []ConnectorReference, now time.Time, entry audit.Entry) (int64, error)
+}
+
+// ManageStore is what the flow management service needs of the storage: the flow and the atomic
+// change of its row with its audit entry.
+type ManageStore interface {
+	// GetFlow returns a non-deleted flow, or [ErrNotFound].
+	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
+	// UpdateFlowNameWithEntry renames the flow when its revision still equals expectedRevision,
+	// increments the revision and writes the audit entry in the same transaction. A different
+	// revision fails with [ErrRevisionConflict], a missing flow with [ErrNotFound] and a name the
+	// project already uses with [ErrConflict]; none of them writes anything.
+	UpdateFlowNameWithEntry(ctx context.Context, org orgscope.Org, flow FlowID, name string, expectedRevision int64, now time.Time, entry audit.Entry) error
 }

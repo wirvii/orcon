@@ -22,6 +22,7 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 	return flow.Record{
 		ID: fromPGUUID[flow.FlowID](row.ID), OrgID: fromPGUUID[identity.OrgID](row.OrgID), ProjectID: fromPGUUID[identity.ProjectID](row.ProjectID),
 		Name: row.Name, Draft: row.DraftDocument, DraftRevision: row.DraftRevision,
+		Revision: row.Revision, ActiveVersion: row.ActiveVersionNumber,
 		ActiveVersionID:      fromPGUUID[flow.FlowVersionID](row.ActiveFlowVersionID),
 		ActivationState:      flow.ActivationState(row.ActivationState),
 		DeletedAt:            instant(row.DeletedAt),
@@ -130,7 +131,7 @@ func (s *Store) ListFlowActivity(ctx context.Context, org orgscope.Org, project 
 func activityFrom(row *sqlcgen.ListFlowActivityRow) flow.Activity {
 	out := flow.Activity{
 		Flow: flowFrom(&sqlcgen.GetFlowRow{
-			ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision,
+			ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision, Revision: row.Revision, ActiveVersionNumber: row.ActiveVersionNumber,
 			ActiveFlowVersionID: row.ActiveFlowVersionID, ActivationState: row.ActivationState,
 			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 		}),
@@ -198,6 +199,27 @@ func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID fl
 	return revision, err
 }
 
+// UpdateFlowNameWithEntry implements [flow.ManageStore]: the new name, the new revision of the flow
+// row and the audit entry in one transaction.
+func (s *Store) UpdateFlowNameWithEntry(ctx context.Context, org orgscope.Org, flowID flow.FlowID, name string, expectedRevision int64, now time.Time, entry audit.Entry) error {
+	return s.inScope(ctx, "rename flow", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
+		n, err := q.UpdateFlowName(ctx, sqlcgen.UpdateFlowNameParams{
+			Name: name, UpdatedAt: timestamp(now), OrgID: pgUUID(org.UUID()), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
+		})
+		if err != nil {
+			return err
+		}
+		if n == 1 {
+			return insertPendingOrg(ctx, q, org, entry)
+		}
+		// Either the flow does not exist or its revision moved; tell them apart.
+		if _, err := q.GetFlow(ctx, pgUUID(org.UUID()), pgUUID(flowID)); err != nil {
+			return err
+		}
+		return flow.ErrRevisionConflict
+	})
+}
+
 // PublishVersion implements [flow.VersionStore].
 func (s *Store) PublishVersion(ctx context.Context, org orgscope.Org, v flow.VersionRecord) error {
 	return s.inScopeRecord(ctx, "publish flow version", org, v.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
@@ -206,6 +228,7 @@ func (s *Store) PublishVersion(ctx context.Context, org orgscope.Org, v flow.Ver
 			VersionNumber: v.Number, Document: v.Document, ContentHash: v.ContentHash,
 			PublishedByPrincipalID: nullPGUUID(v.PublishedByPrincipalID),
 			PublishedAt:            timestamp(v.PublishedAt), CreatedAt: timestamp(v.CreatedAt),
+			PublicationNote: nullText(v.Note), RolledBackFromVersionNumber: nullPositive(v.RolledBackFromVersion),
 		}
 		if v.Warnings != nil {
 			params.WarningDocument = v.Warnings
@@ -234,8 +257,12 @@ func versionFrom(row *sqlcgen.GetFlowVersionRow) flow.VersionRecord {
 		Warnings:               row.WarningDocument,
 		PublishedByPrincipalID: fromPGUUID[identity.PrincipalID](row.PublishedByPrincipalID),
 		PublishedAt:            instant(row.PublishedAt), CreatedAt: instant(row.CreatedAt),
+		Note: row.PublicationNote.String, RolledBackFromVersion: row.RolledBackFromVersionNumber.Int64,
 	}
 }
+
+// nullPositive is the nullable form of a number that is absent when it is 0.
+func nullPositive(n int64) pgtype.Int8 { return pgtype.Int8{Int64: n, Valid: n > 0} }
 
 // GetVersion implements [flow.VersionStore].
 func (s *Store) GetVersion(ctx context.Context, org orgscope.Org, version flow.FlowVersionID) (flow.VersionRecord, error) {

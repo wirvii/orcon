@@ -74,9 +74,9 @@ func (q *Queries) CountUncertainExecutions(ctx context.Context, orgID pgtype.UUI
 }
 
 const getFlow = `-- name: GetFlow :one
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = $1 AND id = $2 AND deleted_at IS NULL
+WHERE flow.org_id = $1 AND flow.id = $2 AND flow.deleted_at IS NULL
 `
 
 type GetFlowRow struct {
@@ -86,7 +86,9 @@ type GetFlowRow struct {
 	Name                 string
 	DraftDocument        []byte
 	DraftRevision        int64
+	Revision             int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActiveVersionNumber  int64
 	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
@@ -105,7 +107,9 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 		&i.Name,
 		&i.DraftDocument,
 		&i.DraftRevision,
+		&i.Revision,
 		&i.ActiveFlowVersionID,
+		&i.ActiveVersionNumber,
 		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
@@ -116,9 +120,9 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 }
 
 const getFlowByName = `-- name: GetFlowByName :one
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = $1 AND project_id = $2 AND name = $3 AND deleted_at IS NULL
+WHERE flow.org_id = $1 AND flow.project_id = $2 AND flow.name = $3 AND flow.deleted_at IS NULL
 `
 
 type GetFlowByNameRow struct {
@@ -128,7 +132,9 @@ type GetFlowByNameRow struct {
 	Name                 string
 	DraftDocument        []byte
 	DraftRevision        int64
+	Revision             int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActiveVersionNumber  int64
 	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
@@ -148,7 +154,9 @@ func (q *Queries) GetFlowByName(ctx context.Context, orgID pgtype.UUID, projectI
 		&i.Name,
 		&i.DraftDocument,
 		&i.DraftRevision,
+		&i.Revision,
 		&i.ActiveFlowVersionID,
+		&i.ActiveVersionNumber,
 		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
@@ -219,22 +227,24 @@ func (q *Queries) GetFlowSnapshotByContentHash(ctx context.Context, orgID pgtype
 }
 
 const getFlowVersion = `-- name: GetFlowVersion :one
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = $1 AND id = $2
 `
 
 type GetFlowVersionRow struct {
-	ID                     pgtype.UUID
-	OrgID                  pgtype.UUID
-	FlowID                 pgtype.UUID
-	VersionNumber          int64
-	Document               []byte
-	ContentHash            string
-	WarningDocument        []byte
-	PublishedByPrincipalID pgtype.UUID
-	PublishedAt            pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
+	ID                          pgtype.UUID
+	OrgID                       pgtype.UUID
+	FlowID                      pgtype.UUID
+	VersionNumber               int64
+	Document                    []byte
+	ContentHash                 string
+	WarningDocument             []byte
+	PublishedByPrincipalID      pgtype.UUID
+	PublishedAt                 pgtype.Timestamptz
+	CreatedAt                   pgtype.Timestamptz
+	PublicationNote             pgtype.Text
+	RolledBackFromVersionNumber pgtype.Int8
 }
 
 // orcon:scope org
@@ -252,27 +262,31 @@ func (q *Queries) GetFlowVersion(ctx context.Context, orgID pgtype.UUID, iD pgty
 		&i.PublishedByPrincipalID,
 		&i.PublishedAt,
 		&i.CreatedAt,
+		&i.PublicationNote,
+		&i.RolledBackFromVersionNumber,
 	)
 	return i, err
 }
 
 const getFlowVersionByNumber = `-- name: GetFlowVersionByNumber :one
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = $1 AND flow_id = $2 AND version_number = $3
 `
 
 type GetFlowVersionByNumberRow struct {
-	ID                     pgtype.UUID
-	OrgID                  pgtype.UUID
-	FlowID                 pgtype.UUID
-	VersionNumber          int64
-	Document               []byte
-	ContentHash            string
-	WarningDocument        []byte
-	PublishedByPrincipalID pgtype.UUID
-	PublishedAt            pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
+	ID                          pgtype.UUID
+	OrgID                       pgtype.UUID
+	FlowID                      pgtype.UUID
+	VersionNumber               int64
+	Document                    []byte
+	ContentHash                 string
+	WarningDocument             []byte
+	PublishedByPrincipalID      pgtype.UUID
+	PublishedAt                 pgtype.Timestamptz
+	CreatedAt                   pgtype.Timestamptz
+	PublicationNote             pgtype.Text
+	RolledBackFromVersionNumber pgtype.Int8
 }
 
 // orcon:scope org
@@ -291,6 +305,8 @@ func (q *Queries) GetFlowVersionByNumber(ctx context.Context, orgID pgtype.UUID,
 		&i.PublishedByPrincipalID,
 		&i.PublishedAt,
 		&i.CreatedAt,
+		&i.PublicationNote,
+		&i.RolledBackFromVersionNumber,
 	)
 	return i, err
 }
@@ -363,22 +379,24 @@ func (q *Queries) InsertFlowSnapshot(ctx context.Context, arg InsertFlowSnapshot
 }
 
 const insertFlowVersion = `-- name: InsertFlowVersion :exec
-INSERT INTO flow_version (id, org_id, flow_id, version_number, document, document_format, content_hash, warning_document, warning_document_format, published_by_principal_id, published_at, created_at)
-VALUES ($1, $2, $3, $4, $5, 'orcon/flow@1', $6, $7, $8, $9, $10, $11)
+INSERT INTO flow_version (id, org_id, flow_id, version_number, document, document_format, content_hash, warning_document, warning_document_format, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number)
+VALUES ($1, $2, $3, $4, $5, 'orcon/flow@1', $6, $7, $8, $9, $10, $11, $12, $13)
 `
 
 type InsertFlowVersionParams struct {
-	ID                     pgtype.UUID
-	OrgID                  pgtype.UUID
-	FlowID                 pgtype.UUID
-	VersionNumber          int64
-	Document               []byte
-	ContentHash            string
-	WarningDocument        []byte
-	WarningDocumentFormat  pgtype.Text
-	PublishedByPrincipalID pgtype.UUID
-	PublishedAt            pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
+	ID                          pgtype.UUID
+	OrgID                       pgtype.UUID
+	FlowID                      pgtype.UUID
+	VersionNumber               int64
+	Document                    []byte
+	ContentHash                 string
+	WarningDocument             []byte
+	WarningDocumentFormat       pgtype.Text
+	PublishedByPrincipalID      pgtype.UUID
+	PublishedAt                 pgtype.Timestamptz
+	CreatedAt                   pgtype.Timestamptz
+	PublicationNote             pgtype.Text
+	RolledBackFromVersionNumber pgtype.Int8
 }
 
 // orcon:scope org
@@ -395,6 +413,8 @@ func (q *Queries) InsertFlowVersion(ctx context.Context, arg InsertFlowVersionPa
 		arg.PublishedByPrincipalID,
 		arg.PublishedAt,
 		arg.CreatedAt,
+		arg.PublicationNote,
+		arg.RolledBackFromVersionNumber,
 	)
 	return err
 }
@@ -441,7 +461,7 @@ func (q *Queries) ListExecutionHourCounts(ctx context.Context, orgID pgtype.UUID
 }
 
 const listFlowActivity = `-- name: ListFlowActivity :many
-SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.active_flow_version_id, f.activation_state, f.created_at, f.updated_at,
+SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.revision, f.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = f.org_id AND v.id = f.active_flow_version_id), 0)::bigint AS active_version_number, f.activation_state, f.created_at, f.updated_at,
        le.id AS last_execution_id, le.status AS last_execution_status, le.created_at AS last_execution_created_at, le.finished_at AS last_execution_finished_at,
        EXISTS (SELECT 1 FROM external_operation o WHERE o.org_id = le.org_id AND o.execution_id = le.id AND o.state = 'UNCERTAIN') AS last_execution_has_uncertain_operation,
        (SELECT COUNT(*) FROM execution c WHERE c.org_id = f.org_id AND c.flow_id = f.id AND c.created_at >= $1) AS execution_count_last_24h
@@ -466,7 +486,9 @@ type ListFlowActivityRow struct {
 	ProjectID                          pgtype.UUID
 	Name                               string
 	DraftRevision                      int64
+	Revision                           int64
 	ActiveFlowVersionID                pgtype.UUID
+	ActiveVersionNumber                int64
 	ActivationState                    string
 	CreatedAt                          pgtype.Timestamptz
 	UpdatedAt                          pgtype.Timestamptz
@@ -501,7 +523,9 @@ func (q *Queries) ListFlowActivity(ctx context.Context, arg ListFlowActivityPara
 			&i.ProjectID,
 			&i.Name,
 			&i.DraftRevision,
+			&i.Revision,
 			&i.ActiveFlowVersionID,
+			&i.ActiveVersionNumber,
 			&i.ActivationState,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -523,7 +547,7 @@ func (q *Queries) ListFlowActivity(ctx context.Context, arg ListFlowActivityPara
 }
 
 const listFlowVersions = `-- name: ListFlowVersions :many
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = $1 AND flow_id = $2 AND version_number > $3
 ORDER BY version_number, id
@@ -538,16 +562,18 @@ type ListFlowVersionsParams struct {
 }
 
 type ListFlowVersionsRow struct {
-	ID                     pgtype.UUID
-	OrgID                  pgtype.UUID
-	FlowID                 pgtype.UUID
-	VersionNumber          int64
-	Document               []byte
-	ContentHash            string
-	WarningDocument        []byte
-	PublishedByPrincipalID pgtype.UUID
-	PublishedAt            pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
+	ID                          pgtype.UUID
+	OrgID                       pgtype.UUID
+	FlowID                      pgtype.UUID
+	VersionNumber               int64
+	Document                    []byte
+	ContentHash                 string
+	WarningDocument             []byte
+	PublishedByPrincipalID      pgtype.UUID
+	PublishedAt                 pgtype.Timestamptz
+	CreatedAt                   pgtype.Timestamptz
+	PublicationNote             pgtype.Text
+	RolledBackFromVersionNumber pgtype.Int8
 }
 
 // orcon:scope org
@@ -577,6 +603,8 @@ func (q *Queries) ListFlowVersions(ctx context.Context, arg ListFlowVersionsPara
 			&i.PublishedByPrincipalID,
 			&i.PublishedAt,
 			&i.CreatedAt,
+			&i.PublicationNote,
+			&i.RolledBackFromVersionNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -589,10 +617,10 @@ func (q *Queries) ListFlowVersions(ctx context.Context, arg ListFlowVersionsPara
 }
 
 const listFlows = `-- name: ListFlows :many
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = $1 AND project_id = $2 AND id > $3 AND deleted_at IS NULL
-ORDER BY id
+WHERE flow.org_id = $1 AND flow.project_id = $2 AND flow.id > $3 AND flow.deleted_at IS NULL
+ORDER BY flow.id
 LIMIT $4
 `
 
@@ -610,7 +638,9 @@ type ListFlowsRow struct {
 	Name                 string
 	DraftDocument        []byte
 	DraftRevision        int64
+	Revision             int64
 	ActiveFlowVersionID  pgtype.UUID
+	ActiveVersionNumber  int64
 	ActivationState      string
 	DeletedAt            pgtype.Timestamptz
 	DeletedByPrincipalID pgtype.UUID
@@ -641,7 +671,9 @@ func (q *Queries) ListFlows(ctx context.Context, arg ListFlowsParams) ([]ListFlo
 			&i.Name,
 			&i.DraftDocument,
 			&i.DraftRevision,
+			&i.Revision,
 			&i.ActiveFlowVersionID,
+			&i.ActiveVersionNumber,
 			&i.ActivationState,
 			&i.DeletedAt,
 			&i.DeletedByPrincipalID,
@@ -661,6 +693,7 @@ func (q *Queries) ListFlows(ctx context.Context, arg ListFlowsParams) ([]ListFlo
 const updateFlowActiveVersion = `-- name: UpdateFlowActiveVersion :execrows
 UPDATE flow
 SET active_flow_version_id = $1,
+    revision = revision + 1,
     updated_at = $2
 WHERE org_id = $3 AND id = $4 AND deleted_at IS NULL
 `
@@ -706,6 +739,37 @@ type UpdateFlowDraftParams struct {
 func (q *Queries) UpdateFlowDraft(ctx context.Context, arg UpdateFlowDraftParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateFlowDraft,
 		arg.DraftDocument,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.ExpectedRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateFlowName = `-- name: UpdateFlowName :execrows
+UPDATE flow
+SET name = $1,
+    revision = revision + 1,
+    updated_at = $2
+WHERE org_id = $3 AND id = $4 AND revision = $5 AND deleted_at IS NULL
+`
+
+type UpdateFlowNameParams struct {
+	Name             string
+	UpdatedAt        pgtype.Timestamptz
+	OrgID            pgtype.UUID
+	ID               pgtype.UUID
+	ExpectedRevision int64
+}
+
+// orcon:scope org
+func (q *Queries) UpdateFlowName(ctx context.Context, arg UpdateFlowNameParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateFlowName,
+		arg.Name,
 		arg.UpdatedAt,
 		arg.OrgID,
 		arg.ID,

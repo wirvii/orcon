@@ -97,7 +97,7 @@ func (q *Queries) ExistsRouteTakenByOtherOrganization(ctx context.Context, arg E
 const getFlowState = `-- name: GetFlowState :one
 
 
-SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
+SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, revision, deleted_at
 FROM flow
 WHERE org_id = ?1 AND id = ?2
 `
@@ -109,6 +109,7 @@ type GetFlowStateRow struct {
 	ActivationState     string
 	ActiveFlowVersionID []byte
 	DraftRevision       int64
+	Revision            int64
 	DeletedAt           sql.NullInt64
 }
 
@@ -128,6 +129,7 @@ func (q *Queries) GetFlowState(ctx context.Context, orgID []byte, iD []byte) (Ge
 		&i.ActivationState,
 		&i.ActiveFlowVersionID,
 		&i.DraftRevision,
+		&i.Revision,
 		&i.DeletedAt,
 	)
 	return i, err
@@ -571,7 +573,7 @@ func (q *Queries) ListTriggerRoutes(ctx context.Context, arg ListTriggerRoutesPa
 }
 
 const lockFlowState = `-- name: LockFlowState :one
-SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
+SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, revision, deleted_at
 FROM flow
 WHERE org_id = ?1 AND id = ?2
 `
@@ -583,6 +585,7 @@ type LockFlowStateRow struct {
 	ActivationState     string
 	ActiveFlowVersionID []byte
 	DraftRevision       int64
+	Revision            int64
 	DeletedAt           sql.NullInt64
 }
 
@@ -598,6 +601,7 @@ func (q *Queries) LockFlowState(ctx context.Context, orgID []byte, iD []byte) (L
 		&i.ActivationState,
 		&i.ActiveFlowVersionID,
 		&i.DraftRevision,
+		&i.Revision,
 		&i.DeletedAt,
 	)
 	return i, err
@@ -607,6 +611,7 @@ const markFlowDeleted = `-- name: MarkFlowDeleted :execrows
 UPDATE flow
 SET deleted_at = ?1,
     deleted_by_principal_id = ?2,
+    revision = revision + 1,
     updated_at = ?3
 WHERE org_id = ?4 AND id = ?5 AND deleted_at IS NULL
 `
@@ -692,6 +697,7 @@ const restoreFlow = `-- name: RestoreFlow :execrows
 UPDATE flow
 SET deleted_at = NULL,
     deleted_by_principal_id = NULL,
+    revision = revision + 1,
     updated_at = ?1
 WHERE org_id = ?2 AND id = ?3 AND deleted_at IS NOT NULL
 `
@@ -709,6 +715,7 @@ func (q *Queries) RestoreFlow(ctx context.Context, updatedAt int64, orgID []byte
 const updateFlowActivationState = `-- name: UpdateFlowActivationState :execrows
 UPDATE flow
 SET activation_state = ?1,
+    revision = revision + 1,
     updated_at = ?2
 WHERE org_id = ?3 AND id = ?4
 `

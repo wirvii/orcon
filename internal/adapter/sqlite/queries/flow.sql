@@ -12,30 +12,30 @@ VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(project_id), sqlc.arg(name), sq
 
 -- name: GetFlow :one
 -- orcon:scope org
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, CAST(COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0) AS INTEGER) AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NULL;
+WHERE flow.org_id = sqlc.arg(org_id) AND flow.id = sqlc.arg(id) AND flow.deleted_at IS NULL;
 
 -- name: GetFlowByName :one
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, CAST(COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0) AS INTEGER) AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND name = sqlc.arg(name) AND deleted_at IS NULL;
+WHERE flow.org_id = sqlc.arg(org_id) AND flow.project_id = sqlc.arg(project_id) AND flow.name = sqlc.arg(name) AND flow.deleted_at IS NULL;
 
 -- name: ListFlows :many
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, CAST(COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0) AS INTEGER) AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
-WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND id > sqlc.arg(after_id) AND deleted_at IS NULL
-ORDER BY id
+WHERE flow.org_id = sqlc.arg(org_id) AND flow.project_id = sqlc.arg(project_id) AND flow.id > sqlc.arg(after_id) AND flow.deleted_at IS NULL
+ORDER BY flow.id
 LIMIT sqlc.arg(page_size);
 
 -- name: ListFlowActivity :many
 -- orcon:scope org
 -- orcon:hot
-SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.active_flow_version_id, f.activation_state, f.created_at, f.updated_at,
+SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.revision, f.active_flow_version_id, CAST(COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = f.org_id AND v.id = f.active_flow_version_id), 0) AS INTEGER) AS active_version_number, f.activation_state, f.created_at, f.updated_at,
        le.id AS last_execution_id, le.status AS last_execution_status, le.created_at AS last_execution_created_at, le.finished_at AS last_execution_finished_at,
        CAST(EXISTS (SELECT 1 FROM external_operation o WHERE o.org_id = le.org_id AND o.execution_id = le.id AND o.state = 'UNCERTAIN') AS INTEGER) AS last_execution_has_uncertain_operation,
        (SELECT COUNT(*) FROM execution c WHERE c.org_id = f.org_id AND c.flow_id = f.id AND c.created_at >= sqlc.arg(since_at)) AS execution_count_last_24h
@@ -92,31 +92,40 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND draft_revision = sqlc.
 -- orcon:scope org
 UPDATE flow
 SET active_flow_version_id = sqlc.arg(flow_version_id),
+    revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NULL;
 
+-- name: UpdateFlowName :execrows
+-- orcon:scope org
+UPDATE flow
+SET name = sqlc.arg(name),
+    revision = revision + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND revision = sqlc.arg(expected_revision) AND deleted_at IS NULL;
+
 -- name: InsertFlowVersion :exec
 -- orcon:scope org
-INSERT INTO flow_version (id, org_id, flow_id, version_number, document, document_format, content_hash, warning_document, warning_document_format, published_by_principal_id, published_at, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(flow_id), sqlc.arg(version_number), sqlc.arg(document), 'orcon/flow@1', sqlc.arg(content_hash), sqlc.arg(warning_document), sqlc.arg(warning_document_format), sqlc.arg(published_by_principal_id), sqlc.arg(published_at), sqlc.arg(created_at));
+INSERT INTO flow_version (id, org_id, flow_id, version_number, document, document_format, content_hash, warning_document, warning_document_format, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(flow_id), sqlc.arg(version_number), sqlc.arg(document), 'orcon/flow@1', sqlc.arg(content_hash), sqlc.arg(warning_document), sqlc.arg(warning_document_format), sqlc.arg(published_by_principal_id), sqlc.arg(published_at), sqlc.arg(created_at), sqlc.arg(publication_note), sqlc.arg(rolled_back_from_version_number));
 
 -- name: GetFlowVersion :one
 -- orcon:scope org
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 
 -- name: GetFlowVersionByNumber :one
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = sqlc.arg(org_id) AND flow_id = sqlc.arg(flow_id) AND version_number = sqlc.arg(version_number);
 
 -- name: ListFlowVersions :many
 -- orcon:scope org
 -- orcon:hot
-SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at
+SELECT id, org_id, flow_id, version_number, document, content_hash, warning_document, published_by_principal_id, published_at, created_at, publication_note, rolled_back_from_version_number
 FROM flow_version
 WHERE org_id = sqlc.arg(org_id) AND flow_id = sqlc.arg(flow_id) AND version_number > sqlc.arg(after_number)
 ORDER BY version_number, id

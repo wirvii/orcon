@@ -59,7 +59,12 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec, sec.clock,
 		)
 		deps.Rebuilds = projects.Rebuilds()
-		drafts := httpapi.NewDrafts(flow.NewDrafts(sec.store, sec.clock, sec.ids))
+		flowDrafts := flow.NewDrafts(sec.store, sec.clock, sec.ids)
+		drafts := httpapi.NewDrafts(flowDrafts)
+		// The trigger service of the engine runs the lifecycle; a process without an engine has
+		// none, and those operations keep answering 503.
+		lifecycle, _ := webhooks.(httpapi.FlowLifecycle)
+		flows := httpapi.NewFlows(flow.NewManager(sec.store, sec.clock, sec.ids), lifecycle, sec.store, flowDrafts, sec.pageCodec)
 		deps.Server = productServer{
 			StrictServerInterface: httpapi.Unavailable{},
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin, sec.store, sec.evaluator),
@@ -67,6 +72,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			projects:              projects,
 			nodeTypes:             httpapi.NewNodeTypes(httpapi.NewNodeCatalog(sec.store, assets), sec.pageCodec),
 			drafts:                drafts,
+			flows:                 flows,
 			executions: httpapi.NewExecutions(
 				sec.store, sec.store, flowReader{}, sec.store, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
 			),
@@ -96,6 +102,7 @@ type productServer struct {
 	activity   *httpapi.Activity
 	// orgExecutions serves the executions of an organization.
 	orgExecutions *httpapi.OrgExecutions
+	flows         *httpapi.Flows
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -144,6 +151,50 @@ func (s productServer) ListExecutionData(ctx context.Context, req apigen.ListExe
 
 func (s productServer) ListExecutionEvents(ctx context.Context, req apigen.ListExecutionEventsRequestObject) (apigen.ListExecutionEventsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.executions.ListExecutionEvents(ctx, req)
+}
+
+func (s productServer) GetFlow(ctx context.Context, req apigen.GetFlowRequestObject) (apigen.GetFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.GetFlow(ctx, req)
+}
+
+func (s productServer) UpdateFlow(ctx context.Context, req apigen.UpdateFlowRequestObject) (apigen.UpdateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.UpdateFlow(ctx, req)
+}
+
+func (s productServer) DeleteFlow(ctx context.Context, req apigen.DeleteFlowRequestObject) (apigen.DeleteFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.DeleteFlow(ctx, req)
+}
+
+func (s productServer) PublishFlow(ctx context.Context, req apigen.PublishFlowRequestObject) (apigen.PublishFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.PublishFlow(ctx, req)
+}
+
+func (s productServer) ActivateFlow(ctx context.Context, req apigen.ActivateFlowRequestObject) (apigen.ActivateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.ActivateFlow(ctx, req)
+}
+
+func (s productServer) DeactivateFlow(ctx context.Context, req apigen.DeactivateFlowRequestObject) (apigen.DeactivateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.DeactivateFlow(ctx, req)
+}
+
+func (s productServer) RollbackFlow(ctx context.Context, req apigen.RollbackFlowRequestObject) (apigen.RollbackFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.RollbackFlow(ctx, req)
+}
+
+func (s productServer) ListFlowVersions(ctx context.Context, req apigen.ListFlowVersionsRequestObject) (apigen.ListFlowVersionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.ListFlowVersions(ctx, req)
+}
+
+func (s productServer) GetFlowVersion(ctx context.Context, req apigen.GetFlowVersionRequestObject) (apigen.GetFlowVersionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.GetFlowVersion(ctx, req)
+}
+
+func (s productServer) ValidateDraft(ctx context.Context, req apigen.ValidateDraftRequestObject) (apigen.ValidateDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.flows.ValidateDraft(ctx, req)
+}
+
+func (s productServer) UpdateDraft(ctx context.Context, req apigen.UpdateDraftRequestObject) (apigen.UpdateDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.drafts.UpdateDraft(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it

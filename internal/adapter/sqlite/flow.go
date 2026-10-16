@@ -38,6 +38,8 @@ func flowFrom(row *sqlcgen.GetFlowRow) (flow.Record, error) {
 	out.Name = row.Name
 	out.Draft = row.DraftDocument
 	out.DraftRevision = row.DraftRevision
+	out.Revision = row.Revision
+	out.ActiveVersion = row.ActiveVersionNumber
 	out.ActivationState = flow.ActivationState(row.ActivationState)
 	out.DeletedAt = nullInstant(row.DeletedAt)
 	out.CreatedAt = instant(row.CreatedAt)
@@ -177,7 +179,7 @@ func (s *Store) ListFlowActivity(ctx context.Context, org orgscope.Org, project 
 func activityFrom(row *sqlcgen.ListFlowActivityRow) (flow.Activity, error) {
 	var out flow.Activity
 	f, err := flowFrom(&sqlcgen.GetFlowRow{
-		ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision,
+		ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision, Revision: row.Revision, ActiveVersionNumber: row.ActiveVersionNumber,
 		ActiveFlowVersionID: row.ActiveFlowVersionID, ActivationState: row.ActivationState,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	})
@@ -259,6 +261,31 @@ func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID fl
 	return revision, err
 }
 
+// UpdateFlowNameWithEntry implements [flow.ManageStore]: the new name, the new revision of the flow
+// row and the audit entry in one transaction.
+func (s *Store) UpdateFlowNameWithEntry(ctx context.Context, org orgscope.Org, flowID flow.FlowID, name string, expectedRevision int64, now time.Time, entry audit.Entry) error {
+	return s.write(ctx, "rename flow", func(ctx context.Context, q *sqlcgen.Queries) error {
+		scope, err := scoped(org)
+		if err != nil {
+			return err
+		}
+		n, err := q.UpdateFlowName(ctx, sqlcgen.UpdateFlowNameParams{
+			Name: name, UpdatedAt: micros(now), OrgID: scope, ID: uuidBytes(flowID), ExpectedRevision: expectedRevision,
+		})
+		if err != nil {
+			return err
+		}
+		if n == 1 {
+			return insertPendingOrg(ctx, q, org, entry)
+		}
+		// Either the flow does not exist or its revision moved; tell them apart.
+		if _, err := q.GetFlow(ctx, scope, uuidBytes(flowID)); err != nil {
+			return err
+		}
+		return flow.ErrRevisionConflict
+	})
+}
+
 // PublishVersion implements [flow.VersionStore].
 func (s *Store) PublishVersion(ctx context.Context, org orgscope.Org, v flow.VersionRecord) error {
 	return s.write(ctx, "publish flow version", func(ctx context.Context, q *sqlcgen.Queries) error {
@@ -271,6 +298,7 @@ func (s *Store) PublishVersion(ctx context.Context, org orgscope.Org, v flow.Ver
 			VersionNumber: v.Number, Document: v.Document, ContentHash: v.ContentHash,
 			PublishedByPrincipalID: nullUUIDBytes(v.PublishedByPrincipalID),
 			PublishedAt:            micros(v.PublishedAt), CreatedAt: micros(v.CreatedAt),
+			PublicationNote: nullText(v.Note), RolledBackFromVersionNumber: nullPositive(v.RolledBackFromVersion),
 		}
 		if v.Warnings != nil {
 			params.WarningDocument = v.Warnings
@@ -313,8 +341,13 @@ func versionFrom(row *sqlcgen.GetFlowVersionRow) (flow.VersionRecord, error) {
 	out.Warnings = row.WarningDocument
 	out.PublishedAt = instant(row.PublishedAt)
 	out.CreatedAt = instant(row.CreatedAt)
+	out.Note = row.PublicationNote.String
+	out.RolledBackFromVersion = row.RolledBackFromVersionNumber.Int64
 	return out, nil
 }
+
+// nullPositive is the nullable form of a number that is absent when it is 0.
+func nullPositive(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: n > 0} }
 
 // notFoundAs maps a missing row to the given area error.
 func notFoundAs(err, target error) error {

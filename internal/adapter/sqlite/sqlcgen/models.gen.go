@@ -308,6 +308,7 @@ type Flow struct {
 	CreatedAt            int64
 	UpdatedAt            int64
 	ActivationState      string
+	Revision             int64
 }
 
 type FlowDataOperation struct {
@@ -360,18 +361,20 @@ type FlowTrigger struct {
 }
 
 type FlowVersion struct {
-	ID                     []byte
-	OrgID                  []byte
-	FlowID                 []byte
-	VersionNumber          int64
-	Document               []byte
-	DocumentFormat         string
-	ContentHash            string
-	WarningDocument        []byte
-	WarningDocumentFormat  sql.NullString
-	PublishedByPrincipalID []byte
-	PublishedAt            int64
-	CreatedAt              int64
+	ID                          []byte
+	OrgID                       []byte
+	FlowID                      []byte
+	VersionNumber               int64
+	Document                    []byte
+	DocumentFormat              string
+	ContentHash                 string
+	WarningDocument             []byte
+	WarningDocumentFormat       sql.NullString
+	PublishedByPrincipalID      []byte
+	PublishedAt                 int64
+	CreatedAt                   int64
+	PublicationNote             sql.NullString
+	RolledBackFromVersionNumber sql.NullInt64
 }
 
 type HumanTask struct {

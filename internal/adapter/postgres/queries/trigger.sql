@@ -7,14 +7,14 @@
 -- name: GetFlowState :one
 -- orcon:scope org
 -- orcon:include-deleted the lifecycle reads a deleted flow to restore or purge it
-SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
+SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, revision, deleted_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 
 -- name: LockFlowState :one
 -- orcon:scope org
 -- orcon:include-deleted the lifecycle reads a deleted flow to restore or purge it
-SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, deleted_at
+SELECT id, project_id, name, activation_state, active_flow_version_id, draft_revision, revision, deleted_at
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id)
 FOR NO KEY UPDATE;
@@ -30,6 +30,7 @@ WHERE org_id = sqlc.arg(org_id) AND flow_id = sqlc.arg(flow_id);
 -- orcon:include-deleted deleting a flow also switches its state to INACTIVE
 UPDATE flow
 SET activation_state = sqlc.arg(activation_state),
+    revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 
@@ -38,6 +39,7 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 UPDATE flow
 SET deleted_at = sqlc.arg(deleted_at),
     deleted_by_principal_id = sqlc.arg(deleted_by_principal_id),
+    revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NULL;
 
@@ -47,6 +49,7 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NULL;
 UPDATE flow
 SET deleted_at = NULL,
     deleted_by_principal_id = NULL,
+    revision = revision + 1,
     updated_at = sqlc.arg(updated_at)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND deleted_at IS NOT NULL;
 

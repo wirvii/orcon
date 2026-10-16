@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wirvii/orcon/internal/adapter/sqlite/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -59,7 +60,7 @@ type triggerTx struct {
 
 func (t *triggerTx) orgBytes() []byte { return uuidBytes(t.org.UUID()) }
 
-func stateFrom(id flow.FlowID, name string, project, activeVersion []byte, activation string, revision int64, deletedAt sql.NullInt64) (trigger.FlowState, error) {
+func stateFrom(id flow.FlowID, name string, project, activeVersion []byte, activation string, draftRevision, revision int64, deletedAt sql.NullInt64) (trigger.FlowState, error) {
 	var out trigger.FlowState
 	var err error
 	if out.ProjectID, err = uuidOf[identity.ProjectID](project); err != nil {
@@ -69,7 +70,7 @@ func stateFrom(id flow.FlowID, name string, project, activeVersion []byte, activ
 		return out, fmt.Errorf("flow active version id: %w", err)
 	}
 	out.ID, out.Name, out.ActivationState = id, name, flow.ActivationState(activation)
-	out.DraftRevision, out.DeletedAt = revision, nullInstant(deletedAt)
+	out.DraftRevision, out.Revision, out.DeletedAt = draftRevision, revision, nullInstant(deletedAt)
 	return out, nil
 }
 
@@ -78,7 +79,7 @@ func (t *triggerTx) GetFlowState(ctx context.Context, flowID flow.FlowID) (trigg
 	if err != nil {
 		return trigger.FlowState{}, notFoundAs(err, flow.ErrNotFound)
 	}
-	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.DeletedAt)
+	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.Revision, row.DeletedAt)
 }
 
 // LockFlowState needs no lock: the single writer already serializes transactions.
@@ -87,7 +88,7 @@ func (t *triggerTx) LockFlowState(ctx context.Context, flowID flow.FlowID) (trig
 	if err != nil {
 		return trigger.FlowState{}, notFoundAs(err, flow.ErrNotFound)
 	}
-	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.DeletedAt)
+	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.Revision, row.DeletedAt)
 }
 
 func (t *triggerTx) NextVersionNumber(ctx context.Context, flowID flow.FlowID) (int64, error) {
@@ -100,6 +101,7 @@ func (t *triggerTx) InsertVersion(ctx context.Context, v flow.VersionRecord) err
 		VersionNumber: v.Number, Document: v.Document, ContentHash: v.ContentHash,
 		PublishedByPrincipalID: nullUUIDBytes(v.PublishedByPrincipalID),
 		PublishedAt:            micros(v.PublishedAt), CreatedAt: micros(v.CreatedAt),
+		PublicationNote: nullText(v.Note), RolledBackFromVersionNumber: nullPositive(v.RolledBackFromVersion),
 	}
 	if v.Warnings != nil {
 		params.WarningDocument = v.Warnings
@@ -148,6 +150,15 @@ func (t *triggerTx) SoftDeleteFlow(ctx context.Context, flowID flow.FlowID, by i
 func (t *triggerTx) RestoreFlow(ctx context.Context, flowID flow.FlowID, now time.Time) error {
 	n, err := t.q.RestoreFlow(ctx, micros(now), t.orgBytes(), uuidBytes(flowID))
 	return expectOne(n, err, "flow", flowID)
+}
+
+// RecordChange implements [trigger.Tx]: the idempotency claim of the context, when there is one,
+// and the audit entry, in the transaction Atomic opened.
+func (t *triggerTx) RecordChange(ctx context.Context, entry audit.Entry, resourceRef string, now time.Time) error {
+	if err := claimIdempotency(ctx, t.q, t.org, resourceRef, now); err != nil {
+		return err
+	}
+	return insertPendingOrg(ctx, t.q, t.org, entry)
 }
 
 func (t *triggerTx) PurgeFlow(ctx context.Context, flowID flow.FlowID) error {

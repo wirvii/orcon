@@ -103,12 +103,13 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"ListFlows":                caseListFlows,
 	"ListFlowActivity":         caseListFlowActivity,
 	"CountFlows":               caseCountFlows,
-	"UpdateFlowDraft":          caseUpdateFlowDraft,
-	"UpdateFlowDraftWithEntry": caseUpdateFlowDraftWithEntry,
 	"ProjectActivity":          caseProjectActivity,
 	"TimeSavedMinutes":         caseTimeSavedMinutes,
 	"ListProjectExecutions":    caseListProjectExecutions,
 	"InTx":                     caseInTx,
+	"UpdateFlowDraft":          caseUpdateFlowDraft,
+	"UpdateFlowDraftWithEntry": caseUpdateFlowDraftWithEntry,
+	"UpdateFlowNameWithEntry":  caseUpdateFlowNameWithEntry,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
 	"GetVersion":         caseGetVersion,
@@ -612,6 +613,15 @@ func caseUpdateFlowDraftWithEntry(ctx context.Context, tb testing.TB, env *Env) 
 	entry := audittest.Org(tb, env.A.UUID, "flow.updated")
 	_, err := env.Stores.UpdateFlowDraftWithEntry(ctx, env.A.Scope, env.B.Flow.ID, []byte(`{"defaced":true}`), 0, nil, seededAt.Add(time.Hour), entry)
 	wantErr(tb, "saving B's draft from A", err, identity.ErrNotFound)
+	noLeak(tb, "the refusal", nil, err, &env.B)
+	intact(ctx, tb, env)
+}
+
+func caseUpdateFlowNameWithEntry(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	entry := audittest.Org(tb, env.A.UUID, "flow.updated")
+	err := env.Stores.UpdateFlowNameWithEntry(ctx, env.A.Scope, env.B.Flow.ID, "defaced", 0, seededAt.Add(time.Hour), entry)
+	wantErr(tb, "renaming B's flow from A", err, identity.ErrNotFound)
 	noLeak(tb, "the refusal", nil, err, &env.B)
 	intact(ctx, tb, env)
 }

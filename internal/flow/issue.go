@@ -207,6 +207,9 @@ var (
 	// ErrDraftConflict means the draft changed since the caller read it
 	// (optimistic concurrency on draftRevision).
 	ErrDraftConflict = errors.New("flow draft was changed by someone else")
+	// ErrRevisionConflict means the flow row changed since the caller read it (optimistic
+	// concurrency on the revision of the flow, the ETag of activation, rename, rollback and delete).
+	ErrRevisionConflict = errors.New("flow was changed by someone else")
 	// ErrVersionNotFound means the requested flow version does not exist.
 	ErrVersionNotFound = errors.New("flow version not found")
 	// ErrSnapshotNotFound means the requested snapshot does not exist.
