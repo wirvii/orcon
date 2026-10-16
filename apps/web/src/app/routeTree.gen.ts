@@ -9,14 +9,27 @@
 import { Route as rootRouteImport } from './shell/RootLayout'
 import { Route as DotDotFeaturesSessionRoutesSessionLayoutRouteImport } from './../features/session/routes/SessionLayout'
 import { Route as DotDotFeaturesSessionRoutesLoginRouteImport } from './../features/session/routes/login'
+import { Route as DotDotFeaturesSessionRoutesLegacySettingsRouteImport } from './../features/session/routes/legacy-settings'
 import { Route as DotDotFeaturesSessionRoutesLandingRouteImport } from './../features/session/routes/landing'
 import { Route as DotDotFeaturesSessionRoutesOrgsRouteImport } from './../features/session/routes/orgs'
-import { Route as SettingsAppearanceRouteImport } from './../features/settings/routes/appearance'
+import { Route as DotDotFeaturesSessionRoutesLegacyAppearanceRouteImport } from './../features/session/routes/legacy-appearance'
 import { Route as DotDotFeaturesEditorRoutesLegacyFlowRouteImport } from './../features/editor/routes/legacy-flow'
 import { Route as DotDotFeaturesSessionRoutesOrgRouteImport } from './../features/session/routes/org'
 import { Route as DotDotFeaturesProjectsRoutesOrgIndexRouteImport } from './../features/projects/routes/org-index'
+import { Route as DotDotFeaturesCredentialsRoutesOrgCredentialsRouteImport } from './../features/credentials/routes/org-credentials'
+import { Route as DotDotFeaturesExecutionsRoutesOrgExecutionsRouteImport } from './../features/executions/routes/org-executions'
+import { Route as DotDotFeaturesOverviewRoutesOverviewRouteImport } from './../features/overview/routes/overview'
 import { Route as DotDotFeaturesProjectsRoutesProjectsRouteImport } from './../features/projects/routes/projects'
+import { Route as DotDotFeaturesSettingsRoutesSettingsRouteImport } from './../features/settings/routes/settings'
+import { Route as DotDotFeaturesTemplatesRoutesTemplatesRouteImport } from './../features/templates/routes/templates'
 import { Route as DotDotFeaturesProjectsRoutesProjectRouteImport } from './../features/projects/routes/project'
+import { Route as DotDotFeaturesSettingsRoutesSettingsIndexRouteImport } from './../features/settings/routes/settings-index'
+import { Route as DotDotFeaturesSettingsRoutesApiKeysRouteImport } from './../features/settings/routes/api-keys'
+import { Route as DotDotFeaturesSettingsRoutesAppearanceRouteImport } from './../features/settings/routes/appearance'
+import { Route as DotDotFeaturesSettingsRoutesMembersRouteImport } from './../features/settings/routes/members'
+import { Route as DotDotFeaturesSettingsRoutesOrganizationRouteImport } from './../features/settings/routes/organization'
+import { Route as DotDotFeaturesSettingsRoutesProfileRouteImport } from './../features/settings/routes/profile'
+import { Route as DotDotFeaturesSettingsRoutesSecurityRouteImport } from './../features/settings/routes/security'
 import { Route as DotDotFeaturesProjectsRoutesProjectIndexRouteImport } from './../features/projects/routes/project-index'
 import { Route as DotDotFeaturesCredentialsRoutesCredentialsRouteImport } from './../features/credentials/routes/credentials'
 import { Route as DotDotFeaturesExecutionsRoutesExecutionsRouteImport } from './../features/executions/routes/executions'
@@ -35,6 +48,12 @@ const DotDotFeaturesSessionRoutesLoginRoute =
     path: '/login',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotDotFeaturesSessionRoutesLegacySettingsRoute =
+  DotDotFeaturesSessionRoutesLegacySettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DotDotFeaturesSessionRoutesLandingRoute =
   DotDotFeaturesSessionRoutesLandingRouteImport.update({
     id: '/',
@@ -47,11 +66,12 @@ const DotDotFeaturesSessionRoutesOrgsRoute =
     path: '/orgs',
     getParentRoute: () => DotDotFeaturesSessionRoutesSessionLayoutRoute,
   } as any)
-const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
-  id: '/settings/appearance',
-  path: '/settings/appearance',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const DotDotFeaturesSessionRoutesLegacyAppearanceRoute =
+  DotDotFeaturesSessionRoutesLegacyAppearanceRouteImport.update({
+    id: '/settings/appearance',
+    path: '/settings/appearance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DotDotFeaturesEditorRoutesLegacyFlowRoute =
   DotDotFeaturesEditorRoutesLegacyFlowRouteImport.update({
     id: '/flows/$flowId',
@@ -70,10 +90,40 @@ const DotDotFeaturesProjectsRoutesOrgIndexRoute =
     path: '/',
     getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
   } as any)
+const DotDotFeaturesCredentialsRoutesOrgCredentialsRoute =
+  DotDotFeaturesCredentialsRoutesOrgCredentialsRouteImport.update({
+    id: '/credentials',
+    path: '/credentials',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesExecutionsRoutesOrgExecutionsRoute =
+  DotDotFeaturesExecutionsRoutesOrgExecutionsRouteImport.update({
+    id: '/executions',
+    path: '/executions',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesOverviewRoutesOverviewRoute =
+  DotDotFeaturesOverviewRoutesOverviewRouteImport.update({
+    id: '/overview',
+    path: '/overview',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
 const DotDotFeaturesProjectsRoutesProjectsRoute =
   DotDotFeaturesProjectsRoutesProjectsRouteImport.update({
     id: '/projects',
     path: '/projects',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesSettingsRoute =
+  DotDotFeaturesSettingsRoutesSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesTemplatesRoutesTemplatesRoute =
+  DotDotFeaturesTemplatesRoutesTemplatesRouteImport.update({
+    id: '/templates',
+    path: '/templates',
     getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
   } as any)
 const DotDotFeaturesProjectsRoutesProjectRoute =
@@ -81,6 +131,48 @@ const DotDotFeaturesProjectsRoutesProjectRoute =
     id: '/projects/$projectHandle',
     path: '/projects/$projectHandle',
     getParentRoute: () => DotDotFeaturesSessionRoutesOrgRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesSettingsIndexRoute =
+  DotDotFeaturesSettingsRoutesSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesApiKeysRoute =
+  DotDotFeaturesSettingsRoutesApiKeysRouteImport.update({
+    id: '/api-keys',
+    path: '/api-keys',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesAppearanceRoute =
+  DotDotFeaturesSettingsRoutesAppearanceRouteImport.update({
+    id: '/appearance',
+    path: '/appearance',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesMembersRoute =
+  DotDotFeaturesSettingsRoutesMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesOrganizationRoute =
+  DotDotFeaturesSettingsRoutesOrganizationRouteImport.update({
+    id: '/organization',
+    path: '/organization',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesProfileRoute =
+  DotDotFeaturesSettingsRoutesProfileRouteImport.update({
+    id: '/profile',
+    path: '/profile',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
+  } as any)
+const DotDotFeaturesSettingsRoutesSecurityRoute =
+  DotDotFeaturesSettingsRoutesSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => DotDotFeaturesSettingsRoutesSettingsRoute,
   } as any)
 const DotDotFeaturesProjectsRoutesProjectIndexRoute =
   DotDotFeaturesProjectsRoutesProjectIndexRouteImport.update({
@@ -122,13 +214,26 @@ const DotDotFeaturesEditorRoutesFlowIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesLegacySettingsRoute
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof DotDotFeaturesSessionRoutesLegacyAppearanceRoute
   '/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
   '/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/orgs/$orgSlug/credentials': typeof DotDotFeaturesCredentialsRoutesOrgCredentialsRoute
+  '/orgs/$orgSlug/executions': typeof DotDotFeaturesExecutionsRoutesOrgExecutionsRoute
+  '/orgs/$orgSlug/overview': typeof DotDotFeaturesOverviewRoutesOverviewRoute
   '/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/orgs/$orgSlug/settings': typeof DotDotFeaturesSettingsRoutesSettingsRouteWithChildren
+  '/orgs/$orgSlug/templates': typeof DotDotFeaturesTemplatesRoutesTemplatesRoute
+  '/orgs/$orgSlug/settings/': typeof DotDotFeaturesSettingsRoutesSettingsIndexRoute
   '/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
+  '/orgs/$orgSlug/settings/api-keys': typeof DotDotFeaturesSettingsRoutesApiKeysRoute
+  '/orgs/$orgSlug/settings/appearance': typeof DotDotFeaturesSettingsRoutesAppearanceRoute
+  '/orgs/$orgSlug/settings/members': typeof DotDotFeaturesSettingsRoutesMembersRoute
+  '/orgs/$orgSlug/settings/organization': typeof DotDotFeaturesSettingsRoutesOrganizationRoute
+  '/orgs/$orgSlug/settings/profile': typeof DotDotFeaturesSettingsRoutesProfileRoute
+  '/orgs/$orgSlug/settings/security': typeof DotDotFeaturesSettingsRoutesSecurityRoute
   '/orgs/$orgSlug/projects/$projectHandle/': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
   '/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
@@ -138,12 +243,24 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesLegacySettingsRoute
   '/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof DotDotFeaturesSessionRoutesLegacyAppearanceRoute
   '/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/orgs/$orgSlug': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/orgs/$orgSlug/credentials': typeof DotDotFeaturesCredentialsRoutesOrgCredentialsRoute
+  '/orgs/$orgSlug/executions': typeof DotDotFeaturesExecutionsRoutesOrgExecutionsRoute
+  '/orgs/$orgSlug/overview': typeof DotDotFeaturesOverviewRoutesOverviewRoute
   '/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/orgs/$orgSlug/templates': typeof DotDotFeaturesTemplatesRoutesTemplatesRoute
+  '/orgs/$orgSlug/settings': typeof DotDotFeaturesSettingsRoutesSettingsIndexRoute
+  '/orgs/$orgSlug/settings/api-keys': typeof DotDotFeaturesSettingsRoutesApiKeysRoute
+  '/orgs/$orgSlug/settings/appearance': typeof DotDotFeaturesSettingsRoutesAppearanceRoute
+  '/orgs/$orgSlug/settings/members': typeof DotDotFeaturesSettingsRoutesMembersRoute
+  '/orgs/$orgSlug/settings/organization': typeof DotDotFeaturesSettingsRoutesOrganizationRoute
+  '/orgs/$orgSlug/settings/profile': typeof DotDotFeaturesSettingsRoutesProfileRoute
+  '/orgs/$orgSlug/settings/security': typeof DotDotFeaturesSettingsRoutesSecurityRoute
   '/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
   '/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
@@ -155,14 +272,27 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_session': typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
   '/login': typeof DotDotFeaturesSessionRoutesLoginRoute
+  '/settings': typeof DotDotFeaturesSessionRoutesLegacySettingsRoute
   '/_session/': typeof DotDotFeaturesSessionRoutesLandingRoute
   '/_session/orgs': typeof DotDotFeaturesSessionRoutesOrgsRoute
-  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/appearance': typeof DotDotFeaturesSessionRoutesLegacyAppearanceRoute
   '/_session/flows/$flowId': typeof DotDotFeaturesEditorRoutesLegacyFlowRoute
   '/_session/orgs/$orgSlug': typeof DotDotFeaturesSessionRoutesOrgRouteWithChildren
   '/_session/orgs/$orgSlug/': typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  '/_session/orgs/$orgSlug/credentials': typeof DotDotFeaturesCredentialsRoutesOrgCredentialsRoute
+  '/_session/orgs/$orgSlug/executions': typeof DotDotFeaturesExecutionsRoutesOrgExecutionsRoute
+  '/_session/orgs/$orgSlug/overview': typeof DotDotFeaturesOverviewRoutesOverviewRoute
   '/_session/orgs/$orgSlug/projects': typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  '/_session/orgs/$orgSlug/settings': typeof DotDotFeaturesSettingsRoutesSettingsRouteWithChildren
+  '/_session/orgs/$orgSlug/templates': typeof DotDotFeaturesTemplatesRoutesTemplatesRoute
+  '/_session/orgs/$orgSlug/settings/': typeof DotDotFeaturesSettingsRoutesSettingsIndexRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle': typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
+  '/_session/orgs/$orgSlug/settings/api-keys': typeof DotDotFeaturesSettingsRoutesApiKeysRoute
+  '/_session/orgs/$orgSlug/settings/appearance': typeof DotDotFeaturesSettingsRoutesAppearanceRoute
+  '/_session/orgs/$orgSlug/settings/members': typeof DotDotFeaturesSettingsRoutesMembersRoute
+  '/_session/orgs/$orgSlug/settings/organization': typeof DotDotFeaturesSettingsRoutesOrganizationRoute
+  '/_session/orgs/$orgSlug/settings/profile': typeof DotDotFeaturesSettingsRoutesProfileRoute
+  '/_session/orgs/$orgSlug/settings/security': typeof DotDotFeaturesSettingsRoutesSecurityRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/': typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
@@ -175,13 +305,26 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/settings'
     | '/orgs'
     | '/settings/appearance'
     | '/flows/$flowId'
     | '/orgs/$orgSlug'
     | '/orgs/$orgSlug/'
+    | '/orgs/$orgSlug/credentials'
+    | '/orgs/$orgSlug/executions'
+    | '/orgs/$orgSlug/overview'
     | '/orgs/$orgSlug/projects'
+    | '/orgs/$orgSlug/settings'
+    | '/orgs/$orgSlug/templates'
+    | '/orgs/$orgSlug/settings/'
     | '/orgs/$orgSlug/projects/$projectHandle'
+    | '/orgs/$orgSlug/settings/api-keys'
+    | '/orgs/$orgSlug/settings/appearance'
+    | '/orgs/$orgSlug/settings/members'
+    | '/orgs/$orgSlug/settings/organization'
+    | '/orgs/$orgSlug/settings/profile'
+    | '/orgs/$orgSlug/settings/security'
     | '/orgs/$orgSlug/projects/$projectHandle/'
     | '/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/orgs/$orgSlug/projects/$projectHandle/executions'
@@ -191,12 +334,24 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/settings'
     | '/'
     | '/orgs'
     | '/settings/appearance'
     | '/flows/$flowId'
     | '/orgs/$orgSlug'
+    | '/orgs/$orgSlug/credentials'
+    | '/orgs/$orgSlug/executions'
+    | '/orgs/$orgSlug/overview'
     | '/orgs/$orgSlug/projects'
+    | '/orgs/$orgSlug/templates'
+    | '/orgs/$orgSlug/settings'
+    | '/orgs/$orgSlug/settings/api-keys'
+    | '/orgs/$orgSlug/settings/appearance'
+    | '/orgs/$orgSlug/settings/members'
+    | '/orgs/$orgSlug/settings/organization'
+    | '/orgs/$orgSlug/settings/profile'
+    | '/orgs/$orgSlug/settings/security'
     | '/orgs/$orgSlug/projects/$projectHandle'
     | '/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/orgs/$orgSlug/projects/$projectHandle/executions'
@@ -207,14 +362,27 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_session'
     | '/login'
+    | '/settings'
     | '/_session/'
     | '/_session/orgs'
     | '/settings/appearance'
     | '/_session/flows/$flowId'
     | '/_session/orgs/$orgSlug'
     | '/_session/orgs/$orgSlug/'
+    | '/_session/orgs/$orgSlug/credentials'
+    | '/_session/orgs/$orgSlug/executions'
+    | '/_session/orgs/$orgSlug/overview'
     | '/_session/orgs/$orgSlug/projects'
+    | '/_session/orgs/$orgSlug/settings'
+    | '/_session/orgs/$orgSlug/templates'
+    | '/_session/orgs/$orgSlug/settings/'
     | '/_session/orgs/$orgSlug/projects/$projectHandle'
+    | '/_session/orgs/$orgSlug/settings/api-keys'
+    | '/_session/orgs/$orgSlug/settings/appearance'
+    | '/_session/orgs/$orgSlug/settings/members'
+    | '/_session/orgs/$orgSlug/settings/organization'
+    | '/_session/orgs/$orgSlug/settings/profile'
+    | '/_session/orgs/$orgSlug/settings/security'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/executions'
@@ -226,7 +394,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   DotDotFeaturesSessionRoutesSessionLayoutRoute: typeof DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren
   DotDotFeaturesSessionRoutesLoginRoute: typeof DotDotFeaturesSessionRoutesLoginRoute
-  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  DotDotFeaturesSessionRoutesLegacySettingsRoute: typeof DotDotFeaturesSessionRoutesLegacySettingsRoute
+  DotDotFeaturesSessionRoutesLegacyAppearanceRoute: typeof DotDotFeaturesSessionRoutesLegacyAppearanceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -243,6 +412,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof DotDotFeaturesSessionRoutesLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesLegacySettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_session/': {
@@ -263,7 +439,7 @@ declare module '@tanstack/react-router' {
       id: '/settings/appearance'
       path: '/settings/appearance'
       fullPath: '/settings/appearance'
-      preLoaderRoute: typeof SettingsAppearanceRouteImport
+      preLoaderRoute: typeof DotDotFeaturesSessionRoutesLegacyAppearanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_session/flows/$flowId': {
@@ -287,11 +463,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotFeaturesProjectsRoutesOrgIndexRouteImport
       parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
     }
+    '/_session/orgs/$orgSlug/credentials': {
+      id: '/_session/orgs/$orgSlug/credentials'
+      path: '/credentials'
+      fullPath: '/orgs/$orgSlug/credentials'
+      preLoaderRoute: typeof DotDotFeaturesCredentialsRoutesOrgCredentialsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/executions': {
+      id: '/_session/orgs/$orgSlug/executions'
+      path: '/executions'
+      fullPath: '/orgs/$orgSlug/executions'
+      preLoaderRoute: typeof DotDotFeaturesExecutionsRoutesOrgExecutionsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/overview': {
+      id: '/_session/orgs/$orgSlug/overview'
+      path: '/overview'
+      fullPath: '/orgs/$orgSlug/overview'
+      preLoaderRoute: typeof DotDotFeaturesOverviewRoutesOverviewRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
     '/_session/orgs/$orgSlug/projects': {
       id: '/_session/orgs/$orgSlug/projects'
       path: '/projects'
       fullPath: '/orgs/$orgSlug/projects'
       preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/settings': {
+      id: '/_session/orgs/$orgSlug/settings'
+      path: '/settings'
+      fullPath: '/orgs/$orgSlug/settings'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesSettingsRouteImport
+      parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/templates': {
+      id: '/_session/orgs/$orgSlug/templates'
+      path: '/templates'
+      fullPath: '/orgs/$orgSlug/templates'
+      preLoaderRoute: typeof DotDotFeaturesTemplatesRoutesTemplatesRouteImport
       parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
     }
     '/_session/orgs/$orgSlug/projects/$projectHandle': {
@@ -300,6 +511,55 @@ declare module '@tanstack/react-router' {
       fullPath: '/orgs/$orgSlug/projects/$projectHandle'
       preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectRouteImport
       parentRoute: typeof DotDotFeaturesSessionRoutesOrgRoute
+    }
+    '/_session/orgs/$orgSlug/settings/': {
+      id: '/_session/orgs/$orgSlug/settings/'
+      path: '/'
+      fullPath: '/orgs/$orgSlug/settings/'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesSettingsIndexRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/api-keys': {
+      id: '/_session/orgs/$orgSlug/settings/api-keys'
+      path: '/api-keys'
+      fullPath: '/orgs/$orgSlug/settings/api-keys'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesApiKeysRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/appearance': {
+      id: '/_session/orgs/$orgSlug/settings/appearance'
+      path: '/appearance'
+      fullPath: '/orgs/$orgSlug/settings/appearance'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesAppearanceRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/members': {
+      id: '/_session/orgs/$orgSlug/settings/members'
+      path: '/members'
+      fullPath: '/orgs/$orgSlug/settings/members'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesMembersRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/organization': {
+      id: '/_session/orgs/$orgSlug/settings/organization'
+      path: '/organization'
+      fullPath: '/orgs/$orgSlug/settings/organization'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesOrganizationRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/profile': {
+      id: '/_session/orgs/$orgSlug/settings/profile'
+      path: '/profile'
+      fullPath: '/orgs/$orgSlug/settings/profile'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesProfileRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
+    }
+    '/_session/orgs/$orgSlug/settings/security': {
+      id: '/_session/orgs/$orgSlug/settings/security'
+      path: '/security'
+      fullPath: '/orgs/$orgSlug/settings/security'
+      preLoaderRoute: typeof DotDotFeaturesSettingsRoutesSecurityRouteImport
+      parentRoute: typeof DotDotFeaturesSettingsRoutesSettingsRoute
     }
     '/_session/orgs/$orgSlug/projects/$projectHandle/': {
       id: '/_session/orgs/$orgSlug/projects/$projectHandle/'
@@ -346,6 +606,39 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DotDotFeaturesSettingsRoutesSettingsRouteChildren {
+  DotDotFeaturesSettingsRoutesSettingsIndexRoute: typeof DotDotFeaturesSettingsRoutesSettingsIndexRoute
+  DotDotFeaturesSettingsRoutesApiKeysRoute: typeof DotDotFeaturesSettingsRoutesApiKeysRoute
+  DotDotFeaturesSettingsRoutesAppearanceRoute: typeof DotDotFeaturesSettingsRoutesAppearanceRoute
+  DotDotFeaturesSettingsRoutesMembersRoute: typeof DotDotFeaturesSettingsRoutesMembersRoute
+  DotDotFeaturesSettingsRoutesOrganizationRoute: typeof DotDotFeaturesSettingsRoutesOrganizationRoute
+  DotDotFeaturesSettingsRoutesProfileRoute: typeof DotDotFeaturesSettingsRoutesProfileRoute
+  DotDotFeaturesSettingsRoutesSecurityRoute: typeof DotDotFeaturesSettingsRoutesSecurityRoute
+}
+
+const DotDotFeaturesSettingsRoutesSettingsRouteChildren: DotDotFeaturesSettingsRoutesSettingsRouteChildren =
+  {
+    DotDotFeaturesSettingsRoutesSettingsIndexRoute:
+      DotDotFeaturesSettingsRoutesSettingsIndexRoute,
+    DotDotFeaturesSettingsRoutesApiKeysRoute:
+      DotDotFeaturesSettingsRoutesApiKeysRoute,
+    DotDotFeaturesSettingsRoutesAppearanceRoute:
+      DotDotFeaturesSettingsRoutesAppearanceRoute,
+    DotDotFeaturesSettingsRoutesMembersRoute:
+      DotDotFeaturesSettingsRoutesMembersRoute,
+    DotDotFeaturesSettingsRoutesOrganizationRoute:
+      DotDotFeaturesSettingsRoutesOrganizationRoute,
+    DotDotFeaturesSettingsRoutesProfileRoute:
+      DotDotFeaturesSettingsRoutesProfileRoute,
+    DotDotFeaturesSettingsRoutesSecurityRoute:
+      DotDotFeaturesSettingsRoutesSecurityRoute,
+  }
+
+const DotDotFeaturesSettingsRoutesSettingsRouteWithChildren =
+  DotDotFeaturesSettingsRoutesSettingsRoute._addFileChildren(
+    DotDotFeaturesSettingsRoutesSettingsRouteChildren,
+  )
+
 interface DotDotFeaturesProjectsRoutesProjectRouteChildren {
   DotDotFeaturesProjectsRoutesProjectIndexRoute: typeof DotDotFeaturesProjectsRoutesProjectIndexRoute
   DotDotFeaturesCredentialsRoutesCredentialsRoute: typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
@@ -377,7 +670,12 @@ const DotDotFeaturesProjectsRoutesProjectRouteWithChildren =
 
 interface DotDotFeaturesSessionRoutesOrgRouteChildren {
   DotDotFeaturesProjectsRoutesOrgIndexRoute: typeof DotDotFeaturesProjectsRoutesOrgIndexRoute
+  DotDotFeaturesCredentialsRoutesOrgCredentialsRoute: typeof DotDotFeaturesCredentialsRoutesOrgCredentialsRoute
+  DotDotFeaturesExecutionsRoutesOrgExecutionsRoute: typeof DotDotFeaturesExecutionsRoutesOrgExecutionsRoute
+  DotDotFeaturesOverviewRoutesOverviewRoute: typeof DotDotFeaturesOverviewRoutesOverviewRoute
   DotDotFeaturesProjectsRoutesProjectsRoute: typeof DotDotFeaturesProjectsRoutesProjectsRoute
+  DotDotFeaturesSettingsRoutesSettingsRoute: typeof DotDotFeaturesSettingsRoutesSettingsRouteWithChildren
+  DotDotFeaturesTemplatesRoutesTemplatesRoute: typeof DotDotFeaturesTemplatesRoutesTemplatesRoute
   DotDotFeaturesProjectsRoutesProjectRoute: typeof DotDotFeaturesProjectsRoutesProjectRouteWithChildren
 }
 
@@ -385,8 +683,18 @@ const DotDotFeaturesSessionRoutesOrgRouteChildren: DotDotFeaturesSessionRoutesOr
   {
     DotDotFeaturesProjectsRoutesOrgIndexRoute:
       DotDotFeaturesProjectsRoutesOrgIndexRoute,
+    DotDotFeaturesCredentialsRoutesOrgCredentialsRoute:
+      DotDotFeaturesCredentialsRoutesOrgCredentialsRoute,
+    DotDotFeaturesExecutionsRoutesOrgExecutionsRoute:
+      DotDotFeaturesExecutionsRoutesOrgExecutionsRoute,
+    DotDotFeaturesOverviewRoutesOverviewRoute:
+      DotDotFeaturesOverviewRoutesOverviewRoute,
     DotDotFeaturesProjectsRoutesProjectsRoute:
       DotDotFeaturesProjectsRoutesProjectsRoute,
+    DotDotFeaturesSettingsRoutesSettingsRoute:
+      DotDotFeaturesSettingsRoutesSettingsRouteWithChildren,
+    DotDotFeaturesTemplatesRoutesTemplatesRoute:
+      DotDotFeaturesTemplatesRoutesTemplatesRoute,
     DotDotFeaturesProjectsRoutesProjectRoute:
       DotDotFeaturesProjectsRoutesProjectRouteWithChildren,
   }
@@ -423,7 +731,10 @@ const rootRouteChildren: RootRouteChildren = {
   DotDotFeaturesSessionRoutesSessionLayoutRoute:
     DotDotFeaturesSessionRoutesSessionLayoutRouteWithChildren,
   DotDotFeaturesSessionRoutesLoginRoute: DotDotFeaturesSessionRoutesLoginRoute,
-  SettingsAppearanceRoute: SettingsAppearanceRoute,
+  DotDotFeaturesSessionRoutesLegacySettingsRoute:
+    DotDotFeaturesSessionRoutesLegacySettingsRoute,
+  DotDotFeaturesSessionRoutesLegacyAppearanceRoute:
+    DotDotFeaturesSessionRoutesLegacyAppearanceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

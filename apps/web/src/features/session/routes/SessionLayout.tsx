@@ -5,8 +5,8 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
 import { problemStatus } from '../../../app/errors/to-problem-details';
-import { currentUserQueryOptions } from '../api/queries';
-import { SessionShell } from '../screens/SessionShell';
+import { currentUserQueryOptions } from '../../../app/session/current-user';
+import { SessionFrame } from '../screens/SessionFrame';
 
 /**
  * Every signed-in page is below this layout. It reads the current user before any of them renders;
@@ -15,9 +15,9 @@ import { SessionShell } from '../screens/SessionShell';
  */
 function SessionLayout() {
   return (
-    <SessionShell>
+    <SessionFrame>
       <Outlet />
-    </SessionShell>
+    </SessionFrame>
   );
 }
 

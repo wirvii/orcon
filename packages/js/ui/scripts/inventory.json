@@ -6,6 +6,7 @@
   "NumberFormat", "RedactedValue", "CommandPalette", "Separator", "ScrollArea", "ConnectorIcon", "BrandMark", "BrandHero",
   "Mascot", "AppShell", "TopBar", "NavItem", "NotificationBell", "AttentionInboxItem", "ThemeSwitcher",
   "DensitySwitcher", "LocaleSwitcher",
+  "SidebarNav", "OrgSwitcher", "UserMenu", "BottomTabBar", "ComingSoon", "ListRow", "ActiveToggle", "FilterChip", "CountTabs",
   "CanvasNode", "NodeStatusBadge", "NodeStatusChip", "PinnedBadge", "NodePort", "PortAddButton", "OutputStub", "CanvasEdge", "EdgeLabel",
   "EdgeActions", "NodeToolbar", "StickyNote", "CanvasControls", "CanvasMinimap", "AddFirstStep", "AiBlock", "NodePalettePanel", "CanvasOutline",
   "WorkflowCanvas", "NodeDetailsView", "PaneSplitter", "DataPane", "DataTableView", "JsonTreeView", "SchemaView",

@@ -3,44 +3,25 @@
 
 import { onlineManager } from '@tanstack/react-query';
 import { act, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { http } from 'msw';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderRoute } from '../../../test/screen-harness';
+import { flow, productApi, project } from '../../../test/product-fixtures';
+import { renderRoute, server } from '../../../test/screen-harness';
+import { acme, problem, signedIn } from '../../../test/session-fixtures';
 import type { LiveConnectionState, LiveEventSource } from '../live-events/dispatcher';
 import { FIRST_USEFUL_MARK } from '../perf/marks';
+
+beforeEach(() => {
+  // Nobody is signed in, unless a test says so.
+  server.use(http.get('/api/v1/users/me', () => problem(401, 'unauthenticated', 'unauthenticated')));
+});
 
 afterEach(() => {
   onlineManager.setOnline(true);
 });
 
-/** The links the shell shows for a section: a sidebar, a bottom bar and a drawer each carry one. */
-const sectionLinks = (name: string) => screen.getAllByRole('link', { name, hidden: true });
-
 describe('the page frame', () => {
-  it('lists the settings and the API reference, and marks the section being shown', async () => {
-    renderRoute('/settings/appearance');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Appearance and language' })).toBeVisible();
-    for (const link of sectionLinks('Settings')) expect(link).toHaveAttribute('aria-current', 'page');
-    expect(sectionLinks('API reference')[0]).toHaveAttribute('href', '/api/reference/');
-    expect(sectionLinks('API reference')[0]).not.toHaveAttribute('target', '_blank');
-  });
-
-  it('leaves a click with a modifier key to the browser', async () => {
-    const { router } = renderRoute('/settings/appearance');
-    await screen.findByRole('heading', { level: 1, name: 'Appearance and language' });
-    const settings = sectionLinks('Settings')[0];
-    if (!settings) throw new Error('The shell has no Settings link.');
-    // The browser would open a new tab; the router must not navigate.
-    settings.addEventListener('click', (event) => {
-      event.preventDefault();
-    });
-    await userEvent.keyboard('{Control>}');
-    await userEvent.click(settings);
-    await userEvent.keyboard('{/Control}');
-    expect(router.state.location.pathname).toBe('/settings/appearance');
-  });
-
   it('shows the not-found page for an address that is no route', async () => {
     renderRoute('/no/such/page');
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
@@ -79,8 +60,9 @@ describe('the page frame', () => {
         return () => undefined;
       },
     };
-    renderRoute('/settings/appearance', { source });
-    await screen.findByRole('heading', { level: 1, name: 'Appearance and language' });
+    server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([project]), productApi.flows([flow]));
+    renderRoute('/orgs/acme/overview', { source });
+    await screen.findByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Ana$/ });
     expect(screen.queryByText('Live updates are paused')).toBeNull();
     act(() => {
       report?.('paused');

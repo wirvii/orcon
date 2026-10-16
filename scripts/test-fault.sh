@@ -3,10 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # make test-fault STORE=sqlite|postgres [FI=FI-04,FI-12]: the fault matrix of
-# ADR-0019 section 3 for the durable engine (SPEC-001). Rows that need a process of
-# their own (kill -9, SIGSTOP, a full disk) run on SQLite in this cut; the rows
-# that run inside the test process run on either store. The PostgreSQL process rows
-# (FI-07, FI-08 and the multi-process races) arrive with cut C4b.
+# ADR-0019 section 3 for the durable engine (SPEC-001). Rows that run real processes
+# (kill -9, SIGSTOP, a cut network) run on both stores, except the rows that need
+# what only one store has: the disk-full and write-kill rows are SQLite's (one
+# process per file), the network cut, the connection loss and the multi-process race
+# are PostgreSQL's. The rows that run inside the test process run on either store.
+# FI-01..FI-03, FI-06 (cut C6), FI-13, FI-14 (C5, C12) and FI-17, FI-18 (C17a) are not
+# rows of the durable engine and are not run here.
 set -eu
 
 store=${STORE:-sqlite}
@@ -22,10 +25,10 @@ case "$store" in
     ;;
 esac
 
-# Rows, by id: the package, the tests, and whether the row needs a process (SQLite).
+# The rows of this cut, by id. Each runs on the stores its case says.
 #   fault:   internal/adapter/storetest/fault (real processes)
 #   durable: test/engine/durable (the engine over the store, in the test process)
-all_rows="FI-04 FI-05 FI-09 FI-10 FI-11 FI-12 FI-15 FI-16"
+all_rows="FI-04 FI-05 FI-07 FI-08 FI-09 FI-10 FI-11 FI-12 FI-15 FI-16"
 if [ -z "$rows" ]; then
   rows=$(echo "$all_rows" | tr ' ' ',')
 fi
@@ -43,23 +46,24 @@ run() {
 
 for row in $(echo "$rows" | tr ',' ' '); do
   case "$row" in
-    FI-04) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestKillDuringForkAndJoin' ;;
-    FI-05) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestStoppedWorkerIsFenced' ;;
-    FI-09) run ./test/engine/durable/ 'TestFencing' ;;
+    FI-04) run ./internal/adapter/storetest/fault/ 'TestKillDuringForkAndJoin' ;;
+    FI-05) run ./internal/adapter/storetest/fault/ 'TestStoppedWorkerIsFenced' ;;
+    FI-07) [ "$store" = postgres ] && run ./internal/adapter/storetest/fault/ 'TestNetworkCutToDatabase' ;;
+    FI-08) [ "$store" = postgres ] && run ./internal/adapter/storetest/fault/ 'TestPostgresConnectionsEnded' ;;
+    FI-09)
+      run ./test/engine/durable/ 'TestFencing'
+      [ "$store" = postgres ] && run ./internal/adapter/storetest/fault/ 'TestRaceAcrossProcesses'
+      ;;
     FI-10) run ./test/engine/durable/ 'TestClockSkew' ;;
     FI-11) run ./test/engine/durable/ 'TestClaimIsExclusive|TestOutbox' ;;
     FI-12)
-      [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestPoisonItem'
+      run ./internal/adapter/storetest/fault/ 'TestPoisonItem'
       run ./test/engine/durable/ 'TestReaper|TestLostLeasesCountAbandonment'
       ;;
     FI-15) [ "$store" = sqlite ] && run ./internal/adapter/storetest/fault/ 'TestKillDuringWrites|TestDiskFull' ;;
     FI-16) run ./test/engine/durable/ 'TestRecomputeDeterminism' ;;
     FI-01 | FI-02 | FI-03 | FI-06)
       echo "test-fault: $row is a row of the effects journal (cut C6); it is not implemented yet" >&2
-      status=1
-      ;;
-    FI-07 | FI-08)
-      echo "test-fault: $row needs PostgreSQL processes (cut C4b); it is not implemented yet" >&2
       status=1
       ;;
     FI-13 | FI-14)

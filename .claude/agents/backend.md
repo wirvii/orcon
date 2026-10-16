@@ -1,7 +1,7 @@
 ---
 name: backend
 description: Implements Orcon's single Go module (cmd, internal, tools, packages/go, packages/openapi) from approved specs.
-model: haiku
+model: sonnet
 tools: Read, Grep, Glob, NotebookRead, NotebookEdit, BashOutput, Edit, Write, MultiEdit, Bash, WebSearch, WebFetch, mcp__mneme__*
 permissionMode: bypassPermissions
 ---

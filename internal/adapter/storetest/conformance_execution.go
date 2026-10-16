@@ -97,6 +97,8 @@ func executionCases() []struct {
 		{"TransactionRollsBack", rollbackCase},
 		{"ClaimIsExclusive", claimCase},
 		{"ClaimOrderAndFilters", claimOrderCase},
+		{"ExecutionCapDoesNotStarveOthers", executionCapCase},
+		{"ClaimCostFlatBehindCappedExecution", claimCostFlatCase},
 		{"FencingStopsALostLease", fencingCase},
 		{"RenewAndReap", reapCase},
 		{"JoinArrivalIsAtomic", joinCase},
@@ -415,6 +417,121 @@ func claimOrderCase(t *testing.T, newStore Factory) {
 			t.Fatalf("claimed fields = %+v", c)
 		}
 	}
+}
+
+// executionCapCase: the per-execution cap holds inside one claim, and an execution at its
+// cap never crowds the other executions out of a claim (ADR-0014 section 2.2, SPEC-001
+// E-FAIR-2). The capped execution has the oldest tokens, so a claim that chose its page
+// before applying the cap would fill it with tokens it then has to refuse.
+func executionCapCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	for i := range 4 {
+		e.token(capped, "capped", 0, now.Add(-2*time.Hour+time.Duration(i)*time.Second))
+	}
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	// One claim of eight, a cap of one per execution: one token of each execution, not four of the first.
+	got, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 8, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("claim of 8 with a cap of 1 = %d tokens, %v; want one per execution", len(got), err)
+	}
+	seen := map[store.ExecutionID]int{}
+	for i := range got {
+		seen[got[i].ExecutionID]++
+	}
+	if seen[capped.ID] != 1 || seen[other.ID] != 1 {
+		t.Fatalf("tokens per execution = %v, want exactly one of each", seen)
+	}
+	if !slicesContainsToken(got, otherToken.ID) {
+		t.Fatal("the token of the second execution was not claimed")
+	}
+
+	// Both executions are at their cap now. A claim of one must reach a third execution behind them.
+	third := e.execution()
+	thirdToken := e.token(third, "third", 0, now.Add(-30*time.Minute))
+	got, err = e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 1 || got[0].TokenID != thirdToken.ID {
+		t.Fatalf("claim of 1 behind two capped executions = %+v, %v; want the token of the third", got, err)
+	}
+}
+
+// claimCostFlatCase: a claim of one token behind an execution at its cap must not cost quadratically more as that
+// execution's runnable tokens grow. The claim alone is timed (not the setup) at two sizes and the sizes are compared,
+// which holds under the race detector and on slow runners where an absolute bound does not: the cost may follow the
+// tokens it skips (a ratio near the 10x size ratio) but counting the candidates ahead of each token puts it near 100x.
+func claimCostFlatCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	const small, large, maxRatio = 200, 2000, 30.0
+	// The best of two runs per size drops scheduler noise from the ratio.
+	best := func(n int) time.Duration {
+		fastest := time.Duration(1<<63 - 1)
+		for range 2 {
+			if d := claimBehindCapped(t, newStore, n); d < fastest {
+				fastest = d
+			}
+		}
+		return fastest
+	}
+	lo, hi := best(small), best(large)
+	if lo < 50*time.Microsecond {
+		lo = 50 * time.Microsecond // a clock-resolution floor, so a very fast small claim cannot inflate the ratio
+	}
+	ratio := float64(hi) / float64(lo)
+	t.Logf("claim behind a capped execution: %s at %d runnable tokens, %s at %d (ratio %.1f, bound %.0f)", lo, small, hi, large, ratio, maxRatio)
+	if ratio > maxRatio {
+		t.Fatalf("claim cost grew %.1fx for %dx the runnable tokens of a capped execution; it must not grow faster than they do", ratio, large/small)
+	}
+}
+
+// claimBehindCapped returns the time of one single-token claim that has to pass over n runnable tokens of an
+// execution at its cap before reaching the token of another execution.
+func claimBehindCapped(t *testing.T, newStore Factory, n int) time.Duration {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	first := e.token(capped, "first", 0, now.Add(-3*time.Hour))
+	mustTx(t, e.tx(capped.OrgID, func(ctx context.Context, tx store.Tx) error {
+		for i := range n {
+			tok := store.Token{
+				ID: next[store.TokenID](e.ids), OrgID: capped.OrgID, ExecutionID: capped.ID, Status: "RUNNABLE", NodeID: "bulk", ScopePath: "",
+				ForkLineage: []byte(`[]`), FairnessKey: "flow/" + capped.FlowID.String(), EffectivePriority: 0,
+				AvailableAt: now.Add(-2*time.Hour + time.Duration(i)*time.Millisecond), CreatedAt: base, UpdatedAt: base,
+			}
+			if err := tx.InsertToken(ctx, &tok); err != nil {
+				return err
+			}
+		}
+		return nil
+	}), "insert bulk tokens")
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	request := store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now}
+	got, err := e.s.ClaimTokens(e.ctx(), request)
+	if err != nil || len(got) != 1 || got[0].TokenID != first.ID {
+		t.Fatalf("first claim = %+v, %v; want the oldest token of the capped execution", got, err)
+	}
+	start := time.Now()
+	got, err = e.s.ClaimTokens(e.ctx(), request)
+	elapsed := time.Since(start)
+	if err != nil || len(got) != 1 || got[0].TokenID != otherToken.ID {
+		t.Fatalf("claim behind a capped execution = %+v, %v; want the token of the other execution", got, err)
+	}
+	return elapsed
+}
+
+func slicesContainsToken(rows []store.Claimed, id store.TokenID) bool {
+	for i := range rows {
+		if rows[i].TokenID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func fencingCase(t *testing.T, newStore Factory) {

@@ -40,6 +40,14 @@
           "role": "brand-exact"
         }
       }
+    },
+    "green-light": {
+      "$value": "#84EB72",
+      "$extensions": {
+        "orcon": {
+          "role": "brand-exact"
+        }
+      }
     }
   }
 }

@@ -22,6 +22,7 @@ export const Hover: Story = { parameters: { pseudo: { hover: true } } };
 export const FocusVisible: Story = { parameters: { pseudo: { focusVisible: true } } };
 export const Active: Story = { parameters: { pseudo: { active: true } } };
 export const External: Story = { args: { external: true, href: 'https://example.com' } };
+export const Prose: Story = { args: { variant: 'prose' } };
 
 /** Inside running text the target size is exempt; the container declares it with data-prose. */
 export const InText: Story = {
@@ -36,12 +37,13 @@ export const InText: Story = {
   ),
 };
 
-const stateProps: Record<(typeof states)[number], { className?: string; external?: boolean }> = {
+const stateProps: Record<(typeof states)[number], { className?: string; external?: boolean; variant?: 'prose' | 'plain' }> = {
   default: {},
   hover: { className: 'pseudo-hover' },
   'focus-visible': { className: 'pseudo-focus-visible' },
   active: { className: 'pseudo-active' },
   external: { external: true },
+  prose: { variant: 'prose' },
 };
 
 export const Matrix: Story = {

@@ -99,7 +99,9 @@ type Activation struct {
 	Emissions     []ActivationEmission
 	// Failure is set when the activation failed the node. Its Cause is dropped.
 	Failure *Failure
-	Puts    []PayloadWrite
+	// Hold is set when the activation delayed or suspended the token.
+	Hold *hold
+	Puts []PayloadWrite
 	// Env is the environment the activation made, when it made one: replaying
 	// the activation keeps the record that goes with it.
 	Env *NodeEnv
@@ -192,7 +194,11 @@ func (r *run) activateNode(ctx context.Context, t *token, n *planNode, ne *nodeE
 	ems, err := r.activate(ctx, t, n, ne)
 	act := &Activation{NodeExecution: ne.id, Puts: r.owned.since(mark)}
 	var fe *failureError
+	var he *holdError
 	switch {
+	case errors.As(err, &he):
+		h := he.hold
+		act.Hold = &h
 	case err == nil:
 		act.Emissions = make([]ActivationEmission, len(ems))
 		for i, em := range ems {
@@ -227,6 +233,9 @@ func (r *run) replay(ctx context.Context, act *Activation) ([]emission, error) {
 	if act.Failure != nil {
 		f := *act.Failure
 		return nil, raise(&f)
+	}
+	if act.Hold != nil {
+		return nil, &holdError{hold: *act.Hold}
 	}
 	ems := make([]emission, len(act.Emissions))
 	for i, e := range act.Emissions {

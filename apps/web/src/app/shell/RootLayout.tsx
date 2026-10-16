@@ -10,7 +10,7 @@ import { NotFound } from './NotFound';
 
 /**
  * The root of every page. It adds no frame of its own: the signed-in pages wrap themselves in
- * `SessionShell`, the other pages in `PageShell`, so each frame appears exactly once.
+ * `AppFrame`, the sign-in page draws its own layout, so each frame appears exactly once.
  */
 function RootLayout() {
   return (

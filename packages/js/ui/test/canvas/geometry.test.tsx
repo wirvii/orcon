@@ -190,7 +190,7 @@ describe('execution states (canvas.md#execution-states)', () => {
     { status: 'SUCCEEDED', border: '--orcon-canvas-node-border', borderWidth: 1, badge: true, chip: null },
     { status: 'SUCCEEDED_WITH_ERRORS', border: '--orcon-status-warning-fg', borderWidth: 2, badge: true, chip: 'Succeeded with errors' },
     { status: 'FAILED', border: '--orcon-status-danger-fg', borderWidth: 2, badge: true, chip: 'Failed' },
-    { status: 'UNCERTAIN', border: '--orcon-status-attention-fg', borderWidth: 2, badge: true, chip: 'Uncertain' },
+    { status: 'UNCERTAIN', border: '--orcon-status-attention-fg', borderWidth: 2, badge: true, chip: 'Needs review' },
     { status: 'WAITING', border: '--orcon-status-active-fg', borderWidth: 2, badge: true, chip: 'Waiting' },
     { status: 'SUSPENDED', border: '--orcon-status-attention-fg', borderWidth: 2, badge: true, chip: 'Needs action' },
     { status: 'CANCELED', border: '--orcon-canvas-node-border', borderWidth: 1, badge: true, chip: 'Canceled' },

@@ -92,6 +92,105 @@ func (q *Queries) ClaimLastChanceToken(ctx context.Context, arg ClaimLastChanceT
 	return items, nil
 }
 
+const claimOneToken = `-- name: ClaimOneToken :many
+UPDATE token
+SET status = 'LEASED', lease_owner = ?1, lease_epoch = lease_epoch + 1, lease_expires_at = ?2,
+    claim_count = claim_count + 1, updated_at = ?3
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
+    AND (?4 = 1 OR t.fairness_key IN (/*SLICE:fairness_keys*/?))
+    AND t.abandoned_count < ?6 - 1
+    AND (t.org_id, t.execution_id) NOT IN (
+      SELECT l.org_id, l.execution_id FROM token l WHERE l.status = 'LEASED'
+      GROUP BY l.org_id, l.execution_id HAVING count(*) >= CAST(?7 AS INTEGER))
+  ORDER BY t.effective_priority, t.available_at, t.id
+  LIMIT 1)
+RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+          lease_epoch, lease_expires_at
+`
+
+type ClaimOneTokenParams struct {
+	WorkerID        []byte
+	LeaseExpiresAt  sql.NullInt64
+	Now             int64
+	AnyFairnessKey  interface{}
+	FairnessKeys    []string
+	PoisonThreshold interface{}
+	ExecutionLimit  int64
+}
+
+type ClaimOneTokenRow struct {
+	OrgID               []byte
+	ID                  []byte
+	ExecutionID         []byte
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	FairnessKey         string
+	LeaseEpoch          int64
+	LeaseExpiresAt      sql.NullInt64
+}
+
+// A claim of one token needs no count of the candidates ahead of it: the cap is only the leased tokens of the
+// execution, and the executions at their cap are found once per claim from the leased tokens (few), so the cost does not grow with the
+// runnable tokens of an execution already at its cap. ClaimTokens is for claims of more than one token.
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) ClaimOneToken(ctx context.Context, arg ClaimOneTokenParams) ([]ClaimOneTokenRow, error) {
+	query := claimOneToken
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkerID)
+	queryParams = append(queryParams, arg.LeaseExpiresAt)
+	queryParams = append(queryParams, arg.Now)
+	queryParams = append(queryParams, arg.AnyFairnessKey)
+	if len(arg.FairnessKeys) > 0 {
+		for _, v := range arg.FairnessKeys {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", strings.Repeat(",?", len(arg.FairnessKeys))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.PoisonThreshold)
+	queryParams = append(queryParams, arg.ExecutionLimit)
+	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimOneTokenRow{}
+	for rows.Next() {
+		var i ClaimOneTokenRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.NodeID,
+			&i.EdgeID,
+			&i.ScopePath,
+			&i.ForkLineageDocument,
+			&i.PayloadReference,
+			&i.FairnessKey,
+			&i.LeaseEpoch,
+			&i.LeaseExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const claimOutbox = `-- name: ClaimOutbox :many
 UPDATE outbox
 SET lease_owner = ?1, lease_expires_at = ?2, attempt_count = attempt_count + 1,
@@ -162,12 +261,23 @@ UPDATE token
 SET status = 'LEASED', lease_owner = ?1, lease_epoch = lease_epoch + 1, lease_expires_at = ?2,
     claim_count = claim_count + 1, updated_at = ?3
 WHERE id IN (
+  -- The execution cap applies inside the selection, before the page limit: a token is a candidate only while its
+  -- execution has room for it, counting the tokens already leased and the candidates ahead of it in the same claim
+  -- (all the tokens of an execution share one fairness key, so the key filter needs no repeat in the inner count).
   SELECT t.id FROM token t
   WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
     AND (?4 = 1 OR t.fairness_key IN (/*SLICE:fairness_keys*/?))
     AND t.abandoned_count < ?6 - 1
+    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED')
+      + (SELECT count(*) FROM token a
+         WHERE a.execution_id = t.execution_id AND a.status = 'RUNNABLE' AND a.available_at <= ?3
+           AND a.abandoned_count < ?6 - 1
+           AND (a.effective_priority < t.effective_priority
+                OR (a.effective_priority = t.effective_priority
+                    AND (a.available_at < t.available_at OR (a.available_at = t.available_at AND a.id < t.id)))))
+      < CAST(?7 AS INTEGER)
   ORDER BY t.effective_priority, t.available_at, t.id
-  LIMIT ?7)
+  LIMIT ?8)
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
           lease_epoch, lease_expires_at
 `
@@ -179,6 +289,7 @@ type ClaimTokensParams struct {
 	AnyFairnessKey  interface{}
 	FairnessKeys    []string
 	PoisonThreshold interface{}
+	ExecutionLimit  int64
 	PageSize        int64
 }
 
@@ -219,6 +330,7 @@ func (q *Queries) ClaimTokens(ctx context.Context, arg ClaimTokensParams) ([]Cla
 		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
 	}
 	queryParams = append(queryParams, arg.PoisonThreshold)
+	queryParams = append(queryParams, arg.ExecutionLimit)
 	queryParams = append(queryParams, arg.PageSize)
 	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
@@ -287,6 +399,52 @@ func (q *Queries) CountJoinArrivals(ctx context.Context, arg CountJoinArrivalsPa
 	var i CountJoinArrivalsRow
 	err := row.Scan(&i.ArrivalCount, &i.LiveCount)
 	return i, err
+}
+
+const countRunnableTokens = `-- name: CountRunnableTokens :many
+SELECT t.fairness_key, t.effective_priority, count(*) AS runnable_count, CAST(min(t.available_at) AS INTEGER) AS oldest_available_at
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= ?1
+GROUP BY t.fairness_key, t.effective_priority
+LIMIT ?2
+`
+
+type CountRunnableTokensRow struct {
+	FairnessKey       string
+	EffectivePriority int64
+	RunnableCount     int64
+	OldestAvailableAt int64
+}
+
+// The claimable tokens grouped by fairness key and priority: the snapshot a worker plans its claims from (ADR-0014 section 1).
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) CountRunnableTokens(ctx context.Context, now int64, rowLimit int64) ([]CountRunnableTokensRow, error) {
+	rows, err := q.db.QueryContext(ctx, countRunnableTokens, now, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountRunnableTokensRow{}
+	for rows.Next() {
+		var i CountRunnableTokensRow
+		if err := rows.Scan(
+			&i.FairnessKey,
+			&i.EffectivePriority,
+			&i.RunnableCount,
+			&i.OldestAvailableAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getOldestLastChance = `-- name: GetOldestLastChance :one

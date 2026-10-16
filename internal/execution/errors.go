@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
 )
@@ -87,6 +88,60 @@ func (e *NodeError) Error() string { return fmt.Sprintf("%s: %v", e.Code, e.Err)
 
 // Unwrap returns the underlying error.
 func (e *NodeError) Unwrap() error { return e.Err }
+
+// DelayError is the answer of a [NodeRunner] that cannot act yet and asks the
+// engine to run the same activation again at an instant: the token goes back to
+// RUNNABLE, claimable from Until on, and the execution keeps its state
+// (ADR-0014 section 2.4: a refused rate bucket delays the work; ADR-0012
+// section 6: a recovery waits for its dispatch deadline). Nothing is failed and
+// no lease is abandoned. Under an interpreter that does not persist (in
+// memory) the error fails the node like any other.
+type DelayError struct {
+	// Until is the instant the activation may run again.
+	Until time.Time
+	// Reason says what is awaited, without secrets.
+	Reason string
+	// Err is the underlying error, if any.
+	Err error
+}
+
+// Error implements error.
+func (e *DelayError) Error() string {
+	return fmt.Sprintf("delayed until %s: %s", e.Until.UTC().Format(time.RFC3339), e.Reason)
+}
+
+// Unwrap returns the underlying error.
+func (e *DelayError) Unwrap() error { return e.Err }
+
+// SuspendError is the answer of a [NodeRunner] whose node cannot go on without a
+// person: the node execution, the token and the execution become SUSPENDED
+// (ADR-0009 sections 1 to 3), for example an effect whose outcome is unknown
+// (ADR-0012 section 7). Under an interpreter that does not persist (in memory)
+// the error fails the node like any other.
+type SuspendError struct {
+	// Reason says what a person has to settle, without secrets.
+	Reason string
+	// Err is the underlying error, if any.
+	Err error
+}
+
+// Error implements error.
+func (e *SuspendError) Error() string { return "suspended: " + e.Reason }
+
+// Unwrap returns the underlying error.
+func (e *SuspendError) Unwrap() error { return e.Err }
+
+// hold is what a delay or a suspension asks of the token that raised it.
+type hold struct {
+	// until is the instant of a delay; the zero time marks a suspension.
+	until  time.Time
+	reason string
+}
+
+// holdError carries a [hold] up from the activation to the step.
+type holdError struct{ hold hold }
+
+func (e *holdError) Error() string { return "hold: " + e.hold.reason }
 
 // FailureOrigin tells whether the engine or a node raised a failure.
 type FailureOrigin string
