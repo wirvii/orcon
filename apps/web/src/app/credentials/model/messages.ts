@@ -342,6 +342,11 @@ export const changeMessages = defineMessages({
     defaultMessage: 'This credential belongs to a service this page cannot edit yet.',
     description: 'Shown in the dialog that replaces a secret when the credential is for a service the page has no form for.',
   },
+  replacesAll: {
+    id: 'credentials.change.replacesAll',
+    defaultMessage: 'The new version replaces all the secret values of this credential. Type again the ones you want to keep.',
+    description: 'Hint in the dialog that replaces the secret of a credential that holds several secret values.',
+  },
   currentValueHidden: {
     id: 'credentials.change.hidden',
     defaultMessage: 'The current value is never shown. Type the new one.',

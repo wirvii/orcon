@@ -34,6 +34,32 @@ export const shared = {
   allowedHosts: ['hooks.slack.com'],
 } as const;
 
+/** The credential the example flow's Slack step names (SLACK_CREDENTIAL_ID of the editor's example flow). */
+export const slackWebhook = {
+  ...siigo,
+  id: '0195f1a0-0000-7000-8000-0000000000c3',
+  name: 'Slack incoming webhook',
+  allowedHosts: ['hooks.slack.com'],
+} as const;
+
+/** A WhatsApp Cloud API credential, as the credential service lists it. */
+export const whatsappCredential = {
+  ...siigo,
+  id: '0195f1a0-0000-7000-8000-0000000000c4',
+  name: 'Ventas WhatsApp',
+  type: 'orcon.whatsapp@1',
+  allowedHosts: ['graph.facebook.com'],
+} as const;
+
+/** The API key of a model provider, as the credential service lists it. */
+export const modelCredential = {
+  ...siigo,
+  id: '0195f1a0-0000-7000-8000-0000000000c5',
+  name: 'Agent model key',
+  type: 'orcon.ai.llm@1',
+  allowedHosts: ['api.provider.example'],
+} as const;
+
 /** The detail of a credential carries its public fields. */
 export const siigoDetail = {
   ...siigo,
@@ -62,5 +88,19 @@ export const httpNodeType = {
   icon: {
     svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20z"/></svg>',
     source: 'orcon-fallback',
+  },
+};
+
+/** A node type of the WhatsApp package with its brand icon: the icon the WhatsApp service shows. */
+export const whatsappNodeType = {
+  type: 'orcon.whatsapp.whatsapp@1',
+  name: 'WhatsApp Cloud API',
+  group: 'Apps',
+  seal: 'OFFICIAL',
+  proofLevel: 'TESTED',
+  operations: [],
+  icon: {
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 20l1.5-4.5A8 8 0 1 1 8 19z"/></svg>',
+    source: 'orcon-package',
   },
 };

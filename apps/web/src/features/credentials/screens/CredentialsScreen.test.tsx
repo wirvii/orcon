@@ -10,7 +10,7 @@ import { productApi, project } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, problem, signedIn } from '../../../../test/session-fixtures';
 
-import { credentialApi, httpNodeType, shared, siigo, siigoDetail } from '../api/fixtures';
+import { credentialApi, httpNodeType, modelCredential, shared, siigo, siigoDetail, whatsappCredential, whatsappNodeType } from '../../../app/credentials/api/fixtures';
 
 const address = '/orgs/acme/projects/ventas/credentials';
 
@@ -83,6 +83,42 @@ describe('CredentialsScreen', () => {
     expect(screen.queryByText(/expire/i)).toBeNull();
     expect(screen.queryByText(/connected|healthy|failed its test/i)).toBeNull();
     expect(screen.queryAllByRole('columnheader')).toHaveLength(0);
+  });
+
+  it('names the WhatsApp and the AI model credentials by their service, with the icon of the package', async () => {
+    open(credentialApi.list([whatsappCredential, modelCredential]), credentialApi.nodeTypes([httpNodeType, whatsappNodeType]));
+    const whatsapp = await rowOf('Ventas WhatsApp');
+    expect(within(whatsapp).getByText('WhatsApp Cloud API')).toBeVisible();
+    expect(within(whatsapp).getByText('graph.facebook.com')).toBeVisible();
+    await waitFor(() => {
+      expect(within(whatsapp).getByRole('img', { name: 'WhatsApp Cloud API' })).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml'));
+    });
+    const model = await rowOf('Agent model key');
+    expect(within(model).getByText('AI model API key')).toBeVisible();
+  });
+
+  it('replaces the secret of a WhatsApp credential and leaves out what was not typed', async () => {
+    let body: unknown;
+    const detail = { ...whatsappCredential };
+    open(
+      credentialApi.list([whatsappCredential]),
+      credentialApi.get(whatsappCredential, '"2-1"', detail),
+      http.put(`/api/v1/credentials/${whatsappCredential.id}/secret`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...whatsappCredential, versionCount: 3 }, { headers: { ETag: '"3-1"' } });
+      }),
+    );
+    const row = await rowOf('Ventas WhatsApp');
+    await userEvent.click(within(row).getByRole('button', { name: 'Actions for Ventas WhatsApp' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Replace secret' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Replace the secret of Ventas WhatsApp' });
+    // A version holds all the values: the dialog says so, and only the access token is required.
+    expect(await within(dialog).findByText(/replaces all the secret values/)).toBeVisible();
+    await userEvent.type(within(dialog).getByLabelText(/^Access token/), 'new-token');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Replace secret' }));
+    await waitFor(() => {
+      expect(body).toEqual({ secretFields: { token: 'new-token' } });
+    });
   });
 
   it('marks a shared credential and gives it no actions', async () => {

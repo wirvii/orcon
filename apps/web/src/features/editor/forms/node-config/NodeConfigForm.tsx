@@ -3,11 +3,13 @@
 
 import { Banner, FormField, Textarea } from '@orcon/ui';
 import { useState } from 'react';
-import { useIntl } from 'react-intl';
+import { useIntl, type MessageDescriptor } from 'react-intl';
 
 import { parseJsonText } from '../../../../app/boundary/parse';
 import { pinOf } from '../../model/connector-versions';
 import type { FlowNode } from '../../model/flow-document';
+import { credentialSlotsOf, slotInManifest } from '../../model/credential-slots';
+import { credentialAt } from '../../model/document-ops';
 import { hiddenWithValue, isVisible } from '../../model/node-config';
 import { isUnsupported, manifestOf, parametersFor, type NodeManifest } from '../../model/node-manifests';
 
@@ -23,12 +25,9 @@ export interface NodeConfigFormProps {
   manifest?: NodeManifest | undefined;
 }
 
-const boundName = (node: FlowNode, slot: string): string | undefined => {
-  const held = node['credentials'];
-  if (typeof held !== 'object' || held === null) return undefined;
-  const binding = (held as Record<string, unknown>)[slot];
-  const name = typeof binding === 'object' && binding !== null ? (binding as Record<string, unknown>)['name'] : undefined;
-  return typeof name === 'string' ? name : undefined;
+const SLOT_TEXT: Partial<Record<string, { label: MessageDescriptor; note: MessageDescriptor }>> = {
+  whatsapp: { label: configMessages.slotWhatsappLabel, note: configMessages.slotWhatsappNote },
+  model: { label: configMessages.slotModelLabel, note: configMessages.slotModelNote },
 };
 
 /** The parameters of a step type the editor has no schema for: the raw object, edited as JSON. */
@@ -90,18 +89,35 @@ export function NodeConfigForm({ nodeId, manifest: override }: NodeConfigFormPro
       </Banner>
     );
   }
-  if (!manifest) return <RawParameters node={node} />;
+  const slots = credentialSlotsOf(node);
+  const slotTexts = (slot: (typeof slots)[number]) => {
+    const own = SLOT_TEXT[slot.slot];
+    return slotInManifest(node, slot) || own === undefined ? { label: t(`credential.${slot.slot}.label`), note: t(`credential.${slot.slot}.note`) } : { label: intl.formatMessage(own.label), note: intl.formatMessage(own.note) };
+  };
+  if (!manifest) {
+    // A step type the editor has no schema for still takes its credential from the list; the rest of its parameters are the raw object.
+    // The raw text restarts when the credential changes, because the credential is one of those parameters.
+    const held = slots.map((slot) => credentialAt(node, slot.parameter) ?? '').join('|');
+    return (
+      <div className="flex flex-col gap-4" data-node-config="raw">
+        {slots.map((slot) => (
+          <CredentialSelect key={slot.slot} nodeId={nodeId} slot={slot} bound={credentialAt(node, slot.parameter)} {...slotTexts(slot)} />
+        ))}
+        <RawParameters key={held} node={node} />
+      </div>
+    );
+  }
 
   const known = parametersFor(manifest, pinOf(node)?.version);
   const defs = known.filter((def) => isVisible(def, node.parameters, known));
   const kept = hiddenWithValue(known, node.parameters);
-  if (defs.length === 0 && manifest.credentials.length === 0) {
+  if (defs.length === 0 && slots.length === 0) {
     return <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.noParameters)}</p>;
   }
   return (
     <div className="flex flex-col gap-4" data-node-config={manifest.key}>
-      {manifest.credentials.map((slot) => (
-        <CredentialSelect key={slot.slot} nodeId={nodeId} slot={slot} bound={boundName(node, slot.slot)} t={t} />
+      {slots.map((slot) => (
+        <CredentialSelect key={slot.slot} nodeId={nodeId} slot={slot} bound={credentialAt(node, slot.parameter)} {...slotTexts(slot)} />
       ))}
       {defs.map((def) =>
         def.widget === 'flow-target' ? (

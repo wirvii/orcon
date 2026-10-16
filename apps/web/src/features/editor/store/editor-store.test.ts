@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { toCanvasGraph, type CanvasGraph } from '../model/canvas-graph';
-import { exampleFlowDocument } from '../model/example-flow';
+import { exampleFlowDocument, SLACK_CREDENTIAL_ID } from '../model/example-flow';
 import { cloneDocument, type FlowDocument } from '../model/flow-document';
 
 import { createEditorStore, HISTORY_LIMIT, type EditorState, type EditorStore } from './editor-store';
@@ -40,7 +40,7 @@ describe('the editor store: every action can be undone and redone', () => {
   it('addNote', () => expectUndoable((state) => state.addNote({ x: 100, y: 500 })));
   it('setParameter', () => expectUndoable((state) => state.setParameter('slack', 'method', 'PUT')));
   it('setNodeBlock', () => expectUndoable((state) => state.setNodeBlock('slack', 'retry', { maxAttempts: 4, initialInterval: 'PT2S' })));
-  it('setCredential', () => expectUndoable((state) => state.setCredential('slack', 'auth', 'Inventory API key')));
+  it('setCredential', () => expectUndoable((state) => state.setCredential('slack', ['credential'], 'other-id')));
   it('updateConnector', () => expectUndoable((state) => state.updateConnector('slack', '1.2.0', 'sha256:c3')));
   it('updateNote', () => expectUndoable((state) => state.updateNote('note-1', { body: 'changed', color: 4 })));
   it('applyLayout', () => expectUndoable((state) => state.applyLayout(new Map([['slack', { x: 700, y: 120 }]]))));
@@ -263,7 +263,7 @@ describe('the editor store: configuring a node', () => {
   it('records nothing when the value does not change', () => {
     const store = open();
     store.getState().setParameter('slack', 'method', 'POST');
-    store.getState().setCredential('slack', 'auth', 'Slack incoming webhook');
+    store.getState().setCredential('slack', ['credential'], SLACK_CREDENTIAL_ID);
     expect(store.getState().history.past).toHaveLength(0);
     expect(store.getState().version).toBe(0);
   });

@@ -35,22 +35,11 @@ export const configMessages = defineMessages({
   credentialOption: { id: 'editor.cred.option', defaultMessage: '{name}, updated {date}', description: 'A credential in the list. {name} is its name and {date} when it last changed.' },
   credentialOptionTyped: { id: 'editor.cred.optionTyped', defaultMessage: '{name} ({type}), updated {date}', description: 'A credential in the list when the step accepts several credential types. {name} is its name, {type} its type and {date} when it last changed.' },
   credentialCreate: { id: 'editor.cred.create', defaultMessage: 'Create new credential', description: 'Button that opens the form to create a credential from the step.' },
-  credentialMissingTitle: { id: 'editor.cred.missing.title', defaultMessage: 'Missing credential: {name}', description: 'Title of the notice when a step uses a credential name the project does not have. {name} is that name.' },
+  credentialMissingTitle: { id: 'editor.cred.missing.title', defaultMessage: 'The credential of this step is not in this project', description: 'Title of the notice when a step names a credential the project does not have, for example because it was deleted or the step was copied from another project.' },
   credentialMissingText: { id: 'editor.cred.missing.text', defaultMessage: 'Publishing fails until the step uses a credential that exists.', description: 'Explains the missing credential notice.' },
   credentialChooseAnother: { id: 'editor.cred.chooseAnother', defaultMessage: 'Choose another', description: 'Button that lets the person pick an existing credential instead of the missing one.' },
-  credentialCreateMissing: { id: 'editor.cred.createMissing', defaultMessage: 'Create', description: 'Button that creates the credential a step asks for by name.' },
   credentialLoadFailed: { id: 'editor.cred.loadFailed', defaultMessage: 'The credentials could not be loaded.', description: 'Error shown when the list of credentials cannot be read.' },
   credentialRetry: { id: 'editor.cred.retry', defaultMessage: 'Try again', description: 'Button that loads the list of credentials again.' },
-  credentialDialogTitle: { id: 'editor.cred.dialog.title', defaultMessage: 'Create credential', description: 'Title of the form that creates a credential.' },
-  credentialDialogText: { id: 'editor.cred.dialog.text', defaultMessage: 'Secret values are stored encrypted and are never shown again.', description: 'Explains how secret values of a new credential are treated.' },
-  credentialName: { id: 'editor.cred.dialog.name', defaultMessage: 'Name', description: 'Label of the field for the name of a new credential.' },
-  credentialNameHint: { id: 'editor.cred.dialog.nameHint', defaultMessage: 'Steps refer to the credential by this name.', description: 'Help text of the name of a new credential.' },
-  credentialNameTaken: { id: 'editor.cred.dialog.nameTaken', defaultMessage: 'The project already has a credential with this name.', description: 'Error shown when the name of a new credential is already used.' },
-  credentialType: { id: 'editor.cred.dialog.type', defaultMessage: 'Type', description: 'Label of the field for the type of a new credential.' },
-  credentialSave: { id: 'editor.cred.dialog.save', defaultMessage: 'Create credential', description: 'Button that creates the credential.' },
-  credentialCancel: { id: 'editor.cred.dialog.cancel', defaultMessage: 'Cancel', description: 'Button that closes the form without creating the credential.' },
-  credentialFailed: { id: 'editor.cred.dialog.failed', defaultMessage: 'The credential could not be created. Try again.', description: 'Error shown when creating a credential failed.' },
-  credentialTestUnavailable: { id: 'editor.cred.testUnavailable', defaultMessage: 'Testing a credential needs the server, which this preview does not use.', description: 'Explains why a credential cannot be tested in the preview.' },
   credentialCreated: { id: 'editor.cred.created', defaultMessage: 'Credential {name} created and chosen.', description: 'Confirmation after a credential was created from a step. {name} is its name.' },
 
   callTarget: { id: 'editor.call.target', defaultMessage: 'Flow', description: 'Label of the field that picks the flow a step calls.' },
@@ -163,5 +152,17 @@ export const configMessages = defineMessages({
   retryNothingOutside: { id: 'editor.config.retry.pure', defaultMessage: 'This step changes nothing outside Orcon, so repeating it is always safe.', description: 'Says a step that changes nothing outside has no duplicate risk.' },
 
   // Credential card (SPEC-019 R-UX-NDV-05)
+  slotWhatsappLabel: { id: 'editor.cred.slot.whatsapp.label', defaultMessage: 'WhatsApp credential', description: 'Label of the credential choice of a WhatsApp step. WhatsApp is a product name.' },
+  slotWhatsappNote: {
+    id: 'editor.cred.slot.whatsapp.note',
+    defaultMessage: 'Holds the access token that sends messages and, for the trigger, the app secret and the verify token that check what Meta sends. Its values are never shown.',
+    description: 'Explains the credential choice of a WhatsApp step. Meta is the company that runs WhatsApp.',
+  },
+  slotModelLabel: { id: 'editor.cred.slot.model.label', defaultMessage: 'Model credential', description: 'Label of the credential choice of an AI model or AI agent step.' },
+  slotModelNote: {
+    id: 'editor.cred.slot.model.note',
+    defaultMessage: 'The API key of the company that runs the model. The key is sent only to the domains listed in the credential. Its value is never shown.',
+    description: 'Explains the credential choice of an AI model or AI agent step.',
+  },
   credentialCard: { id: 'editor.cred.card', defaultMessage: 'Credential in use: {name}, {type}', description: 'Accessible name of the card that shows the credential a step uses. {name} is its name and {type} its type.' },
 });

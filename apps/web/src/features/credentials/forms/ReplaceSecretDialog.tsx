@@ -11,12 +11,12 @@ import { z } from 'zod';
 
 import { problemStatus, toProblemDetails } from '../../../app/errors/to-problem-details';
 import { formatIssue } from '../../../app/forms/zod-messages';
-import { useReplaceSecret } from '../api/mutations';
-import { credentialQueryOptions } from '../api/queries';
-import type { Credential } from '../model/credential';
+import { useReplaceSecret } from '../../../app/credentials/api/mutations';
+import { credentialQueryOptions } from '../../../app/credentials/api/queries';
+import type { Credential } from '../../../app/credentials/model/credential';
 
-import { changeMessages, credentialMessages } from '../model/messages';
-import { serviceOfCredential, type Service } from '../model/services';
+import { changeMessages, credentialMessages } from '../../../app/credentials/model/messages';
+import { serviceOfCredential, type Service } from '../../../app/credentials/model/services';
 
 export interface ReplaceSecretDialogProps {
   orgId: string;
@@ -100,7 +100,7 @@ function ReplaceForm({ formId, credentialId, etag, service, publicFields, onBusy
   const replace = useReplaceSecret();
   const [failure, setFailure] = useState<unknown>(undefined);
   const secrets = service.fields.filter((field) => field.secret);
-  const schema = z.object(Object.fromEntries(secrets.map((field) => [field.name, z.string().min(1).max(65536)])));
+  const schema = z.object(Object.fromEntries(secrets.map((field) => [field.name, field.required ? z.string().min(1).max(65536) : z.string().max(65536)])));
   const form = useForm<Record<string, string>>({
     resolver: zodResolver(schema, {
       error: (issue) => formatIssue(intl, issue),
@@ -116,7 +116,8 @@ function ReplaceForm({ formId, credentialId, etag, service, publicFields, onBusy
       await replace.mutateAsync({
         credentialId,
         etag,
-        secretFields: values,
+        // The new version holds only what is typed: an optional value left empty is not stored.
+        secretFields: Object.fromEntries(Object.entries(values).filter(([, value]) => value !== '')),
         publicFields,
       });
       replace.reset();
@@ -137,13 +138,14 @@ function ReplaceForm({ formId, credentialId, etag, service, publicFields, onBusy
         <ProblemAlert problem={toProblemDetails(failure)} />
       )}
       <p className="text-fg-muted text-sm">{intl.formatMessage(changeMessages.currentValueHidden)}</p>
+      {secrets.length > 1 ? <p className="text-fg-muted text-sm">{intl.formatMessage(changeMessages.replacesAll)}</p> : null}
       {secrets.map((field) => (
         <FormField
           key={field.name}
           name={`/secretFields/${field.name}`}
           label={intl.formatMessage(field.label)}
           description={intl.formatMessage(field.hint)}
-          required
+          required={field.required}
           error={errors[field.name]?.message}
         >
           <Input type="password" autoComplete="new-password" spellCheck={false} {...form.register(field.name)} />

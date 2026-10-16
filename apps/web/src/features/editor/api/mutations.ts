@@ -5,10 +5,9 @@ import { mutationOptions, type QueryClient, useMutation, useQueryClient } from '
 
 import type { FlowDocument } from '../model/flow-document';
 
-import type { NewCredential } from './credential-source';
 import { type FlowAnswer, publishFlow, setFlowActivation } from './flow-operations';
 import type { LoadedDraft, SaveResult } from './draft-source';
-import { credentialSource, draftQueryOptions, draftSource, editorKeys, LOCAL_ORGANIZATION } from './queries';
+import { draftQueryOptions, draftSource, editorKeys, LOCAL_ORGANIZATION } from './queries';
 
 export interface SaveDraftInput {
   document: FlowDocument;
@@ -46,23 +45,6 @@ export function useSaveDraft(flowId: string): (input: SaveDraftInput) => Promise
     },
   });
   return mutation.mutateAsync;
-}
-
-/**
- * Creates a credential from the inline dialog of a node (SPEC-014 R-ED-CRED-02). The secret values
- * are in the input only for the call: the mutation is dropped from the cache as soon as it ends
- * (`gcTime: 0`; the dialog also resets it), and the list in the cache holds names and types, never
- * values (SPEC-010 FM-8).
- */
-export function useCreateCredential() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationKey: [...editorKeys.credentials(LOCAL_ORGANIZATION), 'create'],
-    mutationFn: (input: NewCredential) => credentialSource.create(input),
-    retry: false,
-    gcTime: 0,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: editorKeys.credentials(LOCAL_ORGANIZATION) }),
-  });
 }
 
 /**

@@ -21,6 +21,9 @@ function httpPin(version: string) {
  * an HTTP request looks the stock up and a second HTTP request posts to a chat webhook. It is the
  * flow the preview of the editor opens (no request is made to read it).
  */
+/** The identifier of the stored credential the example's Slack step names; the tests' credential list holds it. */
+export const SLACK_CREDENTIAL_ID = '0195f1a0-0000-7000-8000-0000000000c3';
+
 const example = {
   format: 'orcon/flow@1',
   id: EXAMPLE_FLOW_ID,
@@ -45,7 +48,6 @@ const example = {
       type: 'orcon.http@1',
       parameters: { method: 'GET', url: '=https://inventory.example.test/items/{{ $json.sku }}' },
       connector: httpPin('1.2.0'),
-      credentials: { auth: { name: 'Inventory API key' } },
     },
     {
       id: 'slack',
@@ -55,11 +57,11 @@ const example = {
       parameters: {
         method: 'POST',
         url: 'https://hooks.slack.example.test/services/orders',
+        credential: SLACK_CREDENTIAL_ID,
         body: '={{ { text: "Order " + $(\'Webhook\').item.json.id + ": " + $(\'HTTP Request\').item.json.stock + " in stock" } }}',
       },
       // Pinned to an older connector version on purpose: the details view offers the update.
       connector: httpPin('1.0.0'),
-      credentials: { auth: { name: 'Slack incoming webhook' } },
     },
     { id: 'rejected', name: 'Ignore invalid order', element: 'endEvent', type: 'orcon.end@1', parameters: {} },
     { id: 'done', name: 'Done', element: 'endEvent', type: 'orcon.end@1', parameters: {} },

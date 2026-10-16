@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { apiCall, apiRequest } from '../../../app/api/http';
-import { ContractError } from '../../../app/errors/contract-error';
+import { apiCall, apiRequest } from '../../api/http';
+import { ContractError } from '../../errors/contract-error';
 
 import type { ServiceIcons } from '../model/service-icons';
 import { credentialPageSchema, credentialSchema, nodeTypePageSchema, type Credential, type CredentialWithTag, type NewCredential } from './schema';

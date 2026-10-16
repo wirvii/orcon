@@ -5,12 +5,12 @@ import { Badge, DropdownMenu, IconButton, RelativeTime } from '@orcon/ui';
 import { Globe, KeyRound, Lock, MoreHorizontal, Pencil, Trash2, TriangleAlert } from 'lucide-react';
 import { useIntl } from 'react-intl';
 
-import type { ServiceIcons } from '../model/service-icons';
-import type { Credential } from '../model/credential';
-import { credentialMessages } from '../model/messages';
-import { HTTP_CONNECTOR } from '../model/services';
+import type { ServiceIcons } from '../../../app/credentials/model/service-icons';
+import type { Credential } from '../../../app/credentials/model/credential';
+import { credentialMessages } from '../../../app/credentials/model/messages';
+import { HTTP_CONNECTOR, iconTypeOf, serviceOfConnector } from '../../../app/credentials/model/services';
 
-import { ServiceIcon } from './ServiceIcon';
+import { ServiceIcon } from '../../../app/credentials/components/ServiceIcon';
 
 export interface CredentialRowProps {
   credential: Credential;
@@ -33,12 +33,13 @@ const STATUS_TEXT = {
  */
 export function CredentialRow({ credential, icons, onReplace, onEditHosts, onDelete }: CredentialRowProps) {
   const intl = useIntl();
-  const serviceName = credential.type === HTTP_CONNECTOR ? intl.formatMessage(credentialMessages.connectorHttp) : credential.type;
+  const own = serviceOfConnector(credential.type);
+  const serviceName = credential.type === HTTP_CONNECTOR ? intl.formatMessage(credentialMessages.connectorHttp) : own === undefined ? credential.type : intl.formatMessage(own.name);
   const [firstHost, ...otherHosts] = credential.allowedHosts;
   const state = credential.status === 'OK' ? undefined : STATUS_TEXT[credential.status];
   return (
     <li className="border-border flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-b-0 md:flex-nowrap">
-      <ServiceIcon connector={credential.type} name={serviceName} icons={icons} />
+      <ServiceIcon connector={own === undefined ? credential.type : iconTypeOf(own)} name={serviceName} icons={icons} />
       <div className="flex min-w-0 flex-1 basis-0 flex-col gap-1">
         <span className="text-md font-semibold wrap-anywhere">{credential.name}</span>
         <span className="text-fg-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">

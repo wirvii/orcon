@@ -5,12 +5,10 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { EXAMPLE_FLOW_ID, exampleFlowDocument, PERF_FLOW_ID, SAMPLE_SUBFLOWS, subflowDocument } from '../model/example-flow';
 
-import type { CredentialSource } from './credential-source';
 import type { DraftSource } from './draft-source';
 import { getFlow } from './flow-operations';
 import { getVersionDocument } from './operations';
 import type { FlowTargetSource } from './flow-target-source';
-import { createLocalCredentialSource } from './local-credential-source';
 import { createLocalDraftSource, type DraftSeed } from './local-draft-source';
 import { createServerDraftSource } from './server-draft-source';
 import { createLocalFlowTargetSource } from './local-flow-target-source';
@@ -24,7 +22,6 @@ export const LOCAL_ORGANIZATION = 'local';
 export const editorKeys = {
   all: (organizationId: string) => [organizationId, 'editor'] as const,
   draft: (organizationId: string, flowId: string) => [organizationId, 'editor', 'draft', flowId] as const,
-  credentials: (organizationId: string) => [organizationId, 'editor', 'credentials'] as const,
   flowTargets: (organizationId: string) => [organizationId, 'editor', 'flow-targets'] as const,
   flow: (organizationId: string, flowId: string) => [organizationId, 'editor', 'flow', flowId] as const,
   runs: (organizationId: string, flowId: string, part: 'last' | 'nodes' | 'data', id: string) => [organizationId, 'editor', 'runs', flowId, part, id] as const,
@@ -50,20 +47,8 @@ export const usesLocalDrafts = import.meta.env.MODE === 'perf';
 
 export const draftSource: DraftSource = usesLocalDrafts ? createLocalDraftSource(seeds) : createServerDraftSource();
 
-/** Where the credential widget reads and creates credentials: the same seam as `draftSource` (ED5a part 2 swaps it). */
-export const credentialSource: CredentialSource = createLocalCredentialSource();
-
 /** Where the sub-flow widget reads the flows a node may call. */
 export const flowTargetSource: FlowTargetSource = createLocalFlowTargetSource();
-
-/** The credentials the person can use in this project (`credential:use`), names and types only. */
-export function credentialsQueryOptions() {
-  return queryOptions({
-    queryKey: editorKeys.credentials(LOCAL_ORGANIZATION),
-    queryFn: () => credentialSource.list(),
-    staleTime: 60_000,
-  });
-}
 
 /** The flows a Call sub-flow node may target. */
 export function flowTargetsQueryOptions() {

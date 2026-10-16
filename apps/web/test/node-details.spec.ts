@@ -220,8 +220,10 @@ test.describe('on a computer', () => {
     const dialog = page.getByRole('dialog', { name: 'HTTP Request details' });
     await dialog.getByRole('button', { name: 'Create new credential' }).click();
     const form = page.getByRole('dialog', { name: 'Create credential' });
-    await form.getByRole('textbox', { name: /^Name/ }).fill('Warehouse key');
-    await form.getByLabel(/Header value/).fill('s3cret');
+    await form.getByLabel(/^Credential name/).fill('Warehouse key');
+    await form.getByLabel(/^Key/).fill('s3cret');
+    await form.getByLabel(/Send only to these domains/).fill('warehouse.example.com');
+    await form.getByLabel(/Send only to these domains/).press('Enter');
     await form.getByRole('button', { name: 'Create credential' }).click();
     await expect(form).toHaveCount(0);
     await expect(dialog.getByRole('combobox', { name: /Authentication/ })).toContainText('Warehouse key');
@@ -229,7 +231,7 @@ test.describe('on a computer', () => {
     expect(await page.evaluate(() => document.body.innerHTML.includes('s3cret'))).toBe(false);
   });
 
-  test('asks nothing from the network while the details are edited and a credential is created', async ({ page }) => {
+  test('asks only for the flow and the credentials while the details are edited and a credential is created', async ({ page }) => {
     const requests: string[] = [];
     page.on('request', (request) => {
       if (['fetch', 'xhr', 'websocket', 'eventsource'].includes(request.resourceType())) requests.push(request.url());
@@ -240,11 +242,13 @@ test.describe('on a computer', () => {
     await dialog.getByRole('textbox', { name: /URL/ }).fill('https://other.example.test/hook');
     await dialog.getByRole('button', { name: 'Create new credential' }).click();
     const form = page.getByRole('dialog', { name: 'Create credential' });
-    await form.getByRole('textbox', { name: /^Name/ }).fill('Another key');
-    await form.getByLabel(/Header value/).fill('x');
+    await form.getByLabel(/^Credential name/).fill('Another key');
+    await form.getByLabel(/^Key/).fill('x');
+    await form.getByLabel(/Send only to these domains/).fill('other.example.test');
+    await form.getByLabel(/Send only to these domains/).press('Enter');
     await form.getByRole('button', { name: 'Create credential' }).click();
     await expect(form).toHaveCount(0);
-    // The only data the editor asks for is its flow and draft; a credential is created in the page, without a request.
+    // The only data the editor asks for is its flow, its draft and the credentials of its project; nothing else leaves the page.
     expect(requests.filter((url) => !isFlowDataRequest(url) && !isFrameRequest(url))).toEqual([]);
   });
 

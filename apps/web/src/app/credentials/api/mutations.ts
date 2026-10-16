@@ -16,12 +16,16 @@ function invalidateCredentials(queryClient: QueryClient) {
   });
 }
 
-/** Creates a credential in the project. Never retried: a retry could create a second one. */
+/**
+ * Creates a credential in the project. Never retried: a retry could create a second one. The secret values are in
+ * the input only for the call, so the mutation leaves the cache as soon as it ends (`gcTime: 0`, SPEC-010 FM-8).
+ */
 export function useCreateCredential(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: NewCredential) => createCredential(projectId, input),
     retry: false,
+    gcTime: 0,
     onSuccess: () => invalidateCredentials(queryClient),
   });
 }
@@ -42,6 +46,7 @@ export function useReplaceSecret() {
       publicFields?: Readonly<Record<string, string>> | undefined;
     }) => replaceSecret(credentialId, etag, { secretFields, publicFields }),
     retry: false,
+    gcTime: 0,
     onSuccess: () => invalidateCredentials(queryClient),
   });
 }

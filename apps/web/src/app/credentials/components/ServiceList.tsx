@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl';
 
 import type { ServiceIcons } from '../model/service-icons';
 import { createMessages } from '../model/messages';
-import type { Service } from '../model/services';
+import { iconTypeOf, type Service } from '../model/services';
 
 import { ServiceIcon } from './ServiceIcon';
 
@@ -68,7 +68,7 @@ export function ServiceList({ services, selectedId, onSelect, icons }: ServiceLi
                 >
                   {/* The name is in the text next to it, so the icon is not read out twice. */}
                   <span aria-hidden className="shrink-0">
-                    <ServiceIcon connector={service.connector} name={name} icons={icons} />
+                    <ServiceIcon connector={iconTypeOf(service)} name={name} icons={icons} />
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="font-medium wrap-anywhere">{name}</span>
