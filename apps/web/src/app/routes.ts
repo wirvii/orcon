@@ -37,6 +37,7 @@ export const routes = rootRoute('shell/RootLayout.tsx', [
         route('/flows/$flowId', '../features/editor/routes/$flowId.tsx'),
         route('/executions', '../features/executions/routes/executions.tsx'),
         route('/executions/$executionId', '../features/executions/routes/execution.tsx'),
+        route('/settings', '../features/projects/routes/project-settings.tsx'),
       ]),
     ]),
     // The address the editor had before flows lived under a project. It only forwards (see the file).

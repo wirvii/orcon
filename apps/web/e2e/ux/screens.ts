@@ -19,7 +19,7 @@ export interface ProductScreen {
 
 /** A signed-in organization with one project that has one flow, created through the same API the screens use. */
 async function seed(page: Page): Promise<{ projectHandle: string; flowId: string }> {
-  await installApiDouble(page, { signedIn: true });
+  await installApiDouble(page, { signedIn: true, demo: true });
   await page.goto('/login');
   return page.evaluate(async ({ orgId }) => {
     const create = async (path: string, body: unknown) => {
@@ -61,6 +61,18 @@ export const screens: ProductScreen[] = [
     },
   },
   {
+    name: 'project-empty',
+    open: async (page) => {
+      await seed(page);
+      const handle = await page.evaluate(async ({ orgId }) => {
+        const response = await fetch(`/api/v1/orgs/${orgId}/projects`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Operaciones' }) });
+        return ((await response.json()) as { handle: string }).handle;
+      }, { orgId: org.id });
+      await page.goto(`/orgs/${org.slug}/projects/${handle}/flows`);
+      await expect(page.locator('[data-mascot-pose="thinking"]')).toBeVisible();
+    },
+  },
+  {
     name: 'create-flow',
     open: async (page) => {
       const { projectHandle } = await seed(page);
@@ -73,7 +85,7 @@ export const screens: ProductScreen[] = [
     open: async (page) => {
       const { projectHandle } = await seed(page);
       await page.goto(`/orgs/${org.slug}/projects/${projectHandle}/executions`);
-      await heading(page, 1, /^(Executions|Ejecuciones|Runs)/);
+      await heading(page, 2, /^(Executions|Ejecuciones|Runs)/);
     },
   },
   {
@@ -81,7 +93,7 @@ export const screens: ProductScreen[] = [
     open: async (page) => {
       const { projectHandle } = await seed(page);
       await page.goto(`/orgs/${org.slug}/projects/${projectHandle}/credentials`);
-      await heading(page, 1, /^(Credentials|Credenciales)$/);
+      await heading(page, 2, /^(Credentials|Credenciales)$/);
     },
   },
   {

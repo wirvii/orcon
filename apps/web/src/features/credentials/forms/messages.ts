@@ -23,6 +23,16 @@ export const credentialMessages = defineMessages({
     defaultMessage: 'Create one for each service a flow calls, then choose it in the node.',
     description: 'Explains the empty credentials list and the next step.',
   },
+  unavailableTitle: {
+    id: 'credentials.unavailable.title',
+    defaultMessage: 'Credentials will be available soon',
+    description: 'Title of the credentials list while the server cannot list credentials yet.',
+  },
+  unavailableText: {
+    id: 'credentials.unavailable.text',
+    defaultMessage: 'Nothing you did is lost. The credentials of this project will be listed here once the server is ready.',
+    description: 'Explains that the credentials list is not ready yet and that nothing the person did is lost.',
+  },
   secretSet: { id: 'credentials.secretSet', defaultMessage: 'Secret set', description: 'Shown next to a credential whose secret is stored. The value itself is never shown.' },
   changed: { id: 'credentials.changed', defaultMessage: 'Changed', description: 'Label before the time a credential last changed.' },
   replace: { id: 'credentials.replace', defaultMessage: 'Replace secret', description: 'Button that opens the dialog to replace the secret values of a credential.' },

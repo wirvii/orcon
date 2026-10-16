@@ -28,6 +28,12 @@ interface Flow {
   name: string;
   revision: number;
   document: unknown;
+  /** Set by the first publication; a flow without it cannot be activated. */
+  activeVersion?: number;
+  active: boolean;
+  /** The activity a list shows next to the flow (SPEC-019 UXB1): only the demo data has any. */
+  lastExecution?: { id: string; status: string; hasUncertainOperation: boolean; createdAt: string };
+  executionCountLast24h: number;
 }
 
 const session = {
@@ -60,9 +66,23 @@ const handleOf = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-/** Installs the stand-in on a page. Each page starts signed out, with no projects, unless `signedIn` says otherwise. */
-export async function installApiDouble(page: Page, options: { signedIn?: boolean } = {}): Promise<void> {
+/** The figures of the home page for the demo data (the answer of `getOrgActivitySummary`, SPEC-019 UXB2). */
+const demoSummary = {
+  activeFlowCount: 2,
+  flowCount: 3,
+  projectCount: 3,
+  executionsLast24h: { total: 4812, failed: 7, succeeded: 4803, uncertain: 2, byHour: [30, 22, 18, 25, 40, 62, 80, 95, 88, 76, 70, 82, 91, 85, 77, 64, 58, 49, 43, 38, 35, 33, 31, 29] },
+  timeSaved: { windowDays: 7, succeededExecutions: 620, minutesPerExecution: 3, minutes: 1860 },
+};
+
+/**
+ * Installs the stand-in on a page. Each page starts signed out, with no projects, unless `signedIn` says otherwise.
+ * `demo` gives the flows a last execution and an activity count and answers the home page figures, so a screenshot
+ * shows a lived-in product; without it the flows have never run and the figures say they are not available.
+ */
+export async function installApiDouble(page: Page, options: { signedIn?: boolean; demo?: boolean } = {}): Promise<void> {
   let signedIn = options.signedIn ?? false;
+  const demo = options.demo ?? false;
   const projects: Project[] = [];
   const flows: Flow[] = [];
 
@@ -111,6 +131,7 @@ export async function installApiDouble(page: Page, options: { signedIn?: boolean
         handle: project.handle,
         environment: project.environment,
         protected: true,
+        flowCount: flows.filter((flow) => flow.projectId === project.id).length,
         createdAt: '2026-10-14T10:00:00Z',
         updatedAt: '2026-10-14T10:00:00Z',
       }));
@@ -123,11 +144,36 @@ export async function installApiDouble(page: Page, options: { signedIn?: boolean
       if (method === 'POST') {
         const body = request.postDataJSON() as { name: string };
         const id = crypto.randomUUID();
-        const flow: Flow = { id, projectId, name: body.name, revision: 1, document: subflowDocument(id, body.name) };
+        const flow: Flow = { id, projectId, name: body.name, revision: 1, document: subflowDocument(id, body.name), active: false, executionCountLast24h: 0 };
+        if (demo) giveActivity(flow, flows.length);
         flows.push(flow);
         return route.fulfill(json(201, flowState(flow)));
       }
       return route.fulfill(json(200, { items: flows.filter((flow) => flow.projectId === projectId).map(flowState) }));
+    }
+
+    if (method === 'GET' && path === `/orgs/${org.id}/flows`) {
+      const query = new URL(request.url()).searchParams;
+      const wanted = query.get('q')?.toLowerCase();
+      const items = flows
+        .filter((flow) => query.get('projectId') === null || flow.projectId === query.get('projectId'))
+        .filter((flow) => query.get('activationState') === null || (flow.active ? 'ACTIVE' : 'INACTIVE') === query.get('activationState'))
+        .filter((flow) => wanted === undefined || flow.name.toLowerCase().startsWith(wanted))
+        .map((flow) => ({ ...flowState(flow), ...(flow.lastExecution === undefined ? {} : { lastExecution: flow.lastExecution }), executionCountLast24h: flow.executionCountLast24h }));
+      return route.fulfill(json(200, { items }));
+    }
+    if (method === 'GET' && path === `/orgs/${org.id}/activity-summary`) {
+      return demo ? route.fulfill(json(200, demoSummary)) : route.fulfill(problem(503, 'Service Unavailable', 'service-unavailable'));
+    }
+
+    const activation = /^\/flows\/([^/]+)\/(activate|deactivate)$/.exec(path);
+    if (method === 'POST' && activation) {
+      const flow = flows.find((candidate) => candidate.id === activation[1]);
+      if (flow === undefined) return route.fulfill(problem(404, 'Flow not found', 'not-found'));
+      if (request.headers()['if-match'] !== `"${flow.revision}"`) return route.fulfill(problem(412, 'The flow changed', 'precondition-failed'));
+      if (activation[2] === 'activate' && flow.activeVersion === undefined) return route.fulfill(problem(409, 'The flow was never published', 'conflict'));
+      flow.active = activation[2] === 'activate';
+      return route.fulfill(json(200, flowState(flow), { ETag: `"${flow.revision}"` }));
     }
 
     const flowDraft = /^\/flows\/([^/]+)\/draft$/.exec(path);
@@ -158,14 +204,31 @@ export async function installApiDouble(page: Page, options: { signedIn?: boolean
   await page.route('**/api/v1/**', answer);
 }
 
+/** Demo activity: the flows alternate between a flow that is live and ran fine, one that failed, one that needs review and one never published. */
+function giveActivity(flow: Flow, index: number) {
+  const kinds = [
+    { status: 'SUCCEEDED', hasUncertainOperation: false, count: 124, published: true, active: true },
+    { status: 'FAILED', hasUncertainOperation: false, count: 7, published: true, active: true },
+    { status: 'SUCCEEDED', hasUncertainOperation: true, count: 31, published: true, active: false },
+    { status: 'SUCCEEDED', hasUncertainOperation: false, count: 0, published: false, active: false },
+  ] as const;
+  const kind = kinds[index % kinds.length] ?? kinds[0];
+  flow.active = kind.active;
+  flow.executionCountLast24h = kind.count;
+  if (kind.published) {
+    flow.activeVersion = 1;
+    flow.lastExecution = { id: crypto.randomUUID(), status: kind.status, hasUncertainOperation: kind.hasUncertainOperation, createdAt: new Date(Date.now() - (index + 1) * 7 * 60_000).toISOString() };
+  }
+}
+
 function flowState(flow: Flow) {
   return {
     id: flow.id,
     projectId: flow.projectId,
     name: flow.name,
-    activationState: 'INACTIVE',
-    activeVersion: null,
-    hasUnpublishedChanges: true,
+    activationState: flow.active ? 'ACTIVE' : 'INACTIVE',
+    ...(flow.activeVersion === undefined ? {} : { activeVersion: flow.activeVersion }),
+    hasUnpublishedChanges: flow.activeVersion === undefined,
     draftRevision: flow.revision,
     createdAt: '2026-10-14T10:00:00Z',
     updatedAt: '2026-10-14T10:00:00Z',

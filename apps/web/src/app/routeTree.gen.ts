@@ -34,6 +34,7 @@ import { Route as DotDotFeaturesProjectsRoutesProjectIndexRouteImport } from './
 import { Route as DotDotFeaturesCredentialsRoutesCredentialsRouteImport } from './../features/credentials/routes/credentials'
 import { Route as DotDotFeaturesExecutionsRoutesExecutionsRouteImport } from './../features/executions/routes/executions'
 import { Route as DotDotFeaturesFlowsRoutesFlowsRouteImport } from './../features/flows/routes/flows'
+import { Route as DotDotFeaturesProjectsRoutesProjectSettingsRouteImport } from './../features/projects/routes/project-settings'
 import { Route as DotDotFeaturesExecutionsRoutesExecutionRouteImport } from './../features/executions/routes/execution'
 import { Route as DotDotFeaturesEditorRoutesFlowIdRouteImport } from './../features/editor/routes/$flowId'
 
@@ -198,6 +199,12 @@ const DotDotFeaturesFlowsRoutesFlowsRoute =
     path: '/flows',
     getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
   } as any)
+const DotDotFeaturesProjectsRoutesProjectSettingsRoute =
+  DotDotFeaturesProjectsRoutesProjectSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => DotDotFeaturesProjectsRoutesProjectRoute,
+  } as any)
 const DotDotFeaturesExecutionsRoutesExecutionRoute =
   DotDotFeaturesExecutionsRoutesExecutionRouteImport.update({
     id: '/executions/$executionId',
@@ -238,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
   '/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/settings': typeof DotDotFeaturesProjectsRoutesProjectSettingsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
   '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId': typeof DotDotFeaturesEditorRoutesFlowIdRoute
 }
@@ -265,6 +273,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
   '/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/orgs/$orgSlug/projects/$projectHandle/settings': typeof DotDotFeaturesProjectsRoutesProjectSettingsRoute
   '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
   '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId': typeof DotDotFeaturesEditorRoutesFlowIdRoute
 }
@@ -297,6 +306,7 @@ export interface FileRoutesById {
   '/_session/orgs/$orgSlug/projects/$projectHandle/credentials': typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/executions': typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/flows': typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  '/_session/orgs/$orgSlug/projects/$projectHandle/settings': typeof DotDotFeaturesProjectsRoutesProjectSettingsRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': typeof DotDotFeaturesExecutionsRoutesExecutionRoute
   '/_session/orgs/$orgSlug/projects/$projectHandle/flows/$flowId': typeof DotDotFeaturesEditorRoutesFlowIdRoute
 }
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/orgs/$orgSlug/projects/$projectHandle/executions'
     | '/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/orgs/$orgSlug/projects/$projectHandle/settings'
     | '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
     | '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId'
   fileRoutesByTo: FileRoutesByTo
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/orgs/$orgSlug/projects/$projectHandle/executions'
     | '/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/orgs/$orgSlug/projects/$projectHandle/settings'
     | '/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
     | '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId'
   id:
@@ -387,6 +399,7 @@ export interface FileRouteTypes {
     | '/_session/orgs/$orgSlug/projects/$projectHandle/credentials'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/executions'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/flows'
+    | '/_session/orgs/$orgSlug/projects/$projectHandle/settings'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
     | '/_session/orgs/$orgSlug/projects/$projectHandle/flows/$flowId'
   fileRoutesById: FileRoutesById
@@ -589,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotDotFeaturesFlowsRoutesFlowsRouteImport
       parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
     }
+    '/_session/orgs/$orgSlug/projects/$projectHandle/settings': {
+      id: '/_session/orgs/$orgSlug/projects/$projectHandle/settings'
+      path: '/settings'
+      fullPath: '/orgs/$orgSlug/projects/$projectHandle/settings'
+      preLoaderRoute: typeof DotDotFeaturesProjectsRoutesProjectSettingsRouteImport
+      parentRoute: typeof DotDotFeaturesProjectsRoutesProjectRoute
+    }
     '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId': {
       id: '/_session/orgs/$orgSlug/projects/$projectHandle/executions/$executionId'
       path: '/executions/$executionId'
@@ -644,6 +664,7 @@ interface DotDotFeaturesProjectsRoutesProjectRouteChildren {
   DotDotFeaturesCredentialsRoutesCredentialsRoute: typeof DotDotFeaturesCredentialsRoutesCredentialsRoute
   DotDotFeaturesExecutionsRoutesExecutionsRoute: typeof DotDotFeaturesExecutionsRoutesExecutionsRoute
   DotDotFeaturesFlowsRoutesFlowsRoute: typeof DotDotFeaturesFlowsRoutesFlowsRoute
+  DotDotFeaturesProjectsRoutesProjectSettingsRoute: typeof DotDotFeaturesProjectsRoutesProjectSettingsRoute
   DotDotFeaturesExecutionsRoutesExecutionRoute: typeof DotDotFeaturesExecutionsRoutesExecutionRoute
   DotDotFeaturesEditorRoutesFlowIdRoute: typeof DotDotFeaturesEditorRoutesFlowIdRoute
 }
@@ -657,6 +678,8 @@ const DotDotFeaturesProjectsRoutesProjectRouteChildren: DotDotFeaturesProjectsRo
     DotDotFeaturesExecutionsRoutesExecutionsRoute:
       DotDotFeaturesExecutionsRoutesExecutionsRoute,
     DotDotFeaturesFlowsRoutesFlowsRoute: DotDotFeaturesFlowsRoutesFlowsRoute,
+    DotDotFeaturesProjectsRoutesProjectSettingsRoute:
+      DotDotFeaturesProjectsRoutesProjectSettingsRoute,
     DotDotFeaturesExecutionsRoutesExecutionRoute:
       DotDotFeaturesExecutionsRoutesExecutionRoute,
     DotDotFeaturesEditorRoutesFlowIdRoute:

@@ -3,10 +3,9 @@
 
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
 import { expect, it } from 'vitest';
 
-import { flow, productApi, project } from '../../../../test/product-fixtures';
+import { productApi, project } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, currentUser, signedIn } from '../../../../test/session-fixtures';
 
@@ -19,8 +18,8 @@ async function open(path: string) {
     signedIn.currentUser,
     signedIn.organizations([acme]),
     productApi.projects([project, support]),
-    productApi.flows([flow]),
-    http.get('/api/v1/projects/:projectId/flows', () => HttpResponse.json({ items: [] })),
+    productApi.orgFlows([]),
+    productApi.activitySummary(),
   );
   const view = renderRoute(path);
   // The frame is drawn and the projects are read: only then does the key N know where to start a flow.

@@ -50,9 +50,9 @@ describe('CreateProjectDialog', () => {
   it('creates the project and opens its flows', async () => {
     await openDialog(() => HttpResponse.json(project, { status: 201 }));
     // From now on the project exists: the flows address resolves its handle.
-    server.use(productApi.projects([project]), productApi.flows([]));
+    server.use(productApi.projects([project]), productApi.orgFlows([]));
     await userEvent.type(screen.getByLabelText(/^Name/), 'Ventas');
     await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
-    expect(await screen.findByRole('heading', { name: 'Flows' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Ventas is ready for its first flow' })).toBeVisible();
   });
 });

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Button, EmptyState, ProblemAlert, Skeleton } from '@orcon/ui';
+import { Button, ComingSoon, EmptyState, ProblemAlert, Skeleton } from '@orcon/ui';
 import type { ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
@@ -43,7 +43,7 @@ export interface QueryStateProps<TData> {
   };
   /**
    * What to say when the server answers that the operation is not available yet (503 `service-unavailable`).
-   * The text replaces the error banner, so the person sees a calm state, not a server title or a request id.
+   * The text replaces the error banner with the coming-soon state: nothing failed, so the person sees no server title or request id.
    */
   unavailable?: { title: string; description?: string | undefined } | undefined;
   /** Placeholder rows shown while loading. */
@@ -74,7 +74,7 @@ export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, unav
     const problem = toProblemDetails(query.error);
     if (problem.status === 403) return <Forbidden />;
     if (unavailable !== undefined && problem.code === 'service-unavailable') {
-      return <EmptyState title={unavailable.title} description={unavailable.description} />;
+      return <ComingSoon title={unavailable.title} description={unavailable.description ?? ''} />;
     }
     return (
       <div className="flex flex-col items-start gap-3">

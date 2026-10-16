@@ -64,7 +64,7 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   await page.getByLabel(/^Name/).fill(projectName);
   await page.getByRole('button', { name: 'Create project' }).click();
   await expect(page).toHaveURL(new RegExp(`/orgs/${orgSlug}/projects/${projectHandle}/flows$`));
-  await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
 
   // 4. A new flow opens in the editor at its own address.
   await page.getByRole('button', { name: 'Create flow' }).first().click();
@@ -82,7 +82,7 @@ test('signing in leads to a project, its flow and the editor, and back', async (
 
   // 6. Signing out leaves the signed-in pages; the flows list is one address away.
   await page.goto(`/orgs/${orgSlug}/projects/${projectHandle}/flows`);
-  await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
   // The account button is the last menu button that is on screen (the sidebar's on a computer, the avatar of the top
   // bar on a phone); its name is the person's, whoever they are.
   await page.locator('button[aria-haspopup="menu"]:visible').last().click();
@@ -97,6 +97,6 @@ test('signing in leads to a project, its flow and the editor, and back', async (
   await expect(page).toHaveURL(/\/login\?redirect=/);
   await signIn(page, secret);
   await expect(page).toHaveURL(new RegExp(`${asked}$`));
-  await expect(page.getByRole('heading', { level: 1, name: 'Flows' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
   await expectNoAccessibilityViolations(page);
 });

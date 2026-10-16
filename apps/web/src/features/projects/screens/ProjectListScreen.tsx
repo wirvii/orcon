@@ -31,6 +31,7 @@ const messages = defineMessages({
     description: 'Explains the empty projects list and the next step.',
   },
   columnName: { id: 'projects.list.column.name', defaultMessage: 'Name', description: 'Column heading of the project name.' },
+  columnFlows: { id: 'projects.list.column.flows', defaultMessage: 'Flows', description: 'Column heading of how many flows a project has.' },
   columnEnvironment: { id: 'projects.list.column.environment', defaultMessage: 'Environment', description: 'Column heading of the optional environment label.' },
   columnHandle: { id: 'projects.list.column.handle', defaultMessage: 'Address name', description: 'Column heading of the readable name used in the address of a project.' },
   noEnvironment: { id: 'projects.list.noEnvironment', defaultMessage: 'No environment', description: 'Shown in the environment column when a project has no environment label.' },
@@ -85,6 +86,7 @@ export function ProjectListScreen() {
             <TableHeader>
               <TableRow>
                 <TableHead>{intl.formatMessage(messages.columnName)}</TableHead>
+                <TableHead>{intl.formatMessage(messages.columnFlows)}</TableHead>
                 <TableHead>{intl.formatMessage(messages.columnEnvironment)}</TableHead>
                 <TableHead>{intl.formatMessage(messages.columnHandle)}</TableHead>
               </TableRow>
@@ -99,6 +101,7 @@ export function ProjectListScreen() {
                       </RouterLink>
                     </Link>
                   </TableCell>
+                  <TableCell className="text-fg-muted tabular-nums">{project.flowCount ?? ''}</TableCell>
                   <TableCell className="text-fg-muted">{project.environment ?? intl.formatMessage(messages.noEnvironment)}</TableCell>
                   <TableCell className="font-mono text-sm">{project.handle}</TableCell>
                 </TableRow>

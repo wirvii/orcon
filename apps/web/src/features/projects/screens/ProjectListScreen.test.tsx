@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { http } from 'msw';
 import { describe, expect, it } from 'vitest';
 
@@ -41,5 +41,17 @@ describe('ProjectListScreen', () => {
     expect(await screen.findByRole('link', { name: 'Ventas' })).toHaveAttribute('href', '/orgs/acme/projects/ventas/flows');
     expect(screen.getByRole('cell', { name: 'ventas' })).toBeVisible();
     expect(screen.getByRole('cell', { name: 'production' })).toBeVisible();
+  });
+
+  it('shows how many flows each project has, and nothing when the server does not say', async () => {
+    const empty = { ...project, id: '0195f1a0-0000-7000-8000-0000000000d2', name: 'Soporte', handle: 'soporte', slug: 'soporte' };
+    server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([{ ...project, flowCount: 7 }, empty]));
+    renderRoute('/orgs/acme/projects');
+    const table = await screen.findByRole('table');
+    const row = within(table).getByRole('link', { name: 'Ventas' }).closest('tr') as HTMLElement;
+    expect(within(row).getByRole('cell', { name: '7' })).toBeVisible();
+    // An unknown count is left blank, never drawn as zero.
+    const other = within(table).getByRole('link', { name: 'Soporte' }).closest('tr') as HTMLElement;
+    expect(within(other).queryByRole('cell', { name: '0' })).toBeNull();
   });
 });

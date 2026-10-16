@@ -13,6 +13,8 @@ export const projectSchema = z.object({
   handle: z.string(),
   environment: z.string().nullish(),
   protected: z.boolean(),
+  /** How many flows the project has, in lists of projects (SPEC-019 UXB1); absent from older servers. */
+  flowCount: z.number().int().nonnegative().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
