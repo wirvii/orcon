@@ -3,13 +3,13 @@
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
 const quiet = ['test/harness/quiet.ts'];
 
 const browser = {
   enabled: true,
-  provider: 'playwright',
   headless: true,
 } as const;
 
@@ -57,7 +57,7 @@ export default defineConfig({
           name: 'a11y',
           setupFiles: quiet,
           include: ['test/a11y/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -67,7 +67,7 @@ export default defineConfig({
           name: 'canvas',
           setupFiles: quiet,
           include: ['test/canvas/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -78,7 +78,7 @@ export default defineConfig({
           setupFiles: quiet,
           include: ['test/parity/**/*.test.tsx'],
           testTimeout: 30_000,
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -88,7 +88,7 @@ export default defineConfig({
           name: 'canvas-motion',
           setupFiles: quiet,
           include: ['test/canvas-motion/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'no-preference', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'no-preference', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -98,7 +98,7 @@ export default defineConfig({
           name: 'density',
           setupFiles: quiet,
           include: ['test/density/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -108,7 +108,7 @@ export default defineConfig({
           name: 'expansion',
           setupFiles: quiet,
           include: ['test/expansion/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -118,7 +118,7 @@ export default defineConfig({
           name: 'virtual',
           setupFiles: quiet,
           include: ['test/virtual/**/*.test.tsx'],
-          browser: { ...browser, instances: [{ browser: 'chromium', context: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }] },
+          browser: { ...browser, instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }] },
         },
       },
       {
@@ -130,7 +130,7 @@ export default defineConfig({
           include: ['test/targets/**/*.test.tsx'],
           browser: {
             ...browser,
-            instances: [{ browser: 'chromium', context: { hasTouch: true, isMobile: true, reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }],
+            instances: [{ browser: 'chromium', provider: playwright({ contextOptions: { hasTouch: true, isMobile: true, reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }) }],
           },
         },
       },

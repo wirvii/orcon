@@ -27,9 +27,9 @@
     "@orcon/lint-config": "workspace:*",
     "@types/node": "^22.0.0",
     "eslint": "^9.20.0",
-    "style-dictionary": "^4.4.0",
+    "style-dictionary": "^5.4.4",
     "tailwindcss": "^4.1.17",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.0"
+    "vitest": "^4.1.11"
   }
 }

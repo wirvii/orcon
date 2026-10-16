@@ -58,7 +58,7 @@ Transitive packages bundled with them (for example the d3 modules of `@xyflow/re
 | `@types/react` | 19.3.0 | MIT |
 | `@types/react-dom` | 19.3.0 | MIT |
 | `@vitejs/plugin-react` | 4.7.0 | MIT |
-| `@vitest/browser` | 3.2.7 | MIT |
+| `@vitest/browser-playwright` | 4.1.12 | MIT |
 | `axe-core` | 4.14.0 | MPL-2.0 |
 | `eslint` | 9.39.5 | MIT |
 | `eslint-plugin-better-tailwindcss` | 4.9.0 | MIT |
@@ -69,7 +69,7 @@ Transitive packages bundled with them (for example the d3 modules of `@xyflow/re
 | `playwright` | 1.64.0 | Apache-2.0 |
 | `storybook` | 9.1.20 | MIT |
 | `storybook-addon-pseudo-states` | 9.1.20 | MIT |
-| `style-dictionary` | 4.4.0 | Apache-2.0 |
+| `style-dictionary` | 5.6.1 | Apache-2.0 |
 | `stylelint` | 16.26.1 | MIT |
 | `stylelint-declaration-strict-value` | 1.12.1 | MIT |
 | `tailwindcss` | 4.3.3 | MIT |
@@ -77,7 +77,7 @@ Transitive packages bundled with them (for example the d3 modules of `@xyflow/re
 | `typescript` | 5.9.3 | Apache-2.0 |
 | `typescript-eslint` | 8.71.2 | MIT |
 | `vite` | 6.4.4 | MIT |
-| `vitest` | 3.2.7 | MIT |
+| `vitest` | 4.1.12 | MIT |
 
 Notes:
 

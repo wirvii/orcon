@@ -17,12 +17,17 @@
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "turbo": "^2.4.0",
-    "vitest": "^3.2.0"
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "msw"
-    ]
+    ],
+    "overrides": {
+      "handlebars": "^4.7.10",
+      "tinypool": "^2.1.2",
+      "@ai-sdk/provider-utils": "^4.0.33"
+    }
   }
 }
