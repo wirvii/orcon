@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -51,6 +53,12 @@ type FlowDocumentReader interface {
 	Read(data []byte) (*flow.Document, error)
 }
 
+// ConnectorPackages reads the installed connector packages. The data reads use it to learn which
+// fields the pinned connector version declares as sensitive.
+type ConnectorPackages interface {
+	GetPackage(ctx context.Context, connectorID, version string) (connector.PackageRecord, error)
+}
+
 // OrgAuditLog stores an entry of an organization chain in its own transaction. The reads of
 // execution data use it, because they change nothing else.
 type OrgAuditLog interface {
@@ -65,6 +73,7 @@ type Executions struct {
 	reader     ExecutionReader
 	revisions  ExecutionRevisions
 	docs       FlowDocumentReader
+	packages   ConnectorPackages
 	authorizer authz.Authorizer
 	audit      OrgAuditLog
 	clock      clock.Clock
@@ -74,8 +83,8 @@ type Executions struct {
 
 // NewExecutions returns the handlers over the store, the flow revisions, the authorizer that
 // decides who reads execution data, the audit log, the clock and the page-token codec.
-func NewExecutions(reader ExecutionReader, revisions ExecutionRevisions, docs FlowDocumentReader, authorizer authz.Authorizer, auditLog OrgAuditLog, clk clock.Clock, ids id.Generator, codec *page.Codec) *Executions {
-	return &Executions{reader: reader, revisions: revisions, docs: docs, authorizer: authorizer, audit: auditLog, clock: clk, ids: ids, codec: codec}
+func NewExecutions(reader ExecutionReader, revisions ExecutionRevisions, docs FlowDocumentReader, packages ConnectorPackages, authorizer authz.Authorizer, auditLog OrgAuditLog, clk clock.Clock, ids id.Generator, codec *page.Codec) *Executions {
+	return &Executions{reader: reader, revisions: revisions, docs: docs, packages: packages, authorizer: authorizer, audit: auditLog, clock: clk, ids: ids, codec: codec}
 }
 
 // maxDataItems is the most items one data entry shows (the contract bounds dataItems).
@@ -122,36 +131,31 @@ func (x *Executions) ListExecutions(ctx context.Context, req apigen.ListExecutio
 	}
 	binding := page.Binding("sort="+page.String(terms), "project="+project.String(), "flowId="+flowID,
 		"status="+status, "createdAfter="+after, "createdBefore="+before)
-	cursor, err := cursorFor(x.codec, derefString(req.Params.PageToken), org.String(), binding, terms)
+	cursor, err := keysetCursor(x.codec, derefString(req.Params.PageToken), org.String(), binding)
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := x.readExecutions(ctx, org, project)
+	filter := store.ExecutionFilter{ProjectID: project, Oldest: !terms[0].Descending}
+	if req.Params.FlowId != nil {
+		filter.FlowID = flow.FlowID(*req.Params.FlowId)
+	}
+	if req.Params.Status != nil {
+		filter.Status = string(*req.Params.Status)
+	}
+	if req.Params.CreatedAfter != nil {
+		filter.CreatedAfter = *req.Params.CreatedAfter
+	}
+	if req.Params.CreatedBefore != nil {
+		filter.CreatedBefore = *req.Params.CreatedBefore
+	}
+	rows, err := x.reader.ListExecutions(ctx, org, filter, cursor, limit+1)
 	if err != nil {
-		return nil, err
+		return nil, wrapReadError(err)
 	}
-	var items []listItem
-	for i := range rows {
-		rec := &rows[i]
-		if flowID != "" && rec.FlowID.String() != flowID {
-			continue
-		}
-		if status != "" && rec.Status != status {
-			continue
-		}
-		if req.Params.CreatedAfter != nil && !rec.CreatedAt.After(*req.Params.CreatedAfter) {
-			continue
-		}
-		if req.Params.CreatedBefore != nil && !rec.CreatedAt.Before(*req.Params.CreatedBefore) {
-			continue
-		}
-		items = append(items, listItem{
-			keys: map[string]string{"createdAt": sortKeyTime(rec.CreatedAt)},
-			id:   rec.ID.String(), idx: i,
-		})
+	more := len(rows) > limit
+	if more {
+		rows = rows[:limit]
 	}
-	window, more, last := listWindow(items, terms, limit, cursor)
 
 	hidden, err := x.dataHidden(ctx, authz.ResourceRef{Kind: "project", ID: project.String()})
 	if err != nil {
@@ -159,15 +163,16 @@ func (x *Executions) ListExecutions(ctx context.Context, req apigen.ListExecutio
 	}
 	versions := newVersionNumbers(x.revisions, org)
 	body := apigen.ExecutionList{Items: []apigen.Execution{}}
-	for _, it := range window {
-		b, err := executionBody(ctx, &rows[it.idx], hidden, versions)
+	for i := range rows {
+		b, err := executionBody(ctx, &rows[i], hidden, versions)
 		if err != nil {
 			return nil, err
 		}
 		body.Items = append(body.Items, b)
 	}
 	if more {
-		token, err := tokenFor(x.codec, org.String(), binding, last)
+		last := rows[len(rows)-1]
+		token, err := tokenFor(x.codec, org.String(), binding, keysetPosition(last.CreatedAt, id.UUID(last.ID).String()))
 		if err != nil {
 			return nil, err
 		}
@@ -384,25 +389,6 @@ func (x *Executions) load(ctx context.Context, org orgscope.Org, execID types.UU
 	return rec, nil
 }
 
-// readExecutions reads the executions of the project, newest first, at most maxListRows of them.
-func (x *Executions) readExecutions(ctx context.Context, org orgscope.Org, project identity.ProjectID) ([]store.Execution, error) {
-	var out []store.Execution
-	var after store.Cursor
-	for len(out) < maxListRows {
-		batch, err := x.reader.ListExecutions(ctx, org, store.ExecutionFilter{ProjectID: project}, after, page.MaxLimit)
-		if err != nil {
-			return nil, wrapReadError(err)
-		}
-		out = append(out, batch...)
-		if len(batch) < page.MaxLimit {
-			break
-		}
-		last := batch[len(batch)-1]
-		after = store.Cursor{CreatedAt: last.CreatedAt, ID: id.UUID(last.ID)}
-	}
-	return out, nil
-}
-
 // dataHidden reports whether the caller lacks the permission to read execution data on the
 // resource. The pipeline already authorized the request itself, so a refusal here only hides data.
 func (x *Executions) dataHidden(ctx context.Context, resource authz.ResourceRef) (bool, error) {
@@ -421,8 +407,10 @@ func (x *Executions) dataHidden(ctx context.Context, resource authz.ResourceRef)
 	return decision != authz.DecisionAllow, nil
 }
 
-// sensitivePaths returns, by node id, the paths the flow revision of the execution marks as
-// sensitive (ADR-0017 section 3).
+// sensitivePaths returns, by node id, the paths that are sensitive for the execution: the paths
+// the flow revision marks on the node, together with the fields the manifest of the connector
+// version the node pins declares as sensitive (ADR-0017 section 3). When a manifest cannot be read
+// the call fails, because the data could not be masked.
 func (x *Executions) sensitivePaths(ctx context.Context, org orgscope.Org, rec *store.Execution) (map[string][]string, error) {
 	var raw []byte
 	switch {
@@ -446,12 +434,58 @@ func (x *Executions) sensitivePaths(ctx context.Context, org orgscope.Org, rec *
 		return nil, err
 	}
 	marks := make(map[string][]string, len(doc.Nodes))
+	manifests := map[flow.ConnectorUse]connector.Manifest{}
 	for i := range doc.Nodes {
-		if len(doc.Nodes[i].SensitivePaths) > 0 {
-			marks[string(doc.Nodes[i].ID)] = doc.Nodes[i].SensitivePaths
+		n := &doc.Nodes[i]
+		paths := slices.Clone(n.SensitivePaths)
+		if n.Connector != nil {
+			declared, err := x.connectorSensitiveFields(ctx, manifests, n)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, declared...)
+		}
+		if len(paths) > 0 {
+			marks[string(n.ID)] = paths
 		}
 	}
 	return marks, nil
+}
+
+// connectorSensitiveFields returns the sensitive fields the pinned connector version declares for
+// the type of the node. A package that is missing, is not the pinned one, cannot be read or does
+// not declare the node type is an error: the output of the node could not be masked.
+func (x *Executions) connectorSensitiveFields(ctx context.Context, cache map[flow.ConnectorUse]connector.Manifest, n *flow.Node) ([]string, error) {
+	connectorID, ok := flow.ConnectorIDOf(n.Type)
+	if !ok {
+		return nil, fmt.Errorf("the node %q pins a connector but its type names none", n.ID)
+	}
+	use := flow.ConnectorUse{ConnectorID: connectorID, ConnectorVersion: n.Connector.Version}
+	m, ok := cache[use]
+	if !ok {
+		rec, err := x.packages.GetPackage(ctx, use.ConnectorID, use.ConnectorVersion)
+		if errors.Is(err, connector.ErrNotFound) {
+			// The execution exists; a missing package is a fault of the installation, not a 404.
+			return nil, fmt.Errorf("the connector %s %s the execution pins is not installed", use.ConnectorID, use.ConnectorVersion)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read the connector %s %s the execution pins: %w", use.ConnectorID, use.ConnectorVersion, err)
+		}
+		if n.Connector.Digest != "" && rec.Digest != n.Connector.Digest {
+			return nil, fmt.Errorf("the connector %s %s installed is not the package the flow pins", use.ConnectorID, use.ConnectorVersion)
+		}
+		m, err = connector.Parse(rec.Manifest, connector.Options{})
+		if err != nil {
+			return nil, fmt.Errorf("read the manifest of the connector %s %s: %w", use.ConnectorID, use.ConnectorVersion, err)
+		}
+		cache[use] = m
+	}
+	for i := range m.Nodes {
+		if m.Nodes[i].Type == n.Type {
+			return m.Nodes[i].SensitiveFields, nil
+		}
+	}
+	return nil, fmt.Errorf("the connector %s %s declares no node of type %s", use.ConnectorID, use.ConnectorVersion, n.Type)
 }
 
 // auditView appends execution.data_viewed. The details name the execution and no data.

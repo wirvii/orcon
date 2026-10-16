@@ -24,18 +24,6 @@ SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, statu
 FROM execution
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
 
--- name: ListExecutions :many
--- orcon:scope org
--- orcon:hot
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id)
-  AND (created_at, id) < (sqlc.arg(before_created_at)::timestamptz, sqlc.arg(before_id)::uuid)
-ORDER BY created_at DESC, id DESC
-LIMIT sqlc.arg(page_size);
-
 -- name: ListFlowExecutions :many
 -- orcon:scope org
 -- orcon:hot
@@ -58,6 +46,36 @@ FROM execution
 WHERE org_id = sqlc.arg(org_id) AND status = sqlc.arg(status)
   AND (created_at, id) < (sqlc.arg(before_created_at)::timestamptz, sqlc.arg(before_id)::uuid)
 ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(page_size);
+
+-- name: ListProjectExecutions :many
+-- orcon:scope org
+-- orcon:hot
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at
+FROM execution
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id)
+  AND (sqlc.arg(any_flow)::boolean OR flow_id = sqlc.arg(flow_id)::uuid)
+  AND (sqlc.arg(any_status)::boolean OR status = sqlc.arg(status)::text)
+  AND created_at > sqlc.arg(created_after)::timestamptz AND created_at < sqlc.arg(created_before)::timestamptz
+  AND (created_at, id) < (sqlc.arg(before_created_at)::timestamptz, sqlc.arg(before_id)::uuid)
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(page_size);
+
+-- name: ListProjectExecutionsAsc :many
+-- orcon:scope org
+-- orcon:hot
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at
+FROM execution
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id)
+  AND (sqlc.arg(any_flow)::boolean OR flow_id = sqlc.arg(flow_id)::uuid)
+  AND (sqlc.arg(any_status)::boolean OR status = sqlc.arg(status)::text)
+  AND created_at > sqlc.arg(created_after)::timestamptz AND created_at < sqlc.arg(created_before)::timestamptz
+  AND (created_at, id) > (sqlc.arg(after_created_at)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY created_at ASC, id ASC
 LIMIT sqlc.arg(page_size);
 
 -- name: UpsertExecutionHourCount :exec
