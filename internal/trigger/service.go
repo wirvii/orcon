@@ -194,8 +194,9 @@ type publication struct {
 	actor            audit.Actor
 	note             string
 	// guardActive makes the publication fail with flow.ErrDraftConflict when another publication
-	// changed the live version after the flow was read: a conditional publication is consumed by
-	// the first one that lands, so two requests with the same If-Match never make two versions.
+	// changed the live version after the flow was read: of several concurrent publications that
+	// carry the same If-Match, only the first to land succeeds. It does not stop a later,
+	// sequential request with the same If-Match while the draft revision is still current.
 	guardActive  bool
 	activeAtRead flow.FlowVersionID
 }
