@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestOrgsCreateRequiresItsFlags: a missing slug, name or administrator is a usage error, and the
+// TestOrgsCreateRequiresItsFlags: a missing slug, name or owner is a usage error, and the
 // command does not open the store.
 func TestOrgsCreateRequiresItsFlags(t *testing.T) {
 	cases := [][]string{
@@ -17,6 +17,7 @@ func TestOrgsCreateRequiresItsFlags(t *testing.T) {
 		{"create", "--slug", "acme", "--name", "Acme"},
 		{"create", "--slug", "acme", "--admin", "ana@example.com"},
 		{"create", "--name", "Acme", "--admin", "ana@example.com"},
+		{"create", "--slug", "acme", "--name", "Acme", "--owner", "ana@example.com", "--admin", "bo@example.com"},
 	}
 	for _, args := range cases {
 		var stdout, stderr bytes.Buffer
