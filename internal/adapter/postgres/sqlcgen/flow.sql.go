@@ -74,26 +74,28 @@ func (q *Queries) CountUncertainExecutions(ctx context.Context, orgID pgtype.UUI
 }
 
 const getFlow = `-- name: GetFlow :one
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = $1 AND flow.id = $2 AND flow.deleted_at IS NULL
 `
 
 type GetFlowRow struct {
-	ID                   pgtype.UUID
-	OrgID                pgtype.UUID
-	ProjectID            pgtype.UUID
-	Name                 string
-	DraftDocument        []byte
-	DraftRevision        int64
-	Revision             int64
-	ActiveFlowVersionID  pgtype.UUID
-	ActiveVersionNumber  int64
-	ActivationState      string
-	DeletedAt            pgtype.Timestamptz
-	DeletedByPrincipalID pgtype.UUID
-	CreatedAt            pgtype.Timestamptz
-	UpdatedAt            pgtype.Timestamptz
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	Name                      string
+	DraftDocument             []byte
+	DraftRevision             int64
+	Revision                  int64
+	ActiveFlowVersionID       pgtype.UUID
+	ActiveVersionNumber       int64
+	ActivationState           string
+	DeletedAt                 pgtype.Timestamptz
+	DeletedByPrincipalID      pgtype.UUID
+	DraftUpdatedAt            pgtype.Timestamptz
+	DraftUpdatedByPrincipalID pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
 }
 
 // orcon:scope org
@@ -113,6 +115,8 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
+		&i.DraftUpdatedAt,
+		&i.DraftUpdatedByPrincipalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -120,26 +124,28 @@ func (q *Queries) GetFlow(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID
 }
 
 const getFlowByName = `-- name: GetFlowByName :one
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = $1 AND flow.project_id = $2 AND flow.name = $3 AND flow.deleted_at IS NULL
 `
 
 type GetFlowByNameRow struct {
-	ID                   pgtype.UUID
-	OrgID                pgtype.UUID
-	ProjectID            pgtype.UUID
-	Name                 string
-	DraftDocument        []byte
-	DraftRevision        int64
-	Revision             int64
-	ActiveFlowVersionID  pgtype.UUID
-	ActiveVersionNumber  int64
-	ActivationState      string
-	DeletedAt            pgtype.Timestamptz
-	DeletedByPrincipalID pgtype.UUID
-	CreatedAt            pgtype.Timestamptz
-	UpdatedAt            pgtype.Timestamptz
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	Name                      string
+	DraftDocument             []byte
+	DraftRevision             int64
+	Revision                  int64
+	ActiveFlowVersionID       pgtype.UUID
+	ActiveVersionNumber       int64
+	ActivationState           string
+	DeletedAt                 pgtype.Timestamptz
+	DeletedByPrincipalID      pgtype.UUID
+	DraftUpdatedAt            pgtype.Timestamptz
+	DraftUpdatedByPrincipalID pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
 }
 
 // orcon:scope org
@@ -160,6 +166,8 @@ func (q *Queries) GetFlowByName(ctx context.Context, orgID pgtype.UUID, projectI
 		&i.ActivationState,
 		&i.DeletedAt,
 		&i.DeletedByPrincipalID,
+		&i.DraftUpdatedAt,
+		&i.DraftUpdatedByPrincipalID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -617,7 +625,7 @@ func (q *Queries) ListFlowVersions(ctx context.Context, arg ListFlowVersionsPara
 }
 
 const listFlows = `-- name: ListFlows :many
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = $1 AND flow.project_id = $2 AND flow.id > $3 AND flow.deleted_at IS NULL
 ORDER BY flow.id
@@ -632,20 +640,22 @@ type ListFlowsParams struct {
 }
 
 type ListFlowsRow struct {
-	ID                   pgtype.UUID
-	OrgID                pgtype.UUID
-	ProjectID            pgtype.UUID
-	Name                 string
-	DraftDocument        []byte
-	DraftRevision        int64
-	Revision             int64
-	ActiveFlowVersionID  pgtype.UUID
-	ActiveVersionNumber  int64
-	ActivationState      string
-	DeletedAt            pgtype.Timestamptz
-	DeletedByPrincipalID pgtype.UUID
-	CreatedAt            pgtype.Timestamptz
-	UpdatedAt            pgtype.Timestamptz
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	Name                      string
+	DraftDocument             []byte
+	DraftRevision             int64
+	Revision                  int64
+	ActiveFlowVersionID       pgtype.UUID
+	ActiveVersionNumber       int64
+	ActivationState           string
+	DeletedAt                 pgtype.Timestamptz
+	DeletedByPrincipalID      pgtype.UUID
+	DraftUpdatedAt            pgtype.Timestamptz
+	DraftUpdatedByPrincipalID pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
 }
 
 // orcon:scope org
@@ -677,6 +687,8 @@ func (q *Queries) ListFlows(ctx context.Context, arg ListFlowsParams) ([]ListFlo
 			&i.ActivationState,
 			&i.DeletedAt,
 			&i.DeletedByPrincipalID,
+			&i.DraftUpdatedAt,
+			&i.DraftUpdatedByPrincipalID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -723,16 +735,19 @@ const updateFlowDraft = `-- name: UpdateFlowDraft :execrows
 UPDATE flow
 SET draft_document = $1,
     draft_revision = draft_revision + 1,
-    updated_at = $2
-WHERE org_id = $3 AND id = $4 AND draft_revision = $5 AND deleted_at IS NULL
+    updated_at = $2,
+    draft_updated_at = $2,
+    draft_updated_by_principal_id = $3
+WHERE org_id = $4 AND id = $5 AND draft_revision = $6 AND deleted_at IS NULL
 `
 
 type UpdateFlowDraftParams struct {
-	DraftDocument    []byte
-	UpdatedAt        pgtype.Timestamptz
-	OrgID            pgtype.UUID
-	ID               pgtype.UUID
-	ExpectedRevision int64
+	DraftDocument        []byte
+	UpdatedAt            pgtype.Timestamptz
+	UpdatedByPrincipalID pgtype.UUID
+	OrgID                pgtype.UUID
+	ID                   pgtype.UUID
+	ExpectedRevision     int64
 }
 
 // orcon:scope org
@@ -740,6 +755,7 @@ func (q *Queries) UpdateFlowDraft(ctx context.Context, arg UpdateFlowDraftParams
 	result, err := q.db.Exec(ctx, updateFlowDraft,
 		arg.DraftDocument,
 		arg.UpdatedAt,
+		arg.UpdatedByPrincipalID,
 		arg.OrgID,
 		arg.ID,
 		arg.ExpectedRevision,

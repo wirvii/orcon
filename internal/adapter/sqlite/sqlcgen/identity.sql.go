@@ -820,6 +820,21 @@ func (q *Queries) UpdateConnectorPackageInstalledByPrincipalToNull(ctx context.C
 	return result.RowsAffected()
 }
 
+const updateEffectPreviewDecidedByPrincipalToNull = `-- name: UpdateEffectPreviewDecidedByPrincipalToNull :execrows
+UPDATE effect_preview
+SET decided_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM effect_preview AS target WHERE target.decided_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+func (q *Queries) UpdateEffectPreviewDecidedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateEffectPreviewDecidedByPrincipalToNull, principalID, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateExternalOperationResolvedByPrincipalToNull = `-- name: UpdateExternalOperationResolvedByPrincipalToNull :execrows
 UPDATE external_operation
 SET resolved_by_principal_id = NULL
@@ -849,6 +864,52 @@ WHERE id IN (SELECT target.id FROM flow AS target WHERE target.deleted_by_princi
 // orcon:include-deleted the rows to change are exactly the soft-deleted ones that name the principal
 func (q *Queries) UpdateFlowDeletedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateFlowDeletedByPrincipalToNull, principalID, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateFlowDraftUpdatedByPrincipalToNull = `-- name: UpdateFlowDraftUpdatedByPrincipalToNull :execrows
+UPDATE flow
+SET draft_updated_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow AS target WHERE target.draft_updated_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+// orcon:include-deleted the rows to change are the flows that name the principal, soft-deleted or not
+func (q *Queries) UpdateFlowDraftUpdatedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateFlowDraftUpdatedByPrincipalToNull, principalID, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateFlowEditingSessionOpenedByPrincipalToNull = `-- name: UpdateFlowEditingSessionOpenedByPrincipalToNull :execrows
+UPDATE flow_editing_session
+SET opened_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow_editing_session AS target WHERE target.opened_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+func (q *Queries) UpdateFlowEditingSessionOpenedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateFlowEditingSessionOpenedByPrincipalToNull, principalID, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateFlowNodePinPinnedByPrincipalToNull = `-- name: UpdateFlowNodePinPinnedByPrincipalToNull :execrows
+UPDATE flow_node_pin
+SET pinned_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow_node_pin AS target WHERE target.pinned_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+func (q *Queries) UpdateFlowNodePinPinnedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateFlowNodePinPinnedByPrincipalToNull, principalID, batchSize)
 	if err != nil {
 		return 0, err
 	}
@@ -942,6 +1003,21 @@ func (q *Queries) UpdateMembershipStatus(ctx context.Context, arg UpdateMembersh
 	return result.RowsAffected()
 }
 
+const updateNodeTestDataCreatedByPrincipalToNull = `-- name: UpdateNodeTestDataCreatedByPrincipalToNull :execrows
+UPDATE node_test_data
+SET created_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM node_test_data AS target WHERE target.created_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+func (q *Queries) UpdateNodeTestDataCreatedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateNodeTestDataCreatedByPrincipalToNull, principalID, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateOperationalAlertAcknowledgedByPrincipalToNull = `-- name: UpdateOperationalAlertAcknowledgedByPrincipalToNull :execrows
 UPDATE operational_alert
 SET acknowledged_by_principal_id = NULL
@@ -966,6 +1042,21 @@ WHERE id = ?3 AND revoked_at IS NULL
 // orcon:scope instance
 func (q *Queries) UpdateSessionActivity(ctx context.Context, lastSeenAt int64, idleExpiresAt int64, iD []byte) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateSessionActivity, lastSeenAt, idleExpiresAt, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateTestRunStartedByPrincipalToNull = `-- name: UpdateTestRunStartedByPrincipalToNull :execrows
+UPDATE test_run
+SET started_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM test_run AS target WHERE target.started_by_principal_id = ?1 ORDER BY target.id LIMIT ?2)
+`
+
+// orcon:scope engine
+func (q *Queries) UpdateTestRunStartedByPrincipalToNull(ctx context.Context, principalID []byte, batchSize int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateTestRunStartedByPrincipalToNull, principalID, batchSize)
 	if err != nil {
 		return 0, err
 	}

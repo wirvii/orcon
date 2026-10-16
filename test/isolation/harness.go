@@ -17,6 +17,7 @@ import (
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/flow/editor"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -94,6 +95,7 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	flow.ManageStore
 	flow.VersionStore
 	flow.SnapshotStore
+	editor.Store
 	execution.WorkerStore
 }
 

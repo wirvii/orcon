@@ -13,5 +13,8 @@ func BuildRegistry() *Registry {
 	if err := addStoreCases(r); err != nil {
 		panic("isolation: " + err.Error()) // a duplicate case is a mistake in this package, found by any test run
 	}
+	if err := addEditorCases(r); err != nil {
+		panic("isolation: " + err.Error()) // the editor cases of SPEC-014 ED2, same rule as the store cases
+	}
 	return r
 }
