@@ -57,6 +57,12 @@ func (c *converter) convertCore(n *Node, row CoreNode) convResult {
 		return c.convertSort(n)
 	case basePrefix + "limit":
 		return c.convertLimit(n)
+	case basePrefix + "removeDuplicates":
+		return c.convertRemoveDuplicates(n)
+	case basePrefix + "aggregate":
+		return c.convertAggregate(n)
+	case basePrefix + "splitOut":
+		return c.convertSplitOut(n)
 	}
 	element := flow.ElementTask
 	if row.Disposition == DispTrigger {

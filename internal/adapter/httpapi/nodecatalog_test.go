@@ -128,7 +128,7 @@ func TestBuiltinNodeTypesAreDescribedInTheLanguageOfTheRequest(t *testing.T) {
 	c := NewNodeCatalog(catalogFakePackages{}, nil)
 	en := catalogTypes(t, c, LocaleEnglish)
 	es := catalogTypes(t, c, LocaleSpanish)
-	for _, typ := range []string{"orcon.http@1", "orcon.if@1", "orcon.switch@1", "orcon.loop@1", "orcon.set@1", "orcon.noop@1", "orcon.stopAndError@1", "orcon.filter@1", "orcon.sort@1", "orcon.limit@1"} {
+	for _, typ := range []string{"orcon.http@1", "orcon.if@1", "orcon.switch@1", "orcon.loop@1", "orcon.set@1", "orcon.noop@1", "orcon.stopAndError@1", "orcon.filter@1", "orcon.sort@1", "orcon.limit@1", "orcon.removeDuplicates@1", "orcon.aggregate@1", "orcon.splitOut@1"} {
 		a, ok := en[typ]
 		if !ok {
 			t.Fatalf("%s is not in the catalog", typ)
@@ -149,7 +149,8 @@ func TestBuiltinNodeTypesAreDescribedInTheLanguageOfTheRequest(t *testing.T) {
 	if levels["request.read"] != apigen.NONE || levels["request.write"] != apigen.UNSAFE {
 		t.Fatalf("http safety = %v", levels)
 	}
-	for typ, n8n := range map[string]string{"orcon.filter@1": "n8n-nodes-base.filter", "orcon.sort@1": "n8n-nodes-base.sort", "orcon.limit@1": "n8n-nodes-base.limit"} {
+	for typ, n8n := range map[string]string{"orcon.filter@1": "n8n-nodes-base.filter", "orcon.sort@1": "n8n-nodes-base.sort", "orcon.limit@1": "n8n-nodes-base.limit",
+		"orcon.removeDuplicates@1": "n8n-nodes-base.removeDuplicates", "orcon.aggregate@1": "n8n-nodes-base.aggregate", "orcon.splitOut@1": "n8n-nodes-base.splitOut"} {
 		if got := en[typ].N8nTypes; !slices.Equal(got, []string{n8n}) {
 			t.Errorf("%s maps n8n types %v, want [%s]", typ, got, n8n)
 		}

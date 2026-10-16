@@ -56,6 +56,19 @@ func (m members) enum(key, def string, allowed ...string) (string, error) {
 	return s, nil
 }
 
+// boolean reads a boolean parameter; an absent one takes the default.
+func (m members) boolean(key string, def bool) (bool, error) {
+	v, ok := m[key]
+	if !ok {
+		return def, nil
+	}
+	b, isBool := v.Bool()
+	if !isBool {
+		return false, fmt.Errorf("%s must be a boolean", key)
+	}
+	return b, nil
+}
+
 // integer reads a whole number in [lo, hi]; an absent one takes the default.
 func (m members) integer(key string, def, lo, hi int64) (int64, error) {
 	v, ok := m[key]
@@ -82,6 +95,34 @@ func fieldName(v jsonvalue.Value, what string) (string, error) {
 		return "", fmt.Errorf("%s must be a literal field name, not an expression", what)
 	}
 	return s, nil
+}
+
+// fieldList reads a list of field names or field paths. A repeated name is an
+// error.
+func (m members) fieldList(key string) ([]string, error) {
+	v, ok := m[key]
+	if !ok {
+		return nil, nil
+	}
+	if v.Kind() != jsonvalue.KindArray {
+		return nil, fmt.Errorf("%s must be a list of field names", key)
+	}
+	items := v.Items()
+	if len(items) > maxListedFields {
+		return nil, fmt.Errorf("%s has more than %d fields", key, maxListedFields)
+	}
+	out := make([]string, 0, len(items))
+	for i, it := range items {
+		name, err := fieldName(it, fmt.Sprintf("%s[%d]", key, i))
+		if err != nil {
+			return nil, err
+		}
+		if slices.Contains(out, name) {
+			return nil, fmt.Errorf("%s names the field %q more than once", key, name)
+		}
+		out = append(out, name)
+	}
+	return out, nil
 }
 
 // lookup reads a field of an item. A name that is a key of the item is that
