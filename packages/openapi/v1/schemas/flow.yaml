@@ -56,6 +56,20 @@ Flow:
       examples:
         - 7
       minimum: 0
+    lastExecution:
+      description: >-
+        The most recent execution of the flow. Present only in lists of flows, where it is read with the
+        flow; absent in the answers that return one flow, and when the flow never ran.
+      readOnly: true
+      $ref: ../openapi.yaml#/components/schemas/FlowLastExecution
+    executionCountLast24h:
+      type: integer
+      description: >-
+        Number of executions of the flow accepted in the last 24 hours. Present only in lists of flows.
+      readOnly: true
+      examples:
+        - 12
+      minimum: 0
     createdAt:
       type: string
       format: date-time
@@ -68,6 +82,54 @@ Flow:
       description: When the flow last changed, in UTC.
       examples:
         - '2026-10-12T15:04:05Z'
+FlowLastExecution:
+  type: object
+  description: >-
+    The most recent execution of a flow: enough to show its status in a list without reading the execution.
+  required:
+    - id
+    - status
+    - hasUncertainOperation
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Id of the execution.
+      examples:
+        - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+      readOnly: true
+    status:
+      type: string
+      description: Progress of the execution, the same values as the execution status.
+      enum:
+        - QUEUED
+        - RUNNING
+        - WAITING
+        - SUSPENDED
+        - CANCELING
+        - COMPENSATING
+        - SUCCEEDED
+        - FAILED
+        - CANCELED
+      examples:
+        - SUCCEEDED
+    hasUncertainOperation:
+      type: boolean
+      description: >-
+        True when the execution has an external operation whose outcome is unknown and a person must review it.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the execution was accepted, in UTC.
+      examples:
+        - '2026-10-12T15:04:05Z'
+    finishedAt:
+      type: string
+      format: date-time
+      description: When the execution reached a final status, in UTC; absent before that.
+      examples:
+        - '2026-10-12T15:04:09Z'
 FlowList:
   type: object
   description: One page of flows.

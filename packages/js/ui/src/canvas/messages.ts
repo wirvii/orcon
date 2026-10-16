@@ -305,6 +305,7 @@ export const canvasMessages = defineMessages({
   ariaMinimap: { id: 'canvas.aria.minimap', defaultMessage: 'Overview map of the flow', description: 'Accessible name of the small map that shows the whole flow.' },
 
   // ---- Style A primitives -------------------------------------------------------------------
+  chipNeverTwice: { id: 'canvas.chip.neverTwice', defaultMessage: 'Never sends twice', description: 'Chip under a step that changes something outside and cannot send the same thing twice when it is retried.' },
   chipPinned: { id: 'canvas.chip.pinned', defaultMessage: 'Pinned', description: 'Chip under a node whose output data is pinned.' },
   chipDisabled: { id: 'canvas.chip.disabled', defaultMessage: 'Disabled', description: 'Chip under a node that is turned off and passes data through.' },
   chipNotSupported: {
@@ -421,6 +422,10 @@ export const canvasMessages = defineMessages({
     description: 'Spoken after a sticky note was resized with the keyboard.',
   },
   paletteTriggers: { id: 'canvas.palette.triggers', defaultMessage: 'Choose a trigger', description: 'Title of the node list when it is opened to pick the first step of an empty flow.' },
+  paletteKeyEscape: { id: 'canvas.palette.key.escape', defaultMessage: 'Esc', description: 'Name of the Escape key, shown on its cap in the keyboard hint of the add-node list.' },
+  paletteHintMove: { id: 'canvas.palette.hint.move', defaultMessage: 'move', description: 'Keyboard hint at the bottom of the add-node list: the arrow keys move between steps.' },
+  paletteHintInsert: { id: 'canvas.palette.hint.insert', defaultMessage: 'insert', description: 'Keyboard hint at the bottom of the add-node list: Enter adds the highlighted step.' },
+  paletteHintClose: { id: 'canvas.palette.hint.close', defaultMessage: 'close', description: 'Keyboard hint at the bottom of the add-node list: Escape closes the list.' },
   paletteClose: { id: 'canvas.palette.close', defaultMessage: 'Close the node list', description: 'Accessible name of the button that closes the node list.' },
   paletteResults: { id: 'canvas.palette.results', defaultMessage: 'Nodes', description: 'Accessible name of the list of nodes that can be added.' },
   mobileSheetTitle: { id: 'canvas.mobile.title', defaultMessage: 'Node status', description: 'Title of the panel that opens when a node is tapped on a phone.' },

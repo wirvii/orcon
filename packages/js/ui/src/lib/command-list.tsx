@@ -11,7 +11,20 @@ import { cn } from './cn';
  * listbox is hidden and the "no matches" notice stands on its own, because a
  * listbox without options is not valid ARIA.
  */
-export function CommandResults({ children, emptyMessage, className, emptyClassName }: { children: ReactNode; emptyMessage: string; className?: string; emptyClassName?: string }) {
+export function CommandResults({
+  children,
+  emptyMessage,
+  emptyExtra,
+  className,
+  emptyClassName,
+}: {
+  children: ReactNode;
+  emptyMessage: string;
+  /** What follows the notice when nothing matches (the way out, for example). */
+  emptyExtra?: ReactNode;
+  className?: string;
+  emptyClassName?: string;
+}) {
   const count = useCommandState((state) => state.filtered.count);
   return (
     <>
@@ -19,9 +32,12 @@ export function CommandResults({ children, emptyMessage, className, emptyClassNa
         {children}
       </Command.List>
       {count === 0 ? (
-        <p role="status" className={cn(emptyClassName)}>
-          {emptyMessage}
-        </p>
+        <>
+          <p role="status" className={cn(emptyClassName)}>
+            {emptyMessage}
+          </p>
+          {emptyExtra}
+        </>
       ) : null}
     </>
   );

@@ -107,6 +107,58 @@ func (s *Store) ListFlows(ctx context.Context, org orgscope.Org, project identit
 	return out, err
 }
 
+// ListFlowActivity implements [flow.Store] (SPEC-019 R-UX-BE-01): the flows of the page with their
+// latest execution and the executions of the last day, in one query.
+func (s *Store) ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, since time.Time, after flow.FlowID, limit int) ([]flow.Activity, error) {
+	var out []flow.Activity
+	err := s.inScope(ctx, "list flow activity", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListFlowActivity(ctx, sqlcgen.ListFlowActivityParams{
+			SinceAt: timestamp(since), OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(project), AfterID: pgUUID(after), PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			out = append(out, activityFrom(&rows[i]))
+		}
+		return nil
+	})
+	return out, err
+}
+
+// activityFrom converts a row of ListFlowActivity: the flow, and its latest execution when it ran.
+func activityFrom(row *sqlcgen.ListFlowActivityRow) flow.Activity {
+	out := flow.Activity{
+		Flow: flowFrom(&sqlcgen.GetFlowRow{
+			ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision,
+			ActiveFlowVersionID: row.ActiveFlowVersionID, ActivationState: row.ActivationState,
+			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		}),
+		ExecutionCountLast24h: row.ExecutionCountLast24h,
+	}
+	if !row.LastExecutionID.Valid {
+		return out
+	}
+	out.LastExecution = &flow.LastExecution{
+		ID: fromPGUUID[id.UUID](row.LastExecutionID), Status: row.LastExecutionStatus.String,
+		HasUncertainOperation: row.LastExecutionHasUncertainOperation,
+		CreatedAt:             instant(row.LastExecutionCreatedAt),
+		FinishedAt:            instant(row.LastExecutionFinishedAt),
+	}
+	return out
+}
+
+// CountFlows implements [flow.Store].
+func (s *Store) CountFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) (int64, error) {
+	var n int64
+	err := s.inScope(ctx, "count flows", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		var err error
+		n, err = q.CountFlows(ctx, pgUUID(org.UUID()), pgUUID(project))
+		return err
+	})
+	return n, err
+}
+
 // UpdateFlowDraft implements [flow.Store].
 func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
 	var revision int64

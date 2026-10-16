@@ -16,7 +16,7 @@ import {
   type Connection,
   type OnConnectStartParams,
 } from '@xyflow/react';
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref, type RefObject } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
 import { toast } from 'sonner';
 
@@ -74,7 +74,7 @@ import {
   type StickyNoteData,
 } from './model';
 import { NodeDetails } from './NodeDetails';
-import { NodePalettePanel } from './node-palette-panel/NodePalettePanel';
+import { NodePalettePanel, type PaletteSuggestions } from './node-palette-panel/NodePalettePanel';
 import { edgeAriaLabel, nodeAriaLabel } from './nodeLabel';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { useMediaQuery, wideQuery } from './useMediaQuery';
@@ -162,6 +162,13 @@ export interface WorkflowCanvasProps {
   onExecuteWorkflow?: ((nodeId: string) => void) | undefined;
   /** Link to the execution detail of a node, shown in the node details. */
   executionHref?: ((nodeId: string) => string) | undefined;
+  /**
+   * The steps worth trying first in the add-node list, given the node the new one goes behind (`undefined` when it
+   * goes nowhere in particular). The host knows what each step is; the canvas only shows what it is given.
+   */
+  suggest?: ((previousNodeId: string | undefined) => PaletteSuggestions | undefined) | undefined;
+  /** What the add-node list offers when a search finds nothing, below its notice. `pick` adds a step of the list by its id. */
+  renderPaletteEmpty?: ((context: { query: string; pick: (itemId: string) => void }) => ReactNode) | undefined;
   /** Force view-only mode. Below the md breakpoint the canvas is always view-only. */
   readOnly?: boolean | undefined;
   /** Say that the canvas is view only when it is. Off where the page already makes that clear. */
@@ -290,6 +297,8 @@ function ZoomControls({ containerRef, ...controls }: Omit<CanvasControlsProps, '
 function Canvas({
   defaultGraph,
   catalog = [],
+  suggest,
+  renderPaletteEmpty,
   overlay,
   onGraphChange,
   onOpenDetails,
@@ -1173,6 +1182,21 @@ function Canvas({
               // Nothing can be connected into a trigger, so a node inserted after another one or on a connection is never a trigger.
               items={palette.mode === 'after' || palette.mode === 'edge' ? catalog.filter((item) => item.kind !== 'trigger') : catalog}
               filter={palette.mode === 'first' ? 'triggers' : undefined}
+              suggested={suggest?.(
+                palette.mode === 'after' ? palette.nodeId : palette.mode === 'edge' ? graph.edges.find((edge) => edge.id === palette.edgeId)?.source : undefined,
+              )}
+              renderEmpty={
+                renderPaletteEmpty
+                  ? (query) =>
+                      renderPaletteEmpty({
+                        query,
+                        pick: (itemId) => {
+                          const item = catalog.find((candidate) => candidate.id === itemId);
+                          if (item) pickFromPalette(item);
+                        },
+                      })
+                  : undefined
+              }
               onPick={pickFromPalette}
               onClose={closePalette}
             />

@@ -6,18 +6,20 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useIntl } from 'react-intl';
 
 import { clipboardEventText, setClipboardEventText } from '../../../app/boundary/clipboard';
-import { PublishControls } from '../forms/PublishControls';
+import { RunLogs } from '../forms/RunLogs';
 import type { FlowDocument } from '../model/flow-document';
 import { chordKeys, EDITOR_KEYMAP, resolveEntry, type EditorAction } from '../model/keymap';
 import { useEditorStore, useEditorStoreApi } from '../store/editor-context';
 
 import { EditorCanvas, type EditorCanvasHandle } from './EditorCanvas';
 import { EditorOutline } from './EditorOutline';
-import { EditorTopBar } from './EditorTopBar';
+import { EditorToolbar } from './EditorToolbar';
+import { EditorTopBar, type EditorNav } from './EditorTopBar';
 import { FindNodeDialog } from './FindNodeDialog';
 import { editorMessages } from './messages';
 import { createNoticeChannel, NoticeContext } from './notice-channel';
 import { NoticeBar } from './NoticeBar';
+import { RunBar } from './RunBar';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { useAutosave, type SaveFunction } from './use-autosave';
 import { useEditorCommands } from './use-editor-commands';
@@ -39,6 +41,8 @@ export interface EditorWorkspaceProps {
   preview: boolean;
   /** The flow the publish controls act on. Absent when the flow is not stored on the server, so there is nothing to publish. */
   flowId?: string | undefined;
+  /** Where the tabs and the breadcrumb of the top bar lead. Absent when the editor is not inside a project. */
+  nav?: EditorNav | undefined;
 }
 
 /** Actions a key can still trigger while a text field has focus: they never change what is typed. */
@@ -62,7 +66,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
   );
 }
 
-function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
+function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const editable = useMediaQuery(EDITING_QUERY);
@@ -78,6 +82,8 @@ function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
   const [confirmReload, setConfirmReload] = useState(false);
   const [details, setDetails] = useState<{ id: string; tab: DetailsTab } | undefined>();
   const [previewShown, setPreviewShown] = useState(true);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const { status, saveNow } = useAutosave(save, session);
 
   // A dialog opened from the keyboard has no button to give focus back to: when it closes, focus returns
@@ -261,27 +267,8 @@ function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
         commands.paste(clipboardEventText(event));
       }}
     >
-      <EditorTopBar
-        editable={editable}
-        status={status}
-        outlineOpen={outlineOpen}
-        commands={commands}
-        onToggleOutline={() => {
-          setOutlineOpen((open) => !open);
-        }}
-        onFind={() => {
-          setFindOpen(true);
-        }}
-        onCommands={() => {
-          setCommandsOpen(true);
-        }}
-        onShortcuts={() => {
-          setShortcutsOpen(true);
-        }}
-        onSave={saveNow}
-      />
+      <EditorTopBar editable={editable} status={status} flowId={flowId} nav={nav} />
       <div className="flex flex-col gap-2 empty:hidden px-4 pt-2">
-        {editable && flowId !== undefined ? <PublishControls flowId={flowId} /> : null}
         {preview && previewShown && editable ? (
           <Banner
             tone="info"
@@ -321,8 +308,42 @@ function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-          <div className="flex min-h-0 min-w-0 flex-1">
+          <div className="relative flex min-h-0 min-w-0 flex-1">
             <EditorCanvas ref={canvas} onOpenDetails={openDetails} onOpenPhoneDetails={openDetails} syncNodes={details !== undefined} />
+            <EditorToolbar
+              editable={editable}
+              outlineOpen={outlineOpen}
+              commands={commands}
+              onToggleOutline={() => {
+                setOutlineOpen((open) => !open);
+              }}
+              onFind={() => {
+                setFindOpen(true);
+              }}
+              onCommands={() => {
+                setCommandsOpen(true);
+              }}
+              onShortcuts={() => {
+                setShortcutsOpen(true);
+              }}
+              onSave={saveNow}
+              className={editable ? "absolute start-3 top-3 z-20" : "absolute end-3 bottom-10 z-20"}
+            />
+            {editable && !showDocked ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+                <div className="pointer-events-auto">
+                  <RunBar
+                    chatOpen={chatOpen}
+                    onTest={() => {
+                      commands.run('test-flow');
+                    }}
+                    onChat={() => {
+                      setChatOpen((open) => !open);
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
             {showDocked ? (
               <Suspense fallback={null}>
                 <NodeDetails
@@ -364,6 +385,15 @@ function Workspace({ save, reload, preview, flowId }: EditorWorkspaceProps) {
           <Suspense fallback={null}>
             <DockedDataPanel nodeId={details.id} />
           </Suspense>
+        ) : null}
+        {flowId !== undefined ? (
+          <RunLogs
+            flowId={flowId}
+            open={logsOpen}
+            onOpenChange={setLogsOpen}
+            chatOpen={chatOpen}
+            previousRuns={nav?.link('executions', { className: 'text-fg-muted hover:text-fg', children: intl.formatMessage(editable ? editorMessages.previousRuns : editorMessages.viewRuns) })}
+          />
         ) : null}
       </div>
       {details !== undefined && !editable ? (
