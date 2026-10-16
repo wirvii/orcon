@@ -41,6 +41,7 @@ type fakeStore struct {
 	bindings  []authz.Binding
 	custom    map[string][]authz.Permission
 	projects  map[string]identity.OrgID
+	children  map[string]childRef // by kind + "/" + id
 	bindCalls int
 }
 

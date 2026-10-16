@@ -97,6 +97,8 @@ export interface GraphNode {
   disabled?: boolean | undefined;
   /** The node's output is pinned: later runs reuse it. */
   pinned?: boolean | undefined;
+  /** The node changes something outside and a repeat cannot send it twice (an operation with a unique key or a reconcile check). */
+  neverTwice?: boolean | undefined;
   /** Compare mode: how this node differs from the other version. */
   diff?: DiffMark | undefined;
   /** Configuration blocks of an agent node. */

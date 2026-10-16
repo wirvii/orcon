@@ -41,5 +41,6 @@ sqlite:UpdateConnectorGrantGrantedByPrincipalToNull  # PostgreSQL clears the sam
 sqlite:ResolveUserOrganizations  # PostgreSQL reads the same rows through orcon_engine.resolve_user_organizations (migration 0015) in a hand-written method (DA-8); SQLite has no engine functions
 sqlite:ListActiveOrgKeys  # PostgreSQL lists the same keys through the engine function orcon_engine.list_active_org_keys (migration 0016); SQLite reads them in batches
 sqlite:GetProjectOrganization  # PostgreSQL resolves a project's organization through orcon_engine.project_organization (migration 0017); SQLite has no engine functions
+sqlite:GetResourceProject  # PostgreSQL resolves the project of a flow, execution, external operation or human task through orcon_engine.resource_project (migration 0024); SQLite has no engine functions
 sqlite:ListAuditPendingOrgs  # SPEC-004 R-AUD-03: PostgreSQL reads the organizations with pending rows through the engine function orcon_engine.list_audit_pending_orgs (the application role sees one organization at a time)
 sqlite:ListOrgsWithoutActiveKey  # SPEC-004 R-KEY-05: PostgreSQL reads the organizations without an active key through the engine function orcon_engine.list_orgs_without_active_key (migration 0021; the application role sees one organization at a time)

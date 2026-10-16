@@ -44,6 +44,11 @@ func (Unavailable) ListOrgs(context.Context, apigen.ListOrgsRequestObject) (apig
 	return nil, errUnavailable
 }
 
+// ListOrgFlows refuses GET /orgs/{orgId}/flows.
+func (Unavailable) ListOrgFlows(context.Context, apigen.ListOrgFlowsRequestObject) (apigen.ListOrgFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
 // GetExecution refuses GET /executions/{executionId}.
 func (Unavailable) GetExecution(context.Context, apigen.GetExecutionRequestObject) (apigen.GetExecutionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable

@@ -36,7 +36,7 @@ enablePatches();
 /** History keeps this many entries (SPEC-014 R-ED-UNDO-01, orcon-web ST-5). */
 export const HISTORY_LIMIT = 100;
 
-export type ActionName = 'addNode' | 'removeNodes' | 'connect' | 'disconnect' | 'moveNodes' | 'renameNode' | 'setDisabled' | 'addNote' | 'updateNote' | 'paste' | 'tidyUp' | 'canvasEdit' | 'configureNode' | 'updateConnector';
+export type ActionName = 'addNode' | 'removeNodes' | 'connect' | 'disconnect' | 'moveNodes' | 'renameNode' | 'setDisabled' | 'addNote' | 'updateNote' | 'paste' | 'tidyUp' | 'canvasEdit' | 'configureNode' | 'updateConnector' | 'renameFlow';
 
 /** One undoable user action: the patches that make it and the patches that take it back. */
 export interface HistoryEntry {
@@ -74,6 +74,8 @@ export interface EditorState {
   disconnect: (edgeId: string) => boolean;
   moveNodes: (ids: readonly string[], dx: number, dy: number) => void;
   renameNode: (id: string, name: string) => { references: number } | { problem: RenameProblem };
+  /** Renames the flow itself (the document's `name`); one history entry. Returns false for an empty name. */
+  renameFlow: (name: string) => boolean;
   setDisabled: (id: string, disabled: boolean) => void;
   /** Sets a parameter of a node (`undefined` removes it). Edits with the same `group` in a row are one history entry. */
   setParameter: (id: string, name: string, value: unknown, group?: string) => void;
@@ -219,6 +221,15 @@ export function createEditorStore(initial: EditorInit): EditorStore {
       renameNode: (id, name) => {
         const { value } = commit('renameNode', (draft) => renameNode(draft, id, name));
         return value ?? { problem: 'missing' };
+      },
+
+      renameFlow: (name) => {
+        const next = name.trim();
+        if (next === '' || next.length > 256) return false;
+        commit('renameFlow', (draft) => {
+          draft.name = next;
+        }, { rebuild: false });
+        return true;
       },
 
       setDisabled: (id, disabled) => {

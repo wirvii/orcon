@@ -49,6 +49,8 @@ paths:
     $ref: ./paths/orgs.yaml
   /orgs/{orgId}/projects:
     $ref: ./paths/org-projects.yaml
+  /orgs/{orgId}/flows:
+    $ref: ./paths/org-flows.yaml
   /projects/{projectId}:
     $ref: ./paths/project.yaml
   /projects/{projectId}/flows:
@@ -314,6 +316,8 @@ components:
       $ref: ./schemas/session.yaml#/Session
     CurrentUser:
       $ref: ./schemas/session.yaml#/CurrentUser
+    OrgRole:
+      $ref: ./schemas/session.yaml#/OrgRole
     Organization:
       $ref: ./schemas/session.yaml#/Organization
     OrganizationList:
@@ -332,6 +336,8 @@ components:
       $ref: ./schemas/flow.yaml#/Flow
     FlowList:
       $ref: ./schemas/flow.yaml#/FlowList
+    FlowLastExecution:
+      $ref: ./schemas/flow.yaml#/FlowLastExecution
     CreateFlowRequest:
       $ref: ./schemas/flow.yaml#/CreateFlowRequest
     UpdateFlowRequest:

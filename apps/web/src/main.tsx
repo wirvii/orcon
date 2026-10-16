@@ -23,7 +23,7 @@ const router = createAppRouter({ queryClient });
 
 createRoot(root).render(
   <StrictMode>
-    <Providers messages={appMessages}>
+    <Providers defaultTheme="dark" messages={appMessages}>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           {/* The real stream comes from @orcon/sdk (SPEC-005); until then there is nothing to listen to. */}

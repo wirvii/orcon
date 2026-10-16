@@ -105,3 +105,22 @@ func (s *Store) ProjectOrganization(ctx context.Context, project string) (identi
 	}
 	return identity.OrgID(owner.Bytes), nil
 }
+
+// ResourceProject implements [authz.Store]: the organization and the project of a flow, execution,
+// external operation or human task, across organizations, through orcon_engine.resource_project.
+func (s *Store) ResourceProject(ctx context.Context, kind, resource string) (identity.OrgID, string, error) {
+	rid, err := id.Parse(resource)
+	if err != nil {
+		return identity.OrgID{}, "", fmt.Errorf("%w: %s identifier", identity.ErrNotFound, kind)
+	}
+	var org, project pgtype.UUID
+	err = s.pool.QueryRow(ctx, "SELECT org_id, project_id FROM orcon_engine.resource_project($1, $2)",
+		kind, pgtype.UUID{Bytes: rid, Valid: true}).Scan(&org, &project)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return identity.OrgID{}, "", identity.ErrNotFound
+	}
+	if err != nil {
+		return identity.OrgID{}, "", mapError("get resource project", err)
+	}
+	return identity.OrgID(org.Bytes), id.UUID(project.Bytes).String(), nil
+}

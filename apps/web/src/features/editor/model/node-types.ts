@@ -26,7 +26,7 @@ export type CanvasIconName =
   | 'zap'
   | 'help';
 
-export type NodeGroup = 'triggers' | 'flow' | 'data';
+export type NodeGroup = 'triggers' | 'apps' | 'data' | 'flow' | 'subflows';
 
 export interface PortDef {
   readonly id: string;
@@ -89,7 +89,7 @@ export const NODE_TYPES: readonly NodeTypeDef[] = [
     kind: 'action',
     icon: 'globe',
     outputs: MAIN,
-    group: 'data',
+    group: 'apps',
     aliases: ['HTTP Request', 'REST', 'API call', 'fetch'],
     initial: () => ({ parameters: { method: 'GET', url: '' } }),
   },
@@ -158,7 +158,7 @@ export const NODE_TYPES: readonly NodeTypeDef[] = [
     kind: 'action',
     icon: 'play',
     outputs: MAIN,
-    group: 'flow',
+    group: 'subflows',
     aliases: ['Sub-flow', 'Call flow', 'Execute Workflow', 'Run flow'],
     // The `call` block is written when a flow is chosen; until then the node has none (publishing asks for it, orcon-flow-1.md V11).
     initial: () => ({ parameters: {} }),

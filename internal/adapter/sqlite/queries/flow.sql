@@ -32,6 +32,25 @@ WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND id > s
 ORDER BY id
 LIMIT sqlc.arg(page_size);
 
+-- name: ListFlowActivity :many
+-- orcon:scope org
+-- orcon:hot
+SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.active_flow_version_id, f.activation_state, f.created_at, f.updated_at,
+       le.id AS last_execution_id, le.status AS last_execution_status, le.created_at AS last_execution_created_at, le.finished_at AS last_execution_finished_at,
+       CAST(EXISTS (SELECT 1 FROM external_operation o WHERE o.org_id = le.org_id AND o.execution_id = le.id AND o.state = 'UNCERTAIN') AS INTEGER) AS last_execution_has_uncertain_operation,
+       (SELECT COUNT(*) FROM execution c WHERE c.org_id = f.org_id AND c.flow_id = f.id AND c.created_at >= sqlc.arg(since_at)) AS execution_count_last_24h
+FROM flow f
+LEFT JOIN execution le ON le.org_id = f.org_id AND le.id = (SELECT l.id FROM execution l WHERE l.org_id = f.org_id AND l.flow_id = f.id ORDER BY l.created_at DESC, l.id DESC LIMIT 1)
+WHERE f.org_id = sqlc.arg(org_id) AND f.project_id = sqlc.arg(project_id) AND f.id > sqlc.arg(after_id) AND f.deleted_at IS NULL
+ORDER BY f.id
+LIMIT sqlc.arg(page_size);
+
+-- name: CountFlows :one
+-- orcon:scope org
+SELECT COUNT(*)
+FROM flow
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND deleted_at IS NULL;
+
 -- name: UpdateFlowDraft :execrows
 -- orcon:scope org
 UPDATE flow

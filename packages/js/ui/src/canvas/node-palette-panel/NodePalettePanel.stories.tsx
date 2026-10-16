@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Button } from '../../components/button/Button';
 import { expect, userEvent, within } from 'storybook/test';
 
 import { exampleCatalog } from '../fixtures';
@@ -40,6 +41,22 @@ export const NoMatch: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search nodes' }), 'zzzz');
     await expect(await within(canvasElement).findByText('No node matches your search')).toBeVisible();
+  },
+};
+export const WithSuggestions: Story = {
+  args: { suggested: { heading: 'Suggested after "Webhook"', items: exampleCatalog.slice(0, 2) } },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('Suggested after "Webhook"')).toBeVisible();
+    // Typing searches everything: the suggestions give way to the results.
+    await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search nodes' }), 'zzzz');
+    await expect(within(canvasElement).queryByText('Suggested after "Webhook"')).toBeNull();
+  },
+};
+export const NoMatchWithWayOut: Story = {
+  args: { renderEmpty: (query: string) => <Button variant="secondary">{`Use an HTTP request instead of "${query}"`}</Button> },
+  play: async ({ canvasElement }) => {
+    await userEvent.type(within(canvasElement).getByRole('combobox', { name: 'Search nodes' }), 'zzzz');
+    await expect(await within(canvasElement).findByRole('button', { name: 'Use an HTTP request instead of "zzzz"' })).toBeVisible();
   },
 };
 export const FocusVisible: Story = { args: { className: 'pseudo-focus-visible' } };

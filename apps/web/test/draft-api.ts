@@ -65,7 +65,15 @@ const flowIdOf = (url: string) => new URL(url).pathname.split('/')[4] ?? '';
  * against the entity tag of the flow. An unknown flow is 404. The production build has no server in these
  * tests, so the editor reads and changes its flows against this page-level answer.
  */
-export async function mockDraftApi(page: Page): Promise<void> {
+export interface DraftApiOptions {
+  /**
+   * Starts the sample flow already published and active, with a published version that differs from the draft by
+   * one removed node and one changed node, so the editor has pending changes to count.
+   */
+  published?: boolean;
+}
+
+export async function mockDraftApi(page: Page, options: DraftApiOptions = {}): Promise<void> {
   await mockSession(page);
   const drafts = new Map<string, StoredDraft>([
     [EXAMPLE_FLOW_ID, { revision: 1, document: exampleFlowDocument() }],
@@ -77,6 +85,22 @@ export async function mockDraftApi(page: Page): Promise<void> {
       { activationState: 'INACTIVE', activeVersion: null, hasUnpublishedChanges: true, tag: 1, versions: 0 },
     ]),
   );
+
+  // The runs of the project: none yet, so the logs panel of the editor says the flow has not run.
+  await page.route(/\/api\/v1\/projects\/[^/]+\/executions(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [] }) }));
+
+  // The documents of the published versions, by `<flowId>@<version>`.
+  const versions = new Map<string, unknown>();
+  if (options.published === true) {
+    const flow = flows.get(EXAMPLE_FLOW_ID);
+    if (flow !== undefined) Object.assign(flow, { activationState: 'ACTIVE', activeVersion: 1, versions: 1, hasUnpublishedChanges: true });
+    const older = exampleFlowDocument();
+    older.nodes = older.nodes.filter((node) => node.id !== 'rejected');
+    older.edges = older.edges.filter((edge) => edge.to.node !== 'rejected');
+    const check = older.nodes.find((node) => node.id === 'validate');
+    if (check !== undefined) check.parameters = { condition: '={{ $json.total > 10 }}' };
+    versions.set(`${EXAMPLE_FLOW_ID}@1`, older);
+  }
 
   await page.route('**/api/v1/flows/*/draft', async (route) => {
     const flowId = flowIdOf(route.request().url());
@@ -147,6 +171,7 @@ export async function mockDraftApi(page: Page): Promise<void> {
       return;
     }
     flow.versions += 1;
+    versions.set(`${flowId}@${String(flow.versions)}`, structuredClone(drafts.get(flowId)?.document));
     flow.activeVersion = flow.versions;
     flow.hasUnpublishedChanges = false;
     flow.tag += 1;
@@ -154,6 +179,22 @@ export async function mockDraftApi(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ flowId, version: flow.versions, contentHash: `sha256:${flowId.slice(-8)}`, publishedAt: '2026-10-14T10:00:00Z' }),
+    });
+  });
+
+  await page.route(/\/api\/v1\/flows\/[^/]+\/versions\/\d+$/, async (route) => {
+    const parts = new URL(route.request().url()).pathname.split('/');
+    const flowId = parts[4] ?? '';
+    const version = Number(parts[6]);
+    const document = versions.get(`${flowId}@${String(version)}`);
+    if (document === undefined) {
+      await route.fulfill(problemBody(404, 'Version not found', 'not-found'));
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ flowId, version, contentHash: `sha256:${flowId.slice(-8)}`, publishedAt: '2026-10-14T10:00:00Z', document }),
     });
   });
 
@@ -191,8 +232,8 @@ export async function goInApp(page: Page, path: string): Promise<void> {
   }, path);
 }
 
-/** True for a request the editor makes for its own flow: its state or its draft. Anything else is not expected. */
-export const isFlowDataRequest = (url: string): boolean => /\/api\/v1\/flows\/[^/]+(\/draft)?$/.test(url);
+/** True for a request the editor makes for its own flow: its state, its draft, the published version it compares with and the last run its logs show. Anything else is not expected. */
+export const isFlowDataRequest = (url: string): boolean => /\/api\/v1\/flows\/[^/]+(\/draft|\/versions\/\d+)?$/.test(url) || /\/api\/v1\/projects\/[^/]+\/executions(\?.*)?$/.test(url);
 
 /**
  * True for the reads of the signed-in frame around the editor (the person, the organization, the project

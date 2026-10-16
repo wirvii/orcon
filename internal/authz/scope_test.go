@@ -100,7 +100,7 @@ func TestUnknownResourceKindIsForbiddenWithoutScope(t *testing.T) {
 	req := authz.Request{
 		Principal:   session(),
 		Requirement: authz.Requirement{Mode: authz.ModeAll, Permissions: []authz.Permission{"flow:read"}},
-		Resource:    authz.ResourceRef{Kind: "flow", ID: projectOne},
+		Resource:    authz.ResourceRef{Kind: "widget", ID: projectOne},
 	}
 	d, scope, err := ev.Authorize(t.Context(), req)
 	if err != nil || d != authz.DecisionForbidden || !scope.UUID().IsZero() {

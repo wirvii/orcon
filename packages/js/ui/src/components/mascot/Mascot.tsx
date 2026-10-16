@@ -21,6 +21,11 @@ export type MascotPose = keyof typeof poses;
 
 export interface MascotProps {
   pose?: MascotPose | undefined;
+  /**
+   * The cut-out alone, larger and with a soft shadow, without the rounded panel. For a hero spot on a surface that
+   * is already a picture of its own, such as the brand panel of the sign-in page.
+   */
+  bare?: boolean | undefined;
   className?: string | undefined;
 }
 
@@ -39,8 +44,15 @@ export interface MascotProps {
  * (tables, execution detail, the inbox); the lint configuration rejects the import
  * there.
  */
-export function Mascot({ pose = 'welcome', className }: MascotProps) {
+export function Mascot({ pose = 'welcome', bare = false, className }: MascotProps) {
   const { src, width, height } = poses[pose];
+  if (bare) {
+    return (
+      <div aria-hidden data-mascot-pose={pose} data-mascot-bare className={cn('inline-flex max-w-full shrink-0 items-end justify-center', className)}>
+        <img src={src} width={width} height={height} alt="" aria-hidden loading="lazy" decoding="async" className="orcon-mascot-image-bare" />
+      </div>
+    );
+  }
   return (
     <div aria-hidden data-mascot-pose={pose} className={cn('bg-mascot-panel inline-flex max-w-full shrink-0 items-end justify-center rounded-2xl p-3', className)}>
       <img src={src} width={width} height={height} alt="" aria-hidden loading="lazy" decoding="async" className="orcon-mascot-image" />

@@ -6,6 +6,7 @@ import { expect, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
 import { Input } from '../input/Input';
+import { Link } from '../link/Link';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 
 import { FormField } from './FormField';
@@ -78,8 +79,14 @@ export const Group: Story = {
   },
 };
 
+/** An action at the end of the label row, such as "Forgot it?" next to a password label. */
+export const LabelAction: Story = {
+  args: { label: 'Password', labelAction: <Link href="#recover">Forgot it?</Link> },
+};
+
 const props: Record<(typeof states)[number], Partial<React.ComponentProps<typeof FormField>>> = {
   default: {},
+  'label-action': { labelAction: <Link href="#recover">Forgot it?</Link> },
   description: { description: 'Shown in the flow list.' },
   required: { required: true },
   error: { error: 'Enter a name for the flow.' },

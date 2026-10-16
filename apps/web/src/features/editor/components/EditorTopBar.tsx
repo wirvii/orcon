@@ -1,127 +1,180 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { IconButton, Separator, Tooltip } from '@orcon/ui';
-import { Command, Keyboard, ListTree, Plus, Redo2, Save, Search, StickyNote, Undo2, Wand2 } from 'lucide-react';
-import { useRef, useState, type KeyboardEvent } from 'react';
-import { useIntl, type MessageDescriptor } from 'react-intl';
+import { Tooltip } from '@orcon/ui';
+import { ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { defineMessages, useIntl } from 'react-intl';
 
+import { PublishControls } from '../forms/PublishControls';
+import { usePendingChanges } from '../forms/use-pending-changes';
 import type { SaveStatus } from '../model/autosave';
-import { useEditorStore } from '../store/editor-context';
+import { useEditorStore, useEditorStoreApi } from '../store/editor-context';
 
-import { editorMessages } from './messages';
 import { SaveIndicator } from './SaveIndicator';
-import type { EditorCommands } from './use-editor-commands';
+
+const messages = defineMessages({
+  nav: { id: 'editor.top.nav', defaultMessage: 'Where you are', description: 'Accessible name of the breadcrumb above the flow name: the project the flow belongs to.' },
+  sections: { id: 'editor.top.sections', defaultMessage: 'Flow sections', description: 'Accessible name of the row of tabs that switches between the editor, the runs and the versions of the flow.' },
+  tabEditor: { id: 'editor.top.tab.editor', defaultMessage: 'Editor', description: 'Tab of the flow page: the canvas where the flow is edited.' },
+  tabExecutions: { id: 'editor.top.tab.executions', defaultMessage: 'Executions', description: 'Tab of the flow page: the runs of this flow.' },
+  tabVersions: { id: 'editor.top.tab.versions', defaultMessage: 'Versions', description: 'Tab of the flow page: the published versions of this flow.' },
+  versionsSoon: { id: 'editor.top.tab.versionsSoon', defaultMessage: 'The list of versions is not available yet.', description: 'Why the Versions tab cannot be opened: its screen is not built yet.' },
+  rename: { id: 'editor.top.rename', defaultMessage: 'Rename the flow', description: 'Accessible name of the button that edits the name of the flow.' },
+  nameField: { id: 'editor.top.nameField', defaultMessage: 'Flow name', description: 'Accessible name of the field where the name of the flow is edited.' },
+});
+
+/** Where the bar sends the person: the host (the screen) knows the router, the bar only knows the two places. */
+export interface EditorNav {
+  /** The name of the project, for the breadcrumb. */
+  projectLabel: string;
+  /** Renders a link to `project` (the flows of the project) or `executions` (the runs of this flow). */
+  link: (target: 'project' | 'executions', props: { className: string; children: ReactNode }) => ReactNode;
+}
 
 export interface EditorTopBarProps {
-  /** The editing buttons need a tablet or a computer; a phone shows the flow only. */
+  /** The editing controls need a tablet or a computer; a phone shows the flow only. */
   editable: boolean;
   status: SaveStatus;
-  outlineOpen: boolean;
-  commands: EditorCommands;
-  onToggleOutline: () => void;
-  onFind: () => void;
-  onCommands: () => void;
-  onShortcuts: () => void;
-  onSave: () => void;
+  /** The flow the Active switch and Publish act on. Absent when the flow is not stored on the server, so there is nothing to publish. */
+  flowId?: string | undefined;
+  nav?: EditorNav | undefined;
 }
 
-interface Tool {
-  label: MessageDescriptor;
-  icon: typeof Plus;
-  onClick: () => void;
-  disabled?: boolean;
-  pressed?: boolean;
-}
+const CRUMB = 'text-fg-muted hover:text-fg max-w-canvas-label-width truncate text-sm';
+const tabBase = 'inline-flex min-h-target items-center rounded-md px-3 text-sm font-medium';
 
-/** The name of the flow, the state of its draft and the tools that are not on the canvas itself. */
-export function EditorTopBar({ editable, status, outlineOpen, commands, onToggleOutline, onFind, onCommands, onShortcuts, onSave }: EditorTopBarProps) {
+/**
+ * The top of the editor (SPEC-019 R-UX-EDT-01): the project and the name of the flow (which can be renamed), the
+ * tabs Editor, Executions and Versions, the state of the draft in words, the Active switch and Publish with the
+ * number of changes not published yet. Tags and Share are not shown: they have no backend yet.
+ */
+export function EditorTopBar({ editable, status, flowId, nav }: EditorTopBarProps) {
   const intl = useIntl();
+  const api = useEditorStoreApi();
   const name = useEditorStore((state) => state.document.name);
-  const canUndo = useEditorStore((state) => state.history.past.length > 0);
-  const canRedo = useEditorStore((state) => state.history.future.length > 0);
-
-  // WAI-ARIA toolbar: one tab stop, the arrow keys move between the buttons (the one that had focus last is the stop).
-  const toolbar = useRef<HTMLDivElement>(null);
-  const [current, setCurrent] = useState<string | undefined>(undefined);
-  const enabled = () => Array.from(toolbar.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
-  const onToolbarKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const buttons = enabled();
-    const index = buttons.findIndex((button) => button === document.activeElement);
-    if (index < 0) return;
-    const last = buttons.length - 1;
-    const target = event.key === 'ArrowRight' ? (index === last ? 0 : index + 1) : event.key === 'ArrowLeft' ? (index === 0 ? last : index - 1) : event.key === 'Home' ? 0 : event.key === 'End' ? last : undefined;
-    if (target === undefined) return;
-    event.preventDefault();
-    buttons[target]?.focus();
-  };
-
-  const sections: Tool[][] = [
-    ...(editable
-      ? [
-          [
-            { label: editorMessages.addNode, icon: Plus, onClick: commands.addNode },
-            { label: editorMessages.addNote, icon: StickyNote, onClick: commands.addNote },
-          ],
-          [
-            { label: editorMessages.undo, icon: Undo2, onClick: commands.undo, disabled: !canUndo },
-            { label: editorMessages.redo, icon: Redo2, onClick: commands.redo, disabled: !canRedo },
-            { label: editorMessages.tidyUp, icon: Wand2, onClick: () => void commands.tidyUp() },
-          ],
-          [
-            { label: editorMessages.find, icon: Search, onClick: onFind },
-            { label: editorMessages.commands, icon: Command, onClick: onCommands },
-            { label: editorMessages.saveNow, icon: Save, onClick: onSave },
-          ],
-        ]
-      : []),
-    [
-      { label: editorMessages.showOutline, icon: ListTree, onClick: onToggleOutline, pressed: outlineOpen },
-      ...(editable ? [{ label: editorMessages.shortcuts, icon: Keyboard, onClick: onShortcuts }] : []),
-    ],
-  ];
-  const all = sections.flat();
-  // The tab stop is the button that had focus last, or the first one that can be used.
-  const stop = all.find((tool) => tool.label.id === current && tool.disabled !== true)?.label.id ?? all.find((tool) => tool.disabled !== true)?.label.id;
+  const pending = usePendingChanges(editable ? flowId : undefined);
+  const [renaming, setRenaming] = useState(false);
 
   return (
-    <header className="border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
-      <h1 className="text-md me-auto min-w-0 font-semibold wrap-anywhere">{name}</h1>
-      {editable ? <SaveIndicator status={status} /> : null}
-      <div
-        ref={toolbar}
-        role="toolbar"
-        aria-label={intl.formatMessage(editorMessages.toolbar)}
-        onKeyDown={onToolbarKeyDown}
-        onFocus={(event) => {
-          const id = event.target instanceof HTMLElement ? event.target.dataset['tool'] : undefined;
-          if (id) setCurrent(id);
-        }}
-        className="flex flex-wrap items-center gap-1"
-      >
-        {sections.map((tools, index) => (
-          <div key={tools[0]?.label.id} className="flex items-center gap-1">
-            {index > 0 ? <Separator orientation="vertical" className="h-6" /> : null}
-            {tools.map((tool) => {
-              const label = intl.formatMessage(tool.label);
-              return (
-                <Tooltip key={tool.label.id} content={label}>
-                  <IconButton
-                    variant="ghost"
-                    icon={tool.icon}
-                    label={label}
-                    onClick={tool.onClick}
-                    disabled={tool.disabled}
-                    aria-pressed={tool.pressed}
-                    tabIndex={tool.label.id === stop ? 0 : -1}
-                    data-tool={tool.label.id}
-                  />
-                </Tooltip>
-              );
-            })}
-          </div>
-        ))}
+    <header className="border-border flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2">
+      <div className="md:min-w-canvas-label-width flex min-w-0 basis-full items-center gap-1 md:flex-1 md:basis-0">
+        {nav ? (
+          <nav aria-label={intl.formatMessage(messages.nav)} className="flex items-center gap-1">
+            {nav.link('project', { className: CRUMB, children: nav.projectLabel })}
+            <ChevronRight aria-hidden className="text-fg-subtle size-icon-16 shrink-0" />
+          </nav>
+        ) : null}
+        <h1 className="text-md min-w-0 font-semibold">
+          {renaming && editable ? (
+            <NameField
+              value={name}
+              label={intl.formatMessage(messages.nameField)}
+              onCommit={(next) => {
+                api.getState().renameFlow(next);
+                setRenaming(false);
+              }}
+              onCancel={() => {
+                setRenaming(false);
+              }}
+            />
+          ) : editable ? (
+            <Tooltip content={intl.formatMessage(messages.rename)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRenaming(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'F2') {
+                    event.preventDefault();
+                    setRenaming(true);
+                  }
+                }}
+                className="hover:bg-surface-sunken block max-w-full truncate rounded-md px-1 text-start wrap-anywhere"
+              >
+                {name}
+              </button>
+            </Tooltip>
+          ) : (
+            <span className="wrap-anywhere">{name}</span>
+          )}
+        </h1>
+      </div>
+
+      <nav aria-label={intl.formatMessage(messages.sections)} className="bg-surface-sunken border-border flex shrink-0 items-center gap-1 rounded-lg border p-1">
+        <span aria-current="page" className={`${tabBase} bg-surface text-fg shadow-sm`}>
+          {intl.formatMessage(messages.tabEditor)}
+        </span>
+        {nav ? (
+          nav.link('executions', { className: `${tabBase} text-fg-muted hover:text-fg`, children: intl.formatMessage(messages.tabExecutions) })
+        ) : (
+          <span aria-disabled="true" className={`${tabBase} text-fg-disabled`}>
+            {intl.formatMessage(messages.tabExecutions)}
+          </span>
+        )}
+        <Tooltip content={intl.formatMessage(messages.versionsSoon)}>
+          <span aria-disabled="true" tabIndex={0} className={`${tabBase} text-fg-disabled cursor-not-allowed`}>
+            {intl.formatMessage(messages.tabVersions)}
+            <span className="sr-only">. {intl.formatMessage(messages.versionsSoon)}</span>
+          </span>
+        </Tooltip>
+      </nav>
+
+      <div className="flex shrink-0 items-center justify-end gap-4 md:basis-0 md:flex-1">
+        {editable ? <SaveIndicator status={status} /> : null}
+        {editable && flowId !== undefined ? <PublishControls flowId={flowId} flowName={name} pending={pending} /> : null}
       </div>
     </header>
+  );
+}
+
+interface NameFieldProps {
+  value: string;
+  label: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}
+
+/** The field that renames the flow in place. Enter or leaving the field saves; Escape cancels. */
+function NameField({ value, label, onCommit, onCancel }: NameFieldProps) {
+  const [draft, setDraft] = useState(value);
+  const field = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    field.current?.focus();
+    field.current?.select();
+  }, []);
+  const finish = (commit: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (commit && draft.trim() !== '' && draft.trim() !== value) onCommit(draft.trim());
+    else onCancel();
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finish(true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      finish(false);
+    }
+  };
+  return (
+    <input
+      ref={field}
+      value={draft}
+      aria-label={label}
+      maxLength={256}
+      onChange={(event) => {
+        setDraft(event.target.value);
+      }}
+      onBlur={() => {
+        finish(true);
+      }}
+      onKeyDown={onKeyDown}
+      className="bg-surface border-control text-fg h-control w-canvas-label-width rounded-md border px-2 text-md font-semibold outline-hidden focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus"
+    />
   );
 }
