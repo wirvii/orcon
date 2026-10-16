@@ -234,7 +234,7 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 
 	body := apigen.FlowList{Items: []apigen.Flow{}}
 	for _, it := range window {
-		body.Items = append(body.Items, flowActivityBody(rows[it.idx]))
+		body.Items = append(body.Items, flowActivityBody(&rows[it.idx]))
 	}
 	if more {
 		token, err := tokenFor(p.codec, org.String(), binding, last)
@@ -269,7 +269,7 @@ func (p *Projects) CreateFlow(ctx context.Context, req apigen.CreateFlowRequestO
 	etag := flowETag(rec)
 	loc := flowLocation(rec.ID)
 	return apigen.CreateFlow201JSONResponse{
-		Body: flowBody(rec), Headers: apigen.CreateFlow201ResponseHeaders{ETag: &etag, Location: &loc},
+		Body: flowListBody(rec), Headers: apigen.CreateFlow201ResponseHeaders{ETag: &etag, Location: &loc},
 	}, nil
 }
 
@@ -326,7 +326,7 @@ func (p *Projects) rebuildFlow(ctx context.Context, rec identity.IdempotencyReco
 	if err != nil {
 		return identity.IdempotencyResponse{}, err
 	}
-	return encodeResponse(201, flowBody(f), map[string]string{"Location": flowLocation(f.ID)}, flowETag(f))
+	return encodeResponse(201, flowListBody(f), map[string]string{"Location": flowLocation(f.ID)}, flowETag(f))
 }
 
 // readActivity reads the flows of the project with their latest execution and the executions of
@@ -437,6 +437,15 @@ func projectBody(rec identity.ProjectRecord) apigen.Project {
 	return body
 }
 
+// flowListBody is the flow as a list or a creation shows it. These reads do not compare content
+// hashes, which would cost a version read and a parse per row: a flow that was never published has
+// changes by definition, and a published one is taken to have them once its draft was saved at all
+// (the reads of one flow, [flow.Manager.Get], compare the hashes and are exact).
+func flowListBody(rec flow.Record) apigen.Flow {
+	rec.HasUnpublishedChanges = rec.ActiveVersionID.IsZero() || rec.DraftRevision > 0
+	return flowBody(rec)
+}
+
 // flowBody is the flow as the API shows it. A flow has a version number only once it is
 // published; the publication operations arrive with the editor, so until then the active
 // version is absent.
@@ -444,18 +453,17 @@ func flowBody(rec flow.Record) apigen.Flow {
 	fid := types.UUID(rec.ID)
 	return apigen.Flow{
 		Id: &fid, ProjectId: types.UUID(rec.ProjectID), Name: rec.Name,
-		ActivationState: apigen.FlowActivationState(rec.ActivationState),
-		DraftRevision:   int(rec.DraftRevision),
-		ActiveVersion:   activeVersion(rec),
-		// A draft that was saved after a publication has changes that are not published yet.
-		HasUnpublishedChanges: !rec.ActiveVersionID.IsZero() && rec.DraftRevision > 0,
+		ActivationState:       apigen.FlowActivationState(rec.ActivationState),
+		DraftRevision:         int(rec.DraftRevision),
+		ActiveVersion:         activeVersion(rec),
+		HasUnpublishedChanges: rec.HasUnpublishedChanges,
 		CreatedAt:             rec.CreatedAt, UpdatedAt: rec.UpdatedAt,
 	}
 }
 
 // flowActivityBody is a flow of a list with its latest execution and its executions of the last day.
-func flowActivityBody(a flow.Activity) apigen.Flow {
-	body := flowBody(a.Flow)
+func flowActivityBody(a *flow.Activity) apigen.Flow {
+	body := flowListBody(a.Flow)
 	count := int(a.ExecutionCountLast24h)
 	body.ExecutionCountLast24h = &count
 	if a.LastExecution != nil {

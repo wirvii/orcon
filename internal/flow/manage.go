@@ -30,13 +30,42 @@ func NewManager(store ManageStore, clk clock.Clock, ids id.Generator) *Manager {
 	return &Manager{store: store, clock: clk, ids: ids}
 }
 
-// Get returns the non-deleted flow, or [ErrNotFound].
+// Get returns the non-deleted flow, or [ErrNotFound]. Unlike the list reads, it fills
+// [Record.HasUnpublishedChanges] exactly: it compares the content hash of the draft with the one of
+// the active version (SPEC-002 R-ACT-01).
 func (m *Manager) Get(ctx context.Context, org orgscope.Org, flowID FlowID) (Record, error) {
 	rec, err := m.store.GetFlow(ctx, org, flowID)
 	if err != nil {
 		return Record{}, fmt.Errorf("get flow: %w", err)
 	}
+	rec.HasUnpublishedChanges = true
+	if !rec.ActiveVersionID.IsZero() {
+		v, err := m.store.GetVersion(ctx, org, rec.ActiveVersionID)
+		if err != nil {
+			return Record{}, fmt.Errorf("get flow: read the active version: %w", err)
+		}
+		rec.HasUnpublishedChanges = DraftDiffers(rec.Draft, v.ContentHash)
+	}
 	return rec, nil
+}
+
+// DraftDiffers reports whether the draft, normalized the way publication normalizes it, has a
+// different content hash than the live version. A draft that does not read as a document differs by
+// definition.
+func DraftDiffers(draft []byte, liveHash string) bool {
+	value, err := jsonvalue.Parse(draft)
+	if err != nil {
+		return true
+	}
+	doc, err := Read(value)
+	if err != nil {
+		return true
+	}
+	h, err := ContentHash(&doc)
+	if err != nil {
+		return true
+	}
+	return h.String() != liveHash
 }
 
 // RenameInput is what a caller supplies to rename a flow.

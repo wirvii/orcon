@@ -94,7 +94,7 @@ func (p *Projects) ListOrgFlows(ctx context.Context, req apigen.ListOrgFlowsRequ
 
 	body := apigen.FlowList{Items: []apigen.Flow{}}
 	for _, it := range window {
-		body.Items = append(body.Items, flowActivityBody(rows[it.idx]))
+		body.Items = append(body.Items, flowActivityBody(&rows[it.idx]))
 	}
 	if more {
 		token, err := tokenFor(p.codec, org.String(), binding, last)
