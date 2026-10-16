@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Dialog, FormField, ProblemAlert, Textarea, type ProblemDetails } from '@orcon/ui';
+import { Banner, Button, Dialog, FormField, ProblemAlert, Textarea, type ProblemDetails } from '@orcon/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { defineMessages, useIntl } from 'react-intl';
 import { z } from 'zod';
 
 import { formatIssue } from '../../../app/forms/zod-messages';
-import { toProblemDetails } from '../../../app/errors/to-problem-details';
+import { problemStatus, toProblemDetails } from '../../../app/errors/to-problem-details';
 import { usePublishFlow } from '../api/mutations';
+import { editorMessages } from '../components/messages';
 
 /** The longest release note the server stores (SPEC-005 `PublishFlowRequest`). */
 const MAX_NOTE = 500;
@@ -34,6 +35,11 @@ const messages = defineMessages({
   },
   cancel: { id: 'editor.publish.cancel', defaultMessage: 'Cancel', description: 'Button that closes the publish dialog without publishing.' },
   submit: { id: 'editor.publish.submit', defaultMessage: 'Publish', description: 'Button that publishes the draft as a new version.' },
+  changed: {
+    id: 'editor.publish.changed',
+    defaultMessage: 'Nothing was published. The draft changed somewhere else and was read again; check it, then publish.',
+    description: 'Shown in the publish dialog when the draft on the server is newer than the one the editor had.',
+  },
   tooLong: {
     id: 'editor.publish.tooLong',
     defaultMessage: 'The release note is longer than 500 characters.',
@@ -61,6 +67,7 @@ export function PublishDialog({ open, onOpenChange, flowId }: PublishDialogProps
   const intl = useIntl();
   const publish = usePublishFlow(flowId);
   const [failure, setFailure] = useState<ProblemDetails | undefined>(undefined);
+  const [stale, setStale] = useState(false);
 
   const form = useForm<PublishValues>({
     resolver: zodResolver(publishSchema, {
@@ -73,13 +80,15 @@ export function PublishDialog({ open, onOpenChange, flowId }: PublishDialogProps
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined);
+    setStale(false);
     try {
       const note = values.note.trim();
       await publish.mutateAsync(note === '' ? undefined : note);
       form.reset({ note: '' });
       onOpenChange(false);
     } catch (error) {
-      setFailure(toProblemDetails(error));
+      if (problemStatus(error) === 412) setStale(true);
+      else setFailure(toProblemDetails(error));
     }
   });
 
@@ -101,6 +110,11 @@ export function PublishDialog({ open, onOpenChange, flowId }: PublishDialogProps
       }
     >
       <form id="publish-flow-form" noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+        {stale ? (
+          <Banner tone="warning" title={intl.formatMessage(editorMessages.conflictTitle)}>
+            {intl.formatMessage(messages.changed)}
+          </Banner>
+        ) : null}
         {failure ? <ProblemAlert problem={failure} /> : null}
         <FormField
           label={intl.formatMessage(messages.note)}

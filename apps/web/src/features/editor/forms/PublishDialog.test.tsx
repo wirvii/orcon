@@ -4,7 +4,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderInApp, server } from '../../../../test/screen-harness';
 import { EXAMPLE_FLOW_ID } from '../model/example-flow';
@@ -14,6 +14,18 @@ import { PublishDialog } from './PublishDialog';
 const publishPath = `/api/v1/flows/${EXAMPLE_FLOW_ID}/publish`;
 
 describe('PublishDialog', () => {
+  // A publication is based on the entity tag of the draft, which the dialog reads when the editor has not cached it.
+  beforeEach(() => {
+    server.use(
+      http.get(`/api/v1/flows/${EXAMPLE_FLOW_ID}/draft`, () =>
+        HttpResponse.json(
+          { flowId: EXAMPLE_FLOW_ID, revision: 3, document: { format: 'orcon/flow@1', id: 'flow', name: 'Order notifications', settings: {}, variables: [], nodes: [], edges: [], editor: {} }, updatedAt: '2026-10-13T16:00:00Z' },
+          { headers: { ETag: '"3"' } },
+        ),
+      ),
+    );
+  });
+
   it('publishes the draft with its release note and closes', async () => {
     let body: unknown = null;
     server.use(

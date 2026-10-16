@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { mutationOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { mutationOptions, type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { FlowDocument } from '../model/flow-document';
 
 import type { NewCredential } from './credential-source';
 import { type FlowAnswer, publishFlow, setFlowActivation } from './flow-operations';
 import type { LoadedDraft, SaveResult } from './draft-source';
-import { credentialSource, draftSource, editorKeys, LOCAL_ORGANIZATION } from './queries';
+import { credentialSource, draftQueryOptions, draftSource, editorKeys, LOCAL_ORGANIZATION } from './queries';
 
 export interface SaveDraftInput {
   document: FlowDocument;
@@ -66,24 +66,28 @@ export function useCreateCredential() {
 }
 
 /**
- * Publishes the draft with an optional release note (SPEC-014 ED10a). A publication is not retried: the
- * person decides to publish again. Afterwards the flow state is read again, because the draft is now
- * the published version.
+ * Publishes the draft with an optional release note (SPEC-014 ED10a). The publication is based on the
+ * entity tag of the DRAFT, the revision the editor last saved or read (never the flow's tag); a draft that
+ * moved on is a 412 and nothing is published. A publication is not retried: the person decides to publish
+ * again. After every answer, success or refusal, the flow and the draft are read again.
  */
 export function usePublishFlow(flowId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: [...editorKeys.flow(LOCAL_ORGANIZATION, flowId), 'publish'],
-    mutationFn: (note: string | undefined) => publishFlow(flowId, note),
+    mutationFn: async (note: string | undefined) => {
+      const draft = queryClient.getQueryData<LoadedDraft>(editorKeys.draft(LOCAL_ORGANIZATION, flowId)) ?? (await queryClient.query(draftQueryOptions(flowId)));
+      return publishFlow(flowId, note, draft.revision);
+    },
     retry: false,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) }),
+    onSettled: () => refreshFlowAndDraft(queryClient, flowId),
   });
 }
 
 /**
- * Activates or deactivates a flow against the entity tag it was read at (SPEC-014 ED10a). The answer
- * carries the new state and its tag, so the next change is based on it; a stale tag is a conflict and
- * nothing changes.
+ * Activates or deactivates a flow against the entity tag of the FLOW it was read at (SPEC-014 ED10a). The
+ * answer carries the new state and its tag, so the next change is based on it; a stale tag is a conflict
+ * and nothing changes. After every answer the flow and the draft are read again.
  */
 export function useSetFlowActivation(flowId: string) {
   const queryClient = useQueryClient();
@@ -94,5 +98,14 @@ export function useSetFlowActivation(flowId: string) {
     onSuccess: (answer: FlowAnswer) => {
       queryClient.setQueryData<FlowAnswer>(editorKeys.flow(LOCAL_ORGANIZATION, flowId), answer);
     },
+    onSettled: () => refreshFlowAndDraft(queryClient, flowId),
   });
+}
+
+/** Reads the flow and its draft again: both entity tags may have moved. */
+function refreshFlowAndDraft(queryClient: QueryClient, flowId: string): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) }),
+    queryClient.invalidateQueries({ queryKey: editorKeys.draft(LOCAL_ORGANIZATION, flowId), exact: true }),
+  ]);
 }

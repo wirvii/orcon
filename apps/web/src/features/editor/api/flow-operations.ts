@@ -49,12 +49,14 @@ export async function getFlow(flowId: string): Promise<FlowAnswer> {
 
 /**
  * Publishes the current draft as a new immutable version (`publishFlow`). The note is optional and is
- * stored with the version; an empty note is not sent.
+ * stored with the version; an empty note is not sent. `ifMatch` is the entity tag of the DRAFT (`getDraft`),
+ * not the one of the flow: a draft that moved on is refused with 412 and nothing is published.
  */
-export function publishFlow(flowId: string, note: string | undefined): Promise<FlowVersion> {
+export function publishFlow(flowId: string, note: string | undefined, ifMatch: string): Promise<FlowVersion> {
   return apiRequest({
     method: 'POST',
     path: `/flows/${encodeURIComponent(flowId)}/publish`,
+    ifMatch,
     body: note === undefined || note === '' ? {} : { note },
     schema: flowVersionSchema,
     source: 'response of POST /flows/{flowId}/publish',
@@ -63,7 +65,7 @@ export function publishFlow(flowId: string, note: string | undefined): Promise<F
 
 /**
  * Switches the automatic triggers of a flow on or off (`activateFlow`, `deactivateFlow`). The flow must
- * have been published first; a stale entity tag is refused with 412.
+ * have been published first (409 otherwise); `ifMatch` is the entity tag of the FLOW (`getFlow`), and a stale one is refused with 412.
  */
 export async function setFlowActivation(flowId: string, active: boolean, ifMatch: string): Promise<FlowAnswer> {
   const action = active ? 'activate' : 'deactivate';

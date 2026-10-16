@@ -155,7 +155,7 @@ it('AppFrame signs out to login with a notice', async () => {
 
 it('AppFrame shows the role of the person when the server says it', async () => {
   server.use(
-    http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, orgRoles: [{ orgId: acme.id, role: 'OWNER' }] })),
+    http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, orgRoles: [{ orgId: acme.id, role: 'Owner' }] })),
     signedIn.organizations([acme]),
     productApi.projects([sales]),
     productApi.flows([flow]),

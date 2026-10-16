@@ -22,8 +22,8 @@ export const sessionSchema = z.object({
   assuranceLevel: z.enum(['AAL1', 'AAL2']),
 });
 
-/** The roles an organization gives a person (ADR-0041). */
-export const organizationRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER']);
+/** The predefined roles the server names in `OrgRole.role` (ADR-0041, SPEC-005), spelled as it sends them. */
+export const organizationRoleSchema = z.enum(['Owner', 'Admin', 'Member', 'Project Admin', 'Editor', 'Operator', 'Viewer']);
 
 export const currentUserSchema = z.object({
   id: z.uuid(),

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -33,10 +33,12 @@ describe('PublishControls', () => {
 
   it('activates a published flow against the entity tag it read', async () => {
     let ifMatch: string | null = null;
+    let activated = false;
     server.use(
-      http.get(flowPath, () => flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"5"')),
+      http.get(flowPath, () => (activated ? flowAnswer({ activationState: 'ACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"6"') : flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"5"'))),
       http.post(`${flowPath}/activate`, ({ request }) => {
         ifMatch = request.headers.get('If-Match');
+        activated = true;
         return flowAnswer({ activationState: 'ACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"6"');
       }),
     );
@@ -48,15 +50,84 @@ describe('PublishControls', () => {
     expect(ifMatch).toBe('"5"');
   });
 
-  it('refuses an activation made on a flow that changed, changes nothing and offers a reload', async () => {
+  it('refuses an activation made on a flow that changed, reads the flow again and changes nothing', async () => {
+    let reads = 0;
     server.use(
-      http.get(flowPath, () => flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"5"')),
+      http.get(flowPath, () => {
+        reads += 1;
+        return flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, reads === 1 ? '"5"' : '"7"');
+      }),
       http.post(`${flowPath}/activate`, () => problem(412, 'precondition-failed', 'precondition-failed')),
     );
     renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Active: Order notifications' }));
-    expect(await screen.findByText('Nothing was changed. Reload the flow to see its newest state.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Reload the flow' })).toBeVisible();
+    expect(await screen.findByText('Nothing was changed. The flow changed somewhere else and now shows its newest state.')).toBeVisible();
+    await waitFor(() => {
+      expect(reads).toBe(2);
+    });
     expect(screen.getByText('Inactive')).toBeVisible();
+  });
+
+  it('explains that a flow must be published first when the server answers 409', async () => {
+    server.use(
+      http.get(flowPath, () => flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"5"')),
+      http.post(`${flowPath}/activate`, () => problem(409, 'conflict', 'conflict')),
+    );
+    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Active: Order notifications' }));
+    expect(await screen.findByText('Publish a version first: only a published version can run.')).toBeVisible();
+    expect(screen.getByText('Inactive')).toBeVisible();
+  });
+
+  describe('publishing', () => {
+    const draftAnswer = () =>
+      HttpResponse.json(
+        { flowId: EXAMPLE_FLOW_ID, revision: 3, document: { format: 'orcon/flow@1', id: 'flow', name: 'Order notifications', settings: {}, variables: [], nodes: [], edges: [], editor: {} }, updatedAt: '2026-10-13T16:00:00Z' },
+        { headers: { ETag: '"3"' } },
+      );
+
+    it('sends the entity tag of the draft, not the one of the flow, and reads both again', async () => {
+      let ifMatch: string | null = null;
+      let flowReads = 0;
+      let draftReads = 0;
+      server.use(
+        http.get(flowPath, () => {
+          flowReads += 1;
+          return flowAnswer({ activationState: 'INACTIVE', activeVersion: null, hasUnpublishedChanges: true }, '"9"');
+        }),
+        http.get(`${flowPath}/draft`, () => {
+          draftReads += 1;
+          return draftAnswer();
+        }),
+        http.post(`${flowPath}/publish`, ({ request }) => {
+          ifMatch = request.headers.get('If-Match');
+          return HttpResponse.json({ flowId: EXAMPLE_FLOW_ID, version: 1, contentHash: 'sha256:abc', publishedAt: '2026-10-13T16:00:00Z' });
+        }),
+      );
+      renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
+      await waitFor(() => {
+        expect(ifMatch).toBe('"3"');
+      });
+      await waitFor(() => {
+        expect(flowReads).toBeGreaterThanOrEqual(2);
+      });
+      expect(draftReads).toBeGreaterThanOrEqual(1);
+    });
+
+    it('refuses a draft that moved on, publishes nothing and says so', async () => {
+      server.use(
+        http.get(flowPath, () => flowAnswer({ activationState: 'INACTIVE', activeVersion: null, hasUnpublishedChanges: true }, '"9"')),
+        http.get(`${flowPath}/draft`, () => draftAnswer()),
+        http.post(`${flowPath}/publish`, () => problem(412, 'precondition-failed', 'precondition-failed')),
+      );
+      renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Publish' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
+      expect(await within(dialog).findByText('Nothing was published. The draft changed somewhere else and was read again; check it, then publish.')).toBeVisible();
+    });
   });
 });

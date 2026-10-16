@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActiveToggle, Banner, Button, ProblemAlert, Tooltip, type ProblemDetails } from '@orcon/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import { problemStatus, toProblemDetails } from '../../../app/errors/to-problem-details';
 import { useSetFlowActivation } from '../api/mutations';
-import { editorKeys, flowQueryOptions, LOCAL_ORGANIZATION } from '../api/queries';
+import { flowQueryOptions } from '../api/queries';
 import { editorMessages } from '../components/messages';
 import { PublishDialog } from './PublishDialog';
 
@@ -37,10 +37,9 @@ const messages = defineMessages({
   },
   changedElsewhere: {
     id: 'editor.activation.changed',
-    defaultMessage: 'Nothing was changed. Reload the flow to see its newest state.',
-    description: 'Shown when an activation is refused because the flow changed on the server.',
+    defaultMessage: 'Nothing was changed. The flow changed somewhere else and now shows its newest state.',
+    description: 'Shown when an activation is refused because the flow changed on the server; the flow was read again.',
   },
-  reload: { id: 'editor.activation.reload', defaultMessage: 'Reload the flow', description: 'Button that reads the newest state of the flow.' },
 });
 
 export interface PublishControlsProps {
@@ -59,12 +58,12 @@ export interface PublishControlsProps {
  */
 export function PublishControls({ flowId, flowName = '', pending }: PublishControlsProps) {
   const intl = useIntl();
-  const queryClient = useQueryClient();
   const flow = useQuery(flowQueryOptions(flowId));
   const activation = useSetFlowActivation(flowId);
   const [publishing, setPublishing] = useState(false);
   const [failure, setFailure] = useState<ProblemDetails | undefined>(undefined);
   const [stale, setStale] = useState(false);
+  const [needsPublish, setNeedsPublish] = useState(false);
 
   if (flow.status === 'pending') return null;
   if (flow.status === 'error') return <ProblemAlert problem={toProblemDetails(flow.error)} />;
@@ -77,10 +76,14 @@ export function PublishControls({ flowId, flowName = '', pending }: PublishContr
   const toggle = async () => {
     setFailure(undefined);
     setStale(false);
+    setNeedsPublish(false);
     try {
       await activation.mutateAsync({ active: !active, etag });
     } catch (error) {
-      if (problemStatus(error) === 412) setStale(true);
+      const status = problemStatus(error);
+      // 412: the flow changed elsewhere (the mutation reads it again). 409: the flow has no published version.
+      if (status === 412) setStale(true);
+      else if (status === 409) setNeedsPublish(true);
       else setFailure(toProblemDetails(error));
     }
   };
@@ -112,27 +115,14 @@ export function PublishControls({ flowId, flowName = '', pending }: PublishContr
           )}
         </Button>
       </Tooltip>
-      {stale || failure ? (
+      {stale || needsPublish || failure ? (
         <div className="absolute end-0 top-full z-40 mt-2 flex w-canvas-palette-w max-w-full flex-col gap-2">
           {stale ? (
-            <Banner
-              tone="warning"
-              title={intl.formatMessage(editorMessages.conflictTitle)}
-              action={
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setStale(false);
-                    void queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) });
-                  }}
-                >
-                  {intl.formatMessage(messages.reload)}
-                </Button>
-              }
-            >
+            <Banner tone="warning" title={intl.formatMessage(editorMessages.conflictTitle)}>
               {intl.formatMessage(messages.changedElsewhere)}
             </Banner>
           ) : null}
+          {needsPublish ? <Banner tone="info" title={intl.formatMessage(messages.publishFirst)} /> : null}
           {failure ? <ProblemAlert problem={failure} /> : null}
         </div>
       ) : null}
