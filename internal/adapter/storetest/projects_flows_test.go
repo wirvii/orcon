@@ -543,16 +543,16 @@ func TestCreateFlowAuditedAtomically(t *testing.T) {
 
 // TestOrganizationsCreateAuditsBindingAndMembership (BL-129, SPEC-004 Annex B): creating an
 // organization from the operator's command writes org.created, member.joined for the
-// administrator and role_binding.created for the Admin binding, in the same write as the rows;
+// owner and role_binding.created for the Owner binding, in the same write as the rows;
 // it does not write member.role_changed, which means replacing a role.
 func TestOrganizationsCreateAuditsBindingAndMembership(t *testing.T) {
 	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
 		t.Helper()
 		f := newFixture(t, newStore)
-		admin := f.user("boss@example.test")
+		owner := f.user("boss@example.test")
 		kr, _ := keyringOf(t, f)
 		orgs := identity.NewOrganizations(f.s, keyringIssuer{kr: kr}, clock.NewFake(base), f.ids)
-		org, err := orgs.Create(f.ctx(), identity.NewOrganization{Name: "Fresh", Slug: "fresh", AdminEmail: "boss@example.test"})
+		org, err := orgs.Create(f.ctx(), identity.NewOrganization{Name: "Fresh", Slug: "fresh", OwnerEmail: "boss@example.test"})
 		if err != nil {
 			t.Fatalf("create organization: %v", err)
 		}
@@ -562,9 +562,9 @@ func TestOrganizationsCreateAuditsBindingAndMembership(t *testing.T) {
 		if !slices.Equal(got, want) {
 			t.Errorf("audit actions = %v, want %v", got, want)
 		}
-		bindings, err := f.s.Bindings(f.ctx(), admin.ID, scopeOf(org.ID))
-		if err != nil || len(bindings) != 1 || bindings[0].Role != identity.RoleAdmin {
-			t.Errorf("bindings = %+v, %v; want the Admin binding", bindings, err)
+		bindings, err := f.s.Bindings(f.ctx(), owner.ID, scopeOf(org.ID))
+		if err != nil || len(bindings) != 1 || bindings[0].Role != identity.RoleOwner || bindings[0].Project != "" {
+			t.Errorf("bindings = %+v, %v; want the organization Owner binding (the creator of an organization is its Owner)", bindings, err)
 		}
 	})
 }

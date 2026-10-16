@@ -21,9 +21,9 @@ import (
 )
 
 const orgsUsage = `usage:
-  orcon orgs create --slug <slug> --name <name> --admin <address>
+  orcon orgs create --slug <slug> --name <name> --owner <address>
 
-Creates an organization and makes the account of --admin its Admin, in one
+Creates an organization and makes the account of --owner its Owner, in one
 transaction with the organization's key and the audit entries of the creation.
 The command needs the same master key settings as the server, and the server
 must have started once. An organization that exists without a key (created by
@@ -31,13 +31,13 @@ an older build) gets one at the next server start, logged as a warning. The
 account must already
 exist (orcon accounts create). The slug is lowercase letters, digits and
 single hyphens. When the server runs on SQLite it holds the database file, so
-stop it first.`
+stop it first. --admin is the former name of --owner and still works.`
 
 // orgsCommand creates organizations for the operator (SPEC-016 SH4, SPEC-004 R-ID-02).
 func orgsCommand() command {
 	return command{
 		name:    "orgs",
-		summary: "create organizations and name their first administrator",
+		summary: "create organizations and name their first owner",
 		run:     runOrgs,
 	}
 }
@@ -80,7 +80,8 @@ func runOrgCreate(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	fs.SetOutput(io.Discard)
 	slug := fs.String("slug", "", "the slug of the organization (lowercase letters, digits and single hyphens)")
 	name := fs.String("name", "", "the name of the organization")
-	admin := fs.String("admin", "", "the address of the account that becomes its Admin")
+	owner := fs.String("owner", "", "the address of the account that becomes its Owner")
+	admin := fs.String("admin", "", "the former name of --owner")
 	if err := fs.Parse(args); err != nil {
 		_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
 		return exitUsage
@@ -89,7 +90,14 @@ func runOrgCreate(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		_, _ = fmt.Fprintf(stderr, "orcon: unexpected arguments: %s\n", strings.Join(fs.Args(), " "))
 		return exitUsage
 	}
-	required := []struct{ flag, value string }{{"--slug", *slug}, {"--name", *name}, {"--admin", *admin}}
+	if *owner != "" && *admin != "" {
+		_, _ = fmt.Fprintln(stderr, "orcon: use --owner only; --admin is its former name")
+		return exitUsage
+	}
+	if *owner == "" {
+		*owner = *admin
+	}
+	required := []struct{ flag, value string }{{"--slug", *slug}, {"--name", *name}, {"--owner", *owner}}
 	for _, r := range required {
 		if r.value == "" {
 			_, _ = fmt.Fprintf(stderr, "orcon: %s is required\n", r.flag)
@@ -115,10 +123,10 @@ func runOrgCreate(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	}
 
 	orgs := identity.NewOrganizations(store, orgKeyIssuer{kr: kr}, clock.System{}, id.NewV7Generator(time.Now))
-	org, err := orgs.Create(ctx, identity.NewOrganization{Name: *name, Slug: *slug, AdminEmail: *admin})
+	org, err := orgs.Create(ctx, identity.NewOrganization{Name: *name, Slug: *slug, OwnerEmail: *owner})
 	if err != nil {
 		return accountFailure(stderr, err)
 	}
-	_, _ = fmt.Fprintf(stdout, "created organization %s (%s); %s is its Admin\n", org.Slug, org.ID, *admin)
+	_, _ = fmt.Fprintf(stdout, "created organization %s (%s); %s is its Owner\n", org.Slug, org.ID, *owner)
 	return exitOK
 }

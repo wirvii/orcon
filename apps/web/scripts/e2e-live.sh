@@ -71,7 +71,7 @@ start_server() {
 start_server
 stop_server
 printf '%s\n' "$secret" | "$bin" accounts create --email "$email" --name "Journey User" >/dev/null
-"$bin" orgs create --slug "$org" --name "Acme" --admin "$email" >/dev/null
+"$bin" orgs create --slug "$org" --name "Acme" --owner "$email" >/dev/null
 start_server
 
 if [ "${ORCON_E2E_SERVE_ONLY:-}" = "1" ]; then

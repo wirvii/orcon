@@ -81,7 +81,7 @@ func TestOrganizationCreatedWithItsKeyIsSealed(t *testing.T) {
 			}
 		}
 		svc := identity.NewOrganizations(g.s, keyringIssuer{kr: kr}, clock.System{}, id.NewV7Generator(time.Now))
-		org, err := svc.Create(ctx, identity.NewOrganization{Name: "Wirvii", Slug: "wirvii", AdminEmail: "creator@example.com"})
+		org, err := svc.Create(ctx, identity.NewOrganization{Name: "Wirvii", Slug: "wirvii", OwnerEmail: "creator@example.com"})
 		if err != nil {
 			t.Fatalf("create organization: %v", err)
 		}
