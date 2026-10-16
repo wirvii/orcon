@@ -1,0 +1,7 @@
+-- SPDX-FileCopyrightText: The Orcon Authors
+-- SPDX-License-Identifier: Apache-2.0
+-- Executions of other statuses and hours: migration 0025 backfills the hourly counters from them. The
+-- instants sit on a quarter past the hour in UTC on purpose, so a backfill that truncates in a session time
+-- zone with a half-hour offset instead of UTC gives a different hour.
+INSERT INTO execution (id, org_id, project_id, flow_id, flow_version_id, status, mode, priority, root_execution_id, call_depth, run_generation, runnable_count, leased_count, waiting_count, suspended_count, active_milliseconds, created_at, updated_at) VALUES ('0000000b-0000-7000-8000-000100000002', '00000003-0000-7000-8000-000100000001', '00000005-0000-7000-8000-000100000001', '00000006-0000-7000-8000-000100000001', '00000007-0000-7000-8000-000100000001', 'SUCCEEDED', 'TRIGGER', 0, '0000000b-0000-7000-8000-000100000002', 0, 0, 0, 0, 0, 0, 0, '2026-10-09T08:15:00Z', '2026-10-09T08:15:00Z');
+INSERT INTO execution (id, org_id, project_id, flow_id, flow_version_id, status, mode, priority, root_execution_id, call_depth, run_generation, runnable_count, leased_count, waiting_count, suspended_count, active_milliseconds, created_at, updated_at) VALUES ('0000000b-0000-7000-8000-000100000003', '00000003-0000-7000-8000-000100000001', '00000005-0000-7000-8000-000100000001', '00000006-0000-7000-8000-000100000001', '00000007-0000-7000-8000-000100000001', 'FAILED', 'MANUAL', 0, '0000000b-0000-7000-8000-000100000003', 0, 0, 0, 0, 0, 0, 0, '2026-10-09T23:45:00Z', '2026-10-09T23:45:00Z');

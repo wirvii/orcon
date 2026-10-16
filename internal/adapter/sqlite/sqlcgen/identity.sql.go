@@ -370,6 +370,20 @@ func (q *Queries) GetSystemPrincipal(ctx context.Context) (Principal, error) {
 	return i, err
 }
 
+const getTimeSavedMinutes = `-- name: GetTimeSavedMinutes :one
+SELECT time_saved_minutes_per_execution
+FROM org
+WHERE id = ?1
+`
+
+// orcon:scope instance
+func (q *Queries) GetTimeSavedMinutes(ctx context.Context, id []byte) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTimeSavedMinutes, id)
+	var time_saved_minutes_per_execution int64
+	err := row.Scan(&time_saved_minutes_per_execution)
+	return time_saved_minutes_per_execution, err
+}
+
 const insertApplicationUser = `-- name: InsertApplicationUser :exec
 INSERT INTO application_user (id, principal_id, email_normalized, display_name, status, created_at, updated_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
