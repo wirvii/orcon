@@ -11,6 +11,8 @@ import type { Locale } from '../i18n/locales';
 export interface ProvidersProps {
   children: ReactNode;
   theme?: ThemePreference | undefined;
+  /** The theme of a person who has not chosen one. The app starts dark (SPEC-019 R-UX-GEN-02); without it the system decides. */
+  defaultTheme?: ThemePreference | undefined;
   density?: Density | undefined;
   locale?: Locale | undefined;
   /** Messages of the application, per product locale (see I18nProvider). */
@@ -18,9 +20,9 @@ export interface ProvidersProps {
 }
 
 /** Theme, density and locale in one wrapper. Props make each one controlled (stories, tests). */
-export function Providers({ children, theme, density, locale, messages }: ProvidersProps) {
+export function Providers({ children, theme, defaultTheme, density, locale, messages }: ProvidersProps) {
   return (
-    <ThemeProvider preference={theme}>
+    <ThemeProvider preference={theme} defaultPreference={defaultTheme}>
       <DensityProvider density={density}>
         <I18nProvider locale={locale} messages={messages}>{children}</I18nProvider>
       </DensityProvider>

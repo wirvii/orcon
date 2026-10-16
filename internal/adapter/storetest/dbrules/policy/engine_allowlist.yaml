@@ -109,6 +109,9 @@
   query: GetProjectOrganization
   reason: resolves the organization of a project across organizations so a project of another organization is hidden (ADR-0041 section 6); PostgreSQL uses orcon_engine.project_organization
 - dialect: sqlite
+  query: GetResourceProject
+  reason: resolves the organization and project of a flow, execution, external operation or human task across organizations so a resource of another organization is hidden (ADR-0041 section 6); PostgreSQL uses orcon_engine.resource_project
+- dialect: sqlite
   query: ListAuditPendingOrgs
   reason: "the audit sealer finds the organizations with pending entries; returns org_id only (SPEC-004 R-AUD-03); PostgreSQL uses orcon_engine.list_audit_pending_orgs; owner approved 2026-10-15"
 - dialect: sqlite

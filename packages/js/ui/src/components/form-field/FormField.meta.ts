@@ -3,7 +3,7 @@
 
 import { pair } from '../../lib/meta';
 
-export const states = ['default', 'description', 'required', 'error', 'group'] as const;
+export const states = ['default', 'description', 'required', 'error', 'group', 'label-action'] as const;
 
 export const pairs = [
   pair('fg.default', 'surface.default'),

@@ -88,6 +88,19 @@
   background-image: linear-gradient(135deg, var(--orcon-brand-green-light) 0%, var(--orcon-brand-green) 55%, var(--orcon-brand-cyan) 100%);
 }
 
+/* The glow of the sign-in brand panel: two soft washes of the brand colors, decorative. */
+@utility bg-brand-glow {
+  background-image:
+    radial-gradient(70% 60% at 85% 100%, color-mix(in srgb, var(--orcon-brand-green) 20%, transparent) 0%, transparent 60%),
+    radial-gradient(50% 40% at 0% 0%, color-mix(in srgb, var(--orcon-brand-cyan) 15%, transparent) 0%, transparent 70%);
+}
+
+/* A field of faint dots, decorative, drawn with the foreground token so it follows the theme. */
+@utility bg-dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--orcon-fg-default) 8%, transparent) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
 /* Floating content sizes from the trigger and the space the browser leaves it. */
 @utility min-w-trigger {
   min-width: var(--radix-select-trigger-width, var(--radix-popover-trigger-width, var(--radix-dropdown-menu-trigger-width, 0px)));
@@ -168,6 +181,17 @@
     max-width: 100%;
     max-height: 160px;
     object-fit: contain;
+  }
+
+  /* The bare mascot is a hero: larger than the one on a panel, with a soft shadow from the scrim token. */
+  .orcon-mascot-image-bare {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 230px;
+    object-fit: contain;
+    filter: drop-shadow(0 20px 40px color-mix(in srgb, var(--orcon-overlay-scrim) 55%, transparent));
   }
 
   /* The sign-in brand block: 320 px wide, the available width on a phone, never under 280 px. */

@@ -47,6 +47,36 @@ func (q *Queries) GetProjectOrganization(ctx context.Context, id []byte) ([]byte
 	return org_id, err
 }
 
+const getResourceProject = `-- name: GetResourceProject :one
+SELECT f.org_id AS org_id, f.project_id AS project_id FROM flow f
+WHERE ?1 = 'flow' AND f.id = ?2 AND f.deleted_at IS NULL
+UNION ALL
+SELECT e.org_id, e.project_id FROM execution e
+WHERE ?1 = 'execution' AND e.id = ?2
+UNION ALL
+SELECT e.org_id, e.project_id FROM external_operation o JOIN execution e ON e.org_id = o.org_id AND e.id = o.execution_id
+WHERE ?1 = 'externalOperation' AND o.id = ?2
+UNION ALL
+SELECT e.org_id, e.project_id FROM human_task h JOIN execution e ON e.org_id = h.org_id AND e.id = h.execution_id
+WHERE ?1 = 'humanTask' AND h.id = ?2
+LIMIT 1
+`
+
+type GetResourceProjectRow struct {
+	OrgID     []byte
+	ProjectID []byte
+}
+
+// orcon:scope engine
+// Reads across organizations on purpose: a flow, execution, external operation or human task of another organization
+// must be hidden, so its owner is resolved before any organization scope exists (ADR-0041 section 6).
+func (q *Queries) GetResourceProject(ctx context.Context, kind interface{}, iD []byte) (GetResourceProjectRow, error) {
+	row := q.db.QueryRowContext(ctx, getResourceProject, kind, iD)
+	var i GetResourceProjectRow
+	err := row.Scan(&i.OrgID, &i.ProjectID)
+	return i, err
+}
+
 const insertRoleBinding = `-- name: InsertRoleBinding :exec
 INSERT INTO role_binding (id, org_id, scope_kind, project_id, application_user_id, role_name, created_at, updated_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)

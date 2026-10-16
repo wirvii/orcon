@@ -23,6 +23,10 @@
     "target-min-coarse": {
       "$value": "44px",
       "$description": "Minimum interactive target under a coarse pointer."
+    },
+    "form-width": {
+      "$value": "380px",
+      "$description": "Width of a form card on a page of its own, such as the sign-in form."
     }
   }
 }

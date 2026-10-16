@@ -12,8 +12,8 @@ themes. The test `packages/js/tokens/test/mockup-token-map.test.ts` reads those 
 a token that does not exist or when a value differs.
 
 A value the mockup needed and the tokens did not have was added: `surface.hover`, `border.strong`,
-`brand.green-light`, `radius.base`, `radius.panel`, `font.size.2xs`, `font.size.display`, and the light value of
-`mascot.panel`.
+`brand.green-light`, `radius.base`, `radius.panel`, `font.size.2xs`, `font.size.display`, `size.form-width`, and the
+light value of `mascot.panel`.
 
 ## Colors
 
@@ -91,6 +91,7 @@ token) that carries the same value in each theme.
 | page title | 24px | font.size.xl |
 | sign-in card title | 28px | font.size.display |
 | sign-in brand tagline | 32px | font.size.2xl |
+| sign-in form card width | 380px | size.form-width |
 
 ## Decisions applied in UX1
 

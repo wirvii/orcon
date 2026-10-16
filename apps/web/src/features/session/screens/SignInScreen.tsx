@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Banner, BrandHero, Button, ErrorSummary, FormField, Input, Link, Mascot, ProblemAlert, fieldIdForName, type ProblemDetails } from '@orcon/ui';
+import { Banner, BrandMark, Button, ErrorSummary, FormField, IconButton, Input, Link, ProblemAlert, fieldIdForName, type ProblemDetails } from '@orcon/ui';
 import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { defineMessages, useIntl } from 'react-intl';
@@ -15,6 +16,9 @@ import { toProblemDetails } from '../../../app/errors/to-problem-details';
 import { markFirstUsefulScreen } from '../../../app/perf/marks';
 import { ApiProblem } from '../../../app/api/http';
 import { useSignIn } from '../api/mutations';
+import { ForgotPasswordPanel } from '../components/ForgotPasswordPanel';
+import { SignInBrandPanel } from '../components/SignInBrandPanel';
+import { SignInPreferences } from '../components/SignInPreferences';
 import { safeRedirect } from '../model/redirect';
 
 const messages = defineMessages({
@@ -25,11 +29,12 @@ const messages = defineMessages({
   },
   description: {
     id: 'session.signIn.description',
-    defaultMessage: 'Use the email address and password of your account.',
-    description: 'One line under the heading of the sign-in page: which credentials to use.',
+    defaultMessage: 'Welcome back to Orcon.',
+    description: 'One line under the heading of the sign-in page.',
   },
   email: { id: 'session.signIn.email', defaultMessage: 'Email', description: 'Label of the email field on the sign-in page.' },
   password: { id: 'session.signIn.password', defaultMessage: 'Password', description: 'Label of the password field on the sign-in page.' },
+  forgot: { id: 'session.signIn.forgot', defaultMessage: 'Forgot it?', description: 'Link next to the password label that opens the password recovery panel.' },
   showPassword: {
     id: 'session.signIn.showPassword',
     defaultMessage: 'Show password',
@@ -46,6 +51,11 @@ const messages = defineMessages({
     defaultMessage: 'Email or password is incorrect.',
     description: 'Shown after a failed sign-in. It never says which of the two is wrong.',
   },
+  invalidHelp: {
+    id: 'session.signIn.invalidHelp',
+    defaultMessage: 'Check your details or recover your password.',
+    description: 'Second line of the failed sign-in notice: what to do next.',
+  },
   throttled: {
     id: 'session.signIn.throttled',
     defaultMessage: 'Too many attempts. Wait {minutes, plural, one {# minute} other {# minutes}} and try again.',
@@ -56,10 +66,10 @@ const messages = defineMessages({
     defaultMessage: 'You signed out.',
     description: 'Notice on the sign-in page after the person chose to sign out.',
   },
-  languageLink: {
-    id: 'session.signIn.languageLink',
-    defaultMessage: 'Language and appearance',
-    description: 'Link on the sign-in page to the language and appearance settings, which need no sign-in.',
+  noAccount: {
+    id: 'session.signIn.noAccount',
+    defaultMessage: "Don't have an account? Ask whoever administers your organization for an invitation.",
+    description: 'Text under the sign-in form: accounts are created by an administrator, so there is no sign-up.',
   },
 });
 
@@ -76,9 +86,10 @@ type Failure = { kind: 'invalid' } | { kind: 'throttled'; seconds: number } | { 
 const route = getRouteApi('/login');
 
 /**
- * The sign-in page (SPEC-016 R-SH-UI-01). It is the only page a person without a session can open,
- * so it sets its own frame. A success goes to the landing, which picks the organization, and the
- * page the person came from is kept when it is a safe address.
+ * The sign-in page (SPEC-016 R-SH-UI-01, SPEC-019 R-UX-LGN). It is the only page a person without a session can open,
+ * so it sets its own layout: the brand panel on the left from md up, the form on the right, language and theme at the
+ * top right. A success goes to the landing, which picks the organization, and the page the person came from is kept
+ * when it is a safe address. The recovery panel is a state of the same page (`?step=forgot-password`).
  */
 export function SignInScreen() {
   const intl = useIntl();
@@ -87,6 +98,7 @@ export function SignInScreen() {
   const signIn = useSignIn();
   const [failure, setFailure] = useState<Failure | undefined>(undefined);
   const [revealed, setRevealed] = useState(false);
+  const redirect = safeRedirect(search.redirect);
 
   const form = useForm<SignInValues>({
     resolver: zodResolver(signInSchema, { error: (issue) => formatIssue(intl, issue) }),
@@ -116,7 +128,6 @@ export function SignInScreen() {
       }
       return;
     }
-    const redirect = safeRedirect(search.redirect);
     await navigate({ to: '/', search: redirect === undefined ? {} : { redirect } });
   });
 
@@ -125,57 +136,86 @@ export function SignInScreen() {
   );
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-screen-sm flex-col justify-center gap-4 p-4 md:p-6">
-      <ConnectionBanners />
-      <div className="flex flex-col items-center gap-2">
-        {/* A small mascot keeps the form above the fold on a laptop, even with an error showing. */}
-        <Mascot pose="welcome" className="p-2 [&_img]:max-h-16" />
-        <BrandHero className="gap-1" />
-      </div>
-
-      {search.signedOut === true && failure === undefined ? <Banner tone="success" title={intl.formatMessage(messages.signedOut)} /> : null}
-
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
-        <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.description)}</p>
-      </div>
-
-      {failure ? <FailureAlert failure={failure} /> : null}
-
-      <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
-        {submitCount > 0 ? <ErrorSummary errors={summary} focusOnMount /> : null}
-
-        <FormField
-          label={intl.formatMessage(messages.email)}
-          name="/email"
-          required
-          error={errors.email?.message}
-        >
-          <Input type="email" autoComplete="username" spellCheck={false} {...form.register('email')} />
-        </FormField>
-
-        <FormField label={intl.formatMessage(messages.password)} name="/password" required error={errors.password?.message}>
-          <Input type={revealed ? 'text' : 'password'} autoComplete="current-password" {...form.register('password')} />
-        </FormField>
-        <div>
-          <Button variant="ghost" aria-pressed={revealed} onClick={() => setRevealed((value) => !value)}>
-            {intl.formatMessage(revealed ? messages.hidePassword : messages.showPassword)}
-          </Button>
+    <div className="bg-app flex min-h-dvh">
+      <SignInBrandPanel />
+      <main className="relative flex min-w-0 flex-1 flex-col items-center px-6 pt-16 pb-10 md:justify-center md:pt-10">
+        <div className="absolute top-4 right-4 md:top-6 md:right-6">
+          <SignInPreferences />
         </div>
+        <div className="flex w-full max-w-form-width flex-col gap-5">
+          <ConnectionBanners />
+          {/* The brand panel is not shown on a phone, so the logo is. */}
+          <BrandMark size="large" className="md:hidden" />
 
-        <div>
-          <Button type="submit" loading={signIn.isPending}>
-            {intl.formatMessage(messages.submit)}
-          </Button>
+          {search.step === 'forgot-password' ? (
+            <ForgotPasswordPanel
+              initialEmail={form.getValues('email')}
+              onBack={() => {
+                void navigate({ to: '/login', search: redirect === undefined ? {} : { redirect } });
+              }}
+            />
+          ) : (
+            <>
+              {search.signedOut === true && failure === undefined ? <Banner tone="success" title={intl.formatMessage(messages.signedOut)} /> : null}
+
+              <div className="flex flex-col gap-1">
+                <h1 className="text-display font-bold wrap-anywhere">{intl.formatMessage(messages.title)}</h1>
+                <p className="text-fg-muted wrap-anywhere">{intl.formatMessage(messages.description)}</p>
+              </div>
+
+              {failure ? <FailureAlert failure={failure} /> : null}
+
+              <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+                {submitCount > 0 ? <ErrorSummary errors={summary} focusOnMount /> : null}
+
+                <FormField label={intl.formatMessage(messages.email)} name="/email" required error={errors.email?.message}>
+                  <Input type="email" autoComplete="username" spellCheck={false} startIcon={Mail} {...form.register('email')} />
+                </FormField>
+
+                <FormField
+                  label={intl.formatMessage(messages.password)}
+                  name="/password"
+                  required
+                  error={errors.password?.message}
+                  labelAction={
+                    <Link asChild>
+                      <RouterLink to="/login" search={{ step: 'forgot-password', ...(redirect === undefined ? {} : { redirect }) }}>
+                        {intl.formatMessage(messages.forgot)}
+                      </RouterLink>
+                    </Link>
+                  }
+                >
+                  <Input
+                    type={revealed ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    startIcon={Lock}
+                    endAdornment={
+                      <IconButton
+                        variant="ghost"
+                        icon={revealed ? EyeOff : Eye}
+                        label={intl.formatMessage(revealed ? messages.hidePassword : messages.showPassword)}
+                        aria-pressed={revealed}
+                        onClick={() => {
+                          setRevealed((value) => !value);
+                        }}
+                        className="size-8"
+                      />
+                    }
+                    {...form.register('password')}
+                  />
+                </FormField>
+
+                <Button type="submit" loading={signIn.isPending} className="h-10 w-full">
+                  {intl.formatMessage(messages.submit)}
+                </Button>
+              </form>
+
+              <p className="text-fg-muted text-center text-sm wrap-anywhere">{intl.formatMessage(messages.noAccount)}</p>
+            </>
+          )}
         </div>
-      </form>
-
-      <div>
-        <Link asChild>
-          <RouterLink to="/settings/appearance">{intl.formatMessage(messages.languageLink)}</RouterLink>
-        </Link>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -189,10 +229,14 @@ function FailureAlert({ failure }: { failure: Failure }) {
 
   let alert: ReactNode;
   if (failure.kind === 'invalid') {
-    alert = <ProblemAlert problem={{ status: 401, title: intl.formatMessage(messages.invalid) }} />;
+    alert = (
+      <Banner tone="danger" title={intl.formatMessage(messages.invalid)}>
+        {intl.formatMessage(messages.invalidHelp)}
+      </Banner>
+    );
   } else if (failure.kind === 'throttled') {
     const minutes = Math.max(1, Math.ceil(failure.seconds / 60));
-    alert = <ProblemAlert problem={{ status: 429, title: intl.formatMessage(messages.throttled, { minutes }) }} />;
+    alert = <Banner tone="danger" title={intl.formatMessage(messages.throttled, { minutes })} />;
   } else {
     alert = <ProblemAlert problem={failure.problem} />;
   }
