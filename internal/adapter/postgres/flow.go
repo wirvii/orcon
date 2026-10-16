@@ -19,7 +19,7 @@ import (
 )
 
 func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
-	return flow.Record{
+	rec := flow.Record{
 		ID: fromPGUUID[flow.FlowID](row.ID), OrgID: fromPGUUID[identity.OrgID](row.OrgID), ProjectID: fromPGUUID[identity.ProjectID](row.ProjectID),
 		Name: row.Name, Draft: row.DraftDocument, DraftRevision: row.DraftRevision,
 		Revision: row.Revision, ActiveVersion: row.ActiveVersionNumber,
@@ -27,9 +27,13 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 		ActivationState:      flow.ActivationState(row.ActivationState),
 		DeletedAt:            instant(row.DeletedAt),
 		DeletedByPrincipalID: fromPGUUID[identity.PrincipalID](row.DeletedByPrincipalID),
-		DraftUpdatedAt:       instant(row.DraftUpdatedAt), DraftUpdatedBy: fromPGUUID[identity.PrincipalID](row.DraftUpdatedByPrincipalID),
 		CreatedAt:            instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
 	}
+	if row.DraftUpdatedAt.Valid {
+		t := instant(row.DraftUpdatedAt)
+		rec.DraftUpdatedAt = &t
+	}
+	return rec
 }
 
 // CreateFlow implements [flow.Store].

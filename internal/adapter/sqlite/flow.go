@@ -35,9 +35,6 @@ func flowFrom(row *sqlcgen.GetFlowRow) (flow.Record, error) {
 	if out.DeletedByPrincipalID, err = nullUUIDOf[identity.PrincipalID](row.DeletedByPrincipalID); err != nil {
 		return out, fmt.Errorf("flow deleted by principal id: %w", err)
 	}
-	if out.DraftUpdatedBy, err = nullUUIDOf[identity.PrincipalID](row.DraftUpdatedByPrincipalID); err != nil {
-		return out, fmt.Errorf("flow draft updated by principal id: %w", err)
-	}
 	out.Name = row.Name
 	out.Draft = row.DraftDocument
 	out.DraftRevision = row.DraftRevision
@@ -45,7 +42,9 @@ func flowFrom(row *sqlcgen.GetFlowRow) (flow.Record, error) {
 	out.ActiveVersion = row.ActiveVersionNumber
 	out.ActivationState = flow.ActivationState(row.ActivationState)
 	out.DeletedAt = nullInstant(row.DeletedAt)
-	out.DraftUpdatedAt = nullInstant(row.DraftUpdatedAt)
+	if t := nullInstant(row.DraftUpdatedAt); !t.IsZero() {
+		out.DraftUpdatedAt = &t
+	}
 	out.CreatedAt = instant(row.CreatedAt)
 	out.UpdatedAt = instant(row.UpdatedAt)
 	return out, nil

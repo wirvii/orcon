@@ -60,23 +60,20 @@ func RunEditorSuite(t *testing.T, newStore EditorFactory) {
 }
 
 // editorDraftSaveCase covers what the editor API reads back of a draft save (SPEC-014 A12): the time of the
-// save and, when the audit entry names a principal, who made it.
+// save.
 func editorDraftSaveCase(t *testing.T, f *editorFixture) {
 	t.Helper()
 	ctx := f.ctx()
 	before, err := f.s.GetFlow(ctx, scopeOf(f.orgA), f.flow.ID)
-	if err != nil || !before.DraftUpdatedAt.IsZero() || !before.DraftUpdatedBy.IsZero() {
-		t.Fatalf("flow before any save: want no draft save time and no saver, got %+v, %v", before, err)
+	if err != nil || before.DraftUpdatedAt != nil {
+		t.Fatalf("flow before any save: want no draft save time, got %+v, %v", before, err)
 	}
 	saved := base.Add(time.Hour)
 	rev, err := f.s.UpdateFlowDraft(ctx, scopeOf(f.orgA), f.flow.ID, []byte(`{"saved":true}`), f.flow.DraftRevision, nil, saved)
 	mustTx(t, err, "save draft")
 	after, err := f.s.GetFlow(ctx, scopeOf(f.orgA), f.flow.ID)
-	if err != nil || after.DraftRevision != rev || !after.DraftUpdatedAt.Equal(saved.Truncate(time.Microsecond)) {
+	if err != nil || after.DraftRevision != rev || after.DraftUpdatedAt == nil || !after.DraftUpdatedAt.Equal(saved.Truncate(time.Microsecond)) {
 		t.Fatalf("draft after save: want updated at the save instant, got %+v, %v", after, err)
-	}
-	if !after.DraftUpdatedBy.IsZero() {
-		t.Fatalf("a save without an audit entry names no principal, got %v", after.DraftUpdatedBy)
 	}
 }
 

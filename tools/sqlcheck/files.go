@@ -268,6 +268,10 @@ func scopedTablesOf(dir string, instance map[string]bool) (scopedTables, error) 
 func applyTableStatements(toks []token, tables map[string]bool) {
 	for i := 0; i < len(toks); i++ {
 		verb := toks[i]
+		if verb.isWord("alter") {
+			applyRename(toks[i:], tables)
+			continue
+		}
 		if !verb.isWord("create") && !verb.isWord("drop") {
 			continue
 		}
@@ -299,6 +303,20 @@ func applyTableStatements(toks []token, tables map[string]bool) {
 		} else {
 			delete(tables, name)
 		}
+	}
+}
+
+// applyRename records ALTER TABLE old RENAME TO new, which is how SQLite rebuilds a table
+// whose constraints it cannot alter in place: the rebuilt table is created under a new
+// name, the old one is dropped and the new one takes the old name.
+func applyRename(toks []token, tables map[string]bool) {
+	if len(toks) < 6 || !toks[1].isWord("table") || toks[2].kind != kindWord || toks[3].kind != kindWord ||
+		!toks[3].isWord("rename") || !toks[4].isWord("to") || toks[5].kind != kindWord {
+		return
+	}
+	if tables[toks[2].text] {
+		delete(tables, toks[2].text)
+		tables[toks[5].text] = true
 	}
 }
 

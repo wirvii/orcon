@@ -138,3 +138,15 @@
 - dialect: sqlite
   query: ListOrgsWithoutActiveKey
   reason: "the startup check finds the organizations that have no active key so it can create one (SPEC-004 R-KEY-05, SE3b); returns org_id only; PostgreSQL uses orcon_engine.list_orgs_without_active_key; urgent preview fix, orchestrator decision 2026-10-15, owner review pending"
+- dialect: sqlite
+  query: PurgeEditorTestData
+  reason: "removes editor test outputs that no pin and no test run references and that are older than 24 hours, across organizations, in bounded batches (SPEC-014 section 6, ADR-0082); this is the retention of the engine, not a request of a person"
+- dialect: sqlite
+  query: PurgeEditorPresence
+  reason: "removes editing sessions that expired, across organizations, in bounded batches (SPEC-014 section 6); this is the retention of the engine, not a request of a person"
+- dialect: postgres
+  query: PurgeEditorTestData
+  reason: "removes editor test outputs that no pin and no test run references and that are older than 24 hours, across organizations, in bounded batches (SPEC-014 section 6, ADR-0082); this is the retention of the engine, not a request of a person"
+- dialect: postgres
+  query: PurgeEditorPresence
+  reason: "removes editing sessions that expired, across organizations, in bounded batches (SPEC-014 section 6); this is the retention of the engine, not a request of a person"
