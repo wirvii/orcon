@@ -33,7 +33,7 @@ Full compromise of the server with the MK in memory.
 | TM-03 | Escalating privileges by creating a role with permissions the actor lacks | A3 | Subset rule (R-AZ-03) | — |
 | TM-04 | Keeping access after offboarding | A3 | Revocation ≤ 1 s, authorization epochs, SCIM/LDAP | Window of ≤ 1 s |
 | TM-05 | Extracting a use-only credential by sending it to one's own host | A4 | Host binding, no `$credentials` in expressions, Code node without credentials | Approved connectors with raw credential access |
-| TM-06 | Extracting a credential through error messages or logs | A4/A5 | Masking of resolved values (R-CRED-04) | Transformations of the value (for example base64) are not detected |
+| TM-06 | Extracting a credential through error messages or logs | A4/A5 | Masking of resolved values (R-CRED-04) | Exact matches of the value, and the base64 form of a BASIC pair, are replaced in what a provider sends back; other transformations of the value (hashing, partial display, other encodings) are not detected |
 | TM-07 | Copying ciphertext from B to A in the database | A8 | Additional authenticated data with organization and id | — |
 | TM-08 | Reading credentials from a database backup | A7 | MK kept outside the database | Backup and MK obtained together |
 | TM-09 | Tampering with or deleting the audit log | A8 | Hash chain + MAC with the OK + anchors + hourly verification | Recent truncation without an external anchor (persistent warning, SPEC-004 Q17) |

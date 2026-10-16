@@ -4,12 +4,18 @@
 
 # API operation index
 
-Generated from the API contract: 41 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
+Generated from the API contract: 49 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
 
 ## Operations
 
 | Method | Path | Operation id | Summary | Stability | Permission | CLI | MCP |
 |---|---|---|---|---|---|---|---|
+| DELETE | `/api/v1/credentials/{credentialId}` | `deleteCredential` | Delete a credential | stable | `credential:delete` | `orcon credentials delete` | none |
+| GET | `/api/v1/credentials/{credentialId}` | `getCredential` | Get a credential | stable | `credential:read` | `orcon credentials get` | none |
+| PATCH | `/api/v1/credentials/{credentialId}` | `updateCredential` | Update the name or the allowed hosts of a credential | stable | `credential:update` | `orcon credentials update` | none |
+| PUT | `/api/v1/credentials/{credentialId}/secret` | `replaceCredentialSecret` | Replace the secret of a credential | stable | `credential:update` | `orcon credentials replace-secret` | none |
+| POST | `/api/v1/credentials/{credentialId}/shares` | `createCredentialShare` | Let another project use a credential | stable | `credential:share` | `orcon credentials share` | none |
+| DELETE | `/api/v1/credentials/{credentialId}/shares/{projectId}` | `deleteCredentialShare` | Stop sharing a credential with a project | stable | `credential:share` | `orcon credentials unshare` | none |
 | GET | `/api/v1/executions/{executionId}` | `getExecution` | Get an execution | stable | `execution:read` | `orcon executions get` | `get_execution` (read) |
 | POST | `/api/v1/executions/{executionId}/cancel` | `cancelExecution` | Cancel an execution | stable | `execution:cancel` | `orcon executions cancel` | `cancel_execution` (write) |
 | GET | `/api/v1/executions/{executionId}/data` | `listExecutionData` | List the data of an execution | stable | `execution:read-data` | `orcon executions data` | none |
@@ -44,6 +50,8 @@ Generated from the API contract: 41 operations and 0 event types. The reference 
 | DELETE | `/api/v1/projects/{projectId}` | `deleteProject` | Delete a project | stable | `project:delete` | `orcon projects delete` | none |
 | GET | `/api/v1/projects/{projectId}` | `getProject` | Get a project | stable | `project:read` | `orcon projects get` | none |
 | PATCH | `/api/v1/projects/{projectId}` | `updateProject` | Update a project | stable | `project:update` | `orcon projects update` | none |
+| GET | `/api/v1/projects/{projectId}/credentials` | `listCredentials` | List the credentials of a project | stable | `credential:read` | `orcon credentials list` | `list_credentials` (read) |
+| POST | `/api/v1/projects/{projectId}/credentials` | `createCredential` | Create a credential in a project | stable | `credential:create` | `orcon credentials create` | none |
 | GET | `/api/v1/projects/{projectId}/executions` | `listExecutions` | List the executions of a project | stable | `execution:read` | `orcon executions list` | `list_executions` (read) |
 | GET | `/api/v1/projects/{projectId}/flows` | `listFlows` | List the flows of a project | stable | `flow:read` | `orcon flows list` | `search_flows` (read) |
 | POST | `/api/v1/projects/{projectId}/flows` | `createFlow` | Create a flow in a project | stable | `flow:create` | `orcon flows create` | `create_flow` (write) |

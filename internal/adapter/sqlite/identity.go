@@ -144,6 +144,15 @@ var principalClearers = []clearer{
 	{"flow_editing_session.opened_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
 		return q.UpdateFlowEditingSessionOpenedByPrincipalToNull(ctx, principal, batch)
 	}},
+	{"credential.created_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateCredentialCreatedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"credential_version.created_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateCredentialVersionCreatedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"credential_share.granted_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateCredentialShareGrantedByPrincipalToNull(ctx, principal, batch)
+	}},
 }
 
 // PrincipalReferenceColumns returns the actor columns, as "table.column", that DeletePrincipal

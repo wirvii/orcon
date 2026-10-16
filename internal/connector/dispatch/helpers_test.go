@@ -6,12 +6,12 @@ package dispatch
 import (
 	"context"
 	"errors"
+	"net/url"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
-	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/journal"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
@@ -113,19 +113,26 @@ func TestRouterAndProviderEdges(t *testing.T) {
 
 func TestCredentialResolution(t *testing.T) {
 	n := &HTTPNode{}
-	c, err := n.credential(t.Context(), testOrg, "")
+	call := execution.NodeCall{Org: testOrg, Project: testProject}
+	c, err := n.credential(t.Context(), call, request{})
 	if err != nil || c.Auth.Type != declarative.AuthNone {
 		t.Fatalf("no credential named = %+v, %v", c, err)
 	}
-	if _, err := n.credential(t.Context(), testOrg, "crm"); err == nil {
+	named := request{credential: "crm", target: &url.URL{Scheme: "https", Host: "api.example.com:8443"}}
+	if _, err := n.credential(t.Context(), call, named); err == nil {
 		t.Fatal("a named credential without a resolver was accepted")
 	}
-	n.cfg.Credential = func(context.Context, identity.OrgID, string) (Credential, error) {
+	var got CredentialRequest
+	n.cfg.Credential = func(_ context.Context, req CredentialRequest) (Credential, error) {
+		got = req
 		return Credential{Fields: map[string]string{"token": "t"}}, nil
 	}
-	c, err = n.credential(t.Context(), testOrg, "crm")
+	c, err = n.credential(t.Context(), call, named)
 	if err != nil || c.Fields["token"] != "t" {
 		t.Fatalf("resolved credential = %+v, %v", c, err)
+	}
+	if got.Org != testOrg || got.Project != testProject || got.ID != "crm" || got.Host != "api.example.com" {
+		t.Fatalf("the resolver was asked %+v; want the org, the project, the credential and the host without the port", got)
 	}
 }
 

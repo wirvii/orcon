@@ -48,10 +48,31 @@ var ChildKinds = []string{"flow", "execution", "externalOperation", "humanTask"}
 // kept while the organization's epoch does not move, so a change of roles takes effect on
 // the next request.
 type Evaluator struct {
-	store Store
-	cat   *Catalog
-	mu    sync.Mutex
-	cache map[string]cachedGrant
+	store  Store
+	cat    *Catalog
+	owners map[string]OwnerResolver
+	mu     sync.Mutex
+	cache  map[string]cachedGrant
+}
+
+// OwnerResolver names the project that owns a resource of one kind, so the evaluator can decide a request
+// about that resource with the grant of the project (SPEC-004 R-AZ-07). It returns [identity.ErrNotFound]
+// when the organization holds no resource with that identifier; the resolver never answers for another
+// organization, because the scope it receives is the principal's.
+type OwnerResolver interface {
+	OwnerProject(ctx context.Context, org orgscope.Org, id string) (identity.ProjectID, error)
+}
+
+// WithOwner returns the evaluator with the owner resolver of kind (the first path parameter names it, for
+// example credential for {credentialId}). Kinds without a resolver and outside [ChildKinds] are denied.
+func (e *Evaluator) WithOwner(kind string, r OwnerResolver) *Evaluator {
+	next := make(map[string]OwnerResolver, len(e.owners)+1)
+	for k, v := range e.owners {
+		next[k] = v
+	}
+	next[kind] = r
+	e.owners = next
+	return e
 }
 
 type cachedGrant struct {
@@ -173,6 +194,9 @@ func (e *Evaluator) target(ctx context.Context, req Request) (identity.OrgID, st
 		}
 		return owner, req.Resource.ID, Permission("project:read"), DecisionAllow, nil
 	default:
+		if r, ok := e.owners[req.Resource.Kind]; ok {
+			return e.ownedTarget(ctx, req, r)
+		}
 		if !slices.Contains(ChildKinds, req.Resource.Kind) {
 			return identity.OrgID{}, "", "", DecisionForbidden, nil
 		}
@@ -185,6 +209,28 @@ func (e *Evaluator) target(ctx context.Context, req Request) (identity.OrgID, st
 		}
 		return owner, project, Permission("project:read"), DecisionAllow, nil
 	}
+}
+
+// ownedTarget resolves a resource whose kind has an owner resolver: it lives in the organization the principal
+// carries, and the grant of the project that owns it decides the request. An identifier the organization does
+// not hold is hidden, the same as one of another organization.
+func (e *Evaluator) ownedTarget(ctx context.Context, req Request, r OwnerResolver) (identity.OrgID, string, Permission, Decision, error) {
+	own := req.Principal.OrgID
+	if own.IsZero() {
+		return identity.OrgID{}, "", "", DecisionForbidden, nil
+	}
+	scope, err := issue.New(id.UUID(own))
+	if err != nil {
+		return identity.OrgID{}, "", "", DecisionForbidden, fmt.Errorf("authorize: organization scope: %w", err)
+	}
+	owner, err := r.OwnerProject(ctx, scope, req.Resource.ID)
+	if errors.Is(err, identity.ErrNotFound) {
+		return identity.OrgID{}, "", "", DecisionHidden, nil
+	}
+	if err != nil {
+		return identity.OrgID{}, "", "", DecisionForbidden, fmt.Errorf("authorize: %s owner: %w", req.Resource.Kind, err)
+	}
+	return own, owner.String(), Permission(req.Resource.Kind + ":read"), DecisionAllow, nil
 }
 
 // grant returns the grant of the user in the organization, recomputed when the epoch moved.

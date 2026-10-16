@@ -38,6 +38,8 @@ tags:
     description: Executions of flows and the actions that finish or repeat them.
   - name: node-types
     description: The node types a project can use in its flows.
+  - name: credentials
+    description: Secret settings a project keeps for outside services; secret values are write-only.
 paths:
   /users/me:
     $ref: ./paths/current-user.yaml
@@ -105,6 +107,16 @@ paths:
     $ref: ./paths/external-operation-resolve.yaml
   /human-tasks/{humanTaskId}/complete:
     $ref: ./paths/human-task-complete.yaml
+  /projects/{projectId}/credentials:
+    $ref: ./paths/project-credentials.yaml
+  /credentials/{credentialId}:
+    $ref: ./paths/credential.yaml
+  /credentials/{credentialId}/secret:
+    $ref: ./paths/credential-secret.yaml
+  /credentials/{credentialId}/shares:
+    $ref: ./paths/credential-shares.yaml
+  /credentials/{credentialId}/shares/{projectId}:
+    $ref: ./paths/credential-share.yaml
 components:
   securitySchemes:
     bearer:
@@ -193,6 +205,16 @@ components:
         format: uuid
         examples:
           - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a67
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      description: Id of the credential.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
     HumanTaskId:
       name: humanTaskId
       in: path
@@ -416,6 +438,20 @@ components:
       $ref: ./schemas/node-type.yaml#/NodeTypeIcon
     NodeTypeList:
       $ref: ./schemas/node-type.yaml#/NodeTypeList
+    Credential:
+      $ref: ./schemas/credential.yaml#/Credential
+    CredentialSecret:
+      $ref: ./schemas/credential.yaml#/CredentialSecret
+    CredentialList:
+      $ref: ./schemas/credential.yaml#/CredentialList
+    CreateCredentialRequest:
+      $ref: ./schemas/credential.yaml#/CreateCredentialRequest
+    UpdateCredentialRequest:
+      $ref: ./schemas/credential.yaml#/UpdateCredentialRequest
+    ReplaceCredentialSecretRequest:
+      $ref: ./schemas/credential.yaml#/ReplaceCredentialSecretRequest
+    ShareCredentialRequest:
+      $ref: ./schemas/credential.yaml#/ShareCredentialRequest
   responses:
     ValidationFailed:
       description: A parameter or the body is invalid.

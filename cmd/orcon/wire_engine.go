@@ -17,6 +17,7 @@ import (
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/connector/limit"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/durable"
 	"github.com/wirvii/orcon/internal/execution/store"
@@ -39,8 +40,7 @@ const WebhookNodeType = "orcon.webhook@1"
 const webhookBodyCap = 1 << 20
 
 // ErrNoCredentialStore means a node names a credential and this process has no
-// credential store to resolve it from. The credential store is a later cut of
-// SPEC-003; until it arrives, no node can use a credential.
+// credential store to resolve it from.
 var ErrNoCredentialStore = errors.New("no credential store is available in this build")
 
 // engineStore is everything the composition root takes from the database: the
@@ -67,9 +67,13 @@ type engineOptions struct {
 	sandbox expr.Sandbox
 	// senderPolicy returns the egress policy of one destination of orcon.http@1.
 	senderPolicy func(*url.URL) egress.Policy
-	// credentials resolves the credential a node names; nil uses the refusing
-	// resolver.
-	credentials func(ctx context.Context, org identity.OrgID, credentialID string) (httpdispatch.Credential, error)
+	// resolver is the credential service of the process: every orcon.http@1
+	// activation that names a credential resolves it through it, for the project of
+	// the execution and the host of the request (ADR-0043).
+	resolver credential.Resolver
+	// credentials replaces the resolver in tests; nil uses the resolver, or the
+	// refusing function when there is none either.
+	credentials func(ctx context.Context, req httpdispatch.CredentialRequest) (httpdispatch.Credential, error)
 }
 
 // engine is the execution engine of a process: the durable engine that runs the
@@ -97,7 +101,11 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 		return nil, fmt.Errorf("wire egress: %w", err)
 	}
 	credentials := opts.credentials
-	if credentials == nil {
+	switch {
+	case credentials != nil:
+	case opts.resolver != nil:
+		credentials = resolveCredentials(opts.resolver, st)
+	default:
 		credentials = refuseCredentials
 	}
 	policy := opts.senderPolicy
@@ -243,7 +251,7 @@ func (noTriggerCredentials) Missing(context.Context, orgscope.Org, identity.Proj
 }
 
 // refuseCredentials is the credential port until the credential store arrives.
-func refuseCredentials(context.Context, identity.OrgID, string) (httpdispatch.Credential, error) {
+func refuseCredentials(context.Context, httpdispatch.CredentialRequest) (httpdispatch.Credential, error) {
 	return httpdispatch.Credential{}, ErrNoCredentialStore
 }
 

@@ -24,6 +24,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/connector"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	execstore "github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -66,6 +67,7 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	flow.VersionStore
 	identity.MembershipStore
 	authz.Store
+	credential.Store
 	envelope.KeyStore
 	identity.OrgKeyGapStore
 	audit.Store
@@ -80,11 +82,13 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 // security is the storage, the keys and the identity services of the roles that serve
 // the API. It is built once at start and closed at shutdown.
 type security struct {
-	store        persistence
-	keyring      *envelope.Keyring
-	sessions     *identity.Sessions
-	evaluator    *authz.Evaluator
-	sealer       *audit.Sealer
+	store     persistence
+	keyring   *envelope.Keyring
+	sessions  *identity.Sessions
+	evaluator *authz.Evaluator
+	sealer    *audit.Sealer
+	// credentials is the credential store of SPEC-004 SE7; the API serves it and dispatch resolves through it.
+	credentials  *credential.Service
 	publicOrigin string
 	clock        clock.Clock
 	ids          id.Generator
@@ -201,10 +205,16 @@ func wireSecurity(ctx context.Context, cfg *config.Config, logger *slog.Logger, 
 	if err != nil {
 		return nil, fmt.Errorf("page tokens: %w", err)
 	}
+	creds, err := credential.New(credential.Config{Store: store, Keys: kr, Clock: clk, IDs: ids})
+	if err != nil {
+		return nil, fmt.Errorf("credentials: %w", err)
+	}
 	return &security{
-		store: store, keyring: kr, sessions: sessions, evaluator: authz.NewEvaluator(store, catalog),
-		sealer: audit.NewSealer(store, auditKeys{kr: kr}, ids, clk), publicOrigin: cfg.Value("publicUrl").Text(),
-		clock: clk, ids: ids, pageCodec: codec,
+		store: store, keyring: kr, sessions: sessions,
+		// A request that names a credential is decided with the grant of the project that owns it.
+		evaluator: authz.NewEvaluator(store, catalog).WithOwner("credential", creds),
+		sealer:    audit.NewSealer(store, auditKeys{kr: kr}, ids, clk), publicOrigin: cfg.Value("publicUrl").Text(),
+		clock: clk, ids: ids, pageCodec: codec, credentials: creds,
 	}, nil
 }
 

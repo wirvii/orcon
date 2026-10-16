@@ -25,6 +25,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi"
 	"github.com/wirvii/orcon/internal/adapter/wazero"
 	"github.com/wirvii/orcon/internal/adapter/webui"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/expr"
 	"github.com/wirvii/orcon/internal/platform/config"
 )
@@ -70,12 +71,12 @@ type serveDeps struct {
 
 // engineOpener builds the execution engine of the process over the store that the
 // security wiring already opened. The store is closed by that wiring, not here.
-type engineOpener func(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error)
+type engineOpener func(st engineStore, creds credential.Resolver, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error)
 
 // productionEngine is the engine opener of the server: the engine over the open store,
 // with the process version.
-func productionEngine(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
-	return newEngine(st, engineOptions{role: cfg.Role(), logger: logger, version: version, sandbox: sandbox})
+func productionEngine(st engineStore, creds credential.Resolver, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
+	return newEngine(st, engineOptions{role: cfg.Role(), logger: logger, version: version, sandbox: sandbox, resolver: creds})
 }
 
 // servesEngine reports whether a role opens the engine. Only standalone does for
@@ -311,7 +312,7 @@ func serveWithSandbox(ctx context.Context, logger *slog.Logger, s serveSettings,
 			exprSB = es
 		}
 		var err error
-		eng, err = s.openEngine(s.sec.store, s.cfg, exprSB, logger)
+		eng, err = s.openEngine(s.sec.store, s.sec.credentials, s.cfg, exprSB, logger)
 		if err != nil {
 			logger.ErrorContext(ctx, "the execution engine could not start", "error", err)
 			return exitError

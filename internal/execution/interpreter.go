@@ -64,6 +64,9 @@ type Request struct {
 	// Org is the organization the execution belongs to; nodes that act on
 	// external systems use it for their journal and their rate buckets.
 	Org identity.OrgID
+	// Project is the project the execution belongs to; a node that uses a
+	// credential resolves it for this project.
+	Project identity.ProjectID
 	// Start is the start event to begin at. It may be empty when the flow has
 	// exactly one start event.
 	Start flow.NodeID

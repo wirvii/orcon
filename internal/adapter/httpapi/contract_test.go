@@ -213,6 +213,15 @@ var coreOperations = []struct {
 	{"revokeSession", "POST", "/users/me/sessions/{sessionId}/revoke", "authenticated", "write", "optional", ""},
 	{"getCurrentUser", "GET", "/users/me", "authenticated", "read", "", ""},
 	{"listOrgs", "GET", "/orgs", "authenticated", "read", "", ""},
+	// The credential operations of SPEC-004 SE7-store (SPEC-005 section 3, credentials and shares).
+	{"listCredentials", "GET", "/projects/{projectId}/credentials", "credential:read", "read", "", "list_credentials"},
+	{"createCredential", "POST", "/projects/{projectId}/credentials", "credential:create", "write", "optional", ""},
+	{"getCredential", "GET", "/credentials/{credentialId}", "credential:read", "read", "", ""},
+	{"updateCredential", "PATCH", "/credentials/{credentialId}", "credential:update", "write", "", ""},
+	{"replaceCredentialSecret", "PUT", "/credentials/{credentialId}/secret", "credential:update", "write", "", ""},
+	{"deleteCredential", "DELETE", "/credentials/{credentialId}", "credential:delete", "write", "", ""},
+	{"createCredentialShare", "POST", "/credentials/{credentialId}/shares", "credential:share", "write", "optional", ""},
+	{"deleteCredentialShare", "DELETE", "/credentials/{credentialId}/shares/{projectId}", "credential:share", "write", "", ""},
 }
 
 // TestCoreOperationsDeclared: the contract declares exactly the operations of

@@ -55,11 +55,31 @@ var ErrThrottled = errors.New("dispatch: throttled by a rate bucket")
 // engine parks the node, the token and the execution until a person decides.
 var ErrUnknownOutcome = errors.New("dispatch: outcome of an effect is unknown")
 
+// CodeCredentialHostNotAllowed is the code of the failure raised when the credential a node names is not allowed
+// for the host the request goes to (ADR-0043 section 4). The failure is permanent: sending again does not change it.
+const CodeCredentialHostNotAllowed = "CredentialHostNotAllowed" //nolint:gosec // an error code, not a credential
+
 // Credential is the credential a node runs under, resolved by the caller: the
 // authentication scheme and the decrypted fields. Values never leave the send.
 type Credential struct {
 	Auth   declarative.Auth
 	Fields map[string]string
+	// Mask holds every secret value of the credential. The send replaces each
+	// occurrence in the response items (strings and object keys) with a redaction
+	// marker before the items become node output or journal response (ADR-0043
+	// section 5, R-CRED-04). The base64 form of a BASIC pair is derived from Fields.
+	Mask []string
+}
+
+// CredentialRequest asks for the credential one activation names.
+type CredentialRequest struct {
+	Org     identity.OrgID
+	Project identity.ProjectID
+	// ID is the credential the node names.
+	ID string
+	// Host is the host the request goes to; the resolver refuses a credential
+	// that is not allowed for it.
+	Host string
 }
 
 // Config are the ports and bounds of a dispatcher.
@@ -72,9 +92,10 @@ type Config struct {
 	// SenderFor returns the network port of one destination: the egress
 	// adapter, bound to the policy that grants that host.
 	SenderFor func(u *url.URL) declarative.Sender
-	// Credential resolves the credential a node names. A nil function means no
-	// node can name a credential.
-	Credential func(ctx context.Context, org identity.OrgID, credentialID string) (Credential, error)
+	// Credential resolves the credential a node names, for the project of its
+	// execution and the host the request is sent to, on every activation (ADR-0043
+	// sections 3 and 4). A nil function means no node can name a credential.
+	Credential func(ctx context.Context, req CredentialRequest) (Credential, error)
 	// Bucket is the rate bucket of each credential and host.
 	Bucket     limit.Spec
 	IDs        id.Generator
@@ -243,7 +264,7 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 	if err != nil {
 		return execution.NodeOutput{}, err
 	}
-	cred, err := n.credential(ctx, call.Org, req.credential)
+	cred, err := n.credential(ctx, call, req)
 	if err != nil {
 		return execution.NodeOutput{}, err
 	}
@@ -273,14 +294,17 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 	return execution.NodeOutput{Ports: []execution.PortBatch{{Port: flow.PortMain, Batch: execution.NewBatch(items...)}}}, nil
 }
 
-func (n *HTTPNode) credential(ctx context.Context, org identity.OrgID, name string) (Credential, error) {
+func (n *HTTPNode) credential(ctx context.Context, call execution.NodeCall, req request) (Credential, error) {
+	name := req.credential
 	if name == "" {
 		return Credential{Auth: declarative.Auth{Type: declarative.AuthNone}}, nil
 	}
 	if n.cfg.Credential == nil {
 		return Credential{}, errors.New("dispatch: no credential resolver is configured")
 	}
-	return n.cfg.Credential(ctx, org, name)
+	return n.cfg.Credential(ctx, CredentialRequest{
+		Org: call.Org, Project: call.Project, ID: name, Host: req.target.Hostname(),
+	})
 }
 
 func bucketKeyOf(credential, host string) string {
@@ -373,7 +397,7 @@ func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, k
 		n.honorRetryAfter(ctx, req, err)
 		return nil, describe(err)
 	}
-	return res.Items, nil
+	return newMasker(cred).items(res.Items), nil
 }
 
 // honorRetryAfter blocks the shared bucket until the instant the provider asked

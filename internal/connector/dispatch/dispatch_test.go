@@ -26,11 +26,12 @@ import (
 )
 
 var (
-	testOrg  = identity.OrgID(id.Derive("org"))
-	testExec = id.Derive("exec")
-	testNode = id.Derive("node-execution")
-	testTok  = id.Derive("token")
-	t0       = time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	testOrg     = identity.OrgID(id.Derive("org"))
+	testProject = identity.ProjectID(id.Derive("project"))
+	testExec    = id.Derive("exec")
+	testNode    = id.Derive("node-execution")
+	testTok     = id.Derive("token")
+	t0          = time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 )
 
 // fakeSender answers from a script and records every request.
