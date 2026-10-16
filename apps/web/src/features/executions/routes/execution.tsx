@@ -5,7 +5,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router';
 import { z } from 'zod';
 
 import { RouteError } from '../../../app/errors/RouteError';
-import { ExecutionDetailScreen } from '../screens/ExecutionDetailScreen';
+import { ProjectExecutionScreen } from '../screens/ExecutionScreens';
 
 const executionIdSchema = z.uuid();
 
@@ -21,5 +21,5 @@ export const Route = createFileRoute('/_session/orgs/$orgSlug/projects/$projectH
     stringify: ({ executionId }) => ({ executionId }),
   },
   errorComponent: RouteError,
-  component: ExecutionDetailScreen,
+  component: ProjectExecutionScreen,
 });

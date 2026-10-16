@@ -5,11 +5,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
 import { executionsSearchSchema } from '../model/params';
-import { ExecutionListScreen } from '../screens/ExecutionListScreen';
+import { ProjectExecutionsScreen } from '../screens/ExecutionsScreen';
 
-/** The runs of the project, optionally of one flow (`?flowId=`). */
+/** The runs of the project (its Executions tab), optionally of one flow (`?flowId=`) and with the same filters as the list of the organization. */
 export const Route = createFileRoute('/_session/orgs/$orgSlug/projects/$projectHandle/executions')({
   validateSearch: executionsSearchSchema,
   errorComponent: RouteError,
-  component: ExecutionListScreen,
+  component: ProjectExecutionsScreen,
 });

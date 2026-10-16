@@ -38,13 +38,6 @@ describe('the organization pages whose whole-organization view does not exist ye
     });
   });
 
-  it('leads executions to the executions of each project', async () => {
-    signInAs();
-    renderRoute('/orgs/acme/executions');
-    const list = (await screen.findByRole('heading', { name: 'Meanwhile, open a project' })).closest('section') as HTMLElement;
-    expect(await within(list).findByRole('link', { name: 'Ventas' })).toHaveAttribute('href', '/orgs/acme/projects/ventas/executions');
-  });
-
   it('says there are no projects when there is none to open', async () => {
     server.use(signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([]));
     renderRoute('/orgs/acme/credentials');
@@ -53,7 +46,7 @@ describe('the organization pages whose whole-organization view does not exist ye
 
   it('shows a problem when the projects cannot be read', async () => {
     server.use(signedIn.currentUser, signedIn.organizations([acme]), http.get(`/api/v1/orgs/${acme.id}/projects`, () => problem(500, 'Internal Server Error', 'internal')));
-    renderRoute('/orgs/acme/executions');
+    renderRoute('/orgs/acme/credentials');
     expect(await screen.findByRole('alert')).toBeVisible();
   });
 });

@@ -4,11 +4,17 @@
 import { z } from 'zod';
 
 import { apiRequest } from '../../../app/api/http';
+import {
+  executionModes,
+  executionStatuses,
+  nodeStatuses,
+  type DocumentNode,
+  type Execution,
+  type ExecutionDataEntry,
+  type NodeExecution,
+} from '../model/types';
 
-/** The execution statuses and node statuses of the contract (SPEC-005 `Execution`, `NodeExecution`). */
-export const executionStatuses = ['QUEUED', 'RUNNING', 'WAITING', 'SUSPENDED', 'CANCELING', 'COMPENSATING', 'SUCCEEDED', 'FAILED', 'CANCELED'] as const;
-export const nodeStatuses = ['RUNNING', 'WAITING', 'SUCCEEDED', 'SUCCEEDED_WITH_ERRORS', 'FAILED', 'SUSPENDED', 'CANCELED'] as const;
-export const executionModes = ['WEBHOOK', 'TRIGGER', 'TEST', 'MANUAL', 'CHILD', 'ERROR', 'RETRY', 'EVALUATION'] as const;
+export type { DocumentNode, Execution, ExecutionDataEntry, NodeExecution };
 
 /** Why an execution or a node failed. The text is the server's; it is shown as given. */
 const failureSchema = z.object({
@@ -18,11 +24,15 @@ const failureSchema = z.object({
   nodeId: z.string().optional(),
 });
 
-export const executionSchema = z.looseObject({
+/** The schemas are checked against the plain types the screens use: a field that drifts is a compile error. */
+export const executionSchema: z.ZodType<Execution> = z.looseObject({
   id: z.uuid(),
   flowId: z.uuid(),
   projectId: z.uuid(),
-  flowVersion: z.number().int().min(1),
+  /** Absent for a run of a draft snapshot (a test run), which has no version number. */
+  flowVersion: z.number().int().min(1).optional(),
+  /** True when an operation of the run has an unknown outcome and a person must review it ("Needs review"). */
+  hasUncertainOperation: z.boolean().optional(),
   mode: z.enum(executionModes),
   status: z.enum(executionStatuses),
   createdAt: z.string(),
@@ -33,7 +43,7 @@ export const executionSchema = z.looseObject({
   dataHidden: z.boolean(),
 });
 
-export const nodeExecutionSchema = z.looseObject({
+export const nodeExecutionSchema: z.ZodType<NodeExecution> = z.looseObject({
   id: z.uuid(),
   executionId: z.uuid(),
   nodeId: z.string(),
@@ -44,7 +54,7 @@ export const nodeExecutionSchema = z.looseObject({
   failure: failureSchema.optional(),
 });
 
-export const executionDataEntrySchema = z.looseObject({
+export const executionDataEntrySchema: z.ZodType<ExecutionDataEntry> = z.looseObject({
   nodeExecutionId: z.uuid(),
   nodeId: z.string(),
   side: z.enum(['INPUT', 'OUTPUT']),
@@ -63,29 +73,48 @@ export const executionPageSchema = page(executionSchema);
 export const nodeExecutionPageSchema = page(nodeExecutionSchema);
 export const executionDataPageSchema = page(executionDataEntrySchema);
 
-export type Execution = z.infer<typeof executionSchema>;
-export type NodeExecution = z.infer<typeof nodeExecutionSchema>;
-export type ExecutionDataEntry = z.infer<typeof executionDataEntrySchema>;
 export type ExecutionPage = z.infer<typeof executionPageSchema>;
 
-/** One page of the runs of a project, newest first; `flowId` keeps the runs of one flow only. */
-export function listExecutions({
-  projectId,
-  flowId,
+/** The filters of the list of runs. Every one is optional; a missing one filters nothing. */
+export interface ExecutionFilters {
+  projectId?: string | undefined;
+  flowId?: string | undefined;
+  /** Only the runs that have an operation of unknown outcome ("Needs review"). */
+  uncertain?: boolean | undefined;
+  status?: Execution['status'] | undefined;
+  /** Only the runs accepted at or after this instant. */
+  createdAfter?: string | undefined;
+  /** Only the run with this identifier (the search box takes an identifier only, SPEC-019 Q9). */
+  id?: string | undefined;
+}
+
+/** One page of the runs of the organization the person can read, newest first (`listOrgExecutions`). */
+export function listOrgExecutions({
+  orgId,
+  filters,
   pageToken,
   limit = 50,
 }: {
-  projectId: string;
-  flowId?: string | undefined;
+  orgId: string;
+  filters: ExecutionFilters;
   pageToken?: string | undefined;
   limit?: number | undefined;
 }): Promise<ExecutionPage> {
   return apiRequest({
     method: 'GET',
-    path: `/projects/${encodeURIComponent(projectId)}/executions`,
-    query: { flowId, pageToken, limit },
+    path: `/orgs/${encodeURIComponent(orgId)}/executions`,
+    query: {
+      projectId: filters.projectId,
+      flowId: filters.flowId,
+      status: filters.status,
+      uncertain: filters.uncertain === true ? 'true' : undefined,
+      createdAfter: filters.createdAfter,
+      id: filters.id,
+      pageToken,
+      limit,
+    },
     schema: executionPageSchema,
-    source: 'response of GET /projects/{projectId}/executions',
+    source: 'response of GET /orgs/{orgId}/executions',
   });
 }
 
@@ -124,4 +153,30 @@ export async function listExecutionData(executionId: string): Promise<ExecutionD
     source: 'response of GET /executions/{executionId}/data',
   });
   return page.items;
+}
+
+/** The nodes of a published version of a flow, read only for their names (the document is open and the rest is ignored). */
+const versionSchema = z.looseObject({
+  document: z.looseObject({ nodes: z.array(z.looseObject({ id: z.string(), name: z.string().optional() })) }),
+});
+
+/** The nodes of one published version of a flow, in the order of the document (`getFlowVersion`). */
+export async function listVersionNodes(flowId: string, version: number): Promise<DocumentNode[]> {
+  const answer = await apiRequest({
+    method: 'GET',
+    path: `/flows/${encodeURIComponent(flowId)}/versions/${String(version)}`,
+    schema: versionSchema,
+    source: 'response of GET /flows/{flowId}/versions/{version}',
+  });
+  return answer.document.nodes.map((node) => ({ id: node.id, name: node.name }));
+}
+
+/** Starts a new run that repeats a failed one on the same version of the flow (`retryExecution`). */
+export function retryExecution(executionId: string): Promise<Execution> {
+  return apiRequest({
+    method: 'POST',
+    path: `/executions/${encodeURIComponent(executionId)}/retry`,
+    schema: executionSchema,
+    source: 'response of POST /executions/{executionId}/retry',
+  });
 }

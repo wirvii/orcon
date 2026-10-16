@@ -195,8 +195,9 @@ export async function installApiDouble(page: Page, options: { signedIn?: boolean
       return route.fulfill(json(200, flowState(flow), { ETag: `"${flow.revision}"` }));
     }
 
-    // The lists of a project's credentials and executions: there are none.
+    // The lists of a project's credentials and executions, and the executions of the organization: there are none.
     if (method === 'GET' && /^\/projects\/[^/]+\/(credentials|executions)$/.test(path)) return route.fulfill(json(200, { items: [] }));
+    if (method === 'GET' && path === `/orgs/${org.id}/executions`) return route.fulfill(json(200, { items: [] }));
 
     return route.fulfill(problem(404, 'Not found', 'not-found'));
   };

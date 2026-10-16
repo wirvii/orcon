@@ -18,6 +18,7 @@
   "overview.stats.hours": "unit",
   "overview.stats.minutes": "unit",
   "runs.mode.webhook": "proper noun",
+  "runs.step.error": "word spelled the same in both languages",
   "settings.appearance.language.en": "proper noun",
   "settings.appearance.language.es": "proper noun",
   "settings.nav.general": "word spelled the same in both languages"
