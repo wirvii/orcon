@@ -253,14 +253,77 @@ func (w *walk) mapItems(body jsonvalue.Value) ([]jsonvalue.Value, error) {
 		}
 		sel = v
 	}
+	var items []jsonvalue.Value
 	if sel.Kind() == jsonvalue.KindArray {
-		items := sel.Items()
+		items = sel.Items()
 		if len(items) == 0 {
 			return w.emptyItems(), nil
 		}
+	} else {
+		items = []jsonvalue.Value{sel}
+	}
+	if len(w.op.Response.Map) == 0 {
 		return items, nil
 	}
-	return []jsonvalue.Value{sel}, nil
+	out := make([]jsonvalue.Value, 0, len(items))
+	for _, item := range items {
+		enriched, err := enrich(item, w.op.Response.Map)
+		if err != nil {
+			return nil, &CallError{Class: ClassPermanent, Code: "ProviderError", Message: "the response map path is invalid"}
+		}
+		out = append(out, enriched)
+	}
+	return out, nil
+}
+
+// enrich adds the mapped keys to an item and keeps the provider's record as it
+// is (ADR-0030 section 5; NM-10): a key that the record already has is replaced
+// by the mapped value, and a path that finds nothing adds nothing. An item that
+// is not an object is returned unchanged.
+func enrich(item jsonvalue.Value, mapping map[string]string) (jsonvalue.Value, error) {
+	if item.Kind() != jsonvalue.KindObject {
+		return item, nil
+	}
+	out := item
+	for _, k := range slices.Sorted(maps.Keys(mapping)) {
+		v, ok, err := firstFound(item, mapping[k])
+		if err != nil {
+			return jsonvalue.Value{}, err
+		}
+		if ok {
+			out = out.With(k, v)
+		}
+	}
+	return out, nil
+}
+
+// project builds the output object of one event from a decode map: each key
+// takes the value at its path, and a path that finds nothing is left out.
+// Unlike [enrich], the record is not kept.
+func project(item jsonvalue.Value, mapping map[string]string) (jsonvalue.Value, error) {
+	keys := slices.Sorted(maps.Keys(mapping))
+	members := make([]jsonvalue.Member, 0, len(keys))
+	for _, k := range keys {
+		v, ok, err := firstFound(item, mapping[k])
+		if err != nil {
+			return jsonvalue.Value{}, err
+		}
+		if ok {
+			members = append(members, jsonvalue.Member{Key: k, Value: v})
+		}
+	}
+	return jsonvalue.Object(members...)
+}
+
+// firstFound returns the value of the first alternative of expr that finds one.
+func firstFound(item jsonvalue.Value, expr string) (jsonvalue.Value, bool, error) {
+	for _, alt := range alternatives(expr) {
+		v, ok, err := lookup(item, alt)
+		if err != nil || ok {
+			return v, ok, err
+		}
+	}
+	return jsonvalue.Value{}, false, nil
 }
 
 func (w *walk) emptyItems() []jsonvalue.Value {
@@ -467,7 +530,11 @@ func (in *Interpreter) addBody(op Operation, params scope, req *HTTPRequest) err
 	}
 	if b.Type == "FORM" {
 		form := url.Values{}
-		for k, tpl := range b.Fields {
+		for k, n := range b.Fields {
+			tpl, ok := n.Value.Str()
+			if !ok {
+				return fmt.Errorf("%w: a form field must be a string", ErrTemplate)
+			}
 			v, err := params.render(tpl)
 			if err != nil {
 				return err
@@ -480,7 +547,7 @@ func (in *Interpreter) addBody(op Operation, params scope, req *HTTPRequest) err
 	}
 	members := make([]jsonvalue.Member, 0, len(b.Fields))
 	for _, k := range slices.Sorted(maps.Keys(b.Fields)) {
-		v, err := params.renderValue(b.Fields[k])
+		v, err := params.renderNode(b.Fields[k].Value)
 		if err != nil {
 			return err
 		}

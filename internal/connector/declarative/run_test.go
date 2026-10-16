@@ -374,9 +374,9 @@ func TestRequestBuildingRendersQueryHeadersAndJSONBody(t *testing.T) {
 			Query:  map[string]string{"expand": "{{$parameter.expand}}"},
 			// The operation header overrides the connector-wide one.
 			Headers: map[string]string{"X-Version": "2"},
-			Body: &Body{Type: "JSON", Fields: map[string]string{
-				"name":  "{{$parameter.name}}",
-				"count": "{{$parameter.count}}",
+			Body: &Body{Type: "JSON", Fields: map[string]Node{
+				"name":  {Value: jsonvalue.String("{{$parameter.name}}")},
+				"count": {Value: jsonvalue.String("{{$parameter.count}}")},
 			}},
 		},
 		Response: ResponseSpec{},
@@ -413,7 +413,7 @@ func TestFormBodyIsEncoded(t *testing.T) {
 		Purity: PurityEffect, Safety: SafetyUnsafe,
 		Request: Request{
 			Method: "POST", Path: "/forms",
-			Body: &Body{Type: "FORM", Fields: map[string]string{"b": "{{$parameter.b}}", "a": "x y"}},
+			Body: &Body{Type: "FORM", Fields: map[string]Node{"b": {Value: jsonvalue.String("{{$parameter.b}}")}, "a": {Value: jsonvalue.String("x y")}}},
 		},
 	}
 	s := okSender(`{}`)

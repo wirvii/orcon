@@ -1,0 +1,306 @@
+{
+  "format": "orcon/connector@1",
+  "id": "orcon.whatsapp",
+  "version": "1.0.0",
+  "kind": "DECLARATIVE",
+  "displayName": "WhatsApp Cloud API",
+  "description": "Send WhatsApp messages and mark them as read through the WhatsApp Cloud API of Meta.",
+  "publisher": {
+    "name": "The Orcon Authors",
+    "url": "https://github.com/wirvii/orcon",
+    "contact": "https://github.com/wirvii/orcon/issues"
+  },
+  "license": "Apache-2.0",
+  "compat": {
+    "engineApi": ">=1.0.0 <2.0.0"
+  },
+  "nodes": [
+    {
+      "name": "whatsapp",
+      "type": "orcon.whatsapp.whatsapp@1",
+      "displayName": "WhatsApp Cloud API",
+      "group": "ACTION",
+      "parameters": {
+        "phoneNumberId": {
+          "type": "RESOURCE_LOCATOR",
+          "required": true,
+          "modes": [
+            "ID"
+          ],
+          "description": "The ID of the WhatsApp Business phone number that sends or works with the message."
+        },
+        "to": {
+          "type": "STRING",
+          "required": true,
+          "sensitive": true,
+          "displayWhen": {
+            "operation": [
+              "message.send",
+              "templateMessage.send",
+              "imageMessage.send",
+              "documentMessage.send"
+            ]
+          },
+          "description": "Recipient phone number in international format, digits only, such as 573001234567."
+        },
+        "text": {
+          "type": "JSON",
+          "required": true,
+          "displayWhen": {
+            "operation": [
+              "message.send"
+            ]
+          },
+          "description": "The Meta text object, such as {\"body\": \"Hello\"}. Optional field: preview_url."
+        },
+        "template": {
+          "type": "JSON",
+          "required": true,
+          "displayWhen": {
+            "operation": [
+              "templateMessage.send"
+            ]
+          },
+          "description": "The Meta template object: name, language.code and components, as approved in the WhatsApp Business account."
+        },
+        "image": {
+          "type": "JSON",
+          "required": true,
+          "displayWhen": {
+            "operation": [
+              "imageMessage.send"
+            ]
+          },
+          "description": "The Meta image object: link (https URL of a JPEG or PNG file) and optional caption."
+        },
+        "document": {
+          "type": "JSON",
+          "required": true,
+          "displayWhen": {
+            "operation": [
+              "documentMessage.send"
+            ]
+          },
+          "description": "The Meta document object: link (https URL), filename and optional caption."
+        },
+        "messageId": {
+          "type": "RESOURCE_LOCATOR",
+          "required": true,
+          "modes": [
+            "ID"
+          ],
+          "displayWhen": {
+            "operation": [
+              "message.update"
+            ]
+          },
+          "description": "The WhatsApp message ID (wamid) to mark as read."
+        }
+      },
+      "operations": [
+        {
+          "name": "message.send",
+          "displayName": "Send a text message",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": {
+              "mode": "NONE"
+            },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the chat with {{ $parameter.to }} in the WhatsApp Business inbox and check whether the text message was sent."
+            },
+            "proofLevel": "TESTED"
+          },
+          "rateLimit": "graph"
+        },
+        {
+          "name": "templateMessage.send",
+          "displayName": "Send a template message",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": {
+              "mode": "NONE"
+            },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the chat with {{ $parameter.to }} in the WhatsApp Business inbox and check whether the template message was sent."
+            },
+            "proofLevel": "TESTED"
+          },
+          "rateLimit": "graph"
+        },
+        {
+          "name": "imageMessage.send",
+          "displayName": "Send an image",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": {
+              "mode": "NONE"
+            },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the chat with {{ $parameter.to }} in the WhatsApp Business inbox and check whether the image was sent."
+            },
+            "proofLevel": "TESTED"
+          },
+          "rateLimit": "graph"
+        },
+        {
+          "name": "documentMessage.send",
+          "displayName": "Send a document",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": {
+              "mode": "NONE"
+            },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the chat with {{ $parameter.to }} in the WhatsApp Business inbox and check whether the document was sent."
+            },
+            "proofLevel": "TESTED"
+          },
+          "rateLimit": "graph"
+        },
+        {
+          "name": "message.update",
+          "displayName": "Mark a message as read",
+          "purity": "EFFECT",
+          "itemMode": "PER_ITEM",
+          "safety": {
+            "effect": "WRITE",
+            "level": "UNSAFE",
+            "idempotency": {
+              "mode": "NONE"
+            },
+            "onUncertain": "SUSPEND",
+            "retrySafe": false,
+            "manualCheck": {
+              "description": "Open the chat in the WhatsApp Business inbox and check whether the message {{ $parameter.messageId }} shows as read."
+            },
+            "proofLevel": "TESTED"
+          },
+          "rateLimit": "graph"
+        },
+        {
+          "name": "phoneNumber.get",
+          "displayName": "Get a phone number",
+          "purity": "READ",
+          "itemMode": "PER_ITEM",
+          "rateLimit": "graph"
+        }
+      ],
+      "outputs": [
+        "main"
+      ],
+      "sensitiveFields": [
+        "/parameters/to",
+        "/parameters/text",
+        "/parameters/template",
+        "/parameters/image",
+        "/parameters/document"
+      ]
+    },
+    {
+      "name": "whatsappTrigger",
+      "type": "orcon.whatsapp.whatsappTrigger@1",
+      "displayName": "WhatsApp message received",
+      "group": "TRIGGER",
+      "trigger": {
+        "family": "WEBHOOK",
+        "delivery": "AT_LEAST_ONCE",
+        "maxPayload": 1048576
+      },
+      "outputs": [
+        "main"
+      ]
+    }
+  ],
+  "credentials": [
+    {
+      "id": "systemUser",
+      "displayName": "System user access token",
+      "fields": [
+        {
+          "name": "token",
+          "type": "STRING",
+          "sensitive": true,
+          "required": true
+        },
+        {
+          "name": "appSecret",
+          "type": "STRING",
+          "sensitive": true,
+          "required": false
+        },
+        {
+          "name": "verifyToken",
+          "type": "STRING",
+          "sensitive": true,
+          "required": false
+        }
+      ],
+      "scheme": {
+        "type": "BEARER"
+      },
+      "test": "phoneNumber.get"
+    }
+  ],
+  "permissions": {
+    "network": {
+      "domains": [
+        "graph.facebook.com"
+      ],
+      "schemes": [
+        "https"
+      ],
+      "allowPrivateNetworks": false
+    },
+    "credentials": [
+      "systemUser"
+    ],
+    "credentialRawAccess": false,
+    "resources": {
+      "memoryMiB": 16,
+      "timeout": "PT30S",
+      "maxConcurrent": 4
+    }
+  },
+  "rateLimits": [
+    {
+      "name": "graph",
+      "key": "CREDENTIAL",
+      "requestsPerSecond": 20,
+      "burst": 40,
+      "concurrency": 4,
+      "respectHeaders": {
+        "retryAfter": "Retry-After"
+      }
+    }
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-10-14",
+      "notes": [
+        "changelog.1.0.0.first"
+      ]
+    }
+  ]
+}

@@ -168,8 +168,8 @@ func TestDeclarativeParameterReachesBody(t *testing.T) {
 			Request: declarative.Request{
 				Method: "POST",
 				Path:   "/things",
-				Body: &declarative.Body{Type: "JSON", Fields: map[string]string{
-					"name": "{{$parameter.name}}",
+				Body: &declarative.Body{Type: "JSON", Fields: map[string]declarative.Node{
+					"name": {Value: jsonvalue.String("{{$parameter.name}}")},
 				}},
 			},
 		},
