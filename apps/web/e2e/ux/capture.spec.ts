@@ -130,6 +130,22 @@ async function mockRuns(page: Page) {
     route.fulfill(
       json({
         items: [
+          {
+            nodeExecutionId: '0195f1a0-0000-7000-8000-000000000103',
+            nodeId: 'slack',
+            side: 'INPUT',
+            port: 'main',
+            itemCount: 1,
+            dataItems: [
+              {
+                output: 'Hello Camila! We have the Andes jacket in size M, olive green, at $289,900.',
+                customer: { name: 'Camila Rojas', phone: '573104567890' },
+                message: { id: 'wamid.HBgMNTczMTA0NTY3ODkw', text: 'Hi, do you have the Andes jacket in size M?', receivedAt: '2026-10-15T10:41:07-05:00' },
+                intent: 'buy',
+                needsAdvisor: false,
+              },
+            ],
+          },
           { nodeExecutionId: '0195f1a0-0000-7000-8000-000000000103', nodeId: 'slack', side: 'OUTPUT', port: 'main', itemCount: 1, dataItems: [{ status: 200, body: { ok: true, ts: '1760524861.001' } }] },
         ],
       }),
@@ -288,6 +304,29 @@ const screens: Screen[] = [
     product: async (page) => {
       await openEditor(page);
       await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      await expect(page.getByRole('button', { name: /Use customer\.phone in a parameter|Usar customer\.phone en un parámetro/ })).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-details-chips',
+    mockup: { id: 'ndv' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      const field = page.getByRole('button', { name: /Use customer\.phone in a parameter|Usar customer\.phone en un parámetro/ });
+      await field.dragTo(page.getByRole('textbox', { name: /URL/ }));
+      await expect(page.locator('[data-expression-chips-field]').first()).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-details-retry',
+    mockup: { id: 'ndv' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      await page.getByRole('tab', { name: /Retries and safety|Reintentos y seguridad/ }).click();
     },
   },
   {

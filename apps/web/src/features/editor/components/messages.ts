@@ -105,6 +105,8 @@ export const editorMessages = defineMessages({
   noticeConnectionRefused: { id: 'editor.notice.connectionRefused', defaultMessage: 'That connection is not allowed.', description: 'Shown when a connection is refused for another reason.' },
   noticeTidied: { id: 'editor.notice.tidied', defaultMessage: 'Tidied up {count, plural, one {# item} other {# items}}', description: 'Confirmation after tidying up. {count} is the number of nodes and notes moved.' },
   noticeLaterPin: { id: 'editor.notice.laterPin', defaultMessage: 'Pinning data arrives in a later editor release.', description: 'Shown when somebody tries to pin a node output in an editor that cannot do it yet.' },
+  noticeNoFieldTarget: { id: 'editor.notice.noFieldTarget', defaultMessage: 'Click the parameter you want to fill first, then choose the field.', description: 'Shown when a field of the input was chosen with the keyboard but no parameter had the focus.' },
+  noticeFieldAdded: { id: 'editor.notice.fieldAdded', defaultMessage: 'Added {name} to {field}.', description: 'Confirmation after a field of the input was added to a parameter with the keyboard. {name} is the field and {field} the parameter.' },
   noticeLaterRun: { id: 'editor.notice.laterRun', defaultMessage: 'Test runs arrive in a later editor release.', description: 'Shown when somebody tries to run a node or the flow in an editor that cannot do it yet.' },
   noticeUndone: { id: 'editor.notice.undone', defaultMessage: 'Undone', description: 'Spoken confirmation after undoing a change.' },
   noticeRedone: { id: 'editor.notice.redone', defaultMessage: 'Redone', description: 'Spoken confirmation after redoing a change.' },

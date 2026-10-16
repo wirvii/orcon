@@ -7,6 +7,7 @@
   "editor.catalog.group.apps": "word spelled the same in both languages",
   "editor.data.fileSize": "unit",
   "editor.data.view.json": "acronym or symbol",
+  "editor.details.executeKey": "acronym or symbol",
   "editor.logs.ms": "unit",
   "editor.logs.seconds": "unit",
   "editor.logs.tokens": "word spelled the same in both languages",

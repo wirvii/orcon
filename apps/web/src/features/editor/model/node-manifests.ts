@@ -377,7 +377,15 @@ export function effectOf(manifest: NodeManifest, parameters: Readonly<Record<str
   return method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD' ? 'read' : 'write';
 }
 
-/** What the node's operation declares about repeating it, or undefined for a type that declares nothing. */
+/**
+ * What the node's operation declares about repeating it, or undefined for a step that changes nothing outside.
+ * A type that declares nothing but sends by method (the HTTP request) is a send that cannot be repeated safely
+ * as soon as the method writes: Orcon cannot know whether the other side already did it.
+ */
 export function safetyOf(node: Pick<FlowNode, 'type' | 'element' | 'parameters'>): OperationSafety | undefined {
-  return manifestOf(node)?.safety;
+  const manifest = manifestOf(node);
+  if (!manifest) return undefined;
+  if (manifest.safety) return manifest.safety;
+  if (manifest.effect === 'by-method' && effectOf(manifest, node.parameters) === 'write') return { purity: 'EFFECT', safetyLevel: 'UNSAFE' };
+  return undefined;
 }
