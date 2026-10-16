@@ -66,6 +66,9 @@ var UncoveredStoreMethods = []string{
 	// execution reads; storetest checks that another organization lists nothing (NodeReads,
 	// OrgAuditAppend), and their cases here are owed by BL-100 with the rest of this list.
 	"AppendOrgEntry", "ListNodeExecutions", "ListNodeOutputs",
+	// The retention of editor data (SPEC-014 ED2, [editor.Retention]) removes rows of every organization
+	// by design: it is the engine's cleanup, not a request of a person, so it has no organization case.
+	"PurgeEditorPresence", "PurgeEditorTestData",
 }
 
 // NoSurface is the surface of a tree without routes or store methods that handle

@@ -326,6 +326,30 @@ func TestSQLiteDialect(t *testing.T) {
 	}
 }
 
+// TestSQLiteRebuildKeepsTheTable: a table rebuilt under a new name and renamed back (the SQLite way to
+// change a constraint) is still an organization-scoped table, so its queries are still checked.
+func TestSQLiteRebuildKeepsTheTable(t *testing.T) {
+	t.Parallel()
+	r := newRepo(t)
+	r.write("internal/adapter/sqlite/migrations/0001_init.sql", migrationSQL+`
+CREATE TABLE wait (org_id uuid NOT NULL, id uuid NOT NULL, PRIMARY KEY (org_id, id));
+`)
+	r.write("internal/adapter/sqlite/migrations/0002_rebuild.sql", `
+CREATE TABLE new_wait (org_id uuid NOT NULL, id uuid NOT NULL, PRIMARY KEY (org_id, id));
+INSERT INTO new_wait (org_id, id) SELECT org_id, id FROM wait;
+DROP TABLE wait;
+ALTER TABLE new_wait RENAME TO wait;
+`)
+	r.write("internal/adapter/sqlite/queries/q.sql", "-- name: Scoped :one\n-- orcon:scope org\nSELECT id FROM wait WHERE org_id = ? AND id = ?;\n\n"+
+		"-- name: Unscoped :one\n-- orcon:scope org\nSELECT id FROM wait WHERE id = ?;\n")
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"-root", r.root, filepath.Join(r.root, "internal/adapter/sqlite")}, &stdout, &stderr)
+	out := stdout.String() + stderr.String()
+	if code != 1 || !strings.Contains(out, "wait is not restricted") || strings.Contains(out, "neither organization-scoped") {
+		t.Fatalf("exit %d, want 1 with only the unscoped query reported:\n%s", code, out)
+	}
+}
+
 // TestRepositoryTree runs the check on the real adapters: the tree on main must
 // pass, so a change that breaks the rule or the checker shows up here.
 func TestRepositoryTree(t *testing.T) {

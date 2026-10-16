@@ -180,6 +180,43 @@ UPDATE connector_grant
 SET granted_by_principal_id = NULL
 WHERE id IN (SELECT target.id FROM connector_grant AS target WHERE target.granted_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
 
+-- name: UpdateFlowDraftUpdatedByPrincipalToNull :execrows
+-- orcon:scope engine
+-- orcon:include-deleted the rows to change are the flows that name the principal, soft-deleted or not
+UPDATE flow
+SET draft_updated_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow AS target WHERE target.draft_updated_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: UpdateNodeTestDataCreatedByPrincipalToNull :execrows
+-- orcon:scope engine
+UPDATE node_test_data
+SET created_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM node_test_data AS target WHERE target.created_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: UpdateFlowNodePinPinnedByPrincipalToNull :execrows
+-- orcon:scope engine
+UPDATE flow_node_pin
+SET pinned_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow_node_pin AS target WHERE target.pinned_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: UpdateTestRunStartedByPrincipalToNull :execrows
+-- orcon:scope engine
+UPDATE test_run
+SET started_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM test_run AS target WHERE target.started_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: UpdateEffectPreviewDecidedByPrincipalToNull :execrows
+-- orcon:scope engine
+UPDATE effect_preview
+SET decided_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM effect_preview AS target WHERE target.decided_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
+-- name: UpdateFlowEditingSessionOpenedByPrincipalToNull :execrows
+-- orcon:scope engine
+UPDATE flow_editing_session
+SET opened_by_principal_id = NULL
+WHERE id IN (SELECT target.id FROM flow_editing_session AS target WHERE target.opened_by_principal_id = sqlc.arg(principal_id) ORDER BY target.id LIMIT sqlc.arg(batch_size));
+
 -- name: GetApplicationUserCredentialsByEmail :one
 -- orcon:scope instance
 SELECT id, principal_id, email_normalized, display_name, status, password_hash, created_at, updated_at

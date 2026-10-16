@@ -204,6 +204,30 @@ type CustomRolePermission struct {
 	UpdatedAt    pgtype.Timestamptz
 }
 
+type EffectPreview struct {
+	ID                     pgtype.UUID
+	OrgID                  pgtype.UUID
+	ExecutionID            pgtype.UUID
+	NodeExecutionID        pgtype.UUID
+	NodeID                 string
+	Status                 string
+	Effect                 string
+	SafetyLevel            string
+	ItemCount              int64
+	IsPreviewAvailable     bool
+	PreviewDocument        []byte
+	PreviewDocumentFormat  string
+	PreviewSha256          []byte
+	DecisionDocument       []byte
+	DecisionDocumentFormat pgtype.Text
+	ExpiresAt              pgtype.Timestamptz
+	DecidedByPrincipalID   pgtype.UUID
+	DecidedAt              pgtype.Timestamptz
+	Revision               int64
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
 type Execution struct {
 	ID                        pgtype.UUID
 	OrgID                     pgtype.UUID
@@ -295,20 +319,22 @@ type ExternalOperation struct {
 }
 
 type Flow struct {
-	ID                   pgtype.UUID
-	OrgID                pgtype.UUID
-	ProjectID            pgtype.UUID
-	Name                 string
-	DraftDocument        []byte
-	DraftDocumentFormat  string
-	DraftRevision        int64
-	ActiveFlowVersionID  pgtype.UUID
-	DeletedAt            pgtype.Timestamptz
-	DeletedByPrincipalID pgtype.UUID
-	CreatedAt            pgtype.Timestamptz
-	UpdatedAt            pgtype.Timestamptz
-	ActivationState      string
-	Revision             int64
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	Name                      string
+	DraftDocument             []byte
+	DraftDocumentFormat       string
+	DraftRevision             int64
+	ActiveFlowVersionID       pgtype.UUID
+	DeletedAt                 pgtype.Timestamptz
+	DeletedByPrincipalID      pgtype.UUID
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+	ActivationState           string
+	Revision                  int64
+	DraftUpdatedAt            pgtype.Timestamptz
+	DraftUpdatedByPrincipalID pgtype.UUID
 }
 
 type FlowDataOperation struct {
@@ -330,6 +356,34 @@ type FlowDatum struct {
 	ValueDocument       []byte
 	ValueDocumentFormat string
 	Version             int64
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	Namespace           string
+}
+
+type FlowEditingSession struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	FlowID                pgtype.UUID
+	OpenedByPrincipalID   pgtype.UUID
+	ClientLabel           string
+	LastSeenDraftRevision int64
+	OpenedAt              pgtype.Timestamptz
+	LastSeenAt            pgtype.Timestamptz
+	ExpiresAt             pgtype.Timestamptz
+	Revision              int64
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+}
+
+type FlowNodePin struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	FlowID              pgtype.UUID
+	NodeID              string
+	NodeTestDataID      pgtype.UUID
+	Revision            int64
+	PinnedByPrincipalID pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
 }
@@ -624,6 +678,23 @@ type NodeOutput struct {
 	UpdatedAt            pgtype.Timestamptz
 }
 
+type NodeTestDatum struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	FlowID               pgtype.UUID
+	NodeID               string
+	SourceKind           string
+	OutputDocument       []byte
+	OutputDocumentFormat pgtype.Text
+	BlobID               pgtype.UUID
+	ItemCount            int64
+	SizeBytes            int64
+	ContentSha256        []byte
+	HasMaskedValues      bool
+	CreatedByPrincipalID pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+}
+
 type NondeterminismRecord struct {
 	ID                  pgtype.UUID
 	OrgID               pgtype.UUID
@@ -787,6 +858,31 @@ type TaskAttempt struct {
 	FinishedAt          pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+}
+
+type TestRun struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	FlowID               pgtype.UUID
+	ExecutionID          pgtype.UUID
+	FlowSnapshotID       pgtype.UUID
+	TargetKind           string
+	TargetNodeID         pgtype.Text
+	EffectMode           string
+	PlanDocument         []byte
+	PlanDocumentFormat   string
+	StartedByPrincipalID pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+}
+
+type TestRunSeed struct {
+	ID             pgtype.UUID
+	OrgID          pgtype.UUID
+	TestRunID      pgtype.UUID
+	NodeID         string
+	SeedKind       string
+	NodeTestDataID pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
 }
 
 type Timer struct {

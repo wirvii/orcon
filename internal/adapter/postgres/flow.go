@@ -19,7 +19,7 @@ import (
 )
 
 func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
-	return flow.Record{
+	rec := flow.Record{
 		ID: fromPGUUID[flow.FlowID](row.ID), OrgID: fromPGUUID[identity.OrgID](row.OrgID), ProjectID: fromPGUUID[identity.ProjectID](row.ProjectID),
 		Name: row.Name, Draft: row.DraftDocument, DraftRevision: row.DraftRevision,
 		Revision: row.Revision, ActiveVersion: row.ActiveVersionNumber,
@@ -29,6 +29,11 @@ func flowFrom(row *sqlcgen.GetFlowRow) flow.Record {
 		DeletedByPrincipalID: fromPGUUID[identity.PrincipalID](row.DeletedByPrincipalID),
 		CreatedAt:            instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
 	}
+	if row.DraftUpdatedAt.Valid {
+		t := instant(row.DraftUpdatedAt)
+		rec.DraftUpdatedAt = &t
+	}
+	return rec
 }
 
 // CreateFlow implements [flow.Store].
@@ -162,20 +167,20 @@ func (s *Store) CountFlows(ctx context.Context, org orgscope.Org, project identi
 
 // UpdateFlowDraft implements [flow.Store].
 func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
-	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, nil)
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, identity.PrincipalID{}, now, nil)
 }
 
 // UpdateFlowDraftWithEntry implements [flow.Store]: the new draft, its connector references and
 // the audit entry of the change in one transaction.
 func (s *Store) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry audit.Entry) (int64, error) {
-	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, &entry)
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, flow.SavingPrincipal(entry.Actor), now, &entry)
 }
 
-func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry *audit.Entry) (int64, error) {
+func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, by identity.PrincipalID, now time.Time, entry *audit.Entry) (int64, error) {
 	var revision int64
 	err := s.inScope(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
-			DraftDocument: draft, UpdatedAt: timestamp(now), OrgID: pgUUID(org.UUID()), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
+			DraftDocument: draft, UpdatedAt: timestamp(now), UpdatedByPrincipalID: nullPGUUID(by), OrgID: pgUUID(org.UUID()), ID: pgUUID(flowID), ExpectedRevision: expectedRevision,
 		})
 		if err != nil {
 			return err

@@ -87,8 +87,22 @@ type Record struct {
 	DeletedAt time.Time
 	// DeletedByPrincipalID is the zero value unless a principal deleted the flow.
 	DeletedByPrincipalID identity.PrincipalID
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	// DraftUpdatedAt is nil until the draft is first saved after the editor storage migration
+	// (SPEC-014 A12). It is a pointer, and the principal that saved the draft is stored with it but
+	// not carried here, so the record stays below the size the linter allows for a value parameter.
+	DraftUpdatedAt *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// SavingPrincipal returns the principal an audit actor stands for, the zero value when the actor
+// is not a principal of the organization (an API key, the system, an anonymous caller). Stores use
+// it to record who saved a draft from the audit entry of the save.
+func SavingPrincipal(a audit.Actor) identity.PrincipalID {
+	if a.Kind == audit.ActorUser || a.Kind == audit.ActorServiceAccount {
+		return identity.PrincipalID(a.PrincipalID)
+	}
+	return identity.PrincipalID{}
 }
 
 // IsDeleted reports whether the flow is soft-deleted.

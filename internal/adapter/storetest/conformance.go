@@ -29,6 +29,7 @@ import (
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/flow/editor"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -60,6 +61,8 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	flow.VersionStore
 	flow.SnapshotStore
 	flow.ReferenceStore
+	editor.Store
+	editor.Retention
 	connector.PackageStore
 	connector.GrantStore
 	execution.WorkerStore

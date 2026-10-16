@@ -126,6 +126,24 @@ var principalClearers = []clearer{
 	{"connector_grant.granted_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
 		return q.UpdateConnectorGrantGrantedByPrincipalToNull(ctx, principal, batch)
 	}},
+	{"flow.draft_updated_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateFlowDraftUpdatedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"node_test_data.created_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateNodeTestDataCreatedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"flow_node_pin.pinned_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateFlowNodePinPinnedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"test_run.started_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateTestRunStartedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"effect_preview.decided_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateEffectPreviewDecidedByPrincipalToNull(ctx, principal, batch)
+	}},
+	{"flow_editing_session.opened_by_principal_id", func(ctx context.Context, q *sqlcgen.Queries, principal []byte, batch int64) (int64, error) {
+		return q.UpdateFlowEditingSessionOpenedByPrincipalToNull(ctx, principal, batch)
+	}},
 }
 
 // PrincipalReferenceColumns returns the actor columns, as "table.column", that DeletePrincipal

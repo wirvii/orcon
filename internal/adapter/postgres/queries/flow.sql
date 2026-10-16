@@ -12,21 +12,21 @@ VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(project_id), sqlc.arg(name), sq
 
 -- name: GetFlow :one
 -- orcon:scope org
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = sqlc.arg(org_id) AND flow.id = sqlc.arg(id) AND flow.deleted_at IS NULL;
 
 -- name: GetFlowByName :one
 -- orcon:scope org
 -- orcon:hot
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = sqlc.arg(org_id) AND flow.project_id = sqlc.arg(project_id) AND flow.name = sqlc.arg(name) AND flow.deleted_at IS NULL;
 
 -- name: ListFlows :many
 -- orcon:scope org
 -- orcon:hot
-SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.created_at, flow.updated_at
+SELECT flow.id, flow.org_id, flow.project_id, flow.name, flow.draft_document, flow.draft_revision, flow.revision, flow.active_flow_version_id, COALESCE((SELECT v.version_number FROM flow_version v WHERE v.org_id = flow.org_id AND v.id = flow.active_flow_version_id), 0)::bigint AS active_version_number, flow.activation_state, flow.deleted_at, flow.deleted_by_principal_id, flow.draft_updated_at, flow.draft_updated_by_principal_id, flow.created_at, flow.updated_at
 FROM flow
 WHERE flow.org_id = sqlc.arg(org_id) AND flow.project_id = sqlc.arg(project_id) AND flow.id > sqlc.arg(after_id) AND flow.deleted_at IS NULL
 ORDER BY flow.id
@@ -85,7 +85,9 @@ WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND status
 UPDATE flow
 SET draft_document = sqlc.arg(draft_document),
     draft_revision = draft_revision + 1,
-    updated_at = sqlc.arg(updated_at)
+    updated_at = sqlc.arg(updated_at),
+    draft_updated_at = sqlc.arg(updated_at),
+    draft_updated_by_principal_id = sqlc.arg(updated_by_principal_id)
 WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND draft_revision = sqlc.arg(expected_revision) AND deleted_at IS NULL;
 
 -- name: UpdateFlowActiveVersion :execrows
