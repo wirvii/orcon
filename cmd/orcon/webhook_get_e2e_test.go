@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
-	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -65,7 +64,7 @@ func TestNativeWebhookAcceptingGETStartsAnExecution(t *testing.T) {
 			if err != nil {
 				t.Fatalf("the response names no execution: %v", err)
 			}
-			waitExecution(t, env, st, store.ExecutionID(u), execution.ExecSucceeded)
+			waitExecution(t, env, st, store.ExecutionID(u))
 
 			// A GET to an address nobody serves is still not found, not forbidden.
 			req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/hooks/engine/unknown", http.NoBody)
