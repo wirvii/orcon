@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft, BookOpen, Play } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
@@ -9,6 +9,7 @@ import { useIntl } from 'react-intl';
 import { Banner } from '../../components/banner/Banner';
 import { Button } from '../../components/button/Button';
 import { IconButton } from '../../components/icon-button/IconButton';
+import { Kbd } from '../../components/kbd/Kbd';
 import { Tabs } from '../../components/tabs/Tabs';
 import { NodeGlyph } from '../../canvas/NodeGlyph';
 import { NodeStatusChip } from '../../canvas/node-status-chip/NodeStatusChip';
@@ -18,7 +19,7 @@ import { InsideModal, useScrim } from '../../lib/modal-nesting';
 import { PaneSplitter } from '../pane-splitter/PaneSplitter';
 import { editorMessages } from '../messages';
 
-export type DetailsTab = 'parameters' | 'settings' | 'docs' | 'agent';
+export type DetailsTab = 'parameters' | 'settings' | 'retry' | 'docs' | 'agent';
 
 export interface NodeDetailsViewProps {
   node: GraphNode;
@@ -55,6 +56,7 @@ export interface NodeDetailsViewProps {
 const tabMessages = {
   parameters: editorMessages.parameters,
   settings: editorMessages.settings,
+  retry: editorMessages.retry,
   docs: editorMessages.docs,
   agent: editorMessages.agent,
 } as const;
@@ -104,19 +106,21 @@ function NodeName({ name, onRename }: { name: string; onRename?: ((name: string)
   );
 }
 
-function Header({ node, onBack, onExecute, onRename, compact = false }: { node: GraphNode; onBack: () => void; onExecute?: (() => void) | undefined; onRename?: ((name: string) => void) | undefined; compact?: boolean }) {
+function Header({ node, onBack, onExecute, onRename, onOpenDocs, compact = false }: { node: GraphNode; onBack: () => void; onExecute?: (() => void) | undefined; onRename?: ((name: string) => void) | undefined; onOpenDocs?: (() => void) | undefined; compact?: boolean }) {
   const intl = useIntl();
   const back = intl.formatMessage(editorMessages.backToCanvas);
   const execute = onExecute ? (
-    <Button onClick={onExecute} className={compact ? undefined : 'ms-auto'}>
+    <Button onClick={onExecute}>
       <Play aria-hidden className="size-icon-16" />
       {intl.formatMessage(editorMessages.executeStep)}
+      {compact ? null : <Kbd aria-hidden className="ms-1">{intl.formatMessage(editorMessages.executeKey)}</Kbd>}
     </Button>
   ) : null;
   const chips = (
     <>
       {node.status ? <NodeStatusChip status={node.status} code={node.statusCode} /> : null}
       {node.pinned ? <NodeStatusChip kind="pinned" /> : null}
+      {node.neverTwice ? <NodeStatusChip kind="never-twice" /> : null}
     </>
   );
   const glyph = (
@@ -159,7 +163,15 @@ function Header({ node, onBack, onExecute, onRename, compact = false }: { node: 
       {glyph}
       {name}
       {chips}
-      {execute}
+      <span className="ms-auto flex flex-wrap items-center gap-2">
+        {onOpenDocs ? (
+          <Button variant="ghost" onClick={onOpenDocs}>
+            <BookOpen aria-hidden className="size-icon-16" />
+            {intl.formatMessage(editorMessages.documentation)}
+          </Button>
+        ) : null}
+        {execute}
+      </span>
     </header>
   );
 }
@@ -208,8 +220,16 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
     setLocalTab(next as DetailsTab);
     onTabChange?.(next as DetailsTab);
   };
+  const openDocs = tabs.docs === undefined ? undefined : () => switchTab('docs');
+  // `R` runs the step, the way it does on the canvas; it never fires while a field has the focus.
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!executeAction || event.key.toLowerCase() !== 'r' || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+    if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"], [role="combobox"]')) return;
+    event.preventDefault();
+    executeAction();
+  };
 
-  const tabItems = (['parameters', 'settings', 'docs', ...(node.kind === 'agent' ? (['agent'] as const) : [])] as DetailsTab[])
+  const tabItems = (['parameters', 'settings', 'retry', 'docs', ...(node.kind === 'agent' ? (['agent'] as const) : [])] as DetailsTab[])
     .filter((id) => tabs[id] !== undefined)
     .map((id) => {
       const body = (
@@ -295,6 +315,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
         <DialogPrimitive.Content
           aria-describedby={undefined}
           data-node-details="dialog"
+          onKeyDown={onKeyDown}
           onCloseAutoFocus={(event) => {
             if (onReturnFocus) {
               event.preventDefault();
@@ -304,7 +325,7 @@ export function NodeDetailsView({ node, open, onOpenChange, layout = 'dialog', i
           className={cn('bg-surface text-fg border-border fixed inset-6 z-modal flex flex-col overflow-hidden rounded-lg border shadow-lg', className)}
         >
           <DialogPrimitive.Title className="sr-only">{intl.formatMessage(editorMessages.detailsTitle, { name: node.name })}</DialogPrimitive.Title>
-          <Header node={node} onBack={() => onOpenChange(false)} onExecute={executeAction} onRename={renameAction} />
+          <Header node={node} onBack={() => onOpenChange(false)} onExecute={executeAction} onRename={renameAction} onOpenDocs={openDocs} />
           <div ref={frame} className="flex min-h-0 flex-1">
             {!trigger ? (
               <>

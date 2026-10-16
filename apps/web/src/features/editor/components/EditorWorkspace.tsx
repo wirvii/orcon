@@ -6,6 +6,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useIntl } from 'react-intl';
 
 import { clipboardEventText, setClipboardEventText } from '../../../app/boundary/clipboard';
+import { type FieldInsertController } from '../forms/node-config/field-insert';
 import { RunLogs } from '../forms/RunLogs';
 import type { FlowDocument } from '../model/flow-document';
 import { chordKeys, EDITOR_KEYMAP, resolveEntry, type EditorAction } from '../model/keymap';
@@ -73,6 +74,8 @@ function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps)
   const dialogLayout = useMediaQuery(DIALOG_QUERY);
   const platform = useMemo(detectPlatform, []);
   const canvas = useRef<EditorCanvasHandle>(null);
+  // How a field chosen in the input pane reaches the parameter that had the focus: shared by the details view and the docked data panel.
+  const insertController = useRef<FieldInsertController | undefined>(undefined);
   const root = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(false);
@@ -355,6 +358,8 @@ function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps)
                   }}
                   onClose={closeDetails}
                   onReturnFocus={returnFocus}
+                  flowId={flowId}
+                  insertController={insertController}
                 />
               </Suspense>
             ) : null}
@@ -383,7 +388,7 @@ function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps)
         </div>
         {showDocked ? (
           <Suspense fallback={null}>
-            <DockedDataPanel nodeId={details.id} />
+            <DockedDataPanel nodeId={details.id} flowId={flowId} insertController={insertController} />
           </Suspense>
         ) : null}
         {flowId !== undefined ? (
@@ -398,7 +403,7 @@ function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps)
       </div>
       {details !== undefined && !editable ? (
         <Suspense fallback={null}>
-          <NodeDetails nodeId={details.id} layout="fullscreen" tab={details.tab} onTabChange={(tab) => { setDetails({ id: details.id, tab }); }} onClose={closeDetails} onReturnFocus={returnFocus} />
+          <NodeDetails nodeId={details.id} layout="fullscreen" tab={details.tab} onTabChange={(tab) => { setDetails({ id: details.id, tab }); }} onClose={closeDetails} onReturnFocus={returnFocus} flowId={flowId} insertController={insertController} />
         </Suspense>
       ) : null}
       {details !== undefined && editable && dialogLayout ? (
@@ -412,6 +417,8 @@ function Workspace({ save, reload, preview, flowId, nav }: EditorWorkspaceProps)
             }}
             onClose={closeDetails}
             onReturnFocus={returnFocus}
+            flowId={flowId}
+            insertController={insertController}
           />
         </Suspense>
       ) : null}

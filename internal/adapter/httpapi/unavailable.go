@@ -44,6 +44,11 @@ func (Unavailable) ListOrgs(context.Context, apigen.ListOrgsRequestObject) (apig
 	return nil, errUnavailable
 }
 
+// GetOrgActivitySummary refuses GET /orgs/{orgId}/activity-summary.
+func (Unavailable) GetOrgActivitySummary(context.Context, apigen.GetOrgActivitySummaryRequestObject) (apigen.GetOrgActivitySummaryResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
 // ListOrgFlows refuses GET /orgs/{orgId}/flows.
 func (Unavailable) ListOrgFlows(context.Context, apigen.ListOrgFlowsRequestObject) (apigen.ListOrgFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable

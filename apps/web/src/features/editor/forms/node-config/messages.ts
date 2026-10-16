@@ -133,4 +133,35 @@ export const configMessages = defineMessages({
   updateRemoved: { id: 'editor.update.kind.removed', defaultMessage: 'Removed', description: 'Marks a change that removes something from a connector.' },
   updated: { id: 'editor.update.done', defaultMessage: '{name} now uses version {version}.', description: 'Confirmation after a step was moved to a newer connector version. {name} is the step and {version} the version.' },
   updateNote: { id: 'editor.update.note', defaultMessage: 'Updating changes the draft only. Publishing stays a separate step.', description: 'Tells that updating the connector version does not publish anything.' },
+
+  // Expression chips (SPEC-019 R-UX-NDV-03)
+  viewAsText: { id: 'editor.config.viewAsText', defaultMessage: 'View as text', description: 'Accessible name of the small button that shows a formula field as the raw text of the formula instead of chips.' },
+  viewAsChips: { id: 'editor.config.viewAsChips', defaultMessage: 'View as chips', description: 'Accessible name of the small button that shows a formula field as readable chips instead of raw text.' },
+  chipsDrop: { id: 'editor.config.chipsDrop', defaultMessage: 'Drag more fields from the input here', description: 'Placeholder of a formula field shown as chips: fields dragged from the input are added to it.' },
+  chipsLabel: { id: 'editor.config.chipsLabel', defaultMessage: '{field}: formula as chips', description: 'Accessible name of a formula field shown as chips. {field} is the field name.' },
+  chipsDropped: { id: 'editor.config.chipsDropped', defaultMessage: 'Added {name} to {field}.', description: 'Confirmation, read aloud, after a field of the input was added to a parameter. {name} is the field and {field} the parameter.' },
+
+  // Protection against duplicates (SPEC-019 R-UX-NDV-06)
+  dupTitle: { id: 'editor.config.dup.title', defaultMessage: 'Protection against duplicate messages', description: 'Title of the box that explains how a step that changes something outside is protected when it is retried.' },
+  dupKey: {
+    id: 'editor.config.dup.key',
+    defaultMessage: 'If this step is retried, Orcon sends the same unique key, so {service} ignores a repeat. Unique key:',
+    description: 'Explains the protection of a step that sends a unique key. {service} is the name of the service. The key follows as a chip.',
+  },
+  dupReconcile: {
+    id: 'editor.config.dup.reconcile',
+    defaultMessage: 'If this step is retried, Orcon first asks {service} whether it already happened, and only sends again if it did not.',
+    description: 'Explains the protection of a step that checks with the service before sending again. {service} is the name of the service.',
+  },
+  dupUnsafeTitle: { id: 'editor.config.dup.unsafeTitle', defaultMessage: 'A retry can send this twice', description: 'Title of the warning on a step that changes something outside and cannot be repeated safely.' },
+  dupUnsafeText: {
+    id: 'editor.config.dup.unsafeText',
+    defaultMessage: 'This step changes something outside Orcon and cannot confirm whether it already happened. If Orcon does not know the result, the step is left as Needs review until you decide.',
+    description: 'Explains the warning of a step that cannot be repeated safely: a retry can duplicate it and an unknown result needs a person.',
+  },
+  retryIntro: { id: 'editor.config.retry.intro', defaultMessage: 'How this step is retried, and what keeps it from running twice.', description: 'Introduces the tab about retries and safety of a step.' },
+  retryNothingOutside: { id: 'editor.config.retry.pure', defaultMessage: 'This step changes nothing outside Orcon, so repeating it is always safe.', description: 'Says a step that changes nothing outside has no duplicate risk.' },
+
+  // Credential card (SPEC-019 R-UX-NDV-05)
+  credentialCard: { id: 'editor.cred.card', defaultMessage: 'Credential in use: {name}, {type}', description: 'Accessible name of the card that shows the credential a step uses. {name} is its name and {type} its type.' },
 });

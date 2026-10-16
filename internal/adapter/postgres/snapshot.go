@@ -158,6 +158,16 @@ func (t *pgTx) SaveEngineState(ctx context.Context, u store.EngineStateUpdate) e
 	if err := t.own(u.OrgID); err != nil {
 		return err
 	}
+	// The status before the change decides which hourly counters move (SPEC-019 R-UX-BE-02): the counter
+	// of a final status is raised when the execution reaches it and lowered when it leaves it, in this
+	// transaction. Only the key of the execution is read, not the row.
+	prior, found, err := readCountKey(ctx, t.q, u.OrgID, u.Execution)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return conflictf("save engine state of %s at revision %d", u.Execution, u.ExpectedRevision)
+	}
 	n, err := t.q.UpdateEngineState(ctx, sqlcgen.UpdateEngineStateParams{
 		Status: u.Status, Document: u.Document, StartedAt: nullTimestamp(u.StartedAt), FinishedAt: nullTimestamp(u.FinishedAt),
 		UpdatedAt: timestamp(u.Now), OrgID: pgUUID(u.OrgID), ID: pgUUID(u.Execution), ExpectedRevision: u.ExpectedRevision,
@@ -168,7 +178,7 @@ func (t *pgTx) SaveEngineState(ctx context.Context, u store.EngineStateUpdate) e
 	if n == 0 {
 		return conflictf("save engine state of %s at revision %d", u.Execution, u.ExpectedRevision)
 	}
-	return nil
+	return countTransition(ctx, t.q, u.OrgID, prior, u.Status, u.Now)
 }
 
 func (t *pgTx) RefreshCounters(ctx context.Context, org identity.OrgID, exec store.ExecutionID, now time.Time) error {

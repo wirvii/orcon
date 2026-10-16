@@ -13,7 +13,7 @@ import { cn } from '../../lib/cn';
 import { DataTableView } from '../data-table-view/DataTableView';
 import { JsonTreeView } from '../json-tree-view/JsonTreeView';
 import { editorMessages } from '../messages';
-import { visibleValue, type DataView, type PaneData } from '../model';
+import { visibleValue, type DataView, type FieldPath, type PaneData } from '../model';
 import { SchemaView } from '../schema-view/SchemaView';
 
 export interface OutputPort {
@@ -41,14 +41,16 @@ export interface DataPaneProps {
   onExecute?: (() => void) | undefined;
   onPinChange?: ((pinned: boolean) => void) | undefined;
   onEdit?: (() => void) | undefined;
+  /** Makes the fields of the Schema view usable in a parameter: they can be dragged there or chosen with Enter. Only for the input. */
+  onInsertField?: ((path: FieldPath) => void) | undefined;
   headingLevel?: 2 | 3 | 4 | undefined;
   className?: string | undefined;
 }
 
 const views: { id: DataView; message: typeof editorMessages.viewTable }[] = [
+  { id: 'schema', message: editorMessages.viewSchema },
   { id: 'table', message: editorMessages.viewTable },
   { id: 'json', message: editorMessages.viewJson },
-  { id: 'schema', message: editorMessages.viewSchema },
 ];
 
 /**
@@ -63,7 +65,7 @@ export function DataPane({
   status = 'data',
   error,
   view: viewProp,
-  defaultView = 'table',
+  defaultView,
   onViewChange,
   ports,
   activePort,
@@ -71,12 +73,14 @@ export function DataPane({
   onExecute,
   onPinChange,
   onEdit,
+  onInsertField,
   headingLevel = 3,
   className,
 }: DataPaneProps) {
   const intl = useIntl();
   const headingId = useId();
-  const [localView, setLocalView] = useState<DataView>(defaultView);
+  // The input starts on its fields, the thing to take from it; the output starts on the table.
+  const [localView, setLocalView] = useState<DataView>(defaultView ?? (mode === 'input' ? 'schema' : 'table'));
   const [copied, setCopied] = useState(false);
   const view = viewProp ?? localView;
   const Heading = `h${headingLevel}` as const;
@@ -145,7 +149,7 @@ export function DataPane({
           </div>
         ) : null}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {view === 'table' ? <DataTableView items={items} /> : view === 'json' ? <JsonTreeView value={items} /> : <SchemaView items={items} />}
+          {view === 'table' ? <DataTableView items={items} /> : view === 'json' ? <JsonTreeView value={items} /> : <SchemaView items={items} onInsert={input ? onInsertField : undefined} />}
         </div>
       </div>
     );
