@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/oapi-codegen/runtime/types"
@@ -78,6 +79,9 @@ func principalOf(ctx context.Context) (identity.Principal, error) {
 
 // revisionOf reads If-Match as a revision. A tag this API did not issue names no current revision.
 func revisionOf(ifMatch string) (int64, error) {
+	if strings.TrimSpace(ifMatch) == "" {
+		return 0, conditional.ErrRequired
+	}
 	rev, err := conditional.Parse(ifMatch)
 	if err != nil {
 		return 0, conditional.ErrMismatch
