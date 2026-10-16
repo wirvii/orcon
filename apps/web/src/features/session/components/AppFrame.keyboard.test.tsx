@@ -58,7 +58,8 @@ it('the key N is left to a field while a person types', async () => {
   const { router } = await open('/orgs/acme/projects/ventas/flows');
   await userEvent.keyboard('n');
   const dialog = await screen.findByRole('dialog');
-  const name = within(dialog).getByLabelText(/^Name/);
+  const name = within(dialog).getByLabelText(/^Flow name/);
+  await userEvent.clear(name);
   await userEvent.type(name, 'new');
   expect(name).toHaveValue('new');
   expect(router.state.location.pathname).toBe('/orgs/acme/projects/ventas/flows');

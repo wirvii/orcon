@@ -61,6 +61,14 @@ export const screens: ProductScreen[] = [
     },
   },
   {
+    name: 'create-flow',
+    open: async (page) => {
+      const { projectHandle } = await seed(page);
+      await page.goto(`/orgs/${org.slug}/projects/${projectHandle}/flows?create=true`);
+      await expect(page.getByRole('dialog', { name: /^(Create flow|Crear flujo)$/ })).toBeVisible();
+    },
+  },
+  {
     name: 'executions',
     open: async (page) => {
       const { projectHandle } = await seed(page);
