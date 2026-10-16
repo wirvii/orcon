@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { cn, useDensity, useLocale, useTheme, type Density, type ThemePreference } from '@orcon/ui';
+import { cn, Switch, useDensity, useLocale, useTheme, type Density, type ThemePreference } from '@orcon/ui';
 import { Check } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
@@ -17,6 +17,12 @@ const messages = defineMessages({
   language: { id: 'settings.appearance.language', defaultMessage: 'Interface language', description: 'Label of the choice of the language of the interface.' },
   english: { id: 'settings.appearance.language.en', defaultMessage: 'English', description: 'Language option. It is the name of the language in that language, so it is the same in every catalog.' },
   spanish: { id: 'settings.appearance.language.es', defaultMessage: 'Español', description: 'Language option. It is the name of the language in that language, so it is the same in every catalog.' },
+  motion: { id: 'settings.appearance.motion', defaultMessage: 'Reduce animations', description: 'Switch that turns off the movement of the interface: transitions and looping animations.' },
+  motionHint: {
+    id: 'settings.appearance.motion.hint',
+    defaultMessage: 'Panels and menus appear without moving. Your device setting for less motion is always respected.',
+    description: 'One line under the reduce animations switch that says what it changes.',
+  },
   saved: { id: 'settings.appearance.saved', defaultMessage: 'Saved automatically', description: 'Confirmation, read aloud politely, after a choice was applied and kept in this browser.' },
 });
 
@@ -61,7 +67,12 @@ function useAutosaveNotice() {
  * The appearance choices of Settings. Every choice applies the moment it is made and is kept in this browser, so there
  * is no Save button; a polite live region says "Saved automatically" after each one (SPEC-019 R-UX-SET-03).
  */
-export function AppearanceControls() {
+export interface AppearanceControlsProps {
+  reducedMotion: boolean;
+  onReducedMotionChange: (reduced: boolean) => void;
+}
+
+export function AppearanceControls({ reducedMotion, onReducedMotionChange }: AppearanceControlsProps) {
   const intl = useIntl();
   const theme = useTheme();
   const density = useDensity();
@@ -138,6 +149,18 @@ export function AppearanceControls() {
             markSaved();
           }}
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <Switch
+          label={intl.formatMessage(messages.motion)}
+          checked={reducedMotion}
+          onCheckedChange={(checked) => {
+            onReducedMotionChange(checked);
+            markSaved();
+          }}
+        />
+        <p className="text-fg-muted text-xs">{intl.formatMessage(messages.motionHint)}</p>
       </div>
 
       {/* Polite: a screen reader says it after the choice, without taking the focus. */}

@@ -76,6 +76,9 @@ export function emitCss(model) {
       block(':root', durations.map((t) => `  ${t.cssName}: 0ms;`), '  '),
     ]),
     '',
+    // The same, chosen by the person in Settings > Appearance (stored in this browser, set before the first paint).
+    block('[data-motion="reduce"]', durations.map((t) => `  ${t.cssName}: 0ms;`)),
+    '',
   ].join('\n');
 }
 

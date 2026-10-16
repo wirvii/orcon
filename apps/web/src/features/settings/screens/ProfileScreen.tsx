@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { Avatar } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
@@ -41,6 +42,7 @@ export function ProfileScreen() {
   if (current === undefined) return null;
   return (
     <SettingsCard title={intl.formatMessage(messages.title)} description={intl.formatMessage(messages.description)}>
+      <Avatar name={identityOf(current).name} initials={identityOf(current).initials} size="lg" tone="accent" decorative />
       <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-1">
           <dt className="text-sm font-medium">{intl.formatMessage(messages.name)}</dt>

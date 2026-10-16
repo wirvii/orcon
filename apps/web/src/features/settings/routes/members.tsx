@@ -4,7 +4,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
-import { MembersScreen } from '../screens/ComingSoonSections';
+import { MembersScreen } from '../screens/MembersScreen';
 
 /** People and roles: not available until the server lists people. */
 export const Route = createFileRoute('/_session/orgs/$orgSlug/settings/members')({

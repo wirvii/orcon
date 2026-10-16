@@ -114,8 +114,8 @@ it('the profile shows the real name and email, read only', async () => {
 
 it('a section that needs a server part that does not exist yet says so instead of failing', async () => {
   signInAs();
-  renderRoute('/orgs/acme/settings/members');
-  const card = (await screen.findByRole('heading', { level: 2, name: 'People and roles' })).closest('[data-coming-soon]') as HTMLElement;
+  renderRoute('/orgs/acme/settings/api-keys');
+  const card = (await screen.findByRole('heading', { level: 2, name: 'API keys' })).closest('[data-coming-soon]') as HTMLElement;
   expect(within(card).getByText('Coming soon')).toBeVisible();
   expect(within(card).queryByRole('button')).toBeNull();
   expect(screen.queryByRole('alert')).toBeNull();
