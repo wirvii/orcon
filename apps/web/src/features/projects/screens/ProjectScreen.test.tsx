@@ -4,24 +4,11 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { listedFlow, productApi, project } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
 import { acme, problem, signedIn } from '../../../../test/session-fixtures';
-import { ApiProblem } from '../../../app/api/http';
-
-// The credential operations are not in the contract yet, so the screen reads an in-memory store. A server that
-// answers 503 is what this test needs: the store is replaced by one whose list says the operation is unavailable.
-vi.mock('../../credentials/api/store', () => ({
-  usesLocalCredentials: () => false,
-  credentialStore: {
-    list: () => Promise.reject(new ApiProblem(503, { code: 'service-unavailable', title: 'Service Unavailable', status: 503 }, null)),
-    create: () => Promise.reject(new Error('not used')),
-    rotate: () => Promise.reject(new Error('not used')),
-    remove: () => Promise.reject(new Error('not used')),
-  },
-}));
 
 const base = '/orgs/acme/projects/ventas';
 
@@ -86,7 +73,7 @@ describe('ProjectScreen', () => {
   });
 
   it('credentials tab shows coming soon when the operation answers 503', async () => {
-    server.use(...beforeProject());
+    server.use(...beforeProject(), http.get(`/api/v1/projects/${project.id}/credentials`, () => problem(503, 'Service Unavailable', 'service-unavailable')));
     renderRoute(`${base}/credentials`);
     expect(await screen.findByRole('heading', { name: 'Credentials will be available soon' })).toBeVisible();
     expect(document.querySelector('[data-coming-soon]')).not.toBeNull();

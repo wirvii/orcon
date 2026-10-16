@@ -4,10 +4,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { RouteError } from '../../../app/errors/RouteError';
-import { CredentialListScreen } from '../screens/CredentialListScreen';
+import { CredentialsScreen } from '../screens/CredentialsScreen';
 
 /** The credentials of the project (SPEC-016 R-SH-URL: the project's sections live under its address). */
 export const Route = createFileRoute('/_session/orgs/$orgSlug/projects/$projectHandle/credentials')({
   errorComponent: RouteError,
-  component: CredentialListScreen,
+  component: CredentialsScreen,
 });
