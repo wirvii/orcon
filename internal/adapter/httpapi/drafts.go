@@ -68,47 +68,90 @@ func (d *Drafts) GetDraft(ctx context.Context, req apigen.GetDraftRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	etag := flowETag(rec)
+	etag := draftETag(rec)
 	return apigen.GetDraft200JSONResponse{Body: body, Headers: apigen.GetDraft200ResponseHeaders{ETag: &etag}}, nil
 }
 
 // ReplaceDraft replaces the whole document of the draft when If-Match names the current revision.
 func (d *Drafts) ReplaceDraft(ctx context.Context, req apigen.ReplaceDraftRequestObject) (apigen.ReplaceDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
-	org, err := scopeOf(ctx)
-	if err != nil {
-		return nil, err
-	}
-	principal, ok := middleware.PrincipalFrom(ctx)
-	if !ok || principal.UserID.IsZero() {
-		return nil, identity.ErrUnauthenticated
-	}
 	if req.Body == nil {
 		return nil, identity.ErrInvalidInput
-	}
-	expected, err := conditional.Parse(req.Params.IfMatch)
-	if err != nil {
-		// A tag this API did not issue names no current revision: the client reads again.
-		return nil, d.stale(ctx, org, req.FlowId)
 	}
 	document, err := json.Marshal(req.Body.Document)
 	if err != nil {
 		return nil, fmt.Errorf("%w: the document cannot be read", identity.ErrInvalidInput)
 	}
-	rec, err := d.drafts.Save(ctx, org, flow.SaveInput{
-		FlowID: flow.FlowID(req.FlowId), Document: document, ExpectedRevision: expected, By: actorOf(principal),
-	})
-	switch {
-	case errors.Is(err, flow.ErrDraftConflict):
-		return nil, d.stale(ctx, org, req.FlowId)
-	case err != nil:
-		return nil, documentError(err)
+	rec, err := d.save(ctx, req.FlowId, req.Params.IfMatch, func(flow.Record) ([]byte, error) { return document, nil })
+	if err != nil {
+		return nil, err
 	}
 	body, err := draftBody(rec)
 	if err != nil {
 		return nil, err
 	}
-	etag := flowETag(rec)
+	etag := draftETag(rec)
 	return apigen.ReplaceDraft200JSONResponse{Body: body, Headers: apigen.ReplaceDraft200ResponseHeaders{ETag: &etag}}, nil
+}
+
+// UpdateDraft applies a JSON Patch (RFC 6902) to the document of the draft when If-Match names the
+// current revision. The patch is all or nothing: the document it produces is saved by the same
+// checks as a replacement, so a patch cannot leave a draft that is not a flow document.
+func (d *Drafts) UpdateDraft(ctx context.Context, req apigen.UpdateDraftRequestObject) (apigen.UpdateDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	if req.Body == nil {
+		return nil, identity.ErrInvalidInput
+	}
+	rec, err := d.save(ctx, req.FlowId, req.Params.IfMatch, func(current flow.Record) ([]byte, error) {
+		return applyJSONPatch(current.Draft, *req.Body)
+	})
+	if err != nil {
+		return nil, err
+	}
+	body, err := draftBody(rec)
+	if err != nil {
+		return nil, err
+	}
+	etag := draftETag(rec)
+	return apigen.UpdateDraft200JSONResponse{Body: body, Headers: apigen.UpdateDraft200ResponseHeaders{ETag: &etag}}, nil
+}
+
+// save is the save both writes share: it checks the revision of If-Match, builds the new document
+// from the draft as it is, and saves it when the revision is still current at the moment of the
+// write.
+func (d *Drafts) save(ctx context.Context, flowID types.UUID, ifMatch string, build func(current flow.Record) ([]byte, error)) (flow.Record, error) {
+	org, err := scopeOf(ctx)
+	if err != nil {
+		return flow.Record{}, err
+	}
+	principal, ok := middleware.PrincipalFrom(ctx)
+	if !ok || principal.UserID.IsZero() {
+		return flow.Record{}, identity.ErrUnauthenticated
+	}
+	expected, err := conditional.Parse(ifMatch)
+	if err != nil {
+		// A tag this API did not issue names no current revision: the client reads again.
+		return flow.Record{}, d.stale(ctx, org, flowID)
+	}
+	current, err := d.drafts.Get(ctx, org, flow.FlowID(flowID))
+	if err != nil {
+		return flow.Record{}, err
+	}
+	if current.DraftRevision != expected {
+		return flow.Record{}, &staleDraftError{revision: current.DraftRevision}
+	}
+	document, err := build(current)
+	if err != nil {
+		return flow.Record{}, err
+	}
+	rec, err := d.drafts.Save(ctx, org, flow.SaveInput{
+		FlowID: flow.FlowID(flowID), Document: document, ExpectedRevision: expected, By: actorOf(principal),
+	})
+	switch {
+	case errors.Is(err, flow.ErrDraftConflict):
+		return flow.Record{}, d.stale(ctx, org, flowID)
+	case err != nil:
+		return flow.Record{}, documentError(err)
+	}
+	return rec, nil
 }
 
 // stale builds the error of a save based on an old revision: it reads the revision stored now,

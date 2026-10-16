@@ -308,6 +308,7 @@ type Flow struct {
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
 	ActivationState      string
+	Revision             int64
 }
 
 type FlowDataOperation struct {
@@ -360,18 +361,20 @@ type FlowTrigger struct {
 }
 
 type FlowVersion struct {
-	ID                     pgtype.UUID
-	OrgID                  pgtype.UUID
-	FlowID                 pgtype.UUID
-	VersionNumber          int64
-	Document               []byte
-	DocumentFormat         string
-	ContentHash            string
-	WarningDocument        []byte
-	WarningDocumentFormat  pgtype.Text
-	PublishedByPrincipalID pgtype.UUID
-	PublishedAt            pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
+	ID                          pgtype.UUID
+	OrgID                       pgtype.UUID
+	FlowID                      pgtype.UUID
+	VersionNumber               int64
+	Document                    []byte
+	DocumentFormat              string
+	ContentHash                 string
+	WarningDocument             []byte
+	WarningDocumentFormat       pgtype.Text
+	PublishedByPrincipalID      pgtype.UUID
+	PublishedAt                 pgtype.Timestamptz
+	CreatedAt                   pgtype.Timestamptz
+	PublicationNote             pgtype.Text
+	RolledBackFromVersionNumber pgtype.Int8
 }
 
 type HumanTask struct {

@@ -88,3 +88,7 @@ func TestManualRun(t *testing.T) { onSelectedStores(t, triggertest.ManualRun) }
 func TestTriggerIsolation(t *testing.T) { onSelectedStores(t, triggertest.Isolation) }
 
 func TestConcurrentPublish(t *testing.T) { onSelectedStores(t, triggertest.ConcurrentPublish) }
+
+func TestFlowChangesAreRevisionedAndAtomic(t *testing.T) {
+	onSelectedStores(t, triggertest.FlowChangesAreRevisionedAndAtomic)
+}

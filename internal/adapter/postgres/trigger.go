@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -53,11 +54,11 @@ type triggerTx struct {
 
 func (t *triggerTx) orgID() pgtype.UUID { return pgUUID(t.org.UUID()) }
 
-func stateFrom(id flow.FlowID, name string, project, activeVersion pgtype.UUID, activation string, revision int64, deletedAt pgtype.Timestamptz) trigger.FlowState {
+func stateFrom(id flow.FlowID, name string, project, activeVersion pgtype.UUID, activation string, draftRevision, revision int64, deletedAt pgtype.Timestamptz) trigger.FlowState {
 	return trigger.FlowState{
 		ID: id, ProjectID: fromPGUUID[identity.ProjectID](project), Name: name,
 		ActivationState: flow.ActivationState(activation), ActiveVersionID: fromPGUUID[flow.FlowVersionID](activeVersion),
-		DraftRevision: revision, DeletedAt: instant(deletedAt),
+		DraftRevision: draftRevision, Revision: revision, DeletedAt: instant(deletedAt),
 	}
 }
 
@@ -66,7 +67,7 @@ func (t *triggerTx) GetFlowState(ctx context.Context, flowID flow.FlowID) (trigg
 	if err != nil {
 		return trigger.FlowState{}, err
 	}
-	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.DeletedAt), nil
+	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.Revision, row.DeletedAt), nil
 }
 
 func (t *triggerTx) LockFlowState(ctx context.Context, flowID flow.FlowID) (trigger.FlowState, error) {
@@ -74,7 +75,7 @@ func (t *triggerTx) LockFlowState(ctx context.Context, flowID flow.FlowID) (trig
 	if err != nil {
 		return trigger.FlowState{}, err
 	}
-	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.DeletedAt), nil
+	return stateFrom(flowID, row.Name, row.ProjectID, row.ActiveFlowVersionID, row.ActivationState, row.DraftRevision, row.Revision, row.DeletedAt), nil
 }
 
 func (t *triggerTx) NextVersionNumber(ctx context.Context, flowID flow.FlowID) (int64, error) {
@@ -87,6 +88,7 @@ func (t *triggerTx) InsertVersion(ctx context.Context, v flow.VersionRecord) err
 		VersionNumber: v.Number, Document: v.Document, ContentHash: v.ContentHash,
 		PublishedByPrincipalID: nullPGUUID(v.PublishedByPrincipalID),
 		PublishedAt:            timestamp(v.PublishedAt), CreatedAt: timestamp(v.CreatedAt),
+		PublicationNote: nullText(v.Note), RolledBackFromVersionNumber: nullPositive(v.RolledBackFromVersion),
 	}
 	if v.Warnings != nil {
 		params.WarningDocument = v.Warnings
@@ -135,6 +137,15 @@ func (t *triggerTx) SoftDeleteFlow(ctx context.Context, flowID flow.FlowID, by i
 func (t *triggerTx) RestoreFlow(ctx context.Context, flowID flow.FlowID, now time.Time) error {
 	n, err := t.q.RestoreFlow(ctx, timestamp(now), t.orgID(), pgUUID(flowID))
 	return expectOne(n, err, "flow", flowID)
+}
+
+// RecordChange implements [trigger.Tx]: the idempotency claim of the context, when there is one,
+// and the audit entry, in the transaction Atomic opened.
+func (t *triggerTx) RecordChange(ctx context.Context, entry audit.Entry, resourceRef string, now time.Time) error {
+	if err := claimIdempotency(ctx, t.q, t.org, resourceRef, now); err != nil {
+		return err
+	}
+	return insertPendingOrg(ctx, t.q, t.org, entry)
 }
 
 func (t *triggerTx) PurgeFlow(ctx context.Context, flowID flow.FlowID) error {

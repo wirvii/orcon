@@ -17,6 +17,7 @@ import (
 	"github.com/oapi-codegen/runtime/types"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/conditional"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/idempotency"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
@@ -445,6 +446,7 @@ func flowBody(rec flow.Record) apigen.Flow {
 		Id: &fid, ProjectId: types.UUID(rec.ProjectID), Name: rec.Name,
 		ActivationState: apigen.FlowActivationState(rec.ActivationState),
 		DraftRevision:   int(rec.DraftRevision),
+		ActiveVersion:   activeVersion(rec),
 		// A draft that was saved after a publication has changes that are not published yet.
 		HasUnpublishedChanges: !rec.ActiveVersionID.IsZero() && rec.DraftRevision > 0,
 		CreatedAt:             rec.CreatedAt, UpdatedAt: rec.UpdatedAt,
@@ -477,8 +479,13 @@ func lastExecutionBody(e flow.LastExecution) *apigen.FlowLastExecution {
 	return &body
 }
 
-// flowETag is the entity tag of the draft: its revision (Amendment 8 section 8-9).
-func flowETag(rec flow.Record) string { return strconv.Quote(strconv.FormatInt(rec.DraftRevision, 10)) }
+// flowETag is the entity tag of the flow: the revision of its row, which activation, rename,
+// rollback and delete carry in If-Match (Amendment 8 section 8-9).
+func flowETag(rec flow.Record) string { return conditional.ETag(rec.Revision) }
+
+// draftETag is the entity tag of the draft: its revision, which a save and a publication carry in
+// If-Match (Amendment 8 section 8-9).
+func draftETag(rec flow.Record) string { return conditional.ETag(rec.DraftRevision) }
 
 func projectLocation(pid identity.ProjectID) string {
 	return "/api/v1/projects/" + id.UUID(pid).String()
@@ -498,4 +505,13 @@ func encodeResponse(status int, body any, headers map[string]string, etag string
 	return identity.IdempotencyResponse{
 		Status: status, ContentType: "application/json", Location: headers["Location"], ETag: etag, Body: buf.Bytes(),
 	}, nil
+}
+
+// activeVersion is the number of the active version, absent until the first publication.
+func activeVersion(rec flow.Record) *int {
+	if rec.ActiveVersion < 1 {
+		return nil
+	}
+	n := int(rec.ActiveVersion)
+	return &n
 }

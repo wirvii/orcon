@@ -35,6 +35,7 @@ func Battery(t *testing.T, f Factory) {
 		{"ManualRun", ManualRun},
 		{"Isolation", Isolation},
 		{"ConcurrentPublish", ConcurrentPublish},
+		{"FlowChangesAreRevisionedAndAtomic", FlowChangesAreRevisionedAndAtomic},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) { c.run(t, f) })

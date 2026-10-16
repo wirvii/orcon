@@ -8,14 +8,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/idempotencyclaim"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 )
@@ -79,6 +82,8 @@ type memState struct {
 	triggers   map[trigger.ID]*trigger.Trigger
 	addresses  map[trigger.AddressID]*trigger.Address
 	events     []trigger.Event
+	audits     []audit.Entry
+	claims     map[string]bool
 }
 
 // NewMemory returns an empty store.
@@ -111,6 +116,8 @@ func (s *memState) clone() memState {
 		a.Methods = slices.Clone(a.Methods)
 	}
 	out.events = slices.Clone(s.events)
+	out.audits = slices.Clone(s.audits)
+	out.claims = maps.Clone(s.claims)
 	return out
 }
 
@@ -192,7 +199,7 @@ func stateOf(f *flow.Record) trigger.FlowState {
 	}
 	return trigger.FlowState{
 		ID: f.ID, ProjectID: f.ProjectID, Name: f.Name, ActivationState: st,
-		ActiveVersionID: f.ActiveVersionID, DraftRevision: f.DraftRevision, DeletedAt: f.DeletedAt,
+		ActiveVersionID: f.ActiveVersionID, DraftRevision: f.DraftRevision, Revision: f.Revision, DeletedAt: f.DeletedAt,
 	}
 }
 
@@ -247,6 +254,7 @@ func (t *memTx) SetActiveVersion(_ context.Context, flowID flow.FlowID, version 
 		return fmt.Errorf("version %s: %w", version, flow.ErrReference)
 	}
 	f.ActiveVersionID, f.UpdatedAt = version, now
+	f.Revision++
 	return nil
 }
 
@@ -274,6 +282,7 @@ func (t *memTx) SetActivationState(_ context.Context, flowID flow.FlowID, state 
 		return err
 	}
 	f.ActivationState, f.UpdatedAt = state, now
+	f.Revision++
 	return nil
 }
 
@@ -291,6 +300,7 @@ func (t *memTx) SoftDeleteFlow(_ context.Context, flowID flow.FlowID, by identit
 		}
 	}
 	f.DeletedAt, f.DeletedByPrincipalID, f.UpdatedAt = now, by, now
+	f.Revision++
 	return nil
 }
 
@@ -308,7 +318,35 @@ func (t *memTx) RestoreFlow(_ context.Context, flowID flow.FlowID, now time.Time
 		}
 	}
 	f.DeletedAt, f.DeletedByPrincipalID, f.UpdatedAt = time.Time{}, identity.PrincipalID{}, now
+	f.Revision++
 	return nil
+}
+
+// RecordChange implements [trigger.Tx]: the entry is kept with the state, so a rolled back
+// transaction loses it as a database would.
+func (t *memTx) RecordChange(ctx context.Context, entry audit.Entry, _ string, _ time.Time) error {
+	if err := t.write(); err != nil {
+		return err
+	}
+	if claim, ok := idempotencyclaim.From(ctx); ok {
+		key := t.org.String() + "|" + claim.Requester + "|" + claim.Value
+		if t.st().claims[key] {
+			return idempotencyclaim.ErrTaken
+		}
+		if t.st().claims == nil {
+			t.st().claims = map[string]bool{}
+		}
+		t.st().claims[key] = true
+	}
+	t.st().audits = append(t.st().audits, entry)
+	return nil
+}
+
+// Changes returns the audit entries the committed transactions recorded, in order.
+func (m *Memory) Changes() []audit.Entry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.s.audits)
 }
 
 func (t *memTx) PurgeFlow(_ context.Context, flowID flow.FlowID) error {

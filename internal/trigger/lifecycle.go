@@ -10,20 +10,39 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 func sortedKeys[V any](m map[string]V) []string { return slices.Sorted(maps.Keys(m)) }
 
+// ChangeCommand asks to change the lifecycle state of a flow on behalf of a principal.
+type ChangeCommand struct {
+	Org  orgscope.Org
+	Flow flow.FlowID
+	// Actor is the actor of the audit entry; the zero Actor is an anonymous caller.
+	Actor audit.Actor
+	// ExpectedRevision, when set, makes the change fail with flow.ErrRevisionConflict unless the
+	// flow row is still at that revision (the ETag of the flow, SPEC-005 Amendment 8 section 8-9).
+	ExpectedRevision *int64
+}
+
 // Activate switches every automatic trigger of the flow on, on the live
 // version, without creating a version (R-ACT-02). A flow that is already
 // active is left as it is. A flow with no published version fails with
 // [ErrNotPublished].
 func (s *Service) Activate(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
-	return s.setActivation(ctx, org, flowID, flow.ActivationActive)
+	return s.ActivateFlow(ctx, &ChangeCommand{Org: org, Flow: flowID})
+}
+
+// ActivateFlow is [Service.Activate] for a principal: it checks the revision of the flow row when
+// the command carries one and writes the audit entry flow.activated in the same transaction.
+func (s *Service) ActivateFlow(ctx context.Context, cmd *ChangeCommand) error {
+	return s.setActivation(ctx, cmd, flow.ActivationActive)
 }
 
 // Deactivate switches every automatic trigger of the flow off: addresses
@@ -31,10 +50,26 @@ func (s *Service) Activate(ctx context.Context, org orgscope.Org, flowID flow.Fl
 // progress go on (ADR-0024 section 5). A flow that is already inactive is left
 // as it is.
 func (s *Service) Deactivate(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
-	return s.setActivation(ctx, org, flowID, flow.ActivationInactive)
+	return s.DeactivateFlow(ctx, &ChangeCommand{Org: org, Flow: flowID})
 }
 
-func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID flow.FlowID, target flow.ActivationState) error {
+// DeactivateFlow is [Service.Deactivate] for a principal: it checks the revision of the flow row
+// when the command carries one and writes the audit entry flow.deactivated in the same transaction.
+func (s *Service) DeactivateFlow(ctx context.Context, cmd *ChangeCommand) error {
+	return s.setActivation(ctx, cmd, flow.ActivationInactive)
+}
+
+// checkRevision fails with flow.ErrRevisionConflict when the command names a revision and the
+// locked flow row is at another one.
+func checkRevision(cmd *ChangeCommand, state *FlowState) error {
+	if cmd.ExpectedRevision != nil && *cmd.ExpectedRevision != state.Revision {
+		return fmt.Errorf("flow %s at revision %d: %w", cmd.Flow, *cmd.ExpectedRevision, flow.ErrRevisionConflict)
+	}
+	return nil
+}
+
+func (s *Service) setActivation(ctx context.Context, cmd *ChangeCommand, target flow.ActivationState) error {
+	flowID, org := cmd.Flow, cmd.Org
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -42,6 +77,9 @@ func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID fl
 		}
 		if state.IsDeleted() {
 			return fmt.Errorf("flow %s: %w", flowID, flow.ErrNotFound)
+		}
+		if err := checkRevision(cmd, &state); err != nil {
+			return err
 		}
 		if state.ActivationState == target {
 			return nil
@@ -53,9 +91,9 @@ func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID fl
 		if err := tx.SetActivationState(ctx, flowID, target, now); err != nil {
 			return err
 		}
-		status, event := StatusInactive, EventFlowDeactivated
+		status, event, action := StatusInactive, EventFlowDeactivated, "flow.deactivated"
 		if target == flow.ActivationActive {
-			status, event = StatusActive, EventFlowActivated
+			status, event, action = StatusActive, EventFlowActivated, "flow.activated"
 		}
 		if err := tx.SetTriggerStatuses(ctx, flowID, status, now); err != nil {
 			return err
@@ -63,6 +101,9 @@ func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID fl
 		if err := s.appendEvent(ctx, tx, org, flowID, "", event, now, map[string]jsonvalue.Value{
 			"flowId": jsonvalue.String(flowID.String()),
 		}); err != nil {
+			return err
+		}
+		if err := s.recordChange(ctx, tx, &changeRecord{org: org, actor: cmd.Actor, action: action, flowID: flowID, now: now}); err != nil {
 			return err
 		}
 		return tx.NotifyRoutesChanged(ctx, flowID)
@@ -78,6 +119,14 @@ func (s *Service) setActivation(ctx context.Context, org orgscope.Org, flowID fl
 // inactive, and new events are refused with the reason INACTIVE. Executions in
 // progress go on with their version (R-ACT-09, ADR-0024 section 8).
 func (s *Service) Delete(ctx context.Context, org orgscope.Org, flowID flow.FlowID, by identity.PrincipalID) error {
+	return s.DeleteFlow(ctx, &ChangeCommand{Org: org, Flow: flowID, Actor: audit.Actor{PrincipalID: id.UUID(by), Kind: audit.ActorUser}})
+}
+
+// DeleteFlow is [Service.Delete] for a principal: it checks the revision of the flow row when the
+// command carries one and writes the audit entry flow.deleted in the same transaction. The
+// principal of the actor is recorded as the one that deleted the flow.
+func (s *Service) DeleteFlow(ctx context.Context, cmd *ChangeCommand) error {
+	flowID, org := cmd.Flow, cmd.Org
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -86,8 +135,11 @@ func (s *Service) Delete(ctx context.Context, org orgscope.Org, flowID flow.Flow
 		if state.IsDeleted() {
 			return fmt.Errorf("flow %s: %w", flowID, flow.ErrNotFound)
 		}
+		if err := checkRevision(cmd, &state); err != nil {
+			return err
+		}
 		now := s.clock.Now().UTC()
-		if err := tx.SoftDeleteFlow(ctx, flowID, by, now); err != nil {
+		if err := tx.SoftDeleteFlow(ctx, flowID, identity.PrincipalID(cmd.Actor.PrincipalID), now); err != nil {
 			return err
 		}
 		if err := tx.SetActivationState(ctx, flowID, flow.ActivationInactive, now); err != nil {
@@ -103,6 +155,9 @@ func (s *Service) Delete(ctx context.Context, org orgscope.Org, flowID flow.Flow
 			}); err != nil {
 				return err
 			}
+		}
+		if err := s.recordChange(ctx, tx, &changeRecord{org: org, actor: cmd.Actor, action: "flow.deleted", flowID: flowID, now: now}); err != nil {
+			return err
 		}
 		return tx.NotifyRoutesChanged(ctx, flowID)
 	})

@@ -16,8 +16,10 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
+	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/idempotencyclaim"
+	"github.com/wirvii/orcon/internal/trigger"
 )
 
 // unavailableRetry is the Retry-After of an operation that has no handler yet.
@@ -89,7 +91,7 @@ func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error
 		problem.Write(w, r, problem.Unauthenticated)
 	case errors.Is(err, identity.ErrCSRFCheckFailed):
 		problem.Write(w, r, problem.CSRFCheckFailed)
-	case errors.Is(err, identity.ErrNotFound):
+	case errors.Is(err, identity.ErrNotFound), errors.Is(err, flow.ErrVersionNotFound):
 		problem.Write(w, r, problem.NotFound)
 	case errors.Is(err, identity.ErrInvalidInput):
 		problem.Write(w, r, problem.ValidationFailed)
@@ -121,6 +123,11 @@ func knownError(w http.ResponseWriter, r *http.Request, err error) bool {
 		conditional.Write(w, r, conditional.ErrMismatch, stale.revision, problem.CurrentDraft(int(stale.revision), ""))
 	case errors.As(err, &issues):
 		problem.Write(w, r, problem.ValidationFailed, problem.Fields(issues.fields...))
+	case errors.Is(err, trigger.ErrNotPublished):
+		problem.Write(w, r, problem.Conflict, problem.Detail("The flow has no published version: publish it before activating it."))
+	case errors.Is(err, flow.ErrRevisionConflict):
+		// The flow changed since the caller read it; the caller reads it again.
+		problem.Write(w, r, problem.PreconditionFailed)
 	case errors.Is(err, errUnavailable):
 		problem.Write(w, r, problem.ServiceUnavailable, problem.RetryAfter(unavailableRetry))
 	case errors.Is(err, page.ErrInvalidToken):

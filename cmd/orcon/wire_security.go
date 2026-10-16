@@ -62,6 +62,8 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	flow.DraftStore
 	flow.ActivityStore
 	execstore.ProjectExecutionReader
+	flow.ManageStore
+	flow.VersionStore
 	identity.MembershipStore
 	authz.Store
 	envelope.KeyStore

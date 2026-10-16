@@ -163,7 +163,17 @@ func (m *Memory) GetFlow(_ context.Context, org orgscope.Org, id flow.FlowID) (f
 	}
 	out := *f
 	out.Draft = bytes.Clone(f.Draft)
+	out.ActiveVersion = m.activeVersionNumber(f)
 	return out, nil
+}
+
+// activeVersionNumber is the number of the version the flow points at, 0 when there is none. The
+// caller holds the lock.
+func (m *Memory) activeVersionNumber(f *flow.Record) int64 {
+	if v, ok := m.s.versions[f.ActiveVersionID]; ok {
+		return v.Number
+	}
+	return 0
 }
 
 // GetFlowByName implements [flow.Store].
@@ -244,6 +254,29 @@ func (m *Memory) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org,
 	return m.UpdateFlowDraft(ctx, org, id, draft, expected, refs, now)
 }
 
+// UpdateFlowNameWithEntry implements [flow.ManageStore]. The entry is kept with the committed ones
+// (see [Memory.Changes]).
+func (m *Memory) UpdateFlowNameWithEntry(_ context.Context, org orgscope.Org, id flow.FlowID, name string, expected int64, now time.Time, entry audit.Entry) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f, ok := m.s.flows[id]
+	if !ok || !f.OrgID.Matches(org) || f.IsDeleted() {
+		return fmt.Errorf("flow %s: %w", id, flow.ErrNotFound)
+	}
+	if f.Revision != expected {
+		return fmt.Errorf("flow %s at revision %d: %w", id, expected, flow.ErrRevisionConflict)
+	}
+	for _, o := range m.s.flows {
+		if o.ID != id && o.OrgID == f.OrgID && o.ProjectID == f.ProjectID && o.Name == name && !o.IsDeleted() {
+			return fmt.Errorf("flow name %q in the project: %w", name, flow.ErrConflict)
+		}
+	}
+	f.Name, f.UpdatedAt = name, now
+	f.Revision++
+	m.s.audits = append(m.s.audits, entry)
+	return nil
+}
+
 // PublishVersion implements [flow.VersionStore].
 func (m *Memory) PublishVersion(_ context.Context, org orgscope.Org, v flow.VersionRecord) error {
 	m.mu.Lock()
@@ -262,6 +295,7 @@ func (m *Memory) PublishVersion(_ context.Context, org orgscope.Org, v flow.Vers
 	}
 	m.s.versions[v.ID] = &v
 	f.ActiveVersionID, f.UpdatedAt = v.ID, v.PublishedAt
+	f.Revision++
 	return nil
 }
 
