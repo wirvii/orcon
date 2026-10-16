@@ -126,13 +126,13 @@ it('ConnectorIcon falls back to the Plug glyph with the connector name', () => {
 });
 
 it('ConnectorIcon uses the dark variant in the dark theme when present', () => {
-  const light = '/icons/openai.svg';
-  const dark = '/icons/openai-dark.svg';
-  const view = renderWithProviders(<ConnectorIcon name="OpenAI" src={light} darkSrc={dark} />, { theme: 'dark' });
-  expect(screen.getByRole('img', { name: 'OpenAI' })).toHaveAttribute('src', dark);
+  const light = '/icons/shopify.svg';
+  const dark = '/icons/shopify-dark.svg';
+  const view = renderWithProviders(<ConnectorIcon name="Shopify" src={light} darkSrc={dark} />, { theme: 'dark' });
+  expect(screen.getByRole('img', { name: 'Shopify' })).toHaveAttribute('src', dark);
   view.unmount();
-  renderWithProviders(<ConnectorIcon name="OpenAI" src={light} darkSrc={dark} />, { theme: 'light' });
-  expect(screen.getByRole('img', { name: 'OpenAI' })).toHaveAttribute('src', light);
+  renderWithProviders(<ConnectorIcon name="Shopify" src={light} darkSrc={dark} />, { theme: 'light' });
+  expect(screen.getByRole('img', { name: 'Shopify' })).toHaveAttribute('src', light);
 });
 
 function SidebarHarness() {
