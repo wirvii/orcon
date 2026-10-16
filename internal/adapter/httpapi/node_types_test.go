@@ -49,7 +49,7 @@ func nodeTypeFixtures() []apigen.NodeType {
 func nodeTypesContext(t *testing.T) (context.Context, apigen.ProjectId) {
 	t.Helper()
 	ids := id.NewSequence()
-	scope, err := issue.New(id.UUID(ids.New()))
+	scope, err := issue.New(ids.New())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,11 @@ func TestListNodeTypesIncludesIcon(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list node types: %v", err)
 	}
-	body := resp.(apigen.ListNodeTypes200JSONResponse).Body
+	ok, isOK := resp.(apigen.ListNodeTypes200JSONResponse)
+	if !isOK {
+		t.Fatalf("want a 200 response, got %T", resp)
+	}
+	body := ok.Body
 	if len(body.Items) != 2 {
 		t.Fatalf("want 2 node types, got %d", len(body.Items))
 	}
@@ -91,7 +95,11 @@ func TestListNodeTypesFiltersAndPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if items := resp.(apigen.ListNodeTypes200JSONResponse).Body.Items; len(items) != 1 || items[0].Type != "orcon.http@1" {
+	filtered, isOK := resp.(apigen.ListNodeTypes200JSONResponse)
+	if !isOK {
+		t.Fatalf("want a 200 response, got %T", resp)
+	}
+	if items := filtered.Body.Items; len(items) != 1 || items[0].Type != "orcon.http@1" {
 		t.Fatalf("the name filter must keep only HTTP request, got %+v", items)
 	}
 
@@ -100,7 +108,11 @@ func TestListNodeTypesFiltersAndPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstBody := first.(apigen.ListNodeTypes200JSONResponse).Body
+	firstOK, isOK := first.(apigen.ListNodeTypes200JSONResponse)
+	if !isOK {
+		t.Fatalf("want a 200 response, got %T", first)
+	}
+	firstBody := firstOK.Body
 	if firstBody.NextPageToken == nil {
 		t.Fatal("a second page must be announced with nextPageToken")
 	}
@@ -108,7 +120,11 @@ func TestListNodeTypesFiltersAndPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondBody := second.(apigen.ListNodeTypes200JSONResponse).Body
+	secondOK, isOK := second.(apigen.ListNodeTypes200JSONResponse)
+	if !isOK {
+		t.Fatalf("want a 200 response, got %T", second)
+	}
+	secondBody := secondOK.Body
 	if len(secondBody.Items) != 1 || secondBody.Items[0].Type == firstBody.Items[0].Type {
 		t.Fatalf("the second page must hold the other type, got %+v", secondBody.Items)
 	}

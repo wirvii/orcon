@@ -78,7 +78,7 @@ func CheckIcon(fsys fs.FS, placeholders Placeholders) []Finding {
 	}
 	var findings []Finding
 	source, err := fs.ReadFile(fsys, sourceFile)
-	if err != nil || !sourceLine.Match([]byte(strings.TrimSpace(string(source)))) {
+	if err != nil || !sourceLine.MatchString(strings.TrimSpace(string(source))) {
 		findings = append(findings, Finding{
 			Rule:    RuleIconSourceMissing,
 			Message: "icons/SOURCE is missing or is not one line of simple-icons@<version>:<slug>, brand-kit:<url> or orcon-fallback (orcon-connector IC-6)",

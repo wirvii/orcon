@@ -5,7 +5,7 @@ package authoring
 
 import (
 	"bytes"
-	"encoding/xml"
+	"encoding/xml" //nolint:depguard // an SVG icon is checked token by token; this is validation, not a data format, and no adapter uses it yet
 	"errors"
 	"fmt"
 	"io"
@@ -47,7 +47,7 @@ func SanitizeSVG(markup []byte) ([]byte, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("%w: not well-formed XML: %v", ErrUnsafeIcon, err)
+			return nil, fmt.Errorf("%w: not well-formed XML: %w", ErrUnsafeIcon, err)
 		}
 		switch t := tok.(type) {
 		case xml.Directive:
@@ -103,7 +103,7 @@ func checkElement(el xml.StartElement) error {
 
 // Icon is the brand icon of a connector package, checked and ready to serve inline.
 type Icon struct {
-	// SVG is the icon in the brand's colour.
+	// SVG is the icon in the brand's color.
 	SVG string
 	// DarkSVG is the variant the brand publishes for dark backgrounds; empty when the brand
 	// publishes none (orcon-connector IC-7).
