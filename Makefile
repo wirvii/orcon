@@ -22,7 +22,7 @@ WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
 	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
-	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report
+	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report connectors-check
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
 check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
@@ -249,6 +249,11 @@ skill-sync:
 
 skill-check:
 	sh scripts/check-skill.sh
+
+# connectors-check applies the brand icon rules (orcon-connector IC-1, IC-6, IC-8) to every
+# official connector package: icon-missing, icon-source-missing and icon-placeholder.
+connectors-check:
+	go test -race -count=1 -run 'TestIcon|TestOfficialConnectorIcons|TestSanitize|TestLoadIcon' ./internal/connector/authoring/...
 
 # ---------------------------------------------------------------------------
 # Build

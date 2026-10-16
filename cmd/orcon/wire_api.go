@@ -46,6 +46,10 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 		Idempotency: idempotency.UnavailableStore{},
 	}
 	if sec != nil {
+		assets, err := officialConnectorAssets()
+		if err != nil {
+			return nil, err
+		}
 		deps.Authenticator = sec.sessions
 		deps.Authorizer = sec.evaluator
 		deps.OrgSelector = sec.evaluator
@@ -61,6 +65,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin, sec.store, sec.evaluator),
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
+			nodeTypes:             httpapi.NewNodeTypes(httpapi.NewNodeCatalog(sec.store, assets), sec.pageCodec),
 			drafts:                drafts,
 			executions: httpapi.NewExecutions(
 				sec.store, sec.store, flowReader{}, sec.store, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
@@ -83,7 +88,9 @@ type productServer struct {
 	sessions *httpapi.Sessions
 	orgs     *httpapi.Orgs
 	projects *httpapi.Projects
-	drafts   *httpapi.Drafts
+	// nodeTypes serves the node types a project can use.
+	nodeTypes *httpapi.NodeTypes
+	drafts    *httpapi.Drafts
 	// executions serves the read side of the executions.
 	executions *httpapi.Executions
 	activity   *httpapi.Activity
@@ -105,6 +112,10 @@ func (s productServer) ListFlows(ctx context.Context, req apigen.ListFlowsReques
 
 func (s productServer) CreateFlow(ctx context.Context, req apigen.CreateFlowRequestObject) (apigen.CreateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.CreateFlow(ctx, req)
+}
+
+func (s productServer) ListNodeTypes(ctx context.Context, req apigen.ListNodeTypesRequestObject) (apigen.ListNodeTypesResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.nodeTypes.ListNodeTypes(ctx, req)
 }
 
 func (s productServer) GetDraft(ctx context.Context, req apigen.GetDraftRequestObject) (apigen.GetDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it

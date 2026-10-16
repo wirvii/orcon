@@ -290,7 +290,7 @@ func checkPermissions(spec *Spec, cat *authz.Catalog) error {
 // the stability gate; the per-address limit of the global chain protects them.
 func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body middleware.Middleware) []middleware.Middleware {
 	// Step 1 of the pipeline: the body limit of the operation, before anything reads the request.
-	chain := []middleware.Middleware{withOperation(op), middleware.BodyLimit(BodyLimitFor(op.ID)), middleware.CarryCredentials(deps.Auth)}
+	chain := []middleware.Middleware{withOperation(op), withLocale(), middleware.BodyLimit(BodyLimitFor(op.ID)), middleware.CarryCredentials(deps.Auth)}
 	if !op.Public {
 		chain = append(chain,
 			middleware.Authenticate(deps.Authenticator, deps.Logger, deps.Auth),
