@@ -65,7 +65,10 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
 			nodeTypes:             httpapi.NewNodeTypes(httpapi.NewNodeCatalog(sec.store, assets), sec.pageCodec),
-			activity:              httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
+			executions: httpapi.NewExecutions(
+				sec.store, sec.store, flowReader{}, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
+			),
+			activity: httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -84,7 +87,9 @@ type productServer struct {
 	projects *httpapi.Projects
 	// nodeTypes serves the node types a project can use.
 	nodeTypes *httpapi.NodeTypes
-	activity  *httpapi.Activity
+	// executions serves the read side of the executions.
+	executions *httpapi.Executions
+	activity   *httpapi.Activity
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -105,6 +110,26 @@ func (s productServer) CreateFlow(ctx context.Context, req apigen.CreateFlowRequ
 
 func (s productServer) ListNodeTypes(ctx context.Context, req apigen.ListNodeTypesRequestObject) (apigen.ListNodeTypesResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.nodeTypes.ListNodeTypes(ctx, req)
+}
+
+func (s productServer) ListExecutions(ctx context.Context, req apigen.ListExecutionsRequestObject) (apigen.ListExecutionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.executions.ListExecutions(ctx, req)
+}
+
+func (s productServer) GetExecution(ctx context.Context, req apigen.GetExecutionRequestObject) (apigen.GetExecutionResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.executions.GetExecution(ctx, req)
+}
+
+func (s productServer) ListExecutionNodes(ctx context.Context, req apigen.ListExecutionNodesRequestObject) (apigen.ListExecutionNodesResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.executions.ListExecutionNodes(ctx, req)
+}
+
+func (s productServer) ListExecutionData(ctx context.Context, req apigen.ListExecutionDataRequestObject) (apigen.ListExecutionDataResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.executions.ListExecutionData(ctx, req)
+}
+
+func (s productServer) ListExecutionEvents(ctx context.Context, req apigen.ListExecutionEventsRequestObject) (apigen.ListExecutionEventsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.executions.ListExecutionEvents(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it

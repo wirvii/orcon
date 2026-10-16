@@ -61,6 +61,7 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	connector.GrantStore
 	execution.WorkerStore
 	store.Reader
+	store.NodeReader
 	store.EngineReader
 	store.Inbox
 	store.Transactor

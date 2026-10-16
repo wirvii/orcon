@@ -207,6 +207,21 @@ type NodeExecution struct {
 	FinishedAt time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	// AttemptCount is the number of attempts made; the reads fill it, the writes ignore it.
+	AttemptCount int64
+}
+
+// NodeOutputRecord is a stored output batch as the read side of the API lists it: the batch
+// document with the node execution and the node it belongs to.
+type NodeOutputRecord struct {
+	ID              PayloadID
+	NodeExecutionID NodeExecutionID
+	NodeID          string
+	Port            string
+	ItemCount       int64
+	// Document is the orcon/items@1 document, nil when the batch lives in a blob.
+	Document  []byte
+	CreatedAt time.Time
 }
 
 // TaskAttempt is a row of task_attempt: one try of a node execution under a
@@ -515,6 +530,17 @@ type Reader interface {
 	// The zero ExternalOperationID with fromItem 0 starts the list. Operations
 	// sharing an item index (one per retry epoch) are all returned, page by page.
 	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, fromID ExternalOperationID, limit int) ([]ExternalOperation, error)
+}
+
+// NodeReader reads the runs of the nodes of an execution inside one organization, for the read
+// side of the API.
+type NodeReader interface {
+	// ListNodeExecutions returns at most limit node executions of the execution that come after
+	// the cursor, oldest first, with the number of attempts of each.
+	ListNodeExecutions(ctx context.Context, org orgscope.Org, execution ExecutionID, after Cursor, limit int) ([]NodeExecution, error)
+	// ListNodeOutputs returns at most limit stored output batches of the execution that come
+	// after the cursor, oldest first, each with the node it belongs to.
+	ListNodeOutputs(ctx context.Context, org orgscope.Org, execution ExecutionID, after Cursor, limit int) ([]NodeOutputRecord, error)
 }
 
 // EngineReader reads what a worker needs to open an execution.
