@@ -107,6 +107,7 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"UpdateFlowDraftWithEntry": caseUpdateFlowDraftWithEntry,
 	"ProjectActivity":          caseProjectActivity,
 	"TimeSavedMinutes":         caseTimeSavedMinutes,
+	"ListProjectExecutions":    caseListProjectExecutions,
 	"InTx":                     caseInTx,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
@@ -580,6 +581,22 @@ func caseInTx(ctx context.Context, tb testing.TB, env *Env) {
 		tb.Errorf("A's activity counts B's execution: %+v, %v", got, err)
 	}
 	noLeak(tb, "the activity of B's project", got, err, &env.B)
+}
+
+// caseListProjectExecutions: the executions of B's project are not listed for A, and a page after B's
+// cursor leaks nothing of B (SPEC-019 R-UX-BE-03).
+func caseListProjectExecutions(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	got, err := env.Stores.ListProjectExecutions(ctx, env.A.Scope, env.B.Project.ID, store.ExecutionQuery{}, store.Cursor{}, 100)
+	if err != nil || len(got) != 0 {
+		tb.Errorf("executions of B's project listed for A: %d, %v", len(got), err)
+	}
+	noLeak(tb, "the execution list", got, err, &env.B)
+	filtered, err := env.Stores.ListProjectExecutions(ctx, env.A.Scope, env.B.Project.ID, store.ExecutionQuery{UncertainOnly: true}, store.Cursor{}, 100)
+	if err != nil || len(filtered) != 0 {
+		tb.Errorf("uncertain executions of B's project listed for A: %d, %v", len(filtered), err)
+	}
+	noLeak(tb, "the filtered execution list", filtered, err, &env.B)
 }
 
 func caseUpdateFlowDraft(ctx context.Context, tb testing.TB, env *Env) {

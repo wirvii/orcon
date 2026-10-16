@@ -100,34 +100,38 @@ func (q *Queries) GetEngineState(ctx context.Context, orgID pgtype.UUID, iD pgty
 const getExecution = `-- name: GetExecution :one
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND id = $2
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.id = $2
 `
 
 type GetExecutionRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -157,6 +161,8 @@ func (q *Queries) GetExecution(ctx context.Context, orgID pgtype.UUID, iD pgtype
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FlowVersionNumber,
+		&i.HasUncertainOperation,
 	)
 	return i, err
 }
@@ -1174,11 +1180,13 @@ func (q *Queries) ListExecutionEvents(ctx context.Context, arg ListExecutionEven
 const listExecutionsByStatus = `-- name: ListExecutionsByStatus :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND status = $2
-  AND (created_at, id) < ($3::timestamptz, $4::uuid)
-ORDER BY created_at DESC, id DESC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.status = $2
+  AND (e.created_at, e.id) < ($3::timestamptz, $4::uuid)
+ORDER BY e.created_at DESC, e.id DESC
 LIMIT $5
 `
 
@@ -1191,28 +1199,30 @@ type ListExecutionsByStatusParams struct {
 }
 
 type ListExecutionsByStatusRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1255,6 +1265,8 @@ func (q *Queries) ListExecutionsByStatus(ctx context.Context, arg ListExecutions
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
 			return nil, err
 		}
@@ -1345,11 +1357,13 @@ func (q *Queries) ListExternalOperations(ctx context.Context, arg ListExternalOp
 const listFlowExecutions = `-- name: ListFlowExecutions :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND flow_id = $2
-  AND (created_at, id) < ($3::timestamptz, $4::uuid)
-ORDER BY created_at DESC, id DESC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.flow_id = $2
+  AND (e.created_at, e.id) < ($3::timestamptz, $4::uuid)
+ORDER BY e.created_at DESC, e.id DESC
 LIMIT $5
 `
 
@@ -1362,28 +1376,30 @@ type ListFlowExecutionsParams struct {
 }
 
 type ListFlowExecutionsRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1426,6 +1442,8 @@ func (q *Queries) ListFlowExecutions(ctx context.Context, arg ListFlowExecutions
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
 			return nil, err
 		}
@@ -1663,17 +1681,258 @@ func (q *Queries) ListNodeOutputsByExecution(ctx context.Context, arg ListNodeOu
 	return items, nil
 }
 
+const listOrgProjectExecutions = `-- name: ListOrgProjectExecutions :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND (CAST($3 AS uuid) IS NULL OR e.flow_id = CAST($3 AS uuid))
+  AND (CAST($4 AS text) IS NULL OR e.status = CAST($4 AS text))
+  AND (CAST($5 AS uuid) IS NULL OR e.id = CAST($5 AS uuid))
+  AND (CAST($6 AS timestamptz) IS NULL OR e.created_at >= CAST($6 AS timestamptz))
+  AND (CAST($7 AS timestamptz) IS NULL OR e.created_at < CAST($7 AS timestamptz))
+  AND (CAST($8 AS boolean) = FALSE OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) < ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT $11
+`
+
+type ListOrgProjectExecutionsParams struct {
+	OrgID           pgtype.UUID
+	ProjectID       pgtype.UUID
+	FlowID          pgtype.UUID
+	Status          pgtype.Text
+	ExecutionID     pgtype.UUID
+	CreatedAfter    pgtype.Timestamptz
+	CreatedBefore   pgtype.Timestamptz
+	UncertainOnly   bool
+	BeforeCreatedAt pgtype.Timestamptz
+	BeforeID        pgtype.UUID
+	PageSize        int32
+}
+
+type ListOrgProjectExecutionsRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutions(ctx context.Context, arg ListOrgProjectExecutionsParams) ([]ListOrgProjectExecutionsRow, error) {
+	rows, err := q.db.Query(ctx, listOrgProjectExecutions,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgProjectExecutionsOldest = `-- name: ListOrgProjectExecutionsOldest :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND (CAST($3 AS uuid) IS NULL OR e.flow_id = CAST($3 AS uuid))
+  AND (CAST($4 AS text) IS NULL OR e.status = CAST($4 AS text))
+  AND (CAST($5 AS uuid) IS NULL OR e.id = CAST($5 AS uuid))
+  AND (CAST($6 AS timestamptz) IS NULL OR e.created_at >= CAST($6 AS timestamptz))
+  AND (CAST($7 AS timestamptz) IS NULL OR e.created_at < CAST($7 AS timestamptz))
+  AND (CAST($8 AS boolean) = FALSE OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) > ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at ASC, e.id ASC
+LIMIT $11
+`
+
+type ListOrgProjectExecutionsOldestParams struct {
+	OrgID          pgtype.UUID
+	ProjectID      pgtype.UUID
+	FlowID         pgtype.UUID
+	Status         pgtype.Text
+	ExecutionID    pgtype.UUID
+	CreatedAfter   pgtype.Timestamptz
+	CreatedBefore  pgtype.Timestamptz
+	UncertainOnly  bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageSize       int32
+}
+
+type ListOrgProjectExecutionsOldestRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// The same list oldest first, after the cursor.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutionsOldest(ctx context.Context, arg ListOrgProjectExecutionsOldestParams) ([]ListOrgProjectExecutionsOldestRow, error) {
+	rows, err := q.db.Query(ctx, listOrgProjectExecutionsOldest,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsOldestRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsOldestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProjectExecutions = `-- name: ListProjectExecutions :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND project_id = $2
-  AND ($3::boolean OR flow_id = $4::uuid)
-  AND ($5::boolean OR status = $6::text)
-  AND created_at > $7::timestamptz AND created_at < $8::timestamptz
-  AND (created_at, id) < ($9::timestamptz, $10::uuid)
-ORDER BY created_at DESC, id DESC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND ($3::boolean OR e.flow_id = $4::uuid)
+  AND ($5::boolean OR e.status = $6::text)
+  AND e.created_at > $7::timestamptz AND e.created_at < $8::timestamptz
+  AND (e.created_at, e.id) < ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at DESC, e.id DESC
 LIMIT $11
 `
 
@@ -1692,28 +1951,30 @@ type ListProjectExecutionsParams struct {
 }
 
 type ListProjectExecutionsRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1762,6 +2023,8 @@ func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExec
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
 			return nil, err
 		}
@@ -1776,14 +2039,16 @@ func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExec
 const listProjectExecutionsAsc = `-- name: ListProjectExecutionsAsc :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND project_id = $2
-  AND ($3::boolean OR flow_id = $4::uuid)
-  AND ($5::boolean OR status = $6::text)
-  AND created_at > $7::timestamptz AND created_at < $8::timestamptz
-  AND (created_at, id) > ($9::timestamptz, $10::uuid)
-ORDER BY created_at ASC, id ASC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND ($3::boolean OR e.flow_id = $4::uuid)
+  AND ($5::boolean OR e.status = $6::text)
+  AND e.created_at > $7::timestamptz AND e.created_at < $8::timestamptz
+  AND (e.created_at, e.id) > ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at ASC, e.id ASC
 LIMIT $11
 `
 
@@ -1802,28 +2067,30 @@ type ListProjectExecutionsAscParams struct {
 }
 
 type ListProjectExecutionsAscRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1872,6 +2139,8 @@ func (q *Queries) ListProjectExecutionsAsc(ctx context.Context, arg ListProjectE
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
 			return nil, err
 		}

@@ -102,6 +102,7 @@ func executionFrom(row *sqlcgen.GetExecutionRow) (store.Execution, error) {
 		RunnableCount:     row.RunnableCount, LeasedCount: row.LeasedCount, WaitingCount: row.WaitingCount, SuspendedCount: row.SuspendedCount,
 		StartedAt: nullInstant(row.StartedAt), FinishedAt: nullInstant(row.FinishedAt),
 		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		FlowVersionNumber: row.FlowVersionNumber, HasUncertainOperation: row.HasUncertainOperation != 0,
 	}
 	return e, d.err
 }
@@ -122,6 +123,9 @@ func (s *Store) GetExecution(ctx context.Context, org orgscope.Org, execID store
 
 // ListExecutions implements [store.Reader].
 func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
+	if filter.Uncertain {
+		return s.listUncertainExecutions(ctx, org, filter, after, limit)
+	}
 	if !filter.Valid() {
 		return nil, fmt.Errorf("list executions: the filter must name a project, or exactly one of flow and status: %w", flow.ErrInvalidRecord)
 	}
@@ -945,4 +949,13 @@ func defaultText(v, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+// listUncertainExecutions lists the executions of a project that need a review (SPEC-019 R-UX-BE-03).
+// The uncertain filter narrows a project listing and takes no other field.
+func (s *Store) listUncertainExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
+	if filter.ProjectID.IsZero() || !filter.FlowID.IsZero() || filter.Status != "" {
+		return nil, fmt.Errorf("list executions: the uncertain filter takes the project and no other field: %w", flow.ErrInvalidRecord)
+	}
+	return s.ListProjectExecutions(ctx, org, filter.ProjectID, store.ExecutionQuery{UncertainOnly: true}, after, limit)
 }
