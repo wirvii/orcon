@@ -36,6 +36,13 @@ type Options struct {
 	// Sleep waits before a retry. It returns early when ctx ends. Default: a
 	// timer that honors the Retry-After of the provider when given.
 	Sleep func(ctx context.Context, d time.Duration) error
+	// Decode turns the body of a successful response into a value. Default: the
+	// body is JSON, and a body that is not fails the call as a permanent
+	// ProviderError (ADR-0030 section 5). A host that accepts other bodies, such as
+	// the HTTP node with its response format, supplies its own. A *[CallError] it
+	// returns is the failure of the call as is; any other error is a permanent
+	// ProviderError. It is called only with a non-empty body.
+	Decode func(resp HTTPResponse) (jsonvalue.Value, error)
 }
 
 // Sink receives the items of each page as soon as they are mapped. A sink keeps
@@ -384,12 +391,23 @@ func (in *Interpreter) attempt(ctx context.Context, op Operation, call Call, pg 
 	if f := classifyResponse(op, resp); f != nil {
 		return jsonvalue.Value{}, resp, f
 	}
-	body, err := jsonvalue.Parse(resp.Body)
-	if err != nil && len(resp.Body) > 0 {
-		return jsonvalue.Value{}, resp, &CallError{Class: ClassPermanent, Code: "ProviderError", Status: resp.Status, Message: "the response is not JSON"}
-	}
 	if len(resp.Body) == 0 {
-		body = jsonvalue.Null()
+		return jsonvalue.Null(), resp, nil
+	}
+	if in.opts.Decode != nil {
+		body, err := in.opts.Decode(resp)
+		if err != nil {
+			var fail *CallError
+			if errors.As(err, &fail) {
+				return jsonvalue.Value{}, resp, fail
+			}
+			return jsonvalue.Value{}, resp, &CallError{Class: ClassPermanent, Code: "ProviderError", Status: resp.Status, Message: "the response body cannot be read"}
+		}
+		return body, resp, nil
+	}
+	body, err := jsonvalue.Parse(resp.Body)
+	if err != nil {
+		return jsonvalue.Value{}, resp, &CallError{Class: ClassPermanent, Code: "ProviderError", Status: resp.Status, Message: "the response is not JSON"}
 	}
 	return body, resp, nil
 }

@@ -62,6 +62,9 @@ func newMasker(c Credential) *masker {
 }
 
 func (m *masker) text(s string) string {
+	if m == nil {
+		return s
+	}
 	for _, v := range m.values {
 		if strings.Contains(s, v) {
 			s = strings.ReplaceAll(s, v, redact.Redacted)
