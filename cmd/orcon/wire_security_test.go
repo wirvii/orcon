@@ -7,6 +7,8 @@ import (
 	"flag"
 	"io"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/platform/config"
@@ -20,7 +22,9 @@ func loadTestConfig(t *testing.T, environ ...string) *config.Config {
 	flags := flag.NewFlagSet("test", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	fv := schema.BindFlags(flags)
-	environ = append(environ, "ORCON_DATA_DIR="+t.TempDir())
+	if !slices.ContainsFunc(environ, func(kv string) bool { return strings.HasPrefix(kv, "ORCON_DATA_DIR=") }) {
+		environ = append(environ, "ORCON_DATA_DIR="+t.TempDir())
+	}
 	res := schema.Load(config.Input{Flags: fv, Environ: environ, FS: config.OSFileSystem{}, GOOS: runtime.GOOS})
 	if err := res.Err(); err != nil {
 		t.Fatalf("load the configuration: %v", err)

@@ -197,7 +197,7 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	}
 	starter := triggerStarter{engine: eng}
 	svc, err := trigger.New(trigger.Config{
-		Store: st, Flows: st, Catalog: triggerCatalog{}, Credentials: noTriggerCredentials{},
+		Store: st, Flows: st, Catalog: triggerCatalog{}, Credentials: connectorTriggerCredentials{resolver: opts.resolver},
 		Settings: trigger.Settings{}, Starter: starter, Clock: clk, IDs: ids, Verifier: verifier,
 	})
 	if err != nil {
@@ -282,11 +282,43 @@ func bodyItems(body []byte) ([]execution.Item, error) {
 	return out, nil
 }
 
-// noTriggerCredentials reports that no trigger needs a credential this build cannot use.
-type noTriggerCredentials struct{}
+// connectorTriggerCredentials is the [trigger.Credentials] of this build. The native triggers need no
+// credential. The WhatsApp trigger verifies every inbound request with the stored credential its
+// credential parameter names, so publication and activation check, for the project of the flow,
+// that the parameter is set, that the credential exists and is usable there, and that it holds the
+// appSecret field the signature check reads. A process without a credential store cannot verify
+// anything, so it reports the credential as missing.
+type connectorTriggerCredentials struct {
+	resolver credential.Resolver
+}
 
 // Missing implements [trigger.Credentials].
-func (noTriggerCredentials) Missing(context.Context, orgscope.Org, identity.ProjectID, string, jsonvalue.Value) ([]string, error) {
+func (c connectorTriggerCredentials) Missing(ctx context.Context, org orgscope.Org, project identity.ProjectID, nodeType string, parameters jsonvalue.Value) ([]string, error) {
+	if nodeType != whatsappTriggerType {
+		return nil, nil
+	}
+	param, ok := parameters.Get(credentialParameter)
+	name, isText := param.Str()
+	if !ok || !isText || name == "" {
+		return []string{"WhatsApp credential (the node names none)"}, nil
+	}
+	if c.resolver == nil {
+		return []string{name + " (this process has no credential store)"}, nil
+	}
+	cid, err := id.Parse(name)
+	if err != nil {
+		return []string{name + " (not a credential identifier)"}, nil //nolint:nilerr // a malformed identifier is a finding about the node, not a failure to check
+	}
+	res, err := c.resolver.Resolve(ctx, org, project, cid)
+	switch {
+	case errors.Is(err, credential.ErrNotFound), errors.Is(err, credential.ErrNotUsable):
+		return []string{name + " (not found or not usable in this project)"}, nil
+	case err != nil:
+		return nil, fmt.Errorf("resolve the credential of the WhatsApp trigger: %w", err)
+	}
+	if secret, has := res.Secret("appSecret"); !has || secret == "" {
+		return []string{res.Name + " (it has no appSecret field)"}, nil
+	}
 	return nil, nil
 }
 

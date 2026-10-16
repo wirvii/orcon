@@ -179,11 +179,11 @@ func ruleIssues(r *flow.TriggerRule, at string, add addIssue) {
 	}
 }
 
-// credentialIssues is T-V3.
+// credentialIssues is T-V3: the credentials a trigger node needs are present and usable by the
+// project. It applies to every family: a webhook trigger of a connector (WhatsApp) verifies each
+// inbound request with a stored credential, so a missing one would show only on the first request.
+// The catalog of credentials answers for the node types that need none with an empty list.
 func (s *Service) credentialIssues(ctx context.Context, rc *ruleContext, n *flow.Node, add addIssue) error {
-	if !slices.Contains([]flow.TriggerFamily{flow.TriggerPoll, flow.TriggerListen, flow.TriggerAppEvent}, n.Trigger.Family) {
-		return nil
-	}
 	missing, err := s.credentials.Missing(ctx, rc.org, rc.project, n.Type, n.Parameters)
 	if err != nil {
 		return fmt.Errorf("check the credentials of node %q: %w", n.ID, err)
