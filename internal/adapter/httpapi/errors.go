@@ -114,7 +114,13 @@ func (h errorHandler) response(w http.ResponseWriter, r *http.Request, err error
 // handler, the pagination errors and the failed preconditions. It reports
 // whether it answered.
 func knownError(w http.ResponseWriter, r *http.Request, err error) bool {
+	var stale *staleDraftError
+	var issues *documentIssuesError
 	switch {
+	case errors.As(err, &stale):
+		conditional.Write(w, r, conditional.ErrMismatch, stale.revision, problem.CurrentDraft(int(stale.revision), ""))
+	case errors.As(err, &issues):
+		problem.Write(w, r, problem.ValidationFailed, problem.Fields(issues.fields...))
 	case errors.Is(err, errUnavailable):
 		problem.Write(w, r, problem.ServiceUnavailable, problem.RetryAfter(unavailableRetry))
 	case errors.Is(err, page.ErrInvalidToken):

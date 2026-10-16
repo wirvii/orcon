@@ -96,17 +96,18 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"GetProject":             caseGetProject,
 	"ListProjects":           caseListProjects,
 	// Flows.
-	"CreateFlow":          caseCreateFlow,
-	"CreateFlowWithEntry": caseCreateFlowWithEntry,
-	"GetFlow":             caseGetFlow,
-	"GetFlowByName":       caseGetFlowByName,
-	"ListFlows":           caseListFlows,
-	"ListFlowActivity":    caseListFlowActivity,
-	"CountFlows":          caseCountFlows,
-	"ProjectActivity":     caseProjectActivity,
-	"TimeSavedMinutes":    caseTimeSavedMinutes,
-	"InTx":                caseInTx,
-	"UpdateFlowDraft":     caseUpdateFlowDraft,
+	"CreateFlow":               caseCreateFlow,
+	"CreateFlowWithEntry":      caseCreateFlowWithEntry,
+	"GetFlow":                  caseGetFlow,
+	"GetFlowByName":            caseGetFlowByName,
+	"ListFlows":                caseListFlows,
+	"ListFlowActivity":         caseListFlowActivity,
+	"CountFlows":               caseCountFlows,
+	"UpdateFlowDraft":          caseUpdateFlowDraft,
+	"UpdateFlowDraftWithEntry": caseUpdateFlowDraftWithEntry,
+	"ProjectActivity":          caseProjectActivity,
+	"TimeSavedMinutes":         caseTimeSavedMinutes,
+	"InTx":                     caseInTx,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
 	"GetVersion":         caseGetVersion,
@@ -585,6 +586,15 @@ func caseUpdateFlowDraft(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	_, err := env.Stores.UpdateFlowDraft(ctx, env.A.Scope, env.B.Flow.ID, []byte(`{"defaced":true}`), 0, nil, seededAt.Add(time.Hour))
 	wantErr(tb, "updating B's draft from A", err, identity.ErrNotFound)
+	noLeak(tb, "the refusal", nil, err, &env.B)
+	intact(ctx, tb, env)
+}
+
+func caseUpdateFlowDraftWithEntry(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	entry := audittest.Org(tb, env.A.UUID, "flow.updated")
+	_, err := env.Stores.UpdateFlowDraftWithEntry(ctx, env.A.Scope, env.B.Flow.ID, []byte(`{"defaced":true}`), 0, nil, seededAt.Add(time.Hour), entry)
+	wantErr(tb, "saving B's draft from A", err, identity.ErrNotFound)
 	noLeak(tb, "the refusal", nil, err, &env.B)
 	intact(ctx, tb, env)
 }
