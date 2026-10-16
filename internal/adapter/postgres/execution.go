@@ -41,6 +41,22 @@ func beforeCursor(c store.Cursor) (pgtype.Timestamptz, pgtype.UUID) {
 	return timestamp(c.CreatedAt), pgUUID(c.ID)
 }
 
+// afterBound and beforeBound are the exclusive creation-time bounds of a list; the zero time opens
+// the bound.
+func afterBound(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{InfinityModifier: pgtype.NegativeInfinity, Valid: true}
+	}
+	return timestamp(t)
+}
+
+func beforeBound(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{InfinityModifier: pgtype.Infinity, Valid: true}
+	}
+	return timestamp(t)
+}
+
 // afterCursor is the position of an oldest-first list; the zero cursor is before everything.
 func afterCursor(c store.Cursor) (pgtype.Timestamptz, pgtype.UUID) {
 	if c.IsZero() {
@@ -82,48 +98,14 @@ func (s *Store) GetExecution(ctx context.Context, org orgscope.Org, execID store
 
 // ListExecutions implements [store.Reader].
 func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
-	set := 0
-	if !filter.ProjectID.IsZero() {
-		set++
+	if !filter.Valid() {
+		return nil, fmt.Errorf("list executions: the filter must name a project, or exactly one of flow and status: %w", flow.ErrInvalidRecord)
 	}
-	if !filter.FlowID.IsZero() {
-		set++
-	}
-	if filter.Status != "" {
-		set++
-	}
-	if set != 1 {
-		return nil, fmt.Errorf("list executions: exactly one filter field must be set, got %d: %w", set, flow.ErrInvalidRecord)
-	}
-	beforeAt, beforeID := beforeCursor(after)
 	var out []store.Execution
 	err := s.inScope(ctx, "list executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		var rows []sqlcgen.GetExecutionRow
-		switch {
-		case !filter.ProjectID.IsZero():
-			r, err := q.ListExecutions(ctx, sqlcgen.ListExecutionsParams{OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		case !filter.FlowID.IsZero():
-			r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org.UUID()), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		default:
-			r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
+		rows, err := listExecutionRows(ctx, q, org, filter, after, limit)
+		if err != nil {
+			return err
 		}
 		for i := range rows {
 			out = append(out, executionFrom(&rows[i]))
@@ -131,6 +113,60 @@ func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter sto
 		return nil
 	})
 	return out, err
+}
+
+// listExecutionRows runs the list query the filter selects.
+func listExecutionRows(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]sqlcgen.GetExecutionRow, error) {
+	beforeAt, beforeID := beforeCursor(after)
+	var rows []sqlcgen.GetExecutionRow
+	switch {
+	case filter.Oldest:
+		afterAt, afterID := afterCursor(after)
+		r, err := q.ListProjectExecutionsAsc(ctx, sqlcgen.ListProjectExecutionsAscParams{
+			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID),
+			AnyFlow: filter.FlowID.IsZero(), FlowID: pgUUID(filter.FlowID),
+			AnyStatus: filter.Status == "", Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case filter.Refined() || !filter.ProjectID.IsZero():
+		r, err := q.ListProjectExecutions(ctx, sqlcgen.ListProjectExecutionsParams{
+			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID),
+			AnyFlow: filter.FlowID.IsZero(), FlowID: pgUUID(filter.FlowID),
+			AnyStatus: filter.Status == "", Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case !filter.FlowID.IsZero():
+		r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org.UUID()), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	default:
+		r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	}
+	return rows, nil
 }
 
 // GetToken implements [store.Reader].

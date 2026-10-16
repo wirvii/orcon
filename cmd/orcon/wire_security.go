@@ -68,6 +68,7 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	audit.Store
 	connector.PackageStore
 	httpapi.OrgAuditLog
+	httpapi.ConnectorPackages
 	execstore.NodeReader
 	engineStore
 	io.Closer

@@ -68,7 +68,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			nodeTypes:             httpapi.NewNodeTypes(httpapi.NewNodeCatalog(sec.store, assets), sec.pageCodec),
 			drafts:                drafts,
 			executions: httpapi.NewExecutions(
-				sec.store, sec.store, flowReader{}, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
+				sec.store, sec.store, flowReader{}, sec.store, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
 			),
 			activity: httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
 		}
