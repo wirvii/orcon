@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { describe, expect, it } from 'vitest';
 
@@ -49,5 +50,13 @@ describe('FlowListScreen', () => {
     expect(name).toHaveAttribute('href', `/orgs/acme/projects/ventas/flows/${flow.id}`);
     // The state is words, never color alone; on a phone the label precedes it.
     expect(screen.getByText(/Inactive$/)).toBeVisible();
+  });
+
+  it('opens the chooser of how to start from its button, and from the address', async () => {
+    server.use(...beforeFlows(), productApi.flows([]));
+    renderRoute(address);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Create flow' }))[0] as HTMLElement);
+    const dialog = await screen.findByRole('dialog', { name: 'Create flow' });
+    expect(within(dialog).getByRole('button', { name: /Blank/ })).toHaveAttribute('aria-pressed', 'true');
   });
 });

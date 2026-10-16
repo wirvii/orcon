@@ -156,6 +156,19 @@ const screens: Screen[] = [
       await page.keyboard.press('[');
     },
   },
+  ...(['blank', 'template', 'import', 'ai'] as const).map(
+    (mode): Screen => ({
+      name: `create-flow-${mode}`,
+      mockup: { id: 'newflow', variant: mode },
+      devices: ['desktop'],
+      product: async (page) => {
+        await signIn(page);
+        // Before the chooser the address knew only `?create=true`, which opened the name dialog.
+        await page.goto(`/orgs/${org.slug}/projects/ventas-whatsapp/flows?create=${label === 'before' ? 'true' : mode}`);
+        await expect(page.getByRole('dialog')).toBeVisible();
+      },
+    }),
+  ),
   {
     name: 'settings',
     mockup: { id: 'settings', variant: 'apariencia' },

@@ -10,7 +10,8 @@ import { defineMessages, useIntl } from 'react-intl';
 import { markFirstUsefulScreen } from '../../../app/perf/marks';
 import { QueryState } from '../../../app/query-state/QueryState';
 import { flowsQueryOptions } from '../api/queries';
-import { CreateFlowDialog } from '../forms/CreateFlowDialog';
+import { CreateFlowChooser } from '../forms/CreateFlowChooser';
+import type { CreateMode } from '../model/params';
 
 const messages = defineMessages({
   title: { id: 'flows.list.title', defaultMessage: 'Flows', description: 'Main heading of the list of flows of a project.' },
@@ -19,7 +20,7 @@ const messages = defineMessages({
     defaultMessage: 'A flow is a process made of steps. New flows start inactive.',
     description: 'One line under the heading of the flows list: what a flow is and its starting state.',
   },
-  newFlow: { id: 'flows.list.new', defaultMessage: 'New flow', description: 'Button that opens the dialog to create a flow.' },
+  newFlow: { id: 'flows.list.new', defaultMessage: 'Create flow', description: 'Button that opens the dialog where a person chooses how to start a flow.' },
   emptyTitle: { id: 'flows.list.empty.title', defaultMessage: 'No flows yet', description: 'Title of the flows list when the project has none.' },
   emptyDescription: {
     id: 'flows.list.empty.description',
@@ -44,11 +45,12 @@ export function FlowListScreen() {
   const navigate = useNavigate();
   const { create } = route.useSearch();
   // `?create` opens the dialog on arrival; closing it drops the parameter so a reload does not open it again.
-  const [creating, setCreating] = useState(create === true);
+  const requested: CreateMode | undefined = create === undefined || create === false ? undefined : create === true ? 'blank' : create;
+  const [creating, setCreating] = useState<CreateMode | undefined>(requested);
   useEffect(() => {
-    // The address can ask for the dialog while the page is already open (the key N, the sidebar).
-    if (create === true) setCreating(true);
-  }, [create]);
+    // The address can ask for the chooser while the page is already open (the key N, the sidebar).
+    if (requested !== undefined) setCreating(requested);
+  }, [requested]);
 
   useEffect(() => {
     markFirstUsefulScreen('/orgs/$orgSlug/projects/$projectHandle/flows');
@@ -57,7 +59,7 @@ export function FlowListScreen() {
   const newFlow = (
     <Button
       onClick={() => {
-        setCreating(true);
+        setCreating('blank');
       }}
     >
       {intl.formatMessage(messages.newFlow)}
@@ -113,16 +115,18 @@ export function FlowListScreen() {
           </ul>
         )}
       </QueryState>
-      <CreateFlowDialog
-        open={creating}
+      <CreateFlowChooser
+        open={creating !== undefined}
+        initialMode={creating}
         onOpenChange={(open) => {
-          setCreating(open);
-          if (!open && create === true) void navigate({ to: '/orgs/$orgSlug/projects/$projectHandle/flows', params: { orgSlug, projectHandle }, search: {}, replace: true });
+          if (open) return;
+          setCreating(undefined);
+          if (requested !== undefined) void navigate({ to: '/orgs/$orgSlug/projects/$projectHandle/flows', params: { orgSlug, projectHandle }, search: {}, replace: true });
         }}
         orgId={organization.id}
-        projectId={project.id}
         orgSlug={orgSlug}
         projectHandle={projectHandle}
+        replaceHistory={requested !== undefined}
       />
     </div>
   );
