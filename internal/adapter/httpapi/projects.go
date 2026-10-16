@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/oapi-codegen/runtime/types"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/clock"
 	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
@@ -38,6 +40,7 @@ type Projects struct {
 	flows     *flow.Creator
 	flowStore flow.Store
 	codec     *page.Codec
+	clock     clock.Clock
 }
 
 // ProjectAccessResolver says which projects of an organization a user can read (the SE6
@@ -48,8 +51,8 @@ type ProjectAccessResolver interface {
 
 // NewProjects returns the handlers over their services, the project access resolver and the
 // page-token codec.
-func NewProjects(access ProjectAccessResolver, projects *identity.Projects, store identity.ProjectStore, flows *flow.Creator, flowStore flow.Store, codec *page.Codec) *Projects {
-	return &Projects{access: access, projects: projects, store: store, flows: flows, flowStore: flowStore, codec: codec}
+func NewProjects(access ProjectAccessResolver, projects *identity.Projects, store identity.ProjectStore, flows *flow.Creator, flowStore flow.Store, codec *page.Codec, clk clock.Clock) *Projects {
+	return &Projects{access: access, projects: projects, store: store, flows: flows, flowStore: flowStore, codec: codec, clock: clk}
 }
 
 // Sort fields of the listings (the allowlists of the contract, without the minus).
@@ -117,7 +120,14 @@ func (p *Projects) ListProjects(ctx context.Context, req apigen.ListProjectsRequ
 
 	body := apigen.ProjectList{Items: []apigen.Project{}}
 	for _, it := range window {
-		body.Items = append(body.Items, projectBody(rows[it.idx]))
+		item := projectBody(rows[it.idx])
+		n, err := p.flowStore.CountFlows(ctx, org, rows[it.idx].ID)
+		if err != nil {
+			return nil, err
+		}
+		count := int(n)
+		item.FlowCount = &count
+		body.Items = append(body.Items, item)
 	}
 	if more {
 		token, err := tokenFor(p.codec, org.String(), binding, last)
@@ -204,13 +214,13 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 		return nil, err
 	}
 
-	rows, err := p.readFlows(ctx, org, project)
+	rows, err := p.readActivity(ctx, org, project, p.clock.Now().Add(-activityWindow))
 	if err != nil {
 		return nil, err
 	}
 	var items []listItem
 	for i := range rows {
-		rec := &rows[i]
+		rec := &rows[i].Flow
 		if !filter.Match(*rec) {
 			continue
 		}
@@ -223,7 +233,7 @@ func (p *Projects) ListFlows(ctx context.Context, req apigen.ListFlowsRequestObj
 
 	body := apigen.FlowList{Items: []apigen.Flow{}}
 	for _, it := range window {
-		body.Items = append(body.Items, flowBody(rows[it.idx]))
+		body.Items = append(body.Items, flowActivityBody(rows[it.idx]))
 	}
 	if more {
 		token, err := tokenFor(p.codec, org.String(), binding, last)
@@ -318,12 +328,13 @@ func (p *Projects) rebuildFlow(ctx context.Context, rec identity.IdempotencyReco
 	return encodeResponse(201, flowBody(f), map[string]string{"Location": flowLocation(f.ID)}, flowETag(f))
 }
 
-// readFlows reads the flows of the project, at most maxListRows of them, in identity order.
-func (p *Projects) readFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) ([]flow.Record, error) {
-	var out []flow.Record
+// readActivity reads the flows of the project with their latest execution and the executions of
+// the day since the instant given, at most maxListRows flows.
+func (p *Projects) readActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, since time.Time) ([]flow.Activity, error) {
+	var out []flow.Activity
 	var after flow.FlowID
 	for len(out) < maxListRows {
-		batch, err := p.flowStore.ListFlows(ctx, org, project, after, page.MaxLimit)
+		batch, err := p.flowStore.ListFlowActivity(ctx, org, project, since, after, page.MaxLimit)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +342,7 @@ func (p *Projects) readFlows(ctx context.Context, org orgscope.Org, project iden
 		if len(batch) < page.MaxLimit {
 			break
 		}
-		after = batch[len(batch)-1].ID
+		after = batch[len(batch)-1].Flow.ID
 	}
 	return out, nil
 }
@@ -438,6 +449,32 @@ func flowBody(rec flow.Record) apigen.Flow {
 		HasUnpublishedChanges: !rec.ActiveVersionID.IsZero() && rec.DraftRevision > 0,
 		CreatedAt:             rec.CreatedAt, UpdatedAt: rec.UpdatedAt,
 	}
+}
+
+// flowActivityBody is a flow of a list with its latest execution and its executions of the last day.
+func flowActivityBody(a flow.Activity) apigen.Flow {
+	body := flowBody(a.Flow)
+	count := int(a.ExecutionCountLast24h)
+	body.ExecutionCountLast24h = &count
+	if a.LastExecution != nil {
+		body.LastExecution = lastExecutionBody(*a.LastExecution)
+	}
+	return body
+}
+
+// lastExecutionBody is the latest execution of a flow as the list shows it; the finish instant is
+// left out while the execution has not finished.
+func lastExecutionBody(e flow.LastExecution) *apigen.FlowLastExecution {
+	eid := types.UUID(e.ID)
+	body := apigen.FlowLastExecution{
+		Id: &eid, Status: apigen.FlowLastExecutionStatus(e.Status),
+		HasUncertainOperation: e.HasUncertainOperation, CreatedAt: e.CreatedAt,
+	}
+	if !e.FinishedAt.IsZero() {
+		finished := e.FinishedAt
+		body.FinishedAt = &finished
+	}
+	return &body
 }
 
 // flowETag is the entity tag of the draft: its revision (Amendment 8 section 8-9).

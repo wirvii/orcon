@@ -86,7 +86,7 @@ func (r Record) IsDeleted() bool { return !r.DeletedAt.IsZero() }
 
 // Store persists flows. Reads never return a soft-deleted flow unless the
 // method says so.
-type Store interface {
+type Store interface { //nolint:interfacebloat // the flow port: the flows, their drafts and their activity are one area
 	// CreateFlow inserts a flow with draft revision 0. A second non-deleted
 	// flow with the same name in the project fails with [ErrConflict].
 	CreateFlow(ctx context.Context, org orgscope.Org, f Record) error
@@ -101,6 +101,12 @@ type Store interface {
 	// ListFlows returns at most limit non-deleted flows of the project with an
 	// identity greater than after, ordered by identity.
 	ListFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID, after FlowID, limit int) ([]Record, error)
+	// ListFlowActivity returns at most limit non-deleted flows of the project with an identity
+	// greater than after, ordered by identity, each with its latest execution and the number of
+	// executions accepted at or after since (SPEC-019 R-UX-BE-01). It is one read: no query per flow.
+	ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, since time.Time, after FlowID, limit int) ([]Activity, error)
+	// CountFlows returns the number of non-deleted flows of the project.
+	CountFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) (int64, error)
 	// UpdateFlowDraft replaces the draft document when the stored revision still
 	// equals expectedRevision, increments the revision and returns it. In the
 	// same transaction it replaces the connector references recorded for the

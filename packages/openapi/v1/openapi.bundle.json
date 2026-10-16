@@ -860,6 +860,205 @@
         }
       }
     },
+    "/orgs/{orgId}/flows": {
+      "x-orcon-resource": "collection",
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrgId"
+        }
+      ],
+      "get": {
+        "operationId": "listOrgFlows",
+        "summary": "List the flows of an organization",
+        "description": "Returns the flows of every project of one organization that the caller can read, one page at a time, each with its latest execution and the number of executions of the last 24 hours. Use the filters to narrow the list; flows of projects the caller cannot read are left out.",
+        "tags": [
+          "flows"
+        ],
+        "x-orcon-permission": "flow:read",
+        "x-orcon-rate-class": "read",
+        "x-orcon-stability": "stable",
+        "x-orcon-audit": "none",
+        "x-orcon-problems": [
+          "invalid-page-token",
+          "validation-failed",
+          "unauthenticated",
+          "forbidden",
+          "not-found",
+          "rate-limited",
+          "internal-error",
+          "service-unavailable"
+        ],
+        "x-orcon-cli": {
+          "command": "org-flows list"
+        },
+        "x-orcon-mcp": {
+          "level": "none"
+        },
+        "x-orcon-examples": [
+          {
+            "name": "firstPageOfOrgFlows",
+            "scenario": "project-with-flows",
+            "request": {
+              "pathParams": {
+                "orgId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71"
+              },
+              "query": {
+                "sort": "-lastExecutionAt"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "firstPageOfOrgFlows"
+            }
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/PageToken"
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "description": "Return only flows of this project; a project the caller cannot read gives an empty page.",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "examples": [
+                "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "description": "Sort expression; a leading minus sorts in descending order.",
+            "x-orcon-sort-default": "-updatedAt",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "-updatedAt",
+                "-lastExecutionAt"
+              ],
+              "x-orcon-enum-kind": "identifier",
+              "default": "-updatedAt"
+            }
+          },
+          {
+            "name": "activationState",
+            "in": "query",
+            "required": false,
+            "description": "Return only flows in this activation state.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Return only flows whose name starts with this text (case-insensitive).",
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "examples": [
+                "Welcome"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of flows of the organization.",
+            "headers": {
+              "Orcon-Request-Id": {
+                "$ref": "#/components/headers/OrconRequestId"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowList"
+                },
+                "examples": {
+                  "firstPageOfOrgFlows": {
+                    "summary": "Two flows, one of them ran today",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60",
+                          "projectId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70",
+                          "name": "Welcome email",
+                          "activationState": "ACTIVE",
+                          "hasUnpublishedChanges": false,
+                          "draftRevision": 2,
+                          "lastExecution": {
+                            "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64",
+                            "status": "SUCCEEDED",
+                            "hasUncertainOperation": false,
+                            "createdAt": "2026-10-12T15:04:05Z",
+                            "finishedAt": "2026-10-12T15:04:09Z"
+                          },
+                          "executionCountLast24h": 12,
+                          "createdAt": "2026-10-12T15:04:05Z",
+                          "updatedAt": "2026-10-12T15:04:05Z"
+                        },
+                        {
+                          "id": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63",
+                          "projectId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70",
+                          "name": "Weekly report",
+                          "activationState": "INACTIVE",
+                          "hasUnpublishedChanges": true,
+                          "draftRevision": 0,
+                          "executionCountLast24h": 0,
+                          "createdAt": "2026-10-12T15:04:05Z",
+                          "updatedAt": "2026-10-12T15:04:05Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/projects/{projectId}": {
       "x-orcon-resource": "item",
       "parameters": [
@@ -6199,6 +6398,40 @@
           "currentSession": {
             "description": "The session the request carries.",
             "$ref": "#/components/schemas/Session"
+          },
+          "orgRoles": {
+            "type": "array",
+            "description": "The organization role the user holds in each organization it belongs to, for the organization menu. An organization in which the user holds no organization-level role is left out.",
+            "readOnly": true,
+            "items": {
+              "$ref": "#/components/schemas/OrgRole"
+            }
+          }
+        }
+      },
+      "OrgRole": {
+        "type": "object",
+        "description": "The organization-level role a user holds in one organization.",
+        "required": [
+          "orgId",
+          "role"
+        ],
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the organization.",
+            "examples": [
+              "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "description": "Name of the predefined role, one of Owner, Admin, Member, Project Admin, Editor, Operator or Viewer.",
+            "examples": [
+              "Owner"
+            ],
+            "maxLength": 100
           }
         }
       },
@@ -6520,6 +6753,15 @@
             "type": "boolean",
             "description": "Whether the project is protected. Protected projects require confirmation for actions that change production behavior. New projects are protected."
           },
+          "flowCount": {
+            "type": "integer",
+            "description": "Number of flows of the project that are not deleted. Present in lists of projects; absent in the answers that return one project.",
+            "readOnly": true,
+            "examples": [
+              4
+            ],
+            "minimum": 0
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -6702,6 +6944,20 @@
             ],
             "minimum": 0
           },
+          "lastExecution": {
+            "description": "The most recent execution of the flow. Present only in lists of flows, where it is read with the flow; absent in the answers that return one flow, and when the flow never ran.",
+            "readOnly": true,
+            "$ref": "#/components/schemas/FlowLastExecution"
+          },
+          "executionCountLast24h": {
+            "type": "integer",
+            "description": "Number of executions of the flow accepted in the last 24 hours. Present only in lists of flows.",
+            "readOnly": true,
+            "examples": [
+              12
+            ],
+            "minimum": 0
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -6741,6 +6997,65 @@
               "example-page-token-2"
             ],
             "maxLength": 1024
+          }
+        }
+      },
+      "FlowLastExecution": {
+        "type": "object",
+        "description": "The most recent execution of a flow: enough to show its status in a list without reading the execution.",
+        "required": [
+          "id",
+          "status",
+          "hasUncertainOperation",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the execution.",
+            "examples": [
+              "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64"
+            ],
+            "readOnly": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Progress of the execution, the same values as the execution status.",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "WAITING",
+              "SUSPENDED",
+              "CANCELING",
+              "COMPENSATING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELED"
+            ],
+            "examples": [
+              "SUCCEEDED"
+            ]
+          },
+          "hasUncertainOperation": {
+            "type": "boolean",
+            "description": "True when the execution has an external operation whose outcome is unknown and a person must review it."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the execution was accepted, in UTC.",
+            "examples": [
+              "2026-10-12T15:04:05Z"
+            ]
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the execution reached a final status, in UTC; absent before that.",
+            "examples": [
+              "2026-10-12T15:04:09Z"
+            ]
           }
         }
       },

@@ -52,12 +52,12 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 		deps.Idempotency = sec.store
 		projects := httpapi.NewProjects(
 			sec.evaluator, identity.NewProjects(sec.store, sec.store, sec.clock, sec.ids), sec.store,
-			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec,
+			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec, sec.clock,
 		)
 		deps.Rebuilds = projects.Rebuilds()
 		deps.Server = productServer{
 			StrictServerInterface: httpapi.Unavailable{},
-			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin),
+			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin, sec.store, sec.evaluator),
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
 		}
@@ -104,6 +104,10 @@ func (s productServer) RevokeSession(ctx context.Context, req apigen.RevokeSessi
 
 func (s productServer) GetCurrentUser(ctx context.Context, req apigen.GetCurrentUserRequestObject) (apigen.GetCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.sessions.GetCurrentUser(ctx, req)
+}
+
+func (s productServer) ListOrgFlows(ctx context.Context, req apigen.ListOrgFlowsRequestObject) (apigen.ListOrgFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.projects.ListOrgFlows(ctx, req)
 }
 
 func (s productServer) ListOrgs(ctx context.Context, req apigen.ListOrgsRequestObject) (apigen.ListOrgsResponseObject, error) { //nolint:ireturn // the generated interface requires it

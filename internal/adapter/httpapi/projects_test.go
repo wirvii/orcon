@@ -88,7 +88,7 @@ func newProjectsRig(t *testing.T) *projectsRig {
 	grants := &recordingProjects{Memory: mem}
 	h := NewProjects(
 		access, identity.NewProjects(grants, mem, clk, ids), mem,
-		flow.NewCreator(mem, clk, ids), mem, codec,
+		flow.NewCreator(mem, clk, ids), mem, codec, clk,
 	)
 	return &projectsRig{access: access, grants: grants, t: t, clk: clk, h: h, ctx: ctx, org: org, scope: scope, user: user}
 }

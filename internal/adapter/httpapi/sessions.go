@@ -14,6 +14,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // SessionService is the part of the session service that the operations of SPEC-016
@@ -32,13 +33,22 @@ type Sessions struct {
 	svc    SessionService
 	cookie middleware.AuthConfig
 	origin string
+	orgs   identity.OrganizationResolver
+	roles  OrganizationRoleReader
+}
+
+// OrganizationRoleReader says which organization-level role a user holds in an organization (the
+// authorization evaluator implements it).
+type OrganizationRoleReader interface {
+	OrganizationRole(ctx context.Context, user identity.UserID, org orgscope.Org) (string, error)
 }
 
 // NewSessions returns the handlers over svc. The public origin is the origin of the
 // installation (ORCON_PUBLIC_URL). The cookie names come from the same configuration
-// as the authentication pipeline.
-func NewSessions(svc SessionService, cookie middleware.AuthConfig, publicOrigin string) *Sessions {
-	return &Sessions{svc: svc, cookie: cookie, origin: publicOrigin}
+// as the authentication pipeline. The orgs and roles arguments give the organization roles that
+// getCurrentUser lists for the organization menu (SPEC-019 R-UX-SHL-03).
+func NewSessions(svc SessionService, cookie middleware.AuthConfig, publicOrigin string, orgs identity.OrganizationResolver, roles OrganizationRoleReader) *Sessions {
+	return &Sessions{svc: svc, cookie: cookie, origin: publicOrigin, orgs: orgs, roles: roles}
 }
 
 // CreateSession signs in with an email and a password (SPEC-016 R-SH-SES-01..03).
@@ -96,12 +106,38 @@ func (s *Sessions) GetCurrentUser(ctx context.Context, _ apigen.GetCurrentUserRe
 		return nil, err
 	}
 	uid := types.UUID(current.User.ID)
+	roles, err := s.orgRoles(ctx, current.User.ID)
+	if err != nil {
+		return nil, err
+	}
 	return apigen.GetCurrentUser200JSONResponse{Body: apigen.CurrentUser{
 		Id:             &uid,
 		Email:          types.Email(current.User.EmailNormalized),
 		DisplayName:    current.User.DisplayName,
 		CurrentSession: sessionBody(current.Session),
+		OrgRoles:       &roles,
 	}}, nil
+}
+
+// orgRoles lists the organization-level role of the user in each organization it belongs to; an
+// organization where the user holds no such role is left out.
+func (s *Sessions) orgRoles(ctx context.Context, user identity.UserID) ([]apigen.OrgRole, error) {
+	choices, err := s.orgs.ResolveUserOrganizations(ctx, user, identity.MaxResolvedOrganizations)
+	if err != nil {
+		return nil, err
+	}
+	out := []apigen.OrgRole{}
+	for i := range choices {
+		role, err := s.roles.OrganizationRole(ctx, user, choices[i].Scope)
+		if err != nil {
+			return nil, err
+		}
+		if role == "" {
+			continue
+		}
+		out = append(out, apigen.OrgRole{OrgId: types.UUID(choices[i].ID), Role: role})
+	}
+	return out, nil
 }
 
 // createdSession is the 201 answer of createSession: the session body and the two

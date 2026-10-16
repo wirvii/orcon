@@ -124,6 +124,25 @@ func TestCrossOrgSmoke(t *testing.T) {
 	}
 }
 
+// TestIsolationOrgFlows runs the isolation cases of the organization-wide flow reads (SPEC-019
+// UXB1): the flow list with its activity and the flow count of a project never show another
+// organization's flows, runs or counts.
+func TestIsolationOrgFlows(t *testing.T) {
+	if isolation.RLSOnly {
+		t.Skip("the rls-only mode needs the test hook of the full battery cut (SPEC-004 SE17)")
+	}
+	reg := isolation.BuildRegistry()
+	for _, st := range selectedStores(t) {
+		t.Run(string(st), func(t *testing.T) {
+			newStore := factoryOf(t, st)
+			reg.RunSubjects(t.Context(), t, func(t *testing.T) *isolation.Env {
+				t.Helper()
+				return isolation.Seed(t.Context(), t, newStore(t), st, isolation.RLSOnly)
+			}, isolation.StoreMethod("ListFlowActivity"), isolation.StoreMethod("CountFlows"))
+		})
+	}
+}
+
 // TestSeededOrganizationsAreIndependent checks the harness itself: what Seed stores for A
 // is invisible under B's scope and the other way round, so the cases start from isolation
 // that already holds for reads they did not write.

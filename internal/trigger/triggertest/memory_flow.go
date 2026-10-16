@@ -178,6 +178,33 @@ func (m *Memory) GetFlowByName(_ context.Context, org orgscope.Org, project iden
 	return flow.Record{}, fmt.Errorf("flow %q: %w", name, flow.ErrNotFound)
 }
 
+// ListFlowActivity implements [flow.Store]. The fake keeps no executions, so every flow has no
+// latest execution and no executions in the last day.
+func (m *Memory) ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, _ time.Time, after flow.FlowID, limit int) ([]flow.Activity, error) {
+	rows, err := m.ListFlows(ctx, org, project, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]flow.Activity, 0, len(rows))
+	for i := range rows {
+		out = append(out, flow.Activity{Flow: rows[i]})
+	}
+	return out, nil
+}
+
+// CountFlows implements [flow.Store].
+func (m *Memory) CountFlows(_ context.Context, org orgscope.Org, project identity.ProjectID) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for _, f := range m.s.flows {
+		if f.OrgID.Matches(org) && f.ProjectID == project && !f.IsDeleted() {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // ListFlows implements [flow.Store].
 func (m *Memory) ListFlows(_ context.Context, org orgscope.Org, project identity.ProjectID, after flow.FlowID, limit int) ([]flow.Record, error) {
 	m.mu.Lock()
