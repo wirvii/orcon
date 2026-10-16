@@ -19,9 +19,9 @@ import (
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
-// shopManifest is the manifest of a made-up shop connector with an action node that has one
+// catalogShopManifest is the manifest of a made-up shop connector with an action node that has one
 // operation of every safety level and a trigger node.
-const shopManifest = `{
+const catalogShopManifest = `{
   "format": "orcon/connector@1",
   "id": "acme.shop",
   "version": "VERSION",
@@ -87,9 +87,9 @@ const shopManifest = `{
   "changelog": [{ "version": "VERSION", "date": "2026-10-01", "notes": ["changelog.orders"] }]
 }`
 
-type fakePackages struct{ rows []connector.PackageRecord }
+type catalogFakePackages struct{ rows []connector.PackageRecord }
 
-func (f fakePackages) ListPackages(_ context.Context, after connector.PackageID, limit int) ([]connector.PackageRecord, error) {
+func (f catalogFakePackages) ListPackages(_ context.Context, after connector.PackageID, limit int) ([]connector.PackageRecord, error) {
 	var out []connector.PackageRecord
 	for i := range f.rows {
 		if bytes.Compare(f.rows[i].ID[:], after[:]) > 0 && len(out) < limit {
@@ -102,7 +102,7 @@ func (f fakePackages) ListPackages(_ context.Context, after connector.PackageID,
 func shopPackage(n byte, version string, status connector.PackageStatus) connector.PackageRecord {
 	return connector.PackageRecord{
 		ID: connector.PackageID{15: n}, ConnectorID: "acme.shop", Version: version, Status: status,
-		Manifest: []byte(strings.ReplaceAll(shopManifest, "VERSION", version)),
+		Manifest: []byte(strings.ReplaceAll(catalogShopManifest, "VERSION", version)),
 	}
 }
 
@@ -125,7 +125,7 @@ func catalogTypes(t *testing.T, c *NodeCatalog, locale string) map[string]apigen
 // TestBuiltinNodeTypesAreDescribedInTheLanguageOfTheRequest: the engine's own types come with
 // translated texts, the safety of the HTTP node's operations, and the n8n types the importer maps.
 func TestBuiltinNodeTypesAreDescribedInTheLanguageOfTheRequest(t *testing.T) {
-	c := NewNodeCatalog(fakePackages{}, nil)
+	c := NewNodeCatalog(catalogFakePackages{}, nil)
 	en := catalogTypes(t, c, LocaleEnglish)
 	es := catalogTypes(t, c, LocaleSpanish)
 	for _, typ := range []string{"orcon.http@1", "orcon.if@1", "orcon.switch@1", "orcon.loop@1", "orcon.set@1", "orcon.noop@1", "orcon.stopAndError@1"} {
@@ -159,7 +159,7 @@ func TestBuiltinNodeTypesAreDescribedInTheLanguageOfTheRequest(t *testing.T) {
 // nodes, groups and operations with their safety; a retired version is left out; a package with no
 // assets is not official and has no icon.
 func TestInstalledConnectorsJoinTheCatalog(t *testing.T) {
-	c := NewNodeCatalog(fakePackages{rows: []connector.PackageRecord{
+	c := NewNodeCatalog(catalogFakePackages{rows: []connector.PackageRecord{
 		shopPackage(1, "1.0.0", connector.StatusInstalled),
 		shopPackage(2, "1.2.0", connector.StatusInstalled),
 		shopPackage(3, "1.3.0", connector.StatusRetired),
@@ -206,7 +206,7 @@ func TestOfficialConnectorsCarryTheirIconAndTranslations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := NewNodeCatalog(fakePackages{rows: []connector.PackageRecord{shopPackage(1, "1.0.0", connector.StatusInstalled)}},
+	c := NewNodeCatalog(catalogFakePackages{rows: []connector.PackageRecord{shopPackage(1, "1.0.0", connector.StatusInstalled)}},
 		map[string]ConnectorAssets{"acme.shop": assets})
 	es := catalogTypes(t, c, LocaleSpanish)["acme.shop.order@1"]
 	if es.Name != "Pedido" || es.Description != "Pedidos de la tienda." || es.Seal != apigen.NodeTypeSealOFFICIAL {
