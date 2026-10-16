@@ -46,6 +46,10 @@ var nodes = map[string]nodeFunc{
 	TypeFilter:       runFilter,
 	TypeSort:         runSort,
 	TypeLimit:        runLimit,
+
+	TypeRemoveDuplicates: runRemoveDuplicates,
+	TypeAggregate:        runAggregate,
+	TypeSplitOut:         runSplitOut,
 }
 
 // Execute runs one activation of a core node. A node type this package does

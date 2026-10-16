@@ -24,7 +24,7 @@ func mustParse(t *testing.T, s string) jsonvalue.Value {
 
 func TestCoreNodesCatalogDescribesEveryType(t *testing.T) {
 	c := NewCatalog()
-	for _, typ := range []string{TypeNoOp, TypeSet, TypeStopAndError, TypeFilter, TypeSort, TypeLimit} {
+	for _, typ := range []string{TypeNoOp, TypeSet, TypeStopAndError, TypeFilter, TypeSort, TypeLimit, TypeRemoveDuplicates, TypeAggregate, TypeSplitOut} {
 		nt, ok := c.Lookup(t.Context(), typ)
 		if !ok {
 			t.Fatalf("Lookup(%s) not found", typ)

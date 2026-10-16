@@ -358,6 +358,33 @@ var builtins = []builtin{
 		operations: []builtinOperation{{"item.limit", map[string]string{LocaleEnglish: "Limit the number of items", LocaleSpanish: "Limitar el número de elementos"}, flow.PurityPure, apigen.NONE}},
 	},
 	{
+		typ: "orcon.removeDuplicates@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Remove duplicates", LocaleSpanish: "Quitar duplicados"},
+		desc: map[string]string{
+			LocaleEnglish: "Drops the items that repeat an earlier item, comparing all fields or some of them.",
+			LocaleSpanish: "Descarta los elementos que repiten uno anterior, comparando todos los campos o solo algunos.",
+		},
+		operations: []builtinOperation{{"item.deduplicate", map[string]string{LocaleEnglish: "Remove repeated items", LocaleSpanish: "Quitar elementos repetidos"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
+		typ: "orcon.aggregate@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Aggregate", LocaleSpanish: "Agrupar elementos"},
+		desc: map[string]string{
+			LocaleEnglish: "Gathers the items, or the values of some of their fields, into lists in a single item.",
+			LocaleSpanish: "Reúne los elementos, o los valores de algunos de sus campos, en listas dentro de un solo elemento.",
+		},
+		operations: []builtinOperation{{"item.aggregate", map[string]string{LocaleEnglish: "Gather items into one", LocaleSpanish: "Reunir los elementos en uno"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
+		typ: "orcon.splitOut@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Split out", LocaleSpanish: "Separar lista"},
+		desc: map[string]string{
+			LocaleEnglish: "Turns each element of a list field into an item of its own.",
+			LocaleSpanish: "Convierte cada elemento de un campo de lista en un elemento propio.",
+		},
+		operations: []builtinOperation{{"item.split", map[string]string{LocaleEnglish: "Split a list into items", LocaleSpanish: "Separar una lista en elementos"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
 		typ: "orcon.stopAndError@1", group: groupFlow,
 		name: map[string]string{LocaleEnglish: "Stop and error", LocaleSpanish: "Detener con error"},
 		desc: map[string]string{

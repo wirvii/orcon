@@ -1,0 +1,60 @@
+{
+  "name": "Split Out, Aggregate and Remove Duplicates",
+  "active": false,
+  "nodes": [
+    {"id": "n1", "name": "Start", "type": "n8n-nodes-base.manualTrigger", "typeVersion": 1, "position": [0, 0], "parameters": {}},
+    {
+      "id": "n2", "name": "Split tags", "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [200, 0],
+      "parameters": {"fieldToSplitOut": "tags", "include": "allOtherFields", "options": {"destinationFieldName": "tag"}}
+    },
+    {"id": "n3", "name": "Split people", "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [400, 0], "parameters": {"fieldToSplitOut": "people", "options": {}}},
+    {"id": "n4", "name": "Split two", "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [600, 0], "parameters": {"fieldToSplitOut": "a, b", "options": {}}},
+    {"id": "n5", "name": "Split binary", "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [800, 0], "parameters": {"fieldToSplitOut": "files", "options": {"includeBinary": true}}},
+    {
+      "id": "n6", "name": "Split selected", "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [1000, 0],
+      "parameters": {"fieldToSplitOut": "lines", "include": "selectedOtherFields", "fieldsToInclude": "id, customer.name", "options": {"destinationFieldName": "line"}}
+    },
+    {
+      "id": "n7", "name": "Gather names", "type": "n8n-nodes-base.aggregate", "typeVersion": 1, "position": [1200, 0],
+      "parameters": {
+        "aggregate": "aggregateIndividualFields",
+        "fieldsToAggregate": {"fieldToAggregate": [
+          {"fieldToAggregate": "name", "renameField": true, "outputFieldName": "names"},
+          {"fieldToAggregate": "tags"}
+        ]},
+        "options": {"mergeLists": true, "keepMissing": true}
+      }
+    },
+    {
+      "id": "n8", "name": "Gather all", "type": "n8n-nodes-base.aggregate", "typeVersion": 1, "position": [1400, 0],
+      "parameters": {"aggregate": "aggregateAllItemData", "destinationFieldName": "rows", "include": "specifiedFields", "fieldsToInclude": "a, b", "options": {}}
+    },
+    {
+      "id": "n9", "name": "Gather dotted", "type": "n8n-nodes-base.aggregate", "typeVersion": 1, "position": [1600, 0],
+      "parameters": {"fieldsToAggregate": {"fieldToAggregate": [{"fieldToAggregate": "user.id"}]}, "options": {"disableDotNotation": true}}
+    },
+    {
+      "id": "n10", "name": "Gather unique", "type": "n8n-nodes-base.aggregate", "typeVersion": 1, "position": [1800, 0],
+      "parameters": {"fieldsToAggregate": {"fieldToAggregate": [{"fieldToAggregate": "id"}]}, "options": {"keepOnlyUnique": true}}
+    },
+    {"id": "n11", "name": "Dedupe all", "type": "n8n-nodes-base.removeDuplicates", "typeVersion": 1.1, "position": [2000, 0], "parameters": {"compare": "allFields", "options": {}}},
+    {
+      "id": "n12", "name": "Dedupe email", "type": "n8n-nodes-base.removeDuplicates", "typeVersion": 1.1, "position": [2200, 0],
+      "parameters": {"compare": "selectedFields", "fieldsToCompare": "email", "options": {"removeOtherFields": true}}
+    },
+    {
+      "id": "n13", "name": "Dedupe history", "type": "n8n-nodes-base.removeDuplicates", "typeVersion": 2, "position": [2400, 0],
+      "parameters": {"operation": "removeItemsSeenInPreviousExecutions", "logic": "removeItemsWithAlreadySeenKeyValues", "dedupeValue": "={{ $json.id }}", "options": {}}
+    },
+    {
+      "id": "n14", "name": "Dedupe except", "type": "n8n-nodes-base.removeDuplicates", "typeVersion": 1.1, "position": [2600, 0],
+      "parameters": {"compare": "allFieldsExcept", "fieldsToExclude": "seenAt, meta.at", "options": {"disableDotNotation": true}}
+    },
+    {"id": "n15", "name": "Dedupe nothing named", "type": "n8n-nodes-base.removeDuplicates", "typeVersion": 1.1, "position": [2800, 0], "parameters": {"compare": "selectedFields", "options": {}}}
+  ],
+  "connections": {
+    "Start": {"main": [[{"node": "Split tags", "type": "main", "index": 0}]]},
+    "Split tags": {"main": [[{"node": "Gather names", "type": "main", "index": 0}]]},
+    "Gather names": {"main": [[{"node": "Dedupe all", "type": "main", "index": 0}]]}
+  }
+}

@@ -54,6 +54,31 @@ func TestCoreNodesRunFromAWebhookOnEveryStore(t *testing.T) {
 	}
 }
 
+// TestCoreListNodesRunFromAWebhookOnEveryStore runs Split Out, Remove Duplicates
+// and Aggregate in a row: two orders with lines become one item per line, the
+// repeated lines go, and the rest is gathered into one list.
+func TestCoreListNodesRunFromAWebhookOnEveryStore(t *testing.T) {
+	for _, kind := range e2eKinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			env, st, eng, handler := coreEngine(t, kind)
+			publishCoreFlow(t, env, eng, "core-lists",
+				`{"id":"split","name":"Split","element":"task","type":"orcon.splitOut@1","parameters":{"field":"lines","destinationField":"line","include":"ALL_OTHER_FIELDS"}}`,
+				`{"id":"unique","name":"Unique","element":"task","type":"orcon.removeDuplicates@1","parameters":{}}`,
+				`{"id":"gather","name":"Gather","element":"task","type":"orcon.aggregate@1","parameters":{"fields":[{"field":"line","outputField":"lines"}]}}`,
+			)
+			exec := postEvent(t, handler, "/hooks/engine/core-lists",
+				`[{"order":1,"lines":["x","y","x"]},{"order":2,"lines":["y"]}]`, http.StatusAccepted)
+			waitExecution(t, env, st, exec)
+			if got, want := nodeData(t, env, st, exec, "unique"), `[{"line":"x","order":1},{"line":"y","order":1},{"line":"y","order":2}]`; got != want {
+				t.Errorf("the data of the unique node = %s, want %s", got, want)
+			}
+			if got, want := nodeData(t, env, st, exec, "gather"), `[{"lines":["x","y","y"]}]`; got != want {
+				t.Errorf("the data of the gather node = %s, want %s", got, want)
+			}
+		})
+	}
+}
+
 // TestCoreNodeFailureEndsTheExecutionOnEveryStore: a condition that is not a
 // boolean fails the Filter node for good, and the execution ends FAILED on each
 // store.

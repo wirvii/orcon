@@ -38,6 +38,15 @@ const (
 	// TypeLimit is orcon.limit@1: it keeps the first or the last items (n8n
 	// Limit).
 	TypeLimit = "orcon.limit@1"
+	// TypeRemoveDuplicates is orcon.removeDuplicates@1: it drops the items that
+	// repeat an earlier item of the same input (n8n Remove Duplicates).
+	TypeRemoveDuplicates = "orcon.removeDuplicates@1"
+	// TypeAggregate is orcon.aggregate@1: it gathers the items into one item
+	// (n8n Aggregate).
+	TypeAggregate = "orcon.aggregate@1"
+	// TypeSplitOut is orcon.splitOut@1: it turns the elements of a list field
+	// into items (n8n Split Out).
+	TypeSplitOut = "orcon.splitOut@1"
 )
 
 // types is the static description of every node type of this package. All of
@@ -49,6 +58,10 @@ var types = map[string]flow.NodeType{
 	TypeFilter:       {Purity: flow.PurityPure},
 	TypeSort:         {Purity: flow.PurityPure},
 	TypeLimit:        {Purity: flow.PurityPure},
+
+	TypeRemoveDuplicates: {Purity: flow.PurityPure},
+	TypeAggregate:        {Purity: flow.PurityPure},
+	TypeSplitOut:         {Purity: flow.PurityPure},
 }
 
 // Types returns every node type of this package, sorted. The composition root
