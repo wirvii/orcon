@@ -6,7 +6,7 @@
  * `NodeType.icon`). Each mark is the single-color path of Simple Icons 16.35.0 (CC0-1.0), copied here so the
  * editor needs no network for it, in the brand's own color. They only identify the service: they are
  * never recolored or redrawn (SPEC-019 Q6). A connector with no mark here shows the generic plug.
- * Slack and some other brands are not in Simple Icons any more, so they have no mark here either: they need the
+ * Some services are not in Simple Icons any more, so they have no mark here either: they need the
  * brand press kit, which the connector package carries in its `icons/` folder.
  */
 export interface BrandMark {
