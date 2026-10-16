@@ -46,6 +46,10 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 		Idempotency: idempotency.UnavailableStore{},
 	}
 	if sec != nil {
+		assets, err := officialConnectorAssets()
+		if err != nil {
+			return nil, err
+		}
 		deps.Authenticator = sec.sessions
 		deps.Authorizer = sec.evaluator
 		deps.OrgSelector = sec.evaluator
@@ -60,6 +64,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin),
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
+			nodeTypes:             httpapi.NewNodeTypes(httpapi.NewNodeCatalog(sec.store, assets), sec.pageCodec),
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -76,6 +81,8 @@ type productServer struct {
 	sessions *httpapi.Sessions
 	orgs     *httpapi.Orgs
 	projects *httpapi.Projects
+	// nodeTypes serves the node types a project can use.
+	nodeTypes *httpapi.NodeTypes
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -92,6 +99,10 @@ func (s productServer) ListFlows(ctx context.Context, req apigen.ListFlowsReques
 
 func (s productServer) CreateFlow(ctx context.Context, req apigen.CreateFlowRequestObject) (apigen.CreateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.CreateFlow(ctx, req)
+}
+
+func (s productServer) ListNodeTypes(ctx context.Context, req apigen.ListNodeTypesRequestObject) (apigen.ListNodeTypesResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.nodeTypes.ListNodeTypes(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
