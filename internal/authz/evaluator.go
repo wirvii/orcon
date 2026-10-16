@@ -33,7 +33,15 @@ type Store interface {
 	// ProjectOrganization returns the organization a project belongs to, or
 	// [identity.ErrNotFound] when no project has that identifier.
 	ProjectOrganization(ctx context.Context, project string) (identity.OrgID, error)
+	// ResourceProject returns the organization and the project (in canonical text) that own a
+	// resource of a child kind (see [ChildKinds]), or [identity.ErrNotFound] when no such
+	// resource exists. Like ProjectOrganization it reads across organizations.
+	ResourceProject(ctx context.Context, kind, resource string) (identity.OrgID, string, error)
 }
+
+// ChildKinds are the resource kinds that belong to a project: a request that names one is
+// authorized in the organization and the project the resource belongs to.
+var ChildKinds = []string{"flow", "execution", "externalOperation", "humanTask"}
 
 // Evaluator decides the requests of the API (ADR-0041 section 6, SPEC-004 R-AZ-05, R-AZ-06,
 // R-AZ-10). It implements [Authorizer]. Grants are cached per (user, organization) and
@@ -96,8 +104,9 @@ func (e *Evaluator) SelectOrganization(ctx context.Context, user identity.UserID
 // is its own organization, a project resource belongs to the organization of the project.
 // A session principal carries no organization, so the addressed one is the organization of
 // the request, and it must have an active membership there. A key or token principal is
-// fixed to its organization and sees nothing of another. Resource kinds other than org and
-// project are forbidden until their resolvers are wired.
+// fixed to its organization and sees nothing of another. A resource of a child kind (flow,
+// execution, external operation, human task) is resolved to its project and authorized there.
+// Any other kind is forbidden.
 func (e *Evaluator) Authorize(ctx context.Context, req Request) (Decision, orgscope.Org, error) {
 	if !req.Requirement.NeedsDecision() {
 		return DecisionAllow, orgscope.Org{}, nil
@@ -164,7 +173,17 @@ func (e *Evaluator) target(ctx context.Context, req Request) (identity.OrgID, st
 		}
 		return owner, req.Resource.ID, Permission("project:read"), DecisionAllow, nil
 	default:
-		return identity.OrgID{}, "", "", DecisionForbidden, nil
+		if !slices.Contains(ChildKinds, req.Resource.Kind) {
+			return identity.OrgID{}, "", "", DecisionForbidden, nil
+		}
+		owner, project, err := e.store.ResourceProject(ctx, req.Resource.Kind, req.Resource.ID)
+		if errors.Is(err, identity.ErrNotFound) || (err == nil && !own.IsZero() && owner != own) {
+			return identity.OrgID{}, "", "", DecisionHidden, nil
+		}
+		if err != nil {
+			return identity.OrgID{}, "", "", DecisionForbidden, fmt.Errorf("authorize: %s: %w", req.Resource.Kind, err)
+		}
+		return owner, project, Permission("project:read"), DecisionAllow, nil
 	}
 }
 

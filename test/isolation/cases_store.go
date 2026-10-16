@@ -53,6 +53,7 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"Bindings":            caseBindings,
 	"CustomRoles":         caseCustomRoles,
 	"ProjectOrganization": caseProjectOrganization,
+	"ResourceProject":     caseResourceProject,
 	// Key store (ADR-0042).
 	"MasterCanary":             caseMasterCanary,
 	"PutMasterCanary":          caseMasterCanary,

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 )
 
@@ -49,6 +50,22 @@ func caseCustomRoles(ctx context.Context, tb testing.TB, env *Env) {
 	got, err := env.Stores.CustomRoles(ctx, env.A.Scope)
 	if err != nil || len(got) != 0 {
 		tb.Fatalf("custom roles of A = %+v, %v; want none", got, err)
+	}
+}
+
+// caseResourceProject: a flow resolves to its organization and project; an unknown identifier and
+// an unknown kind are not found.
+func caseResourceProject(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	org, project, err := env.Stores.ResourceProject(ctx, "flow", env.B.Flow.ID.String())
+	if err != nil || org != identity.OrgID(env.B.UUID) || project != env.B.Project.ID.String() {
+		tb.Fatalf("owner of the flow of B = %v, %s, %v", org, project, err)
+	}
+	if _, _, err := env.Stores.ResourceProject(ctx, "flow", fresh[flow.FlowID](env).String()); !errors.Is(err, identity.ErrNotFound) {
+		tb.Fatalf("an unknown flow: %v, want not found", err)
+	}
+	if _, _, err := env.Stores.ResourceProject(ctx, "widget", env.B.Flow.ID.String()); !errors.Is(err, identity.ErrNotFound) {
+		tb.Fatalf("an unknown kind: %v, want not found", err)
 	}
 }
 
