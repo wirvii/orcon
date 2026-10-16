@@ -86,6 +86,7 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	identity.ProjectStore
 	identity.IdempotencyStore
 	flow.Store
+	flow.DraftStore
 	flow.VersionStore
 	flow.SnapshotStore
 	execution.WorkerStore

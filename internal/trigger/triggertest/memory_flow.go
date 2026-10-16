@@ -211,6 +211,12 @@ func (m *Memory) UpdateFlowDraft(_ context.Context, org orgscope.Org, id flow.Fl
 	return f.DraftRevision, nil
 }
 
+// UpdateFlowDraftWithEntry implements [flow.Store]. The fake keeps no audit chain, so the entry is
+// dropped.
+func (m *Memory) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, id flow.FlowID, draft []byte, expected int64, refs []flow.ConnectorReference, now time.Time, _ audit.Entry) (int64, error) {
+	return m.UpdateFlowDraft(ctx, org, id, draft, expected, refs, now)
+}
+
 // PublishVersion implements [flow.VersionStore].
 func (m *Memory) PublishVersion(_ context.Context, org orgscope.Org, v flow.VersionRecord) error {
 	m.mu.Lock()

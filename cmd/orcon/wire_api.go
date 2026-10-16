@@ -55,11 +55,13 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			flow.NewCreator(sec.store, sec.clock, sec.ids), sec.store, sec.pageCodec,
 		)
 		deps.Rebuilds = projects.Rebuilds()
+		drafts := httpapi.NewDrafts(flow.NewDrafts(sec.store, sec.clock, sec.ids))
 		deps.Server = productServer{
 			StrictServerInterface: httpapi.Unavailable{},
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin),
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
+			drafts:                drafts,
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -76,6 +78,7 @@ type productServer struct {
 	sessions *httpapi.Sessions
 	orgs     *httpapi.Orgs
 	projects *httpapi.Projects
+	drafts   *httpapi.Drafts
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -92,6 +95,14 @@ func (s productServer) ListFlows(ctx context.Context, req apigen.ListFlowsReques
 
 func (s productServer) CreateFlow(ctx context.Context, req apigen.CreateFlowRequestObject) (apigen.CreateFlowResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.CreateFlow(ctx, req)
+}
+
+func (s productServer) GetDraft(ctx context.Context, req apigen.GetDraftRequestObject) (apigen.GetDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.drafts.GetDraft(ctx, req)
+}
+
+func (s productServer) ReplaceDraft(ctx context.Context, req apigen.ReplaceDraftRequestObject) (apigen.ReplaceDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.drafts.ReplaceDraft(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it

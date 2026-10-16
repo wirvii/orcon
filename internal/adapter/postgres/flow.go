@@ -109,6 +109,16 @@ func (s *Store) ListFlows(ctx context.Context, org orgscope.Org, project identit
 
 // UpdateFlowDraft implements [flow.Store].
 func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, nil)
+}
+
+// UpdateFlowDraftWithEntry implements [flow.Store]: the new draft, its connector references and
+// the audit entry of the change in one transaction.
+func (s *Store) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry audit.Entry) (int64, error) {
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, &entry)
+}
+
+func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry *audit.Entry) (int64, error) {
 	var revision int64
 	err := s.inScope(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
@@ -119,7 +129,13 @@ func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID fl
 		}
 		if n == 1 {
 			revision = expectedRevision + 1
-			return replaceDraftReferences(ctx, q, org, flowID, references, now)
+			if err := replaceDraftReferences(ctx, q, org, flowID, references, now); err != nil {
+				return err
+			}
+			if entry != nil {
+				return insertPendingOrg(ctx, q, org, *entry)
+			}
+			return nil
 		}
 		// Either the flow does not exist or its revision moved; tell them apart.
 		if _, err := q.GetFlow(ctx, pgUUID(org.UUID()), pgUUID(flowID)); err != nil {
