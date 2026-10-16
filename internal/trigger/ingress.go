@@ -42,10 +42,15 @@ type Verifier interface {
 	// authentic is an error wrapping [ErrUnauthorized].
 	Admit(ctx context.Context, r Resolved, req IngressRequest) (input []byte, start bool, err error)
 	// Challenge answers a subscription handshake: it returns the text to echo,
-	// or an error wrapping [ErrUnauthorized] when the token is wrong or the
-	// trigger declares no handshake.
+	// an error wrapping [ErrUnauthorized] when the token is wrong, or an error
+	// wrapping [ErrNoHandshake] when the trigger declares no handshake.
 	Challenge(ctx context.Context, r Resolved, req IngressRequest) (string, error)
 }
+
+// ErrNoHandshake means the route a GET came to declares no subscription
+// handshake (a native webhook, for example), so the GET is an ordinary event and
+// goes through [Service.Ingest]. It is not a refusal.
+var ErrNoHandshake = errors.New("the route declares no subscription handshake")
 
 // Accepted is a request the ingress accepted: the execution it started. The
 // execution runs on the version the registry named when the request arrived.
@@ -105,17 +110,21 @@ func (s *Service) Ingest(ctx context.Context, req IngressRequest) (Accepted, err
 // Handshake answers the subscription request of a provider that verifies a
 // webhook address with a GET (SPEC-002 T2; ADR-0030 §8). It resolves the GET
 // address, asks the verifier for the challenge and returns it. It starts no
-// execution and reads no acceptance. Without a verifier nothing can be
-// confirmed, so the request is refused.
+// execution and reads no acceptance. A route that declares no handshake, or a
+// build without a verifier, answers [ErrNoHandshake]: the caller then treats the
+// GET as an ordinary event.
 func (s *Service) Handshake(ctx context.Context, req IngressRequest) (string, error) {
 	if s.verifier == nil {
-		return "", fmt.Errorf("%w: no verifier is wired", ErrUnauthorized)
+		return "", fmt.Errorf("%w: no verifier is wired", ErrNoHandshake)
 	}
 	r, err := s.store.ResolveRoute(ctx, req.Method, req.Path)
 	if err != nil {
 		return "", fmt.Errorf("resolve %s %s: %w", req.Method, req.Path, err)
 	}
 	challenge, err := s.verifier.Challenge(ctx, r, req)
+	if errors.Is(err, ErrNoHandshake) {
+		return "", err
+	}
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrUnauthorized, err)
 	}

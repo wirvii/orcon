@@ -114,12 +114,12 @@ func TestHandshakeEchoesTheVerifiersChallenge(t *testing.T) {
 	}
 }
 
-// TestHandshakeRefusedWithoutAVerifier: a build that cannot check the verify
-// token must not confirm an address.
+// TestHandshakeNotAnsweredWithoutAVerifier: a build that cannot check the verify
+// token never echoes a challenge; the GET is left to the ordinary ingress.
 func TestHandshakeRefusedWithoutAVerifier(t *testing.T) {
 	svc, _ := newIngress(t, nil)
-	if _, err := svc.Handshake(t.Context(), trigger.IngressRequest{Method: "GET", Path: "/hooks/p/x"}); !errors.Is(err, trigger.ErrUnauthorized) {
-		t.Fatalf("Handshake() = %v, want ErrUnauthorized", err)
+	if _, err := svc.Handshake(t.Context(), trigger.IngressRequest{Method: "GET", Path: "/hooks/p/x"}); !errors.Is(err, trigger.ErrNoHandshake) {
+		t.Fatalf("Handshake() = %v, want ErrNoHandshake", err)
 	}
 }
 

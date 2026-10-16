@@ -112,14 +112,14 @@ func (v whatsappVerifier) Admit(ctx context.Context, r trigger.Resolved, req tri
 }
 
 // Challenge implements [trigger.Verifier]: it answers the subscription handshake
-// of a WhatsApp route, and refuses every other route, which declares none.
+// of a WhatsApp route; every other route declares none and answers [trigger.ErrNoHandshake].
 func (v whatsappVerifier) Challenge(ctx context.Context, r trigger.Resolved, req trigger.IngressRequest) (string, error) {
 	nodeType, err := v.nodeType(ctx, r)
 	if err != nil {
 		return "", err
 	}
 	if nodeType != whatsappTriggerType {
-		return "", errors.New("the trigger declares no handshake")
+		return "", trigger.ErrNoHandshake
 	}
 	cred, err := v.credentials(ctx, r.Org, whatsappCredential)
 	if err != nil {

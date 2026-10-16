@@ -118,6 +118,35 @@ func TestWebhookGetIsTheSubscriptionHandshake(t *testing.T) {
 	}
 }
 
+// TestWebhookGetWithoutHandshakeIsAnOrdinaryEvent: a GET to a route that
+// declares no handshake (a native webhook that accepts GET) goes to the ingress
+// and starts an execution, as a POST would.
+func TestWebhookGetWithoutHandshakeIsAnOrdinaryEvent(t *testing.T) {
+	in := &fakeWebhookIngress{handshakeErr: trigger.ErrNoHandshake}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/hooks/p/lookup?id=7", nil)
+
+	rec := serveWebhook(in, r)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
+	}
+	if rec.Header().Get("Orcon-Execution-Id") != "exec-1" {
+		t.Fatalf("execution id = %q, want exec-1", rec.Header().Get("Orcon-Execution-Id"))
+	}
+	if in.got.Method != http.MethodGet || in.got.Query["id"] != "7" {
+		t.Fatalf("request reaching the ingress = %+v", in.got)
+	}
+}
+
+// TestWebhookGetToNoRouteIsNotFound: a GET to an address nobody serves is
+// answered by the ingress, as any other method is.
+func TestWebhookGetToNoRouteIsNotFound(t *testing.T) {
+	in := &fakeWebhookIngress{handshakeErr: trigger.ErrNoRoute, ingestErr: trigger.ErrNoRoute}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/hooks/p/none", nil)
+	if rec := serveWebhook(in, r); rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
 // TestWebhookRefusedHandshakeIs403: a wrong token is forbidden and says
 // nothing about the address.
 func TestWebhookRefusedHandshakeIs403(t *testing.T) {
@@ -129,5 +158,18 @@ func TestWebhookRefusedHandshakeIs403(t *testing.T) {
 	}
 	if rec.Header().Get("Content-Type") == "text/plain; charset=utf-8" {
 		t.Fatal("a refused handshake answered as a challenge")
+	}
+}
+
+// TestWebhookGetEventWithoutBodyIsAnEmptyObject: a GET has no body, so the
+// event handed to the ingress is an empty JSON object, which the engine accepts.
+func TestWebhookGetEventWithoutBodyIsAnEmptyObject(t *testing.T) {
+	in := &fakeWebhookIngress{handshakeErr: trigger.ErrNoHandshake}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/hooks/p/lookup", nil)
+	if rec := serveWebhook(in, r); rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
+	}
+	if string(in.got.Body) != "{}" {
+		t.Fatalf("body reaching the ingress = %q, want {}", in.got.Body)
 	}
 }
