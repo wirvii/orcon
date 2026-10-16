@@ -11,6 +11,7 @@ import (
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/credential"
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/platform/id"
 )
@@ -36,6 +37,9 @@ func resolveCredentials(r credential.Resolver, scopes store.Scopes) func(context
 			return httpdispatch.Credential{}, err
 		}
 		if err := res.CheckHost(req.Host); err != nil {
+			if errors.Is(err, credential.ErrHostNotAllowed) {
+				return httpdispatch.Credential{}, &execution.NodeError{Code: httpdispatch.CodeCredentialHostNotAllowed, Class: execution.ClassPermanent, Err: err}
+			}
 			return httpdispatch.Credential{}, err
 		}
 		return credentialOf(res)
@@ -59,15 +63,15 @@ func credentialOf(res credential.Resolved) (httpdispatch.Credential, error) {
 	_, hasPass := fields["password"]
 	switch {
 	case hasUser && hasPass:
-		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthBasic}, Fields: fields}, nil
+		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthBasic}, Fields: fields, Mask: res.SecretValues()}, nil
 	case fields["apiKey"] != "":
 		name := fields["headerName"]
 		if name == "" {
 			name = "X-API-Key"
 		}
-		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthAPIKey, In: "HEADER", Name: name, Field: "apiKey"}, Fields: fields}, nil
+		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthAPIKey, In: "HEADER", Name: name, Field: "apiKey"}, Fields: fields, Mask: res.SecretValues()}, nil
 	case fields["token"] != "":
-		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthBearer, Field: "token"}, Fields: fields}, nil
+		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthBearer, Field: "token"}, Fields: fields, Mask: res.SecretValues()}, nil
 	}
 	return httpdispatch.Credential{}, ErrCredentialFields
 }

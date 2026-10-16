@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestInputBoundsAreRefusedWithoutValues: each rule of the input is refused with ErrInvalid, and the message
@@ -127,26 +128,26 @@ func TestOwnerOnlyChangesAreRefusedToOthers(t *testing.T) {
 		t.Fatalf("share: %v", err)
 	}
 	set := Settings{Name: "renamed", AllowedHosts: []string{"graph.facebook.com"}}
-	if _, err := f.svc.Update(t.Context(), f.orgA, f.projA2, created.ID, set, f.actor); !errors.Is(err, ErrNotOwner) {
+	if _, err := f.svc.Update(t.Context(), f.orgA, f.projA2, created.ID, set, time.Time{}, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("update by the user project = %v; want ErrNotOwner", err)
 	}
-	if err := f.svc.Delete(t.Context(), f.orgA, f.projA2, created.ID, f.actor); !errors.Is(err, ErrNotOwner) {
+	if err := f.svc.Delete(t.Context(), f.orgA, f.projA2, created.ID, time.Time{}, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("delete by the user project = %v; want ErrNotOwner", err)
 	}
 	if err := f.svc.Unshare(t.Context(), f.orgA, f.projA2, created.ID, f.projA2, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("unshare by the user project = %v; want ErrNotOwner", err)
 	}
 	bad := Settings{Name: "", AllowedHosts: []string{"graph.facebook.com"}}
-	if _, err := f.svc.Update(t.Context(), f.orgA, f.projA1, created.ID, bad, f.actor); !errors.Is(err, ErrInvalid) {
+	if _, err := f.svc.Update(t.Context(), f.orgA, f.projA1, created.ID, bad, time.Time{}, f.actor); !errors.Is(err, ErrInvalid) {
 		t.Errorf("update with a blank name = %v; want ErrInvalid", err)
 	}
 	if err := f.svc.Unshare(t.Context(), f.orgA, f.projA1, created.ID, f.projB1, f.actor); err == nil {
 		t.Error("unshare of a share that does not exist succeeded")
 	}
-	if err := f.svc.Delete(t.Context(), f.orgA, f.projA1, created.ID, f.actor); err != nil {
+	if err := f.svc.Delete(t.Context(), f.orgA, f.projA1, created.ID, time.Time{}, f.actor); err != nil {
 		t.Fatalf("delete by the owner: %v", err)
 	}
-	if err := f.svc.Delete(t.Context(), f.orgA, f.projA1, created.ID, f.actor); !errors.Is(err, ErrNotFound) {
+	if err := f.svc.Delete(t.Context(), f.orgA, f.projA1, created.ID, time.Time{}, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("delete of a deleted credential = %v; want ErrNotFound", err)
 	}
 }

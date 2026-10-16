@@ -14,13 +14,25 @@ import (
 
 const deleteCredential = `-- name: DeleteCredential :execrows
 DELETE FROM credential
-WHERE org_id = ?1 AND id = ?2 AND project_id = ?3
+WHERE org_id = ?1 AND id = ?2 AND project_id = ?3 AND updated_at = ?4
 `
 
+type DeleteCredentialParams struct {
+	OrgID             []byte
+	ID                []byte
+	ProjectID         []byte
+	ExpectedUpdatedAt int64
+}
+
 // orcon:scope org
-// orcon:delete bookkeeping:the credential audit event (R-AUD-01) is written by the audit cut (SPEC-004 SE8); the versions and shares go with the row
-func (q *Queries) DeleteCredential(ctx context.Context, orgID []byte, iD []byte, projectID []byte) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteCredential, orgID, iD, projectID)
+// orcon:delete bookkeeping:the credential audit event (R-AUD-01) is appended in the same transaction by the adapter; the versions and shares go with the row
+func (q *Queries) DeleteCredential(ctx context.Context, arg DeleteCredentialParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteCredential,
+		arg.OrgID,
+		arg.ID,
+		arg.ProjectID,
+		arg.ExpectedUpdatedAt,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -33,7 +45,7 @@ WHERE org_id = ?1 AND credential_id = ?2 AND project_id = ?3
 `
 
 // orcon:scope org
-// orcon:delete bookkeeping:the share audit event (R-AUD-01) is written by the audit cut (SPEC-004 SE8); the next dispatch sees the removal at once
+// orcon:delete bookkeeping:the share audit event (R-AUD-01) is appended in the same transaction by the adapter; the next dispatch sees the removal at once
 func (q *Queries) DeleteCredentialShare(ctx context.Context, orgID []byte, credentialID []byte, projectID []byte) (int64, error) {
 	result, err := q.db.ExecContext(ctx, deleteCredentialShare, orgID, credentialID, projectID)
 	if err != nil {
@@ -407,7 +419,7 @@ func (q *Queries) UpdateCredentialCurrentVersion(ctx context.Context, arg Update
 const updateCredentialSettings = `-- name: UpdateCredentialSettings :execrows
 UPDATE credential
 SET name = ?1, allowed_host_document = ?2, updated_at = ?3
-WHERE org_id = ?4 AND id = ?5 AND project_id = ?6
+WHERE org_id = ?4 AND id = ?5 AND project_id = ?6 AND updated_at = ?7
 `
 
 type UpdateCredentialSettingsParams struct {
@@ -417,6 +429,7 @@ type UpdateCredentialSettingsParams struct {
 	OrgID               []byte
 	ID                  []byte
 	ProjectID           []byte
+	ExpectedUpdatedAt   int64
 }
 
 // orcon:scope org
@@ -428,6 +441,7 @@ func (q *Queries) UpdateCredentialSettings(ctx context.Context, arg UpdateCreden
 		arg.OrgID,
 		arg.ID,
 		arg.ProjectID,
+		arg.ExpectedUpdatedAt,
 	)
 	if err != nil {
 		return 0, err

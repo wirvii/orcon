@@ -140,7 +140,7 @@ func caseUpdateCredential(ctx context.Context, tb testing.TB, env *Env) {
 	forged := rec
 	forged.OrgID = identity.OrgIDOf(env.B.Scope)
 	forged.Name = env.B.Sentinel("renamed")
-	if err := env.Stores.UpdateCredential(ctx, env.B.Scope, forged, audittest.Org(tb, env.B.Scope.UUID(), "credential.updated")); err == nil {
+	if err := env.Stores.UpdateCredential(ctx, env.B.Scope, forged, rec.UpdatedAt, audittest.Org(tb, env.B.Scope.UUID(), "credential.updated")); err == nil {
 		tb.Fatal("B updated the credential of A")
 	}
 	got, err := env.Stores.GetCredential(ctx, env.A.Scope, rec.ID)
@@ -153,7 +153,7 @@ func caseUpdateCredential(ctx context.Context, tb testing.TB, env *Env) {
 func caseDeleteCredential(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec, _ := credentialOf(ctx, tb, env, &env.A)
-	wantErr(tb, "B deletes the credential of A", env.Stores.DeleteCredential(ctx, env.B.Scope, env.A.Project.ID, rec.ID, audittest.Org(tb, env.B.Scope.UUID(), "credential.deleted")), credential.ErrNotFound)
+	wantErr(tb, "B deletes the credential of A", env.Stores.DeleteCredential(ctx, env.B.Scope, env.A.Project.ID, rec.ID, rec.UpdatedAt, audittest.Org(tb, env.B.Scope.UUID(), "credential.deleted")), credential.ErrNotFound)
 	if _, err := env.Stores.GetCredential(ctx, env.A.Scope, rec.ID); err != nil {
 		tb.Fatalf("A lost its credential after B's attempt: %v", err)
 	}

@@ -67,13 +67,13 @@ WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND current_version_number
 -- orcon:scope org
 UPDATE credential
 SET name = sqlc.arg(name), allowed_host_document = sqlc.arg(allowed_host_document), updated_at = sqlc.arg(updated_at)
-WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND project_id = sqlc.arg(project_id);
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND project_id = sqlc.arg(project_id) AND updated_at = sqlc.arg(expected_updated_at);
 
 -- name: DeleteCredential :execrows
 -- orcon:scope org
--- orcon:delete bookkeeping:the credential audit event (R-AUD-01) is written by the audit cut (SPEC-004 SE8); the versions and shares go with the row
+-- orcon:delete bookkeeping:the credential audit event (R-AUD-01) is appended in the same transaction by the adapter; the versions and shares go with the row
 DELETE FROM credential
-WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND project_id = sqlc.arg(project_id);
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND project_id = sqlc.arg(project_id) AND updated_at = sqlc.arg(expected_updated_at);
 
 -- name: GetCredentialShare :one
 -- orcon:scope org
@@ -88,7 +88,7 @@ VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(credential_id), sqlc.arg(projec
 
 -- name: DeleteCredentialShare :execrows
 -- orcon:scope org
--- orcon:delete bookkeeping:the share audit event (R-AUD-01) is written by the audit cut (SPEC-004 SE8); the next dispatch sees the removal at once
+-- orcon:delete bookkeeping:the share audit event (R-AUD-01) is appended in the same transaction by the adapter; the next dispatch sees the removal at once
 DELETE FROM credential_share
 WHERE org_id = sqlc.arg(org_id) AND credential_id = sqlc.arg(credential_id) AND project_id = sqlc.arg(project_id);
 

@@ -33,10 +33,13 @@ type Store interface {
 	// and only while the current version is still expectedCurrent (otherwise [ErrConflict]). v.Number is
 	// expectedCurrent+1.
 	AddVersion(ctx context.Context, org orgscope.Org, credential id.UUID, expectedCurrent int, v Version, status Status, at time.Time, entry audit.Entry) error
-	// UpdateCredential stores the name and the allowed hosts of a credential.
-	UpdateCredential(ctx context.Context, org orgscope.Org, rec Record, entry audit.Entry) error
-	// DeleteCredential removes a credential owned by the project, with its versions and shares.
-	DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, entry audit.Entry) error
+	// UpdateCredential stores the name and the allowed hosts of a credential, and only while the credential still
+	// carries the update time expected (a compare-and-swap in the write itself); otherwise [ErrConflict]. A
+	// credential that does not exist for the project is [ErrNotFound].
+	UpdateCredential(ctx context.Context, org orgscope.Org, rec Record, expected time.Time, entry audit.Entry) error
+	// DeleteCredential removes a credential owned by the project, with its versions and shares, and only while the
+	// credential still carries the update time expected; otherwise [ErrConflict].
+	DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, expected time.Time, entry audit.Entry) error
 	// GetShare returns the share of a credential with a project, or [ErrNotFound].
 	GetShare(ctx context.Context, org orgscope.Org, credential id.UUID, project identity.ProjectID) (Share, error)
 	// CreateShare stores a share; [ErrConflict] when the project already holds one.

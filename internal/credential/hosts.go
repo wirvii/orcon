@@ -6,6 +6,7 @@ package credential
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
@@ -19,7 +20,9 @@ const maxHostLength = 253
 
 // normalizeHost returns the canonical form of an allowed-host entry: lowercase, without a trailing dot. An entry is a
 // DNS name ("api.example.com") or a wildcard with one leading label ("*.example.com"). Schemes, ports, paths, user
-// information and IP literals are refused: the host binding compares names only.
+// information and IPv6 literals are refused: the host binding compares host names only. An IPv4 address is accepted as
+// an exact entry (ADR-0043 section 4 does not forbid binding a credential to a fixed address, and the network policy of
+// the egress client still decides whether the address may be reached), but a wildcard over an address is refused.
 func normalizeHost(entry string) (string, error) {
 	h := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(entry), "."))
 	if h == "" || len(h) > maxHostLength {
@@ -29,6 +32,15 @@ func normalizeHost(entry string) (string, error) {
 	wildcard := strings.HasPrefix(h, "*.")
 	if wildcard {
 		name = h[2:]
+	}
+	if wildcard {
+		if _, err := netip.ParseAddr(name); err == nil {
+			return "", fmt.Errorf("%w: a wildcard host cannot be an IP address", ErrInvalid)
+		}
+		// A wildcard over a numeric-only tail ("*.1.2.3") reads as a partial address and matches no real host.
+		if strings.IndexFunc(name[strings.LastIndex(name, ".")+1:], func(r rune) bool { return r < '0' || r > '9' }) < 0 {
+			return "", fmt.Errorf("%w: a wildcard host cannot be an IP address", ErrInvalid)
+		}
 	}
 	labels := strings.Split(name, ".")
 	if len(labels) < 2 {

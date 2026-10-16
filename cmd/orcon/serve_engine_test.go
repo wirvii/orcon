@@ -134,7 +134,7 @@ func publishOnDisk(t *testing.T, dbPath, providerURL string) (identity.OrgID, id
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
-	publishWebhookFlow(t, env, eng, providerURL, "mock")
+	publishWebhookFlow(t, env, eng, providerURL+"/v1/items?offset=0&limit=2", "mock", "GET")
 	if err := st.Close(); err != nil {
 		t.Fatalf("close the database: %v", err)
 	}

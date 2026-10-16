@@ -130,7 +130,11 @@ func (s *Service) Replace(ctx context.Context, org orgscope.Org, project identit
 
 // Update changes the name and the allowed hosts of a credential. Only the owning project may update it. The audit
 // entry names the fields that changed.
-func (s *Service) Update(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, set Settings, actor audit.Actor) (Summary, error) {
+//
+// The argument expected is the update time the caller saw when it checked its If-Match revision. The write itself
+// compares it, so two changes that carry the same revision cannot both succeed: the second gets [ErrConflict]. The
+// zero time means the state this call just read.
+func (s *Service) Update(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, set Settings, expected time.Time, actor audit.Actor) (Summary, error) {
 	if err := validateName(set.Name); err != nil {
 		return Summary{}, err
 	}
@@ -142,7 +146,16 @@ func (s *Service) Update(ctx context.Context, org orgscope.Org, project identity
 	if err != nil {
 		return Summary{}, err
 	}
-	now := s.clock.Now()
+	if expected.IsZero() {
+		expected = rec.UpdatedAt
+	}
+	// The stores keep microseconds, so the revision is compared at that precision.
+	now := s.clock.Now().Truncate(time.Microsecond)
+	if !now.After(rec.UpdatedAt) {
+		// The update time is the revision of the credential: it moves forward with every change, even when the clock
+		// reads the same microsecond or went back, so a second change carrying the old revision is refused.
+		now = rec.UpdatedAt.Add(time.Microsecond)
+	}
 	changed := changedSettings(rec, trimmed(set.Name), hosts)
 	rec.Name = trimmed(set.Name)
 	rec.AllowedHosts = hosts
@@ -152,24 +165,29 @@ func (s *Service) Update(ctx context.Context, org orgscope.Org, project identity
 	if err != nil {
 		return Summary{}, err
 	}
-	if err := s.store.UpdateCredential(ctx, org, rec, entry); err != nil {
+	if err := s.store.UpdateCredential(ctx, org, rec, expected, entry); err != nil {
 		return Summary{}, fmt.Errorf("update credential: %w", err)
 	}
 	return s.Get(ctx, org, project, credential)
 }
 
-// Delete removes a credential, its versions and its shares. Only the owning project may delete it.
-func (s *Service) Delete(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, actor audit.Actor) error {
+// Delete removes a credential, its versions and its shares. Only the owning project may delete it. The argument
+// expected has the meaning it has in [Service.Update]: the delete is refused with [ErrConflict] when the credential
+// changed since.
+func (s *Service) Delete(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, expected time.Time, actor audit.Actor) error {
 	rec, err := s.owned(ctx, org, project, credential)
 	if err != nil {
 		return err
+	}
+	if expected.IsZero() {
+		expected = rec.UpdatedAt
 	}
 	entry, err := s.entry(org, actor, ActionDeleted, s.clock.Now(), jsonvalue.Member{Key: "credentialId", Value: jsonvalue.String(rec.ID.String())},
 		jsonvalue.Member{Key: "projectId", Value: jsonvalue.String(project.String())})
 	if err != nil {
 		return err
 	}
-	if err := s.store.DeleteCredential(ctx, org, project, credential, entry); err != nil {
+	if err := s.store.DeleteCredential(ctx, org, project, credential, expected, entry); err != nil {
 		return fmt.Errorf("delete credential: %w", err)
 	}
 	return nil

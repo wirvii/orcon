@@ -139,7 +139,7 @@ func (s *Store) AddVersion(ctx context.Context, org orgscope.Org, cred id.UUID, 
 }
 
 // UpdateCredential implements [credential.Store].
-func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec credential.Record, entry audit.Entry) error {
+func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec credential.Record, expected time.Time, entry audit.Entry) error {
 	err := s.inScope(ctx, "update credential", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		hosts, err := credential.EncodeHosts(rec.AllowedHosts)
 		if err != nil {
@@ -148,12 +148,13 @@ func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec cred
 		n, err := q.UpdateCredentialSettings(ctx, sqlcgen.UpdateCredentialSettingsParams{
 			Name: rec.Name, AllowedHostDocument: hosts, UpdatedAt: timestamp(rec.UpdatedAt),
 			OrgID: pgUUID(identity.OrgIDOf(org)), ID: pgUUID(rec.ID), ProjectID: pgUUID(rec.ProjectID),
+			ExpectedUpdatedAt: timestamp(expected),
 		})
 		if err != nil {
 			return err
 		}
 		if n != 1 {
-			return credential.ErrNotFound
+			return missOrChanged(ctx, q, org, rec.ProjectID, rec.ID)
 		}
 		return insertPendingOrg(ctx, q, org, entry)
 	})
@@ -161,14 +162,14 @@ func (s *Store) UpdateCredential(ctx context.Context, org orgscope.Org, rec cred
 }
 
 // DeleteCredential implements [credential.Store]. The versions and the shares go with the row (ON DELETE CASCADE).
-func (s *Store) DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, entry audit.Entry) error {
+func (s *Store) DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, expected time.Time, entry audit.Entry) error {
 	err := s.inScope(ctx, "delete credential", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
-		n, err := q.DeleteCredential(ctx, pgUUID(identity.OrgIDOf(org)), pgUUID(cred), pgUUID(project))
+		n, err := q.DeleteCredential(ctx, sqlcgen.DeleteCredentialParams{OrgID: pgUUID(identity.OrgIDOf(org)), ID: pgUUID(cred), ProjectID: pgUUID(project), ExpectedUpdatedAt: timestamp(expected)})
 		if err != nil {
 			return err
 		}
 		if n != 1 {
-			return credential.ErrNotFound
+			return missOrChanged(ctx, q, org, project, cred)
 		}
 		return insertPendingOrg(ctx, q, org, entry)
 	})
@@ -279,4 +280,21 @@ func credErr(err error) error {
 		return fmt.Errorf("%w: %w", credential.ErrInvalid, err)
 	}
 	return err
+}
+
+// missOrChanged tells why a compare-and-swap write of a credential touched no row: the credential is not one of the
+// project in this organization ([credential.ErrNotFound]), or it exists and changed since the caller read it
+// ([credential.ErrConflict]).
+func missOrChanged(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org, project identity.ProjectID, cred id.UUID) error {
+	row, err := q.GetCredential(ctx, pgUUID(identity.OrgIDOf(org)), pgUUID(cred))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return credential.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if row.ProjectID != pgUUID(project) {
+		return credential.ErrNotFound
+	}
+	return fmt.Errorf("the credential changed: %w", credential.ErrConflict)
 }

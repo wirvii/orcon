@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -35,8 +36,8 @@ type CredentialService interface {
 	Get(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID) (credential.Summary, error)
 	List(ctx context.Context, org orgscope.Org, project identity.ProjectID) ([]credential.Summary, error)
 	Replace(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, in credential.Input, actor audit.Actor) (credential.Summary, error)
-	Update(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, set credential.Settings, actor audit.Actor) (credential.Summary, error)
-	Delete(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, actor audit.Actor) error
+	Update(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, set credential.Settings, expected time.Time, actor audit.Actor) (credential.Summary, error)
+	Delete(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, expected time.Time, actor audit.Actor) error
 	Share(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, target identity.ProjectID, actor audit.Actor) error
 	Unshare(ctx context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, target identity.ProjectID, actor audit.Actor) error
 	OwnerProject(ctx context.Context, org orgscope.Org, cred string) (identity.ProjectID, error)
@@ -201,9 +202,9 @@ func (c *Credentials) UpdateCredential(ctx context.Context, req apigen.UpdateCre
 			set.AllowedHosts = *req.Body.AllowedHosts
 		}
 	}
-	s, err := c.svc.Update(ctx, org, owner, cid, set, actor)
+	s, err := c.svc.Update(ctx, org, owner, cid, set, cur.UpdatedAt, actor)
 	if err != nil {
-		return nil, err
+		return nil, c.staleOnConflict(ctx, org, owner, cid, err)
 	}
 	etag := conditional.ETag(credentialRevision(&s))
 	return apigen.UpdateCredential200JSONResponse{Body: credentialBody(&s, true), Headers: apigen.UpdateCredential200ResponseHeaders{ETag: &etag}}, nil
@@ -259,8 +260,8 @@ func (c *Credentials) DeleteCredential(ctx context.Context, req apigen.DeleteCre
 	if err := checkRevision(req.Params.IfMatch, &cur); err != nil {
 		return nil, err
 	}
-	if err := c.svc.Delete(ctx, org, owner, cid, actor); err != nil {
-		return nil, err
+	if err := c.svc.Delete(ctx, org, owner, cid, cur.UpdatedAt, actor); err != nil {
+		return nil, c.staleOnConflict(ctx, org, owner, cid, err)
 	}
 	return apigen.DeleteCredential204Response{}, nil
 }
@@ -305,6 +306,20 @@ func (c *Credentials) DeleteCredentialShare(ctx context.Context, req apigen.Dele
 		return nil, err
 	}
 	return apigen.DeleteCredentialShare204Response{}, nil
+}
+
+// staleOnConflict turns the refusal of a write that carried the revision the caller had checked into the
+// 412 answer with the current ETag: another change won the race between the check and the write. Any other
+// error is returned as it is. When the credential is gone by then, the answer is the lookup's (not found).
+func (c *Credentials) staleOnConflict(ctx context.Context, org orgscope.Org, owner identity.ProjectID, cid id.UUID, err error) error {
+	if !errors.Is(err, credential.ErrConflict) {
+		return err
+	}
+	cur, getErr := c.svc.Get(ctx, org, owner, cid)
+	if getErr != nil {
+		return getErr
+	}
+	return staleRevisionError{etag: conditional.ETag(credentialRevision(&cur))}
 }
 
 // ownerOf returns the project that owns the credential named in the URL, inside the caller's organization. A credential

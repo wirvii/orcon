@@ -144,13 +144,16 @@ func (m *memStore) AddVersion(_ context.Context, org orgscope.Org, cred id.UUID,
 	return nil
 }
 
-func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Record, entry audit.Entry) error {
+func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Record, expected time.Time, entry audit.Entry) error {
 	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cur, ok := m.owned(org, rec.ID)
 	if !ok {
 		return ErrNotFound
+	}
+	if !cur.UpdatedAt.Equal(expected) {
+		return ErrConflict
 	}
 	for k := range m.creds {
 		other := m.creds[k]
@@ -163,13 +166,16 @@ func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Rec
 	return nil
 }
 
-func (m *memStore) DeleteCredential(_ context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, entry audit.Entry) error {
+func (m *memStore) DeleteCredential(_ context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, expected time.Time, entry audit.Entry) error {
 	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.owned(org, cred)
 	if !ok || rec.ProjectID != project {
 		return ErrNotFound
+	}
+	if !rec.UpdatedAt.Equal(expected) {
+		return ErrConflict
 	}
 	delete(m.creds, cred)
 	delete(m.versions, cred)
@@ -497,7 +503,7 @@ func TestShareUseWithoutRead(t *testing.T) {
 	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA2, created.ID, basicInput("x"), f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("replace by the shared project = %v; want ErrNotOwner", err)
 	}
-	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA2, created.ID, f.actor); !errors.Is(err, ErrNotOwner) {
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA2, created.ID, time.Time{}, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("delete by the shared project = %v; want ErrNotOwner", err)
 	}
 	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA2, created.ID, f.projA1, f.actor); !errors.Is(err, ErrNotOwner) {
@@ -550,17 +556,17 @@ func TestCredentialLifecycle(t *testing.T) {
 	if _, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, basicInput("two"), f.actor); !errors.Is(err, ErrConflict) {
 		t.Errorf("the same name twice = %v; want ErrConflict", err)
 	}
-	upd, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, first.ID, Settings{Name: "Renamed", AllowedHosts: []string{"graph.facebook.com", "graph.facebook.com"}}, f.actor)
+	upd, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, first.ID, Settings{Name: "Renamed", AllowedHosts: []string{"graph.facebook.com", "graph.facebook.com"}}, time.Time{}, f.actor)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	if upd.Name != "Renamed" || len(upd.AllowedHosts) != 1 {
 		t.Errorf("update = name %q hosts %v; want the new name and one host", upd.Name, upd.AllowedHosts)
 	}
-	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA2, first.ID, Settings{Name: "x", AllowedHosts: []string{"a.example.com"}}, f.actor); !errors.Is(err, ErrNotFound) {
+	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA2, first.ID, Settings{Name: "x", AllowedHosts: []string{"a.example.com"}}, time.Time{}, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("update by an unrelated project = %v; want ErrNotFound", err)
 	}
-	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, first.ID, f.actor); err != nil {
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, first.ID, time.Time{}, f.actor); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA1, first.ID); !errors.Is(err, ErrNotFound) {
@@ -604,7 +610,7 @@ func TestMutationsAuditEveryChangeWithoutValues(t *testing.T) {
 	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, Input{Secret: map[string]string{"accessToken": "rotated-" + secret}}, f.actor); err != nil {
 		t.Fatalf("replace: %v", err)
 	}
-	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, created.ID, Settings{Name: "Renamed", AllowedHosts: created.AllowedHosts}, f.actor); err != nil {
+	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, created.ID, Settings{Name: "Renamed", AllowedHosts: created.AllowedHosts}, time.Time{}, f.actor); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
@@ -613,7 +619,7 @@ func TestMutationsAuditEveryChangeWithoutValues(t *testing.T) {
 	if err := f.svc.Unshare(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
 		t.Fatalf("unshare: %v", err)
 	}
-	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, created.ID, f.actor); err != nil {
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, created.ID, time.Time{}, f.actor); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	want := []string{ActionCreated, ActionUpdated, ActionUpdated, ActionShared, ActionUnshared, ActionDeleted}

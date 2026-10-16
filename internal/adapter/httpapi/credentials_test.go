@@ -33,6 +33,10 @@ type fakeCredentials struct {
 	lastIn   credential.Input
 	unshared []identity.ProjectID
 	err      error
+	// writeErr is what Update and Delete answer, after Get found the credential.
+	writeErr error
+	// lastExpected is the revision the last Update or Delete carried to the write.
+	lastExpected time.Time
 }
 
 func (f *fakeCredentials) Create(_ context.Context, _ orgscope.Org, project identity.ProjectID, in credential.Input, _ audit.Actor) (credential.Summary, error) {
@@ -68,12 +72,19 @@ func (f *fakeCredentials) Replace(ctx context.Context, _ orgscope.Org, _ identit
 	return f.Get(ctx, orgscope.Org{}, identity.ProjectID{}, cred)
 }
 
-func (f *fakeCredentials) Update(ctx context.Context, _ orgscope.Org, _ identity.ProjectID, cred id.UUID, set credential.Settings, _ audit.Actor) (credential.Summary, error) {
-	f.lastSet = set
+func (f *fakeCredentials) Update(ctx context.Context, _ orgscope.Org, _ identity.ProjectID, cred id.UUID, set credential.Settings, expected time.Time, _ audit.Actor) (credential.Summary, error) {
+	f.lastSet, f.lastExpected = set, expected
+	if f.writeErr != nil {
+		return credential.Summary{}, f.writeErr
+	}
 	return f.Get(ctx, orgscope.Org{}, identity.ProjectID{}, cred)
 }
 
-func (f *fakeCredentials) Delete(context.Context, orgscope.Org, identity.ProjectID, id.UUID, audit.Actor) error {
+func (f *fakeCredentials) Delete(_ context.Context, _ orgscope.Org, _ identity.ProjectID, _ id.UUID, expected time.Time, _ audit.Actor) error {
+	f.lastExpected = expected
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	return f.err
 }
 
@@ -185,6 +196,37 @@ func TestUpdateCredentialRefusesStaleRevision(t *testing.T) {
 	if svc.lastSet.Name != name || len(svc.lastSet.AllowedHosts) != 1 || svc.lastSet.AllowedHosts[0] != "hooks.slack.com" {
 		t.Errorf("settings = %+v; the omitted hosts must keep their value", svc.lastSet)
 	}
+}
+
+// TestCredentialWriteRaceAnswers412 (IDEM-5): the revision that passed the If-Match check travels to the write, and a
+// write that loses the race to another change answers 412 with the current ETag, for the settings and the delete.
+func TestCredentialWriteRaceAnswers412(t *testing.T) {
+	cur := credential.Summary{Record: credential.Record{
+		ID: newTestID(3), ProjectID: identity.ProjectID(newTestID(2)), Name: "Slack", AllowedHosts: []string{"hooks.slack.com"},
+		Status: credential.StatusOK, CurrentVersion: 2, UpdatedAt: testInstant,
+	}, Owned: true}
+	svc := &fakeCredentials{byID: map[id.UUID]credential.Summary{cur.ID: cur}, writeErr: credential.ErrConflict}
+	h := NewCredentials(svc)
+	ctx := callerCtx(t)
+	etag := `"` + strconv.FormatInt(testInstant.UnixMicro(), 10) + `"`
+	wantStale := func(err error) {
+		t.Helper()
+		var refused staleRevisionError
+		if !errors.As(err, &refused) || refused.etag != etag {
+			t.Fatalf("lost race = %v, want a staleRevisionError with the current ETag", err)
+		}
+		if !svc.lastExpected.Equal(testInstant) {
+			t.Fatalf("the write carried revision %v, want %v", svc.lastExpected, testInstant)
+		}
+	}
+	_, err := h.UpdateCredential(ctx, apigen.UpdateCredentialRequestObject{
+		CredentialId: apigen.CredentialId(cur.ID), Params: apigen.UpdateCredentialParams{IfMatch: etag}, Body: &apigen.UpdateCredentialRequest{},
+	})
+	wantStale(err)
+	_, err = h.DeleteCredential(ctx, apigen.DeleteCredentialRequestObject{
+		CredentialId: apigen.CredentialId(cur.ID), Params: apigen.DeleteCredentialParams{IfMatch: etag},
+	})
+	wantStale(err)
 }
 
 // TestListCredentialsPages (PAGE): a page carries a token for the next one, the last page carries none, and a token

@@ -55,11 +55,20 @@ var ErrThrottled = errors.New("dispatch: throttled by a rate bucket")
 // engine parks the node, the token and the execution until a person decides.
 var ErrUnknownOutcome = errors.New("dispatch: outcome of an effect is unknown")
 
+// CodeCredentialHostNotAllowed is the code of the failure raised when the credential a node names is not allowed
+// for the host the request goes to (ADR-0043 section 4). The failure is permanent: sending again does not change it.
+const CodeCredentialHostNotAllowed = "CredentialHostNotAllowed" //nolint:gosec // an error code, not a credential
+
 // Credential is the credential a node runs under, resolved by the caller: the
 // authentication scheme and the decrypted fields. Values never leave the send.
 type Credential struct {
 	Auth   declarative.Auth
 	Fields map[string]string
+	// Mask holds every secret value of the credential. The send replaces each
+	// occurrence in the response items (strings and object keys) with a redaction
+	// marker before the items become node output or journal response (ADR-0043
+	// section 5, R-CRED-04). The base64 form of a BASIC pair is derived from Fields.
+	Mask []string
 }
 
 // CredentialRequest asks for the credential one activation names.
@@ -388,7 +397,7 @@ func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, k
 		n.honorRetryAfter(ctx, req, err)
 		return nil, describe(err)
 	}
-	return res.Items, nil
+	return newMasker(cred).items(res.Items), nil
 }
 
 // honorRetryAfter blocks the shared bucket until the instant the provider asked

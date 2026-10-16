@@ -6,8 +6,11 @@ package storetest_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
@@ -116,6 +119,86 @@ func TestCredentialStoreRoundTrip(t *testing.T) {
 		}
 		if _, err := svc.Resolve(ctx, scopeA, projA2, created.ID); !errors.Is(err, credential.ErrNotUsable) {
 			t.Errorf("the next use after the unshare = %v, want ErrNotUsable", err)
+		}
+	})
+}
+
+// TestCredentialStoreCompareAndSwapOnSettingsAndDelete (SPEC-004 SE7, PR 165 review): the revision a settings change or
+// a delete carries is compared in the write itself, so concurrent calls that hold the same revision cannot both win,
+// and a change made after the revision was read is refused with ErrConflict.
+func TestCredentialStoreCompareAndSwapOnSettingsAndDelete(t *testing.T) {
+	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
+		t.Helper()
+		f := newFixture(t, newStore)
+		ctx := f.ctx()
+		svc := credentialFixture(t, f)
+		scopeA := scopeOf(f.orgA)
+		owner := audit.Actor{PrincipalID: id.UUID(f.user("owner-cas@example.com").PrincipalID), Kind: audit.ActorUser}
+
+		const racers = 8
+		for _, op := range []string{"update", "delete"} {
+			created, err := svc.Create(ctx, scopeA, f.projA, credential.Input{
+				Name: "Racing " + op, ConnectorReference: "http", AllowedHosts: []string{"api.example.com"},
+				Secret: map[string]string{"token": "race-" + op},
+			}, owner)
+			if err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			seen := created.UpdatedAt
+			var wins, conflicts, other atomic.Int32
+			var wg sync.WaitGroup
+			start := make(chan struct{})
+			for i := range racers {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-start
+					var err error
+					if op == "update" {
+						_, err = svc.Update(ctx, scopeA, f.projA, created.ID, credential.Settings{
+							Name: fmt.Sprintf("Racing update %d", i), AllowedHosts: []string{"api.example.com"},
+						}, seen, owner)
+					} else {
+						err = svc.Delete(ctx, scopeA, f.projA, created.ID, seen, owner)
+					}
+					switch {
+					case err == nil:
+						wins.Add(1)
+					case errors.Is(err, credential.ErrConflict), errors.Is(err, credential.ErrNotFound):
+						conflicts.Add(1)
+					default:
+						other.Add(1)
+						t.Errorf("%s: unexpected error: %v", op, err)
+					}
+				}()
+			}
+			close(start)
+			wg.Wait()
+			if wins.Load() != 1 || conflicts.Load() != racers-1 {
+				t.Fatalf("%s with the same revision: %d wins and %d refusals, want 1 and %d", op, wins.Load(), conflicts.Load(), racers-1)
+			}
+		}
+
+		// A revision read before another change is stale, for the settings and for the delete.
+		created, err := svc.Create(ctx, scopeA, f.projA, credential.Input{
+			Name: "Stale revision", ConnectorReference: "http", AllowedHosts: []string{"api.example.com"},
+			Secret: map[string]string{"token": "stale"},
+		}, owner)
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		if _, err := svc.Update(ctx, scopeA, f.projA, created.ID, credential.Settings{Name: "Renamed once", AllowedHosts: []string{"api.example.com"}}, created.UpdatedAt, owner); err != nil {
+			t.Fatalf("first update: %v", err)
+		}
+		if _, err := svc.Update(ctx, scopeA, f.projA, created.ID, credential.Settings{Name: "Renamed twice", AllowedHosts: []string{"api.example.com"}}, created.UpdatedAt, owner); !errors.Is(err, credential.ErrConflict) {
+			t.Fatalf("update with a stale revision = %v, want ErrConflict", err)
+		}
+		if err := svc.Delete(ctx, scopeA, f.projA, created.ID, created.UpdatedAt, owner); !errors.Is(err, credential.ErrConflict) {
+			t.Fatalf("delete with a stale revision = %v, want ErrConflict", err)
+		}
+		got, err := svc.Get(ctx, scopeA, f.projA, created.ID)
+		if err != nil || got.Name != "Renamed once" {
+			t.Fatalf("the credential after the refused calls = %q, %v; want the first rename", got.Name, err)
 		}
 	})
 }

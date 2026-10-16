@@ -106,7 +106,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind, stored bool) {
 		}
 	})
 
-	publishWebhookFlow(t, env, eng, srv.URL, credentialRef)
+	publishWebhookFlow(t, env, eng, srv.URL+"/v1/items?offset=0&limit=2", credentialRef, "GET")
 
 	handler, err := newAPIRouterWith(config.RoleStandalone, slog.New(slog.DiscardHandler), nil, eng.ingress())
 	if err != nil {
@@ -149,13 +149,16 @@ func testCredentials(_ context.Context, req httpdispatch.CredentialRequest) (htt
 
 // publishWebhookFlow stores a draft, publishes it and activates it, through the
 // trigger service the process runs.
-func publishWebhookFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, providerURL, credentialRef string) {
+func publishWebhookFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, callURL, credentialRef, method string) {
 	t.Helper()
 	ctx := t.Context()
+	params := fmt.Sprintf(`"method":%q,"url":%q,"credential":%q`, method, callURL, credentialRef)
+	if method != "GET" {
+		params += `,"idempotent":true`
+	}
 	extra := []string{
 		`{"id":"check","name":"Check","element":"exclusiveGateway","type":"orcon.if@1","routing":"EXCLUSIVE","sensitivePaths":["/amount"],"parameters":{"condition":"={{ $json.amount > 10 }}"}}`,
-		fmt.Sprintf(`{"id":"call","name":"Call","element":"serviceTask","type":"orcon.http@1","parameters":{"method":"GET","url":%q,"credential":%q}}`,
-			providerURL+"/v1/items?offset=0&limit=2", credentialRef),
+		`{"id":"call","name":"Call","element":"serviceTask","type":"orcon.http@1","parameters":{` + params + `}}`,
 	}
 	extraEdges := []string{
 		`{"id":"e-true","from":{"node":"check","port":"true"},"to":{"node":"call"},"kind":"SEQUENCE"}`,
@@ -237,6 +240,12 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 // the provider, and returns the service and the identifier the flow names.
 func storedCredential(t *testing.T, env *storetest.EngineEnv, providerURL string) (*credential.Service, string) {
 	t.Helper()
+	return storedCredentialWith(t, env, providerURL, map[string]string{"token": mockprovider.Token})
+}
+
+// storedCredentialWith is storedCredential for the secret fields the caller chooses.
+func storedCredentialWith(t *testing.T, env *storetest.EngineEnv, providerURL string, secret map[string]string) (*credential.Service, string) {
+	t.Helper()
 	ctx := t.Context()
 	u, err := url.Parse(providerURL)
 	if err != nil {
@@ -268,7 +277,7 @@ func storedCredential(t *testing.T, env *storetest.EngineEnv, providerURL string
 	}
 	created, err := svc.Create(ctx, storetest.ScopeOf(env.Org), env.Project, credential.Input{
 		Name: "Mock provider", ConnectorReference: "http", AllowedHosts: []string{u.Hostname()},
-		Secret: map[string]string{"token": mockprovider.Token},
+		Secret: secret,
 	}, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser})
 	if err != nil {
 		t.Fatalf("create the credential: %v", err)
@@ -305,6 +314,10 @@ func TestResolveCredentialsBindsTheHost(t *testing.T) {
 			req.Host = "evil.example.net"
 			if _, err := resolve(t.Context(), req); !errors.Is(err, credential.ErrHostNotAllowed) {
 				t.Fatalf("other host: %v; want ErrHostNotAllowed", err)
+			}
+			var refused *execution.NodeError
+			if _, err := resolve(t.Context(), req); !errors.As(err, &refused) || refused.Code != "CredentialHostNotAllowed" || refused.Class != execution.ClassPermanent {
+				t.Fatalf("other host: %v; want a permanent CredentialHostNotAllowed failure", err)
 			}
 			req.Host, req.Project = "provider.example.com", identity.ProjectID(env.IDs.New())
 			if _, err := resolve(t.Context(), req); !errors.Is(err, credential.ErrNotUsable) {
