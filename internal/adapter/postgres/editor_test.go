@@ -19,7 +19,7 @@ func TestEngineFunctionsAreOwnedByTheEngineRole(t *testing.T) {
 	conn := connect(t, dsn)
 	ctx := t.Context()
 
-	rows, err := conn.Query(ctx, `SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef,
+	rows, err := conn.Query(ctx, `SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef, p.provolatile = 'i',
 		has_function_privilege('public', p.oid, 'EXECUTE'), has_function_privilege('orcon_application', p.oid, 'EXECUTE')
 		FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 		WHERE n.nspname = 'orcon_engine' ORDER BY p.proname LIMIT 100`)
@@ -30,15 +30,16 @@ func TestEngineFunctionsAreOwnedByTheEngineRole(t *testing.T) {
 	var names []string
 	for rows.Next() {
 		var name, owner string
-		var definer, publicExec, appExec bool
-		if err := rows.Scan(&name, &owner, &definer, &publicExec, &appExec); err != nil {
+		var definer, immutable, publicExec, appExec bool
+		if err := rows.Scan(&name, &owner, &definer, &immutable, &publicExec, &appExec); err != nil {
 			t.Fatalf("scan engine function: %v", err)
 		}
 		names = append(names, name)
 		if owner != "orcon_engine" {
 			t.Errorf("orcon_engine.%s is owned by %s, want orcon_engine", name, owner)
 		}
-		if !definer {
+		// A pure immutable helper (derive_uuid) touches no table, so it needs no definer rights.
+		if !definer && !immutable {
 			t.Errorf("orcon_engine.%s is not SECURITY DEFINER", name)
 		}
 		if publicExec {
