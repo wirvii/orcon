@@ -22,3 +22,8 @@ Teams move with their structure intact and re-enter secrets once, on Orcon's wri
 
 ## Alternatives considered
 Reading the n8n database or decrypting n8n credential exports with the n8n encryption key (rejected: couples to n8n internals and handles secrets in bulk).
+
+## Amendments
+Changes applied after acceptance; each entry names its source.
+
+- **SPEC-021 (2026-10-16, Proposed until the owner accepts ADR 0084).** §3: a same-name, same-type credential of the project is linked instead of creating a placeholder; creating one requires `credential:create`; the gate is publication (ADR-0084 §4).

@@ -10,7 +10,7 @@ sources:
   - ADR-0037
   - ADR-0051
   - ADR-0071
-sourceHash: 7d4ec8bb938f640dde3a8df78fddb8c88f25c8efe314d3f86336921f5088d86f
+sourceHash: ca8da7fe8c937eb6c87ee6cb91d7b0c30a4859027b8c4b6f35471a640ca2beba
 ---
 <!-- SPDX-FileCopyrightText: The Orcon Authors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
@@ -19,7 +19,7 @@ sourceHash: 7d4ec8bb938f640dde3a8df78fddb8c88f25c8efe314d3f86336921f5088d86f
 
 n8n is a trademark of its owner; Orcon is an independent project. Esta guía nombra a n8n solo para decir qué es.
 
-> Esta guía describe el comportamiento especificado por las decisiones aceptadas del proyecto. Una función está disponible solo en las versiones que la incluyen; las páginas de esta sección se escriben antes que el importador y se corrigen cuando este se entrega.
+> Esta guía describe el comportamiento especificado por las decisiones aceptadas del proyecto. Una función está disponible solo en las versiones que la incluyen.
 
 Orcon busca una interacción familiar y la importación de flujos de n8n. No promete ser un reemplazo directo. Todo lo que difiere se te muestra antes de activar algo, y nada se sustituye en silencio.
 
@@ -52,4 +52,4 @@ Orcon busca una interacción familiar y la importación de flujos de n8n. No pro
 4. Prueba los flujos con la ejecución de prueba del editor.
 5. Activa los flujos y, cuando estés listo, apunta tu dominio a Orcon.
 
-Las demás páginas de esta sección, que profundizan en cada paso, se escriben junto con el importador.
+[Importar flujos de n8n](importing-flows.md) profundiza en la importación, y el [informe de importación de n8n](../../../reference/n8n-import-report.md) (en inglés) explica cada código del informe.

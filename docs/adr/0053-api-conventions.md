@@ -79,3 +79,5 @@ Changes applied on 2026-10-12 by specifications the owner accepted together with
 - **SPEC-005 (Amendment 8, 2026-10-13).** §3: new code `method-not-allowed` 405 for a new condition; `confirmation-required` confirmed as 403 and `federated-token-rejected` as 400, as this section allowed the implementing slices to do.
 - **SPEC-005 (Amendment 8, Q-API-C, 2026-10-14, owner decision).** §4: the stored idempotent response body is kept in a column of `idempotency_record` together with its format (`response_body_document` and `response_body_document_format`, as SPEC-005 §11.2 states), not as a reference to a blob (ADR-0016); this replaces the column `response_body_reference`.
 - **SPEC-005 (Amendment 8, API1 QA, BL-090, 2026-10-14).** §3: new code `unsupported-media-type` 415 for a new condition: the media type of a request body is not one the operation declares.
+
+- **SPEC-021 (2026-10-16, Proposed until the owner accepts ADR 0084).** §7: "Importing n8n workflow files supplied in the request body is synchronous (ADR-0084 §1); importing users or credentials from a remote n8n instance stays long-running."
