@@ -5,7 +5,7 @@
 
 Status: **Accepted** | Source: SPEC-004 Annex B (accepted 2026-10-12 via SPEC-004), with the actions added by the amendments of [ADR-0048](../adr/0048-tamper-evident-audit-log.md)
 
-This page publishes the audited-actions coverage list of SPEC-004 Annex B. ADR-0048 §7 makes that annex normative, and [ADR-0052](../adr/0052-public-api-architecture-and-resource-model.md) refers to it for the audit event of each human action. This page adds no action and removes none; if it and Annex B disagree, Annex B wins.
+This page publishes the audited-actions coverage list of SPEC-004 Annex B. ADR-0048 §7 makes that annex normative, and [ADR-0052](../adr/0052-public-api-architecture-and-resource-model.md) refers to it for the audit event of each human action. This page adds no action and removes none, except that SPEC-020 gives names to the price actions listed under "Added by SPEC-006". If it and Annex B disagree, Annex B wins.
 
 ## Event format
 Every event uses the public format `orcon/audit@1` defined in [ADR-0048](../adr/0048-tamper-evident-audit-log.md) §1; that ADR is the single place where the fields are described, and this page does not repeat them. Points that matter when reading the tables:
@@ -150,12 +150,21 @@ The amendments of [ADR-0048](../adr/0048-tamper-evident-audit-log.md) record fur
 | `webhook.redelivered` |  |  |
 
 ### Added by SPEC-006
-ADR-0048 describes these actions without naming them, so this page lists them by description:
+ADR-0048 describes these actions without naming them, so this page lists them by description, except the price actions, which SPEC-020 names in the table below:
 
-- changes to budgets, prices and the redaction or injection policy;
+- changes to budgets and the redaction or injection policy;
 - tool approvals, denials and argument edits;
 - evaluation gate overrides;
 - conversion of a conversation into an evaluation case;
 - reads of conversation content (coalesced per 15 minutes);
 - changes to MCP servers;
 - the start of a reindex.
+
+#### Price actions (SPEC-020)
+
+| Action | Details recorded | Notes |
+|---|---|---|
+| `ai_price.override_created\|override_updated\|override_deleted` | Provider, model, the prices before and after (micro-USD per million tokens) and the note | Organization chain. Written in the same transaction as the change. The same three actions exist for the instance chain under the prefix `instance_ai_price`. |
+| `instance_ai_price.config_loaded` | SHA-256 of the file, number of entries, outcome (`SUCCESS` or `FAILURE`) and the reason on failure | Actor `SYSTEM`. Once for each load of the instance price file and for each process. |
+
+A write that is refused (missing permission, organization overrides turned off, or an instance price file in force) is recorded with outcome `DENIED` in its own transaction; a missing permission is recorded as `access.denied`.
