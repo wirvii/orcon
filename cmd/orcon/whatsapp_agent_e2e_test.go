@@ -24,6 +24,7 @@ import (
 	"github.com/wirvii/orcon/internal/ai/provider"
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -111,11 +112,11 @@ func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
 
 	// The first message starts one execution; the agent answers and the reply is sent.
 	exec := postSigned(t, handler, messageBody("wamid.1", "When does my order arrive?"), testAppSecret, http.StatusAccepted)
-	waitExecution(t, env, st, exec)
+	waitExecution(t, env, st, exec, execution.ExecSucceeded)
 
 	// The second message comes from the same sender, so the model sees the first exchange.
 	exec = postSigned(t, handler, messageBody("wamid.2", "And if I am not home?"), testAppSecret, http.StatusAccepted)
-	waitExecution(t, env, st, exec)
+	waitExecution(t, env, st, exec, execution.ExecSucceeded)
 
 	model := llm.Requests()
 	if len(model) != 2 {

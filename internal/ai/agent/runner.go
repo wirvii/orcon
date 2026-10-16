@@ -595,6 +595,12 @@ func (r *Runner) callModel(ctx context.Context, run *runState, msgs []provider.M
 		return provider.Response{}, ModelUse{}, transient(err)
 	}
 	price, version, priced := r.price(ctx, run.org, run.p.model)
+	if run.p.maxSpend > 0 && !priced {
+		// Spend is counted from known prices; without one the cap could never trigger,
+		// so the run is refused instead of silently running without it (ADR-0060).
+		return provider.Response{}, ModelUse{}, &execution.NodeError{Code: CodeBudgetExceeded, Class: execution.ClassPermanent,
+			Err: fmt.Errorf("maxSpend cannot be enforced: model %s/%s has no known price", run.p.model.Provider, run.p.model.Name)}
+	}
 	if err := r.admit(ctx, run, msgs, price, priced); err != nil {
 		return provider.Response{}, ModelUse{}, err
 	}

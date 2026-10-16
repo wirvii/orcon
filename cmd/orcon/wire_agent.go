@@ -10,6 +10,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/llm/anthropic"
 	"github.com/wirvii/orcon/internal/adapter/llm/openai"
+	"github.com/wirvii/orcon/internal/ai/cost"
 	"github.com/wirvii/orcon/internal/ai/provider"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -75,4 +76,20 @@ func (m modelResolver) apiKey(ctx context.Context, org identity.OrgID, name stri
 // modelPolicy grants one model host over https.
 func modelPolicy(host string) egress.Policy {
 	return egress.Policy{Domains: []string{host}, Schemes: []string{"https"}}
+}
+
+// modelPrices is the price source of the agent (ADR-0062 section 3): the table
+// embedded in the binary. Overrides and signed tables join the layers when they
+// are configured; a model no layer prices has an unknown cost.
+type modelPrices struct{ layers cost.Layers }
+
+// newModelPrices returns the price source of this build.
+func newModelPrices() modelPrices {
+	return modelPrices{layers: cost.Layers{Embedded: cost.Embedded()}}
+}
+
+// Price implements [agent.Prices].
+func (p modelPrices) Price(_ context.Context, _ identity.OrgID, ref flow.ModelRef) (cost.Price, string, bool) {
+	r, ok := p.layers.Resolve(cost.ModelKey{Provider: ref.Provider, Model: ref.Name})
+	return r.Price, r.Version, ok
 }

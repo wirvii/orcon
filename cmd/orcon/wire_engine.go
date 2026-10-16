@@ -16,6 +16,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/exprflow"
 	"github.com/wirvii/orcon/internal/ai/agent"
 	"github.com/wirvii/orcon/internal/ai/chain"
+	"github.com/wirvii/orcon/internal/ai/cost"
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/connector/limit"
@@ -146,8 +147,13 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	}
 	// The agent runs its tools through the same runners as the flow: a tool is
 	// a node type the agent may call, here the HTTP node.
+	budgets, ok := st.(cost.Store)
+	if !ok {
+		return nil, errors.New("wire orcon.ai.agent@1: the store keeps no AI budgets")
+	}
 	agentNode, err := agent.New(agent.Config{
 		Models: models, Store: agentStore, Orgs: st, Clock: clk,
+		Prices: newModelPrices(), Budgets: budgets,
 		Runners: map[string]execution.NodeRunner{httpdispatch.HTTPNodeType: httpNode},
 	})
 	if err != nil {

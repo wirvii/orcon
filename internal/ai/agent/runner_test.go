@@ -239,6 +239,21 @@ func TestAgentCapsSpend(t *testing.T) {
 	}
 }
 
+// TestAgentRefusesMaxSpendWithoutAPrice: a spend cap cannot trigger when the
+// model has no known price, so the run is refused before any model call instead
+// of running without the cap.
+func TestAgentRefusesMaxSpendWithoutAPrice(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, []reply{{resp: textReply("nunca")}}, nil, nil, nil)
+	_, err := h.run(t.Context(), agentParams(`"maxSpend":50`), userInput, "ne-nospend")
+	if got := nodeCode(err); got != agent.CodeBudgetExceeded || !strings.Contains(err.Error(), "maxSpend") {
+		t.Errorf("error = %v (code %q), want the maxSpend refusal", err, got)
+	}
+	if n := h.prov.requestCount(); n != 0 {
+		t.Errorf("model asked %d times, want 0", n)
+	}
+}
+
 // TestAgentInvalidArgumentsTwice: a second invalid call to the same tool in a
 // row fails the run; the first one only tells the model what was wrong.
 func TestAgentInvalidArgumentsTwice(t *testing.T) {
