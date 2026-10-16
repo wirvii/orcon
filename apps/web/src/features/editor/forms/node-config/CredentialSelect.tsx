@@ -3,7 +3,7 @@
 
 import { Banner, Button, FormField, Select, Skeleton } from '@orcon/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { KeyRound, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 
@@ -45,6 +45,11 @@ export function CredentialSelect({ nodeId, slot, bound, t }: CredentialSelectPro
   const note = t(`credential.${slot.slot}.note`);
   const usable = (query.data ?? []).filter((credential) => slot.types.includes(credential.type));
   const missing = bound !== undefined && query.data !== undefined && !(query.data.some((credential) => credential.name === bound && slot.types.includes(credential.type)));
+
+  // The credential in use, by name and type. Its account and its health come with the credential service (F-09): until then the card says no more than it knows.
+  const chosen = bound !== undefined && !missing ? usable.find((credential) => credential.name === bound) : undefined;
+  const chosenKind = chosen ? credentialType(chosen.type) : undefined;
+  const chosenType = chosen ? (chosenKind ? credentialText(chosenKind, language, 'name') : chosen.type) : '';
 
   const options = [
     { value: NONE, label: intl.formatMessage(configMessages.credentialNone) },
@@ -108,6 +113,17 @@ export function CredentialSelect({ nodeId, slot, bound, t }: CredentialSelectPro
             </Button>
           }
         />
+      ) : null}
+      {chosen ? (
+        <div data-credential-card role="group" aria-label={intl.formatMessage(configMessages.credentialCard, { name: chosen.name, type: chosenType })} className="border-border bg-surface flex items-center gap-3 rounded-md border p-3">
+          <span aria-hidden className="bg-surface-sunken text-fg-muted grid size-10 shrink-0 place-items-center rounded-md">
+            <KeyRound className="size-icon-20" />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-semibold">{chosen.name}</span>
+            <span className="text-fg-muted truncate text-sm">{chosenType}</span>
+          </span>
+        </div>
       ) : null}
       <FormField label={label} description={note} name={`/credentials/${slot.slot}`} required={slot.required === true}>
         {query.isPending ? (

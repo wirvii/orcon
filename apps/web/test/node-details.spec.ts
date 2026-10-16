@@ -57,7 +57,11 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Settings' }).click();
+      await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeVisible();
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Retries and safety' }).click();
       await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeVisible();
+      await expect(page.getByText('A retry can send this twice')).toBeVisible();
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Docs' }).click();
       await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
@@ -349,6 +353,9 @@ test.describe('on a phone the node details are read-only', () => {
       await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Settings' }).click();
+      await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeDisabled();
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Retries and safety' }).click();
       await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Docs' }).click();
@@ -369,6 +376,9 @@ test.describe('on a phone the node details are read-only', () => {
     await expect(view.getByRole('textbox').first()).toBeDisabled();
     expect(await enabledControls(page)).toEqual([]);
     await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeDisabled();
+    expect(await enabledControls(page)).toEqual([]);
+    await page.getByRole('tab', { name: 'Retries and safety' }).click();
     await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
     expect(await enabledControls(page)).toEqual([]);
     await page.getByRole('tab', { name: 'Docs' }).click();

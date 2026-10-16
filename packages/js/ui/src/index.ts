@@ -190,9 +190,12 @@ export { useAnnouncer, ANNOUNCE_INTERVAL_MS } from './canvas/announcer';
 // Node details view (style A): three panes in a dialog from lg, a docked Parameters pane from md
 export { NodeDetailsView } from './editor/node-details-view/NodeDetailsView';
 export type { DetailsTab, NodeDetailsViewProps } from './editor/node-details-view/NodeDetailsView';
+export { ExpressionChip } from './editor/expression-chips/ExpressionChip';
+export type { ExpressionChipProps } from './editor/expression-chips/ExpressionChip';
 export { DataPane } from './editor/data-pane/DataPane';
 export type { DataPaneProps, OutputPort } from './editor/data-pane/DataPane';
-export type { DataItem, DataRun, DataView, PaneData } from './editor/model';
+export { FIELD_DRAG_TYPE } from './editor/model';
+export type { DataItem, DataRun, DataView, FieldPath, PaneData } from './editor/model';
 export type {
   AiBlockKind,
   AiBlockSpec,
