@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { compareVersions } from './connector-versions';
+import type { OperationSafety } from './effect-safety';
 import type { FlowNode } from './flow-document';
 import { START_TYPE, UNSUPPORTED_TYPE } from './node-types';
 
@@ -79,6 +80,11 @@ export interface NodeManifest {
   readonly parameters: readonly ParamDef[];
   readonly credentials: readonly CredentialSlot[];
   readonly effect: EffectClass;
+  /**
+   * What the operation declares about repeating it (`purity`, `safetyLevel`, the unique key). Absent for the built-in
+   * types: they send nothing to a service that could receive it twice.
+   */
+  readonly safety?: OperationSafety;
   /** Catalog keys of the operations the Docs tab lists. */
   readonly operations: readonly string[];
   readonly catalog: Catalog;
@@ -369,4 +375,9 @@ export function effectOf(manifest: NodeManifest, parameters: Readonly<Record<str
   // A method given by a formula cannot be known here: it counts as a write, the careful reading.
   if (typeof method !== 'string' || method.startsWith('=')) return 'write';
   return method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD' ? 'read' : 'write';
+}
+
+/** What the node's operation declares about repeating it, or undefined for a type that declares nothing. */
+export function safetyOf(node: Pick<FlowNode, 'type' | 'element' | 'parameters'>): OperationSafety | undefined {
+  return manifestOf(node)?.safety;
 }

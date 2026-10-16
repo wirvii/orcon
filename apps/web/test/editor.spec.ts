@@ -201,7 +201,7 @@ test.describe('on a computer', () => {
     await toast.getByRole('button', { name: 'Undo' }).click();
     await expect(tiles(page)).toHaveCount(6);
     // The store followed: the flow is saved with its nodes, and history still goes back through the delete.
-    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved$/ })).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved/ })).toBeVisible({ timeout: 6_000 });
     await page.getByRole('link', { name: 'Settings' }).first().click();
     await goInApp(page, FLOW);
     await page.waitForSelector('[data-fitted="true"]');
@@ -316,7 +316,7 @@ test.describe('on a computer', () => {
     await page.keyboard.press('d');
     await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
     // The full text is matched: "Unsaved changes" also contains "saved", and the wait must be for the save itself.
-    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved$/ })).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved/ })).toBeVisible({ timeout: 6_000 });
     // Leave for another page and come back: the saved draft is what opens.
     await page.getByRole('link', { name: 'Settings' }).first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();

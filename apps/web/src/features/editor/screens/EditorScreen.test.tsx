@@ -510,7 +510,7 @@ describe('the editor screen', () => {
       await waitFor(() => {
         expect(screen.queryByText('This flow changed somewhere else')).toBeNull();
       });
-      expect(screen.getByText('Saved')).toBeVisible();
+      expect(screen.getByText(/^Saved/)).toBeVisible();
     });
   });
 

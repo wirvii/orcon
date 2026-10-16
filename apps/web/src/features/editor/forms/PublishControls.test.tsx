@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -23,13 +23,12 @@ function flowAnswer(state: { activationState: 'ACTIVE' | 'INACTIVE'; activeVersi
 }
 
 describe('PublishControls', () => {
-  it('shows the activation state, the published version and the unpublished changes as words', async () => {
+  it('shows the activation state as a switch with its word and the pending changes on Publish', async () => {
     server.use(http.get(flowPath, () => flowAnswer({ activationState: 'ACTIVE', activeVersion: 2, hasUnpublishedChanges: true }, '"5"')));
-    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} />);
+    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" pending={3} />);
     expect(await screen.findByText('Active')).toBeVisible();
-    expect(screen.getByText('Version 2 is published')).toBeVisible();
-    expect(screen.getByText('Unpublished changes')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Deactivate' })).toBeVisible();
+    expect(screen.getByRole('switch', { name: 'Active: Order notifications' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Publish, 3 changes not published yet' })).toBeVisible();
   });
 
   it('activates a published flow against the entity tag it read', async () => {
@@ -41,9 +40,11 @@ describe('PublishControls', () => {
         return flowAnswer({ activationState: 'ACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"6"');
       }),
     );
-    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Activate' }));
-    expect(await screen.findByRole('button', { name: 'Deactivate' })).toBeVisible();
+    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Active: Order notifications' }));
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'Active: Order notifications' })).toBeChecked();
+    });
     expect(ifMatch).toBe('"5"');
   });
 
@@ -52,8 +53,8 @@ describe('PublishControls', () => {
       http.get(flowPath, () => flowAnswer({ activationState: 'INACTIVE', activeVersion: 1, hasUnpublishedChanges: false }, '"5"')),
       http.post(`${flowPath}/activate`, () => problem(412, 'precondition-failed', 'precondition-failed')),
     );
-    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+    renderInApp(<PublishControls flowId={EXAMPLE_FLOW_ID} flowName="Order notifications" />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Active: Order notifications' }));
     expect(await screen.findByText('Nothing was changed. Reload the flow to see its newest state.')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload the flow' })).toBeVisible();
     expect(screen.getByText('Inactive')).toBeVisible();
