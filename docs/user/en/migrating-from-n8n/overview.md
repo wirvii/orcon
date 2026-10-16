@@ -18,7 +18,7 @@ sources:
 
 n8n is a trademark of its owner; Orcon is an independent project. This guide names n8n only to say what it is.
 
-> This guide describes the behavior specified by the accepted decisions of the project. A feature is available only in versions that ship it; the pages of this section are written ahead of the importer and are corrected when it ships.
+> This guide describes the behavior specified by the accepted decisions of the project. A feature is available only in versions that ship it.
 
 Orcon aims at familiar interaction and at importing n8n flows. It does not promise to be a drop-in replacement. Whatever differs is shown to you before you activate anything, and nothing is replaced silently.
 
@@ -51,4 +51,4 @@ Orcon aims at familiar interaction and at importing n8n flows. It does not promi
 4. Test the flows with the test run of the editor.
 5. Activate the flows and, when you are ready, point your domain at Orcon.
 
-The other pages of this section, which go deeper into each step, are written together with the importer.
+[Importing n8n flows](importing-flows.md) goes deeper into the import, and the [n8n import report](../../../reference/n8n-import-report.md) explains every code of the report.
