@@ -103,13 +103,12 @@ it('the appearance choices apply at once and are announced politely, with no sav
   expect(document.documentElement).toHaveAttribute('lang', 'es');
 });
 
-it('the profile shows the real name and email, read only', async () => {
+it('the profile shows the real name in a field and the email as text', async () => {
   signInAs();
   renderRoute('/orgs/acme/settings/profile');
   const card = (await screen.findByRole('heading', { level: 2, name: 'Profile' })).closest('section') as HTMLElement;
-  expect(within(card).getByText('Ana Ruiz')).toBeVisible();
+  expect(await within(card).findByRole('textbox', { name: /Name/ })).toHaveValue('Ana Ruiz');
   expect(within(card).getByText('ana@example.com')).toBeVisible();
-  expect(within(card).queryByRole('textbox')).toBeNull();
 });
 
 it('a section that needs a server part that does not exist yet says so instead of failing', async () => {

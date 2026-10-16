@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { identityOf } from './identity';
+import { hasDisplayName, identityOf } from './identity';
 
 describe('identityOf', () => {
   it('uses the account name when it is set', () => {
@@ -24,5 +24,13 @@ describe('identityOf', () => {
 
   it('never shows "Owner", even for an odd email', () => {
     expect(identityOf({ displayName: 'Owner', email: '@example.com' }).name).not.toBe('Owner');
+  });
+});
+
+describe('hasDisplayName', () => {
+  it('is false for an empty name and for the placeholder "Owner"', () => {
+    expect(hasDisplayName({ displayName: 'Ana Ruiz' })).toBe(true);
+    expect(hasDisplayName({ displayName: 'Owner' })).toBe(false);
+    expect(hasDisplayName({ displayName: '  ' })).toBe(false);
   });
 });

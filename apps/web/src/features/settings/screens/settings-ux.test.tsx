@@ -8,7 +8,7 @@ import { afterEach, expect, it } from 'vitest';
 
 import { flow, productApi, project } from '../../../../test/product-fixtures';
 import { renderRoute, server } from '../../../../test/screen-harness';
-import { acme, currentUser, sessionId, signedIn } from '../../../../test/session-fixtures';
+import { acme, currentUser, problem, sessionId, signedIn, userEtag } from '../../../../test/session-fixtures';
 
 // The six sections of Settings (SPEC-019 UX9). A section whose server operation is not served says so plainly.
 
@@ -16,7 +16,7 @@ function signInAs(role?: string) {
   server.use(
     role === undefined
       ? signedIn.currentUser
-      : http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, orgRoles: [{ orgId: acme.id, role }] })),
+      : http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, orgRoles: [{ orgId: acme.id, role }] }, { headers: { ETag: userEtag } })),
     signedIn.organizations([acme]),
     productApi.projects([project]),
     productApi.flows([flow]),
@@ -44,23 +44,92 @@ it('settings menu groups your account and organization', async () => {
   ]);
 });
 
-it('profile is read only until the update operation exists', async () => {
+const otherSession = {
+  id: '0195f1a0-0000-7000-8000-0000000000a2',
+  createdAt: '2026-10-12T09:30:00Z',
+  expiresAt: '2026-11-11T09:30:00Z',
+  idleExpiresAt: '2026-10-12T17:30:00Z',
+  assuranceLevel: 'AAL1',
+};
+
+it('profile lets the person change the name with the entity tag and refreshes the frame', async () => {
   signInAs();
+  let ifMatch: string | null = null;
+  let body: unknown;
+  let renamed = false;
+  server.use(
+    http.get('/api/v1/users/me', () =>
+      HttpResponse.json({ ...currentUser, displayName: renamed ? 'Ana Torres' : currentUser.displayName }, { headers: { ETag: renamed ? '"2"' : userEtag } }),
+    ),
+    http.patch('/api/v1/users/me', async ({ request }) => {
+      ifMatch = request.headers.get('If-Match');
+      body = await request.json();
+      renamed = true;
+      return HttpResponse.json({ ...currentUser, displayName: 'Ana Torres' }, { headers: { ETag: '"2"' } });
+    }),
+  );
   renderRoute('/orgs/acme/settings/profile');
-  const card = (await screen.findByRole('heading', { level: 2, name: 'Profile' })).closest('section') as HTMLElement;
-  expect(within(card).getByText('Ana Ruiz')).toBeVisible();
-  expect(within(card).getByText('ana@example.com')).toBeVisible();
-  expect(within(card).queryByRole('textbox')).toBeNull();
-  expect(within(card).queryByRole('button', { name: /save/i })).toBeNull();
-  expect(within(card).getByText(/ask whoever administers the organization/i)).toBeVisible();
+  const field = await screen.findByRole('textbox', { name: /Name/ });
+  expect(field).toHaveValue('Ana Ruiz');
+  expect(screen.getByText('ana@example.com')).toBeVisible();
+  await userEvent.clear(field);
+  await userEvent.type(field, 'Ana Torres');
+  await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+  expect(await screen.findByText('Name saved.')).toBeInTheDocument();
+  expect(ifMatch).toBe(userEtag);
+  expect(body).toEqual({ displayName: 'Ana Torres' });
+  // The frame reads the answer: the sidebar shows the new name without a reload.
+  expect((await screen.findAllByText('Ana Torres')).length).toBeGreaterThan(0);
 });
 
-it('security offers sign out of this session and coming soon for the rest', async () => {
+it('profile explains a refused change and loads the current name', async () => {
+  signInAs();
+  let current = 'Ana Ruiz';
+  server.use(
+    http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, displayName: current }, { headers: { ETag: '"2"' } })),
+    http.patch('/api/v1/users/me', () => problem(412, 'Precondition failed', 'precondition-failed')),
+  );
+  renderRoute('/orgs/acme/settings/profile');
+  const field = await screen.findByRole('textbox', { name: /Name/ });
+  current = 'Ana Maria';
+  await userEvent.clear(field);
+  await userEvent.type(field, 'Ana Torres');
+  await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+  expect(await screen.findByText(/Someone else changed this account/)).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Load the current name' }));
+  await waitFor(() => {
+    expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('Ana Maria');
+  });
+  expect(screen.queryByText(/Someone else changed this account/)).toBeNull();
+});
+
+it('profile treats the name Owner as unset and asks for a real one', async () => {
+  server.use(
+    http.get('/api/v1/users/me', () => HttpResponse.json({ ...currentUser, displayName: 'Owner' }, { headers: { ETag: userEtag } })),
+    signedIn.organizations([acme]),
+    productApi.projects([project]),
+    productApi.flows([flow]),
+  );
+  renderRoute('/orgs/acme/settings/profile');
+  expect(await screen.findByRole('textbox', { name: /Name/ })).toHaveValue('');
+  await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+  expect(await screen.findByText('This field is required.')).toBeVisible();
+});
+
+it('security signs out this session, lists and signs out the others and says the password is coming', async () => {
   signInAs();
   let signedOut = false;
+  const revoked: string[] = [];
+  let sessions = [currentUser.currentSession, otherSession];
   server.use(
+    http.get('/api/v1/users/me/sessions', () => HttpResponse.json({ items: sessions })),
     http.post(`/api/v1/users/me/sessions/${sessionId}/revoke`, () => {
       signedOut = true;
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post(`/api/v1/users/me/sessions/${otherSession.id}/revoke`, () => {
+      revoked.push(otherSession.id);
+      sessions = [currentUser.currentSession];
       return new HttpResponse(null, { status: 204 });
     }),
   );
@@ -69,16 +138,34 @@ it('security offers sign out of this session and coming soon for the rest', asyn
   expect(within(card).getByText('This browser')).toBeVisible();
   expect(within(card).getByText('Active now')).toBeVisible();
 
-  const soon = screen.getByRole('heading', { level: 2, name: 'Change password and open sessions' }).closest('[data-coming-soon]') as HTMLElement;
+  const others = (await screen.findByRole('heading', { level: 2, name: 'Other sessions' })).closest('section') as HTMLElement;
+  expect(await within(others).findByText('Another browser or device')).toBeVisible();
+  expect(within(others).getAllByRole('listitem')).toHaveLength(1);
+  await userEvent.click(within(others).getByRole('button', { name: /Sign out the session started/ }));
+  await waitFor(() => {
+    expect(revoked).toEqual([otherSession.id]);
+  });
+  expect(await within(others).findByText('You have no other open sessions.')).toBeVisible();
+  expect(signedOut).toBe(false);
+
+  const soon = screen.getByRole('heading', { level: 2, name: 'Change password' }).closest('[data-coming-soon]') as HTMLElement;
   expect(within(soon).getByText('Coming soon')).toBeVisible();
+  expect(within(soon).getByText(/orcon accounts set-password/)).toBeVisible();
   expect(within(soon).queryByRole('button')).toBeNull();
   expect(screen.queryByLabelText(/password/i)).toBeNull();
-  expect(screen.queryByRole('alert')).toBeNull();
 
   await userEvent.click(within(card).getByRole('button', { name: 'Sign out of this session' }));
   await waitFor(() => {
     expect(signedOut).toBe(true);
   });
+});
+
+it('security shows an error with a retry when the sessions cannot be listed', async () => {
+  signInAs();
+  server.use(http.get('/api/v1/users/me/sessions', () => problem(500, 'Internal error', 'internal-error')));
+  renderRoute('/orgs/acme/settings/security');
+  const others = (await screen.findByRole('heading', { level: 2, name: 'Other sessions' })).closest('section') as HTMLElement;
+  expect(await within(others).findByRole('button', { name: 'Try again' })).toBeVisible();
 });
 
 it('appearance applies theme density language and reduced motion instantly without a save button', async () => {
