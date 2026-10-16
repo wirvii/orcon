@@ -193,6 +193,16 @@ func (t *sqliteTx) SaveEngineState(ctx context.Context, u store.EngineStateUpdat
 	if err := t.own(u.OrgID); err != nil {
 		return err
 	}
+	// The status before the change decides which hourly counters move (SPEC-019 R-UX-BE-02): the counter
+	// of a final status is raised when the execution reaches it and lowered when it leaves it, in this
+	// transaction. Only the key of the execution is read, not the row.
+	prior, found, err := readCountKey(ctx, t.q, u.OrgID, u.Execution)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("save engine state of %s at revision %d: %w", u.Execution, u.ExpectedRevision, flow.ErrConflict)
+	}
 	n, err := t.q.UpdateEngineState(ctx, sqlcgen.UpdateEngineStateParams{
 		Status: u.Status, Document: u.Document, StartedAt: nullMicros(u.StartedAt), FinishedAt: nullMicros(u.FinishedAt),
 		UpdatedAt: micros(u.Now), OrgID: uuidBytes(u.OrgID), ID: uuidBytes(u.Execution), ExpectedRevision: u.ExpectedRevision,
@@ -203,7 +213,7 @@ func (t *sqliteTx) SaveEngineState(ctx context.Context, u store.EngineStateUpdat
 	if n == 0 {
 		return fmt.Errorf("save engine state of %s at revision %d: %w", u.Execution, u.ExpectedRevision, flow.ErrConflict)
 	}
-	return nil
+	return countTransition(ctx, t.q, u.OrgID, prior, u.Status, u.Now)
 }
 
 func (t *sqliteTx) RefreshCounters(ctx context.Context, org identity.OrgID, exec store.ExecutionID, now time.Time) error {

@@ -399,13 +399,16 @@ func (t *sqliteTx) InsertExecution(ctx context.Context, e *store.Execution) erro
 	if root.IsZero() {
 		root = e.ID
 	}
-	return t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
+	if err := t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
 		ID: uuidBytes(e.ID), OrgID: uuidBytes(e.OrgID), ProjectID: uuidBytes(e.ProjectID), FlowID: uuidBytes(e.FlowID),
 		FlowVersionID: nullUUIDBytes(e.FlowVersionID), FlowSnapshotID: nullUUIDBytes(e.FlowSnapshotID),
 		Status: e.Status, Mode: e.Mode, Priority: e.Priority, ParentExecutionID: nullUUIDBytes(e.ParentExecutionID),
 		RootExecutionID: uuidBytes(root), CallDepth: e.CallDepth, RunnableCount: e.RunnableCount,
 		CreatedAt: micros(e.CreatedAt), UpdatedAt: micros(e.UpdatedAt),
-	})
+	}); err != nil {
+		return err
+	}
+	return countAcceptance(ctx, t.q, e)
 }
 
 func (t *sqliteTx) InsertToken(ctx context.Context, tok *store.Token) error {

@@ -15,6 +15,7 @@ import (
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -87,6 +88,8 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	identity.IdempotencyStore
 	flow.Store
 	flow.DraftStore
+	flow.ActivityStore
+	store.Transactor
 	flow.VersionStore
 	flow.SnapshotStore
 	execution.WorkerStore

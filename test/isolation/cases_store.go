@@ -16,6 +16,7 @@ import (
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -104,6 +105,9 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"CountFlows":               caseCountFlows,
 	"UpdateFlowDraft":          caseUpdateFlowDraft,
 	"UpdateFlowDraftWithEntry": caseUpdateFlowDraftWithEntry,
+	"ProjectActivity":          caseProjectActivity,
+	"TimeSavedMinutes":         caseTimeSavedMinutes,
+	"InTx":                     caseInTx,
 	// Versions.
 	"PublishVersion":     casePublishVersion,
 	"GetVersion":         caseGetVersion,
@@ -524,6 +528,58 @@ func caseCountFlows(ctx context.Context, tb testing.TB, env *Env) {
 		tb.Errorf("flows of B's project counted for A: %d, %v", n, err)
 	}
 	noLeak(tb, "the count", nil, err, &env.B)
+}
+
+// caseProjectActivity: the activity of B's project (its flows, executions and counts) reads as empty
+// for A, and nothing of B appears in the answer (SPEC-019 R-UX-BE-02).
+func caseProjectActivity(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	got, err := env.Stores.ProjectActivity(ctx, env.A.Scope, env.B.Project.ID, flow.SummaryDay(seededAt), flow.SummaryWeek(seededAt))
+	if err != nil || got.Flows != 0 || got.ActiveFlows != 0 || len(got.Executions) != 0 || got.Uncertain != 0 || got.TriggerSucceeded != 0 {
+		tb.Errorf("activity of B's project read for A: %+v, %v", got, err)
+	}
+	noLeak(tb, "the activity of B's project", got, err, &env.B)
+}
+
+// caseTimeSavedMinutes: the minutes of A's organization are read under A's scope and never B's.
+func caseTimeSavedMinutes(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	got, err := env.Stores.TimeSavedMinutes(ctx, env.A.Scope)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if got != 3 {
+		tb.Errorf("time saved minutes of A = %d, want the default 3", got)
+	}
+	noLeak(tb, "the minutes", got, err, &env.B)
+}
+
+// caseInTx: an execution written in B's transaction is counted by B's activity and never by A's
+// (the hourly counters are written under the organization of the transaction, SPEC-019 R-UX-BE-02).
+func caseInTx(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	exec := store.Execution{
+		ID: fresh[store.ExecutionID](env), OrgID: identity.OrgID(env.B.UUID), ProjectID: env.B.Project.ID,
+		FlowID: env.B.Flow.ID, FlowVersionID: env.B.Version.ID, Status: "SUCCEEDED", Mode: "TRIGGER",
+		CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	exec.RootExecutionID = exec.ID
+	err := env.Stores.InTx(ctx, env.B.Scope, func(ctx context.Context, tx store.Tx) error {
+		return tx.InsertExecution(ctx, &exec)
+	})
+	if err != nil {
+		tb.Fatalf("insert an execution of B: %v", err)
+	}
+	day, week := flow.SummaryDay(seededAt), flow.SummaryWeek(seededAt)
+	own, err := env.Stores.ProjectActivity(ctx, env.B.Scope, env.B.Project.ID, day, week)
+	if err != nil || len(own.Executions) == 0 {
+		tb.Errorf("B's activity does not count its own execution: %+v, %v", own, err)
+	}
+	got, err := env.Stores.ProjectActivity(ctx, env.A.Scope, env.B.Project.ID, day, week)
+	if err != nil || len(got.Executions) != 0 {
+		tb.Errorf("A's activity counts B's execution: %+v, %v", got, err)
+	}
+	noLeak(tb, "the activity of B's project", got, err, &env.B)
 }
 
 func caseUpdateFlowDraft(ctx context.Context, tb testing.TB, env *Env) {

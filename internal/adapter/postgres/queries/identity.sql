@@ -15,6 +15,12 @@ SELECT id, name, slug, status, deletion_scheduled_at, created_at, updated_at
 FROM org
 WHERE id = sqlc.arg(id);
 
+-- name: GetTimeSavedMinutes :one
+-- orcon:scope instance
+SELECT time_saved_minutes_per_execution
+FROM org
+WHERE id = sqlc.arg(id);
+
 -- name: InsertPrincipal :exec
 -- orcon:scope instance
 INSERT INTO principal (id, kind, created_at, updated_at)

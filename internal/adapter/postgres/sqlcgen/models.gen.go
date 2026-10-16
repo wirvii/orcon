@@ -260,6 +260,18 @@ type ExecutionEvent struct {
 	CreatedAt               pgtype.Timestamptz
 }
 
+type ExecutionHourCount struct {
+	ID             pgtype.UUID
+	OrgID          pgtype.UUID
+	ProjectID      pgtype.UUID
+	HourStartedAt  pgtype.Timestamptz
+	Mode           string
+	Status         string
+	ExecutionCount int64
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
 type ExternalOperation struct {
 	ID                    pgtype.UUID
 	OrgID                 pgtype.UUID
@@ -666,14 +678,15 @@ type OperationalAlert struct {
 }
 
 type Org struct {
-	ID                  pgtype.UUID
-	Name                string
-	Slug                string
-	Status              string
-	DeletionScheduledAt pgtype.Timestamptz
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
-	AuthorizationEpoch  int64
+	ID                           pgtype.UUID
+	Name                         string
+	Slug                         string
+	Status                       string
+	DeletionScheduledAt          pgtype.Timestamptz
+	CreatedAt                    pgtype.Timestamptz
+	UpdatedAt                    pgtype.Timestamptz
+	AuthorizationEpoch           int64
+	TimeSavedMinutesPerExecution int32
 }
 
 type OrgKey struct {

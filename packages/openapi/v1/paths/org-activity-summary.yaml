@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: singleton
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/OrgId
+get:
+  operationId: getOrgActivitySummary
+  summary: Get the activity summary of an organization
+  description: >-
+    Returns the figures the home screen of an organization shows: the active flows, the flows and projects,
+    the executions of the last 24 hours by hour, status and uncertain outcome, and the time saved by the
+    automated executions of the last 7 days. The figures count only the projects the caller can read.
+  tags:
+    - organizations
+  x-orcon-permission: execution:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: orgs activity
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: activitySummaryOfOrganization
+      scenario: project-with-flows
+      request:
+        pathParams:
+          orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+      response:
+        status: 200
+        body: activitySummaryOfOrganization
+  responses:
+    '200':
+      description: The activity summary of the organization.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/ActivitySummary
+          examples:
+            activitySummaryOfOrganization:
+              summary: Two projects with a day of activity
+              value:
+                activeFlowCount: 1
+                flowCount: 2
+                projectCount: 2
+                executionsLast24h:
+                  total: 6
+                  failed: 1
+                  succeeded: 4
+                  uncertain: 1
+                  byHour: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 1]
+                timeSaved:
+                  windowDays: 7
+                  succeededExecutions: 4
+                  minutesPerExecution: 3
+                  minutes: 12
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
