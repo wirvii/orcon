@@ -65,7 +65,7 @@ func TestConvertGoldenWorkflows(t *testing.T) {
 				"WhatsApp Webhook":    OutcomeConverted,
 				"Is Text Message":     OutcomeConverted,
 				"Route by Intent":     OutcomeConverted,
-				"Create Lead":         OutcomeUnsupported,
+				"Create Lead":         OutcomeConverted,
 				"Save to CRM":         OutcomeUnsupported,
 				"Send Quote":          OutcomeUnsupported,
 				"Wait 15 min":         OutcomeConverted,
@@ -73,7 +73,7 @@ func TestConvertGoldenWorkflows(t *testing.T) {
 				"Lead Agent":          OutcomeUnsupported,
 				"OpenAI Chat Model":   OutcomeUnsupported,
 				"Merge":               OutcomeAdapted,
-				"Notify Team":         OutcomeUnsupported,
+				"Notify Team":         OutcomeConverted,
 			},
 			types: map[string]string{
 				"WhatsApp Webhook": "orcon.webhook@1",
@@ -94,10 +94,10 @@ func TestConvertGoldenWorkflows(t *testing.T) {
 				"Weekday morning":  OutcomeConverted,
 				"Weekly digest":    OutcomeUnsupported,
 				"Wait two days":    OutcomeConverted,
-				"Build reminder":   OutcomeUnsupported,
+				"Build reminder":   OutcomeConverted,
 				"Manual start":     OutcomeConverted,
 				"Join reminders":   OutcomeAdapted,
-				"Notify owner":     OutcomeUnsupported,
+				"Notify owner":     OutcomeConverted,
 			},
 			types: map[string]string{
 				"Every 15 minutes": "orcon.schedule@1",
@@ -111,7 +111,7 @@ func TestConvertGoldenWorkflows(t *testing.T) {
 			outcomes: map[string]Outcome{
 				"Legacy start":        OutcomeConverted,
 				"Old IF":              OutcomeUnsupported,
-				"Paid branch":         OutcomeUnsupported,
+				"Paid branch":         OutcomeAdapted,
 				"Combine by position": OutcomeUnsupported,
 				"Lead lookup":         OutcomeConverted,
 				"Dynamic wait":        OutcomeUnsupported,
@@ -310,7 +310,7 @@ func TestConvertReadsWrappedTemplate(t *testing.T) {
 func TestOutcomeCountsAndMarkdown(t *testing.T) {
 	conv := convertFixture(t, "scheduled-followup")
 	k := conv.OutcomeCounts()
-	want := OutcomeCounts{Nodes: 8, Converted: 4, Adapted: 1, Unsupported: 3}
+	want := OutcomeCounts{Nodes: 8, Converted: 6, Adapted: 1, Unsupported: 1}
 	if diff := cmp.Diff(want, k); diff != "" {
 		t.Errorf("counts mismatch (-want +got):\n%s", diff)
 	}

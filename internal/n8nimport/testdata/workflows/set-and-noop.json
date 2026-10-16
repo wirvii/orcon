@@ -1,0 +1,136 @@
+{
+  "name": "Edit Fields and No Operation",
+  "active": false,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "Pass through",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [200, 0],
+      "parameters": {}
+    },
+    {
+      "id": "n3",
+      "name": "Shape lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 0],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {"id": "s1", "name": "source", "value": "whatsapp", "type": "string"},
+            {"id": "s2", "name": "score", "value": 5, "type": "number"},
+            {"id": "s3", "name": "qualified", "value": true, "type": "boolean"},
+            {"id": "s4", "name": "greeting", "value": "=Hello {{ $json.name }}", "type": "string"}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Tag contact",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [600, 0],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {"id": "t1", "name": "tags", "value": ["lead", "whatsapp"], "type": "array"},
+            {"id": "t2", "name": "meta", "value": {"channel": "=whatsapp", "fixed": 1}, "type": "object"}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Raw output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 0],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"a\": 1}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Dotted field",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1000, 0],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {"id": "d1", "name": "address.city", "value": "Bogota", "type": "string"}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Old fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1200, 0],
+      "parameters": {
+        "values": {"string": [{"name": "status", "value": "new"}]}
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Typed mismatch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1400, 0],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {"id": "m1", "name": "score", "value": "five", "type": "number"}
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n9",
+      "name": "Paused step",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1600, 0],
+      "disabled": true,
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Start": {"main": [[{"node": "Pass through", "type": "main", "index": 0}]]},
+    "Pass through": {"main": [[{"node": "Shape lead", "type": "main", "index": 0}]]},
+    "Shape lead": {"main": [[{"node": "Tag contact", "type": "main", "index": 0}]]},
+    "Tag contact": {"main": [[{"node": "Raw output", "type": "main", "index": 0}]]},
+    "Raw output": {"main": [[{"node": "Dotted field", "type": "main", "index": 0}]]},
+    "Dotted field": {"main": [[{"node": "Old fields", "type": "main", "index": 0}]]},
+    "Old fields": {"main": [[{"node": "Typed mismatch", "type": "main", "index": 0}]]},
+    "Typed mismatch": {"main": [[{"node": "Paused step", "type": "main", "index": 0}]]}
+  },
+  "settings": {}
+}
