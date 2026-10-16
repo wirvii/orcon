@@ -13,6 +13,7 @@ package core
 
 import (
 	"context"
+	"slices"
 
 	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/flow"
@@ -28,6 +29,15 @@ const (
 	// TypeStopAndError is orcon.stopAndError@1: it fails the execution with a
 	// code the flow author chose (n8n Stop and Error).
 	TypeStopAndError = "orcon.stopAndError@1"
+	// TypeFilter is orcon.filter@1: it keeps the items a condition accepts
+	// (n8n Filter).
+	TypeFilter = "orcon.filter@1"
+	// TypeSort is orcon.sort@1: it orders the items by fields or at random
+	// (n8n Sort).
+	TypeSort = "orcon.sort@1"
+	// TypeLimit is orcon.limit@1: it keeps the first or the last items (n8n
+	// Limit).
+	TypeLimit = "orcon.limit@1"
 )
 
 // types is the static description of every node type of this package. All of
@@ -36,6 +46,20 @@ var types = map[string]flow.NodeType{
 	TypeNoOp:         {Purity: flow.PurityPure},
 	TypeSet:          {Purity: flow.PurityPure},
 	TypeStopAndError: {Purity: flow.PurityPure},
+	TypeFilter:       {Purity: flow.PurityPure},
+	TypeSort:         {Purity: flow.PurityPure},
+	TypeLimit:        {Purity: flow.PurityPure},
+}
+
+// Types returns every node type of this package, sorted. The composition root
+// uses it to route the node types to [Runner].
+func Types() []string {
+	out := make([]string, 0, len(types))
+	for t := range types {
+		out = append(out, t)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Catalog answers for the node types of this package. It is stateless and safe

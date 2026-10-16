@@ -331,6 +331,33 @@ var builtins = []builtin{
 		operations: []builtinOperation{{"item.pass", map[string]string{LocaleEnglish: "Pass items through", LocaleSpanish: "Dejar pasar los elementos"}, flow.PurityPure, apigen.NONE}},
 	},
 	{
+		typ: "orcon.filter@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Filter", LocaleSpanish: "Filtrar"},
+		desc: map[string]string{
+			LocaleEnglish: "Keeps the items that meet a condition and drops the rest.",
+			LocaleSpanish: "Conserva los elementos que cumplen una condición y descarta el resto.",
+		},
+		operations: []builtinOperation{{"item.filter", map[string]string{LocaleEnglish: "Keep items by condition", LocaleSpanish: "Conservar elementos por condición"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
+		typ: "orcon.sort@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Sort", LocaleSpanish: "Ordenar"},
+		desc: map[string]string{
+			LocaleEnglish: "Puts the items in order by one or more fields, or in a random order.",
+			LocaleSpanish: "Pone los elementos en orden según uno o más campos, o en orden aleatorio.",
+		},
+		operations: []builtinOperation{{"item.sort", map[string]string{LocaleEnglish: "Sort items", LocaleSpanish: "Ordenar elementos"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
+		typ: "orcon.limit@1", group: groupData,
+		name: map[string]string{LocaleEnglish: "Limit", LocaleSpanish: "Limitar"},
+		desc: map[string]string{
+			LocaleEnglish: "Keeps only the first or the last items, up to a number you choose.",
+			LocaleSpanish: "Conserva solo los primeros o los últimos elementos, hasta un número que eliges.",
+		},
+		operations: []builtinOperation{{"item.limit", map[string]string{LocaleEnglish: "Limit the number of items", LocaleSpanish: "Limitar el número de elementos"}, flow.PurityPure, apigen.NONE}},
+	},
+	{
 		typ: "orcon.stopAndError@1", group: groupFlow,
 		name: map[string]string{LocaleEnglish: "Stop and error", LocaleSpanish: "Detener con error"},
 		desc: map[string]string{
@@ -365,11 +392,10 @@ func builtinNodeTypes(locale string) []apigen.NodeType {
 func n8nTypesOf(orconType string) []string {
 	out := []string{}
 	for _, row := range n8nimport.CoreNodes() {
-		if row.Orcon != orconType {
-			continue
-		}
 		for _, t := range row.N8nTypes {
-			out = append(out, n8nPrefix+t)
+			if row.Orcon == orconType || (row.Orcon == n8nimport.NamedTemplate && "orcon."+t+"@1" == orconType) {
+				out = append(out, n8nPrefix+t)
+			}
 		}
 	}
 	return out
