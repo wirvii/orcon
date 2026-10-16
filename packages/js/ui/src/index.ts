@@ -179,7 +179,7 @@ export type { AddFirstStepProps } from './canvas/add-first-step/AddFirstStep';
 export { AiBlock } from './canvas/ai-block/AiBlock';
 export type { AiBlockProps } from './canvas/ai-block/AiBlock';
 export { NodePalettePanel } from './canvas/node-palette-panel/NodePalettePanel';
-export type { NodePalettePanelProps } from './canvas/node-palette-panel/NodePalettePanel';
+export type { NodePalettePanelProps, PaletteSuggestions } from './canvas/node-palette-panel/NodePalettePanel';
 export { CanvasOutline } from './canvas/canvas-outline/CanvasOutline';
 export type { CanvasOutlineProps } from './canvas/canvas-outline/CanvasOutline';
 export { WorkflowCanvas } from './canvas/WorkflowCanvas';
@@ -190,9 +190,12 @@ export { useAnnouncer, ANNOUNCE_INTERVAL_MS } from './canvas/announcer';
 // Node details view (style A): three panes in a dialog from lg, a docked Parameters pane from md
 export { NodeDetailsView } from './editor/node-details-view/NodeDetailsView';
 export type { DetailsTab, NodeDetailsViewProps } from './editor/node-details-view/NodeDetailsView';
+export { ExpressionChip } from './editor/expression-chips/ExpressionChip';
+export type { ExpressionChipProps } from './editor/expression-chips/ExpressionChip';
 export { DataPane } from './editor/data-pane/DataPane';
 export type { DataPaneProps, OutputPort } from './editor/data-pane/DataPane';
-export type { DataItem, DataRun, DataView, PaneData } from './editor/model';
+export { FIELD_DRAG_TYPE } from './editor/model';
+export type { DataItem, DataRun, DataView, FieldPath, PaneData } from './editor/model';
 export type {
   AiBlockKind,
   AiBlockSpec,

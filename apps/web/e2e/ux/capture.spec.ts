@@ -6,7 +6,10 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { mockDraftApi } from '../../test/draft-api';
 import { account, installApiDouble, org } from '../journeys/api-double';
+
+const EDITOR_FLOW = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-00000000ed5a';
 
 // Visual evidence for a pull request (SPEC-019 §8): the screens of the product at 1440x900 and 390x844, in the
 // dark and light themes, next to the same screens of the approved mockup. It is not a pass/fail check, so it
@@ -73,6 +76,89 @@ async function openMenu(page: Page, which: 'account' | 'organization' | 'help') 
   if (which === 'help') await sidebar.getByRole('button', { name: /^(Help|Ayuda)$/ }).click();
   else await sidebar.locator('button[aria-haspopup="menu"]').filter({ hasNot: page.locator('[data-nothing]') })[which === 'account' ? 'last' : 'first']().click();
   await expect(page.getByRole('menu')).toBeVisible();
+}
+
+/** One finished run of the sample flow, so the logs have something to show. */
+async function mockRuns(page: Page) {
+  const execution = '0195f1a0-0000-7000-8000-0000000000e1';
+  const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  const base = Date.now() - 3 * 60_000 - 2400;
+  const at = (offset: number) => new Date(base + offset).toISOString();
+  await page.route('**/api/v1/projects/*/executions**', (route) =>
+    route.fulfill(
+      json({
+        items: [
+          {
+            id: execution,
+            flowId: '01930000-0000-7000-8000-00000000ed5a',
+            projectId: '0195f1a0-0000-7000-8000-0000000000d1',
+            flowVersion: 1,
+            mode: 'MANUAL',
+            status: 'SUCCEEDED',
+            createdAt: at(0),
+            startedAt: at(0),
+            finishedAt: at(2400),
+            dataHidden: false,
+          },
+        ],
+      }),
+    ),
+  );
+  const nodes = [
+    ['webhook', 0, 4],
+    ['validate', 4, 7],
+    ['inventory', 7, 412],
+    ['slack', 412, 1612],
+    ['done', 1612, 1613],
+  ] as const;
+  await page.route('**/api/v1/executions/*/nodes**', (route) =>
+    route.fulfill(
+      json({
+        items: nodes.map(([nodeId, from, to], index) => ({
+          id: `0195f1a0-0000-7000-8000-0000000001${String(index).padStart(2, '0')}`,
+          executionId: execution,
+          nodeId,
+          status: 'SUCCEEDED',
+          attemptCount: 1,
+          startedAt: at(from),
+          finishedAt: at(to),
+        })),
+      }),
+    ),
+  );
+  await page.route('**/api/v1/executions/*/data**', (route) =>
+    route.fulfill(
+      json({
+        items: [
+          {
+            nodeExecutionId: '0195f1a0-0000-7000-8000-000000000103',
+            nodeId: 'slack',
+            side: 'INPUT',
+            port: 'main',
+            itemCount: 1,
+            dataItems: [
+              {
+                output: 'Hello Camila! We have the Andes jacket in size M, olive green, at $289,900.',
+                customer: { name: 'Camila Rojas', phone: '573104567890' },
+                message: { id: 'wamid.HBgMNTczMTA0NTY3ODkw', text: 'Hi, do you have the Andes jacket in size M?', receivedAt: '2026-10-15T10:41:07-05:00' },
+                intent: 'buy',
+                needsAdvisor: false,
+              },
+            ],
+          },
+          { nodeExecutionId: '0195f1a0-0000-7000-8000-000000000103', nodeId: 'slack', side: 'OUTPUT', port: 'main', itemCount: 1, dataItems: [{ status: 200, body: { ok: true, ts: '1760524861.001' } }] },
+        ],
+      }),
+    ),
+  );
+}
+
+async function openEditor(page: Page) {
+  await mockDraftApi(page, { published: true });
+  await mockRuns(page);
+  await page.goto(EDITOR_FLOW);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.waitForSelector('[data-fitted="true"]');
 }
 
 const screens: Screen[] = [
@@ -170,6 +256,80 @@ const screens: Screen[] = [
     }),
   ),
   {
+    name: 'editor',
+    mockup: { id: 'editor', variant: 'logs' },
+    product: async (page, device) => {
+      await openEditor(page);
+      if (device === 'desktop') await page.waitForSelector('[data-fitted="true"]');
+    },
+  },
+  {
+    name: 'editor-palette',
+    mockup: { id: 'editor', variant: 'palette' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      // A is the keyboard way to add a step after the focused one: the list then suggests what usually follows.
+      await page.locator('.react-flow__node[data-id="validate"]').click();
+      await page.keyboard.press('a');
+      await expect(page.locator('[data-node-palette]')).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-palette-empty',
+    mockup: { id: 'editor', variant: 'palette' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="webhook"]').click();
+      await page.keyboard.press('a');
+      await page.getByRole('combobox', { name: /^(Search nodes|Buscar nodos)/ }).fill('quickbooks');
+      await expect(page.locator('[data-palette-no-match]')).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-logs',
+    mockup: { id: 'editor', variant: 'logs' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.getByRole('button', { name: /^(Show or hide the logs|Mostrar u ocultar los registros)/ }).click();
+      await page.getByRole('button', { name: /^Slack/ }).first().click();
+    },
+  },
+  {
+    name: 'editor-details',
+    mockup: { id: 'ndv' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      await expect(page.getByRole('button', { name: /Use customer\.phone in a parameter|Usar customer\.phone en un parámetro/ })).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-details-chips',
+    mockup: { id: 'ndv' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      const field = page.getByRole('button', { name: /Use customer\.phone in a parameter|Usar customer\.phone en un parámetro/ });
+      await field.dragTo(page.getByRole('textbox', { name: /URL/ }));
+      await expect(page.locator('[data-expression-chips-field]').first()).toBeVisible();
+    },
+  },
+  {
+    name: 'editor-details-retry',
+    mockup: { id: 'ndv' },
+    devices: ['desktop'],
+    product: async (page) => {
+      await openEditor(page);
+      await page.locator('.react-flow__node[data-id="slack"]').dblclick();
+      await page.getByRole('tab', { name: /Retries and safety|Reintentos y seguridad/ }).click();
+    },
+  },
+  {
     name: 'settings',
     mockup: { id: 'settings', variant: 'apariencia' },
     product: async (page) => {
@@ -197,7 +357,7 @@ test.describe('product', () => {
             },
             { value: theme },
           );
-          await installApiDouble(page);
+          if (!screen.name.startsWith('editor')) await installApiDouble(page);
           await screen.product(page, device.name);
           await page.waitForTimeout(400);
           const dir = join(out, label);

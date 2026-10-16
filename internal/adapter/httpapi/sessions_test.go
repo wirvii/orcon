@@ -19,6 +19,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 const (
@@ -73,7 +74,15 @@ func signInRequest(t *testing.T, origin, prior string) context.Context {
 }
 
 func newTestSessions(svc SessionService) *Sessions {
-	return NewSessions(svc, middleware.DefaultAuthConfig(), testOrigin)
+	return NewSessions(svc, middleware.DefaultAuthConfig(), testOrigin, &fakeResolver{}, noOrgRoles{})
+}
+
+// noOrgRoles is an organization-role reader of a user with no organization role.
+type noOrgRoles struct{}
+
+// OrganizationRole returns no role.
+func (noOrgRoles) OrganizationRole(context.Context, identity.UserID, orgscope.Org) (string, error) {
+	return "", nil
 }
 
 // cookieOf returns the Set-Cookie header that names cookie, or nil.

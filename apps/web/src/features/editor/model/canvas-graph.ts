@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { brandIconFor } from './brand-marks';
+import { neverSendsTwice } from './effect-safety';
 import type { FlowDocument, FlowEdge, FlowNode, Point } from './flow-document';
+import { safetyOf } from './node-manifests';
 import { LOOP_TYPE, START_TYPE, UNSUPPORTED_TYPE, subtitleOf, typeDefOf, type CanvasIconName, type CanvasKind, type CanvasLogic } from './node-types';
 
 /**
@@ -31,6 +34,10 @@ export interface CanvasNode {
   icon?: CanvasIconName | undefined;
   disabled?: boolean | undefined;
   pinned?: boolean | undefined;
+  /** The brand mark of the connector the node belongs to, when there is one. */
+  connector?: { src: string; name: string } | undefined;
+  /** The step changes something outside and a repeat cannot send it twice. */
+  neverTwice?: boolean | undefined;
   inputs: CanvasPort[];
   outputs: CanvasPort[];
   position: Point;
@@ -145,6 +152,8 @@ export function toCanvasGraph(document: FlowDocument, describe?: (node: FlowNode
       logicType: view.logic,
       icon: view.icon,
       disabled: node.disabled === true || node.type === UNSUPPORTED_TYPE ? true : undefined,
+      connector: brandIconFor(node.type),
+      neverTwice: neverSendsTwice(safetyOf(node)) ? true : undefined,
       inputs: view.kind === 'trigger' ? [] : [{ id: INPUT_PORT }],
       outputs: view.outputs,
       position: { x: position.x, y: position.y },

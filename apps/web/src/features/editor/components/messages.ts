@@ -27,10 +27,13 @@ export const editorMessages = defineMessages({
   saveNow: { id: 'editor.tool.save', defaultMessage: 'Save now', description: 'Button that saves the flow draft immediately.' },
 
   saveSaved: { id: 'editor.save.saved', defaultMessage: 'Saved', description: 'State of the save indicator: every change has been saved.' },
+  saveSavedAt: { id: 'editor.save.savedAt', defaultMessage: 'Saved · {age}', description: 'State of the save indicator after a save made in this tab. {age} says how long ago, for example "4 s ago".' },
   saveSaving: { id: 'editor.save.saving', defaultMessage: 'Saving…', description: 'State of the save indicator: the draft is being saved.' },
   saveUnsaved: { id: 'editor.save.unsaved', defaultMessage: 'Unsaved changes', description: 'State of the save indicator: there are changes that have not been saved yet.' },
   saveRetrying: { id: 'editor.save.retrying', defaultMessage: 'Not saved, trying again', description: 'State of the save indicator: saving failed and the editor will try again by itself.' },
   saveConflict: { id: 'editor.save.conflict', defaultMessage: 'Not saved, the flow changed elsewhere', description: 'State of the save indicator: the draft on the server changed, so nothing was overwritten.' },
+  previousRuns: { id: 'editor.logs.previousRuns', defaultMessage: 'Previous runs', description: 'Link at the right of the logs bar that opens the list of runs of the flow.' },
+  viewRuns: { id: 'editor.logs.viewRuns', defaultMessage: 'View executions', description: 'Link in the read-only editor of a phone that opens the list of runs of the flow.' },
   saveLabel: { id: 'editor.save.label', defaultMessage: 'Save state', description: 'Accessible name of the save indicator.' },
 
   conflictTitle: { id: 'editor.conflict.title', defaultMessage: 'This flow changed somewhere else', description: 'Title of the banner shown when saving found that the draft on the server is newer than the one being edited.' },
@@ -62,8 +65,10 @@ export const editorMessages = defineMessages({
   outlineNotes: { id: 'editor.outline.notes', defaultMessage: 'Sticky notes', description: 'Heading of the list of sticky notes in the flow outline.' },
 
   catalogTriggers: { id: 'editor.catalog.group.triggers', defaultMessage: 'Triggers', description: 'Heading in the list of nodes to add: the nodes that start a flow.' },
-  catalogFlow: { id: 'editor.catalog.group.flow', defaultMessage: 'Flow control', description: 'Heading in the list of nodes to add: the nodes that split, join or repeat the flow.' },
-  catalogData: { id: 'editor.catalog.group.data', defaultMessage: 'Data', description: 'Heading in the list of nodes to add: the nodes that fetch or change data.' },
+  catalogApps: { id: 'editor.catalog.group.apps', defaultMessage: 'Apps', description: 'Heading in the list of nodes to add: the nodes that talk to another service.' },
+  catalogSubflows: { id: 'editor.catalog.group.subflows', defaultMessage: 'Sub-flows', description: 'Heading in the list of nodes to add: the nodes that run another flow.' },
+  catalogFlow: { id: 'editor.catalog.group.flow', defaultMessage: 'Flow logic', description: 'Heading in the list of nodes to add: the nodes that split, join or repeat the flow.' },
+  catalogData: { id: 'editor.catalog.group.data', defaultMessage: 'Data transformation', description: 'Heading in the list of nodes to add: the nodes that change data.' },
 
   noticeCopied: { id: 'editor.notice.copied', defaultMessage: 'Copied {count, plural, one {# item} other {# items}}', description: 'Confirmation after copying to the clipboard. {count} is the number of nodes and sticky notes.' },
   noticeCopyFailed: { id: 'editor.notice.copyFailed', defaultMessage: 'The clipboard could not be written. Allow clipboard access and try again.', description: 'Shown when the browser refuses to write the copied nodes to the clipboard.' },
@@ -100,6 +105,8 @@ export const editorMessages = defineMessages({
   noticeConnectionRefused: { id: 'editor.notice.connectionRefused', defaultMessage: 'That connection is not allowed.', description: 'Shown when a connection is refused for another reason.' },
   noticeTidied: { id: 'editor.notice.tidied', defaultMessage: 'Tidied up {count, plural, one {# item} other {# items}}', description: 'Confirmation after tidying up. {count} is the number of nodes and notes moved.' },
   noticeLaterPin: { id: 'editor.notice.laterPin', defaultMessage: 'Pinning data arrives in a later editor release.', description: 'Shown when somebody tries to pin a node output in an editor that cannot do it yet.' },
+  noticeNoFieldTarget: { id: 'editor.notice.noFieldTarget', defaultMessage: 'Click the parameter you want to fill first, then choose the field.', description: 'Shown when a field of the input was chosen with the keyboard but no parameter had the focus.' },
+  noticeFieldAdded: { id: 'editor.notice.fieldAdded', defaultMessage: 'Added {name} to {field}.', description: 'Confirmation after a field of the input was added to a parameter with the keyboard. {name} is the field and {field} the parameter.' },
   noticeLaterRun: { id: 'editor.notice.laterRun', defaultMessage: 'Test runs arrive in a later editor release.', description: 'Shown when somebody tries to run a node or the flow in an editor that cannot do it yet.' },
   noticeUndone: { id: 'editor.notice.undone', defaultMessage: 'Undone', description: 'Spoken confirmation after undoing a change.' },
   noticeRedone: { id: 'editor.notice.redone', defaultMessage: 'Redone', description: 'Spoken confirmation after redoing a change.' },

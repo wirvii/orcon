@@ -48,5 +48,6 @@ jobs:
             --subnet shared-usc1 \
             --vpc-egress private-ranges-only \
             --max-instances 1 \
+            --no-invoker-iam-check \
             --update-env-vars "ORCON_STORE_DRIVER=postgres,ORCON_STORE_POSTGRES_MAX_CONNECTIONS=5,ORCON_KEYS_MASTER_PROVIDER=env,ORCON_PUBLIC_URL=https://orcon-preview.wirvii.com" \
             --update-secrets "ORCON_STORE_POSTGRES_DSN=orcon-preview-db-dsn:latest,ORCON_MASTER_KEY=orcon-preview-master-key:latest,ORCON_MASTER_KEY_BACKUP_ACK=orcon-preview-master-key-ack:latest"

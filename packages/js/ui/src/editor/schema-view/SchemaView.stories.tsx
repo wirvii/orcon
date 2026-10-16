@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { MatrixTable } from '../../stories/MatrixTable';
 import { mixedItems, orderItems } from '../fixtures';
@@ -31,6 +31,19 @@ export const Default: Story = {
     const view = within(canvasElement);
     await expect(view.getByRole('list', { name: 'Data fields' })).toBeVisible();
     await expect(view.getAllByText('number').length).toBeGreaterThan(0);
+  },
+};
+export const Usable: Story = {
+  args: { onInsert: fn() },
+  play: async ({ canvasElement, args }) => {
+    const view = within(canvasElement);
+    await expect(view.getByText('Drag a field to a parameter to use it, or press Enter on it.')).toBeVisible();
+    // A field can be chosen with the keyboard: Enter calls back with its path, positions of lists included.
+    const field = view.getByRole('button', { name: /Use shipping\.city in a parameter/ });
+    field.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onInsert).toHaveBeenCalledWith(['shipping', 'city']);
+    await expect(view.getByRole('button', { name: /Use lines\[0\]\.sku in a parameter/ })).toBeVisible();
   },
 };
 export const Protected: Story = {

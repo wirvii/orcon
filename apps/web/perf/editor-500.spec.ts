@@ -3,6 +3,8 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { mockSession } from '../test/draft-api';
+
 import { median, recordResult } from './results';
 
 // How these numbers were taken (orcon-web PF-4, maintainer decision of 2026-10-12): a headless Chromium
@@ -70,8 +72,12 @@ async function gesture(page: Page, durationMs: number, step: (progress: number) 
   return stopFrames(page);
 }
 
-/** The route the measurement opens: the editor of the 500-node reference flow (the `perf` build serves it under this id). */
-const EDITOR_ROUTE = '/flows/01930000-0000-7000-8000-000000000500';
+/**
+ * The route the measurement opens: the editor of the 500-node reference flow (the `perf` build serves it under this id),
+ * at the address the app gives it, under the organization and the project. The editor sits behind the signed-in frame,
+ * and this build has no server, so the page is given the person, the organization and the project the frame asks for.
+ */
+const EDITOR_ROUTE = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-000000000500';
 
 test('the editor with 500 nodes opens fast and stays smooth', async ({ browser }, testInfo) => {
   const editorURL = String(testInfo.project.metadata['editorURL'] ?? '');
@@ -84,6 +90,7 @@ test('the editor with 500 nodes opens fast and stays smooth', async ({ browser }
   for (let run = 0; run < RUNS; run += 1) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US', timezoneId: 'UTC' });
     const view = await context.newPage();
+    await mockSession(view);
     await view.goto(`${editorURL}${EDITOR_ROUTE}`, { waitUntil: 'commit' });
     await view.waitForFunction(() => performance.getEntriesByName('orcon:editor-ready').length > 0, undefined, { timeout: 60_000 });
     opens.push(await view.evaluate(() => performance.getEntriesByName('orcon:editor-ready')[0]?.startTime ?? Number.NaN));

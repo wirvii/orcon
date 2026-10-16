@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Banner, Button, ProblemAlert, type ProblemDetails } from '@orcon/ui';
+import { ActiveToggle, Banner, Button, ProblemAlert, Tooltip, type ProblemDetails } from '@orcon/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
@@ -13,22 +13,28 @@ import { editorMessages } from '../components/messages';
 import { PublishDialog } from './PublishDialog';
 
 const messages = defineMessages({
-  active: { id: 'editor.activation.active', defaultMessage: 'Active', description: 'State of a flow whose triggers are on, shown as text.' },
-  inactive: { id: 'editor.activation.inactive', defaultMessage: 'Inactive', description: 'State of a flow whose triggers are off, shown as text.' },
   versionShown: {
     id: 'editor.activation.version',
     defaultMessage: 'Version {version} is published',
     description: 'Says which published version new runs use.',
   },
   notPublished: { id: 'editor.activation.notPublished', defaultMessage: 'Not published yet', description: 'Says the flow has no published version, so it cannot be activated.' },
-  unpublishedChanges: {
-    id: 'editor.activation.unpublished',
-    defaultMessage: 'Unpublished changes',
-    description: 'Says the draft differs from the published version.',
+  switchLabel: {
+    id: 'editor.activation.switchLabel',
+    defaultMessage: 'Active: {name}',
+    description: 'Accessible name of the switch that turns the automatic triggers of a flow on or off. {name} is the name of the flow.',
   },
-  activate: { id: 'editor.activation.activate', defaultMessage: 'Activate', description: 'Button that switches the automatic triggers of the flow on.' },
-  deactivate: { id: 'editor.activation.deactivate', defaultMessage: 'Deactivate', description: 'Button that switches the automatic triggers of the flow off.' },
+  publishFirst: {
+    id: 'editor.activation.publishFirst',
+    defaultMessage: 'Publish a version first: only a published version can run.',
+    description: 'Why the Active switch is blocked: the flow has no published version yet.',
+  },
   publish: { id: 'editor.activation.publish', defaultMessage: 'Publish', description: 'Button that opens the dialog to publish the draft as a new version.' },
+  publishPending: {
+    id: 'editor.activation.publishPending',
+    defaultMessage: 'Publish, {count, plural, one {# change} other {# changes}} not published yet',
+    description: 'Accessible name of the Publish button when the draft has changes the published version does not have. {count} is how many.',
+  },
   changedElsewhere: {
     id: 'editor.activation.changed',
     defaultMessage: 'Nothing was changed. Reload the flow to see its newest state.',
@@ -39,15 +45,19 @@ const messages = defineMessages({
 
 export interface PublishControlsProps {
   flowId: string;
+  /** The name of the flow, for the accessible name of the switch. */
+  flowName?: string | undefined;
+  /** How many changes the draft has that the published version does not; absent when nothing is published or nothing differs. */
+  pending?: number | undefined;
 }
 
 /**
- * The publish and activation controls of the open flow (SPEC-014 ED10a). The state is words: the
- * activation state, the published version and whether the draft has unpublished changes. An activation
- * is based on the entity tag the state was read at; when the flow changed on the server, nothing is
- * changed and the person is offered a reload.
+ * Active and Publish together (SPEC-019 R-UX-EDT-01, SPEC-014 ED10a). Active says whether the flow listens for
+ * its triggers; Publish says which version runs and carries the number of changes not yet published. An
+ * activation is based on the entity tag the state was read at: when the flow changed on the server, nothing is
+ * changed and the person is offered a reload. A refusal is shown under the controls, over the canvas.
  */
-export function PublishControls({ flowId }: PublishControlsProps) {
+export function PublishControls({ flowId, flowName = '', pending }: PublishControlsProps) {
   const intl = useIntl();
   const queryClient = useQueryClient();
   const flow = useQuery(flowQueryOptions(flowId));
@@ -61,7 +71,7 @@ export function PublishControls({ flowId }: PublishControlsProps) {
 
   const { flow: state, etag } = flow.data;
   const active = state.activationState === 'ACTIVE';
-  // A flow with no published version cannot be activated: the server refuses it, so the button stays off.
+  // A flow with no published version cannot be activated: the server refuses it, so the switch says why and stays off.
   const published = state.activeVersion !== undefined && state.activeVersion !== null;
 
   const toggle = async () => {
@@ -75,48 +85,57 @@ export function PublishControls({ flowId }: PublishControlsProps) {
     }
   };
 
-  const version =
-    state.activeVersion === undefined || state.activeVersion === null
-      ? intl.formatMessage(messages.notPublished)
-      : intl.formatMessage(messages.versionShown, { version: state.activeVersion });
+  const version = published ? intl.formatMessage(messages.versionShown, { version: state.activeVersion }) : intl.formatMessage(messages.notPublished);
+  const count = pending !== undefined && pending > 0 ? pending : undefined;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="font-medium">{intl.formatMessage(active ? messages.active : messages.inactive)}</span>
-        <span className="text-fg-muted">{version}</span>
-        {state.hasUnpublishedChanges ? <span className="text-fg-muted">{intl.formatMessage(messages.unpublishedChanges)}</span> : null}
-        <Button variant="secondary" disabled={!published && !active} loading={activation.isPending} onClick={() => void toggle()}>
-          {intl.formatMessage(active ? messages.deactivate : messages.activate)}
-        </Button>
+    <div className="relative flex items-center gap-3" data-publish-controls>
+      <ActiveToggle
+        checked={active}
+        busy={activation.isPending}
+        label={intl.formatMessage(messages.switchLabel, { name: flowName })}
+        disabledReason={!published && !active ? intl.formatMessage(messages.publishFirst) : undefined}
+        onCheckedChange={() => void toggle()}
+      />
+      <Tooltip content={version}>
         <Button
+          aria-label={count === undefined ? undefined : intl.formatMessage(messages.publishPending, { count })}
           onClick={() => {
             setPublishing(true);
           }}
         >
           {intl.formatMessage(messages.publish)}
+          {count === undefined ? null : (
+            <span aria-hidden data-pending-count className="bg-action-primary-fg text-action-primary inline-flex min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold">
+              {count}
+            </span>
+          )}
         </Button>
-      </div>
-      {stale ? (
-        <Banner
-          tone="warning"
-          title={intl.formatMessage(editorMessages.conflictTitle)}
-          action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setStale(false);
-                void queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) });
-              }}
+      </Tooltip>
+      {stale || failure ? (
+        <div className="absolute end-0 top-full z-40 mt-2 flex w-canvas-palette-w max-w-full flex-col gap-2">
+          {stale ? (
+            <Banner
+              tone="warning"
+              title={intl.formatMessage(editorMessages.conflictTitle)}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setStale(false);
+                    void queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) });
+                  }}
+                >
+                  {intl.formatMessage(messages.reload)}
+                </Button>
+              }
             >
-              {intl.formatMessage(messages.reload)}
-            </Button>
-          }
-        >
-          {intl.formatMessage(messages.changedElsewhere)}
-        </Banner>
+              {intl.formatMessage(messages.changedElsewhere)}
+            </Banner>
+          ) : null}
+          {failure ? <ProblemAlert problem={failure} /> : null}
+        </div>
       ) : null}
-      {failure ? <ProblemAlert problem={failure} /> : null}
       <PublishDialog open={publishing} onOpenChange={setPublishing} flowId={flowId} />
     </div>
   );

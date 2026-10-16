@@ -297,6 +297,21 @@ func (r *Registry) Len() int { return len(r.cases) }
 // every case a fresh, seeded one, so no case sees what another did.
 type EnvFactory func(t *testing.T) *Env
 
+// RunSubjects runs the cases of the named subjects only, as subtests, each in a fresh environment.
+// A subject without a case fails: a battery that names a case must have it.
+func (r *Registry) RunSubjects(ctx context.Context, t *testing.T, newEnv EnvFactory, subjects ...Subject) {
+	t.Helper()
+	for _, sub := range subjects {
+		c, ok := r.cases[sub]
+		if !ok {
+			t.Fatalf("no isolation case for %s", sub)
+		}
+		t.Run(sub.String(), func(t *testing.T) {
+			c.Run(ctx, t, newEnv(t))
+		})
+	}
+}
+
 // Run runs every case as a subtest, in subject order, each in the environment
 // newEnv returns for it.
 func (r *Registry) Run(ctx context.Context, t *testing.T, newEnv EnvFactory) {
