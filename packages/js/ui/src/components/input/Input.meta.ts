@@ -3,7 +3,7 @@
 
 import { pair } from '../../lib/meta';
 
-export const states = ['default', 'hover', 'focus-visible', 'disabled', 'error'] as const;
+export const states = ['default', 'hover', 'focus-visible', 'disabled', 'error', 'with-icon', 'with-adornment'] as const;
 
 export const pairs = [
   pair('fg.default', 'surface.default'),
