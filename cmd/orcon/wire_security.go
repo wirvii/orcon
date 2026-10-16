@@ -22,6 +22,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
@@ -61,6 +62,7 @@ type persistence interface { //nolint:interfacebloat // the wiring holds the sto
 	envelope.KeyStore
 	identity.OrgKeyGapStore
 	audit.Store
+	connector.PackageStore
 	engineStore
 	io.Closer
 }
