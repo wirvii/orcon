@@ -6,6 +6,7 @@ import { mutationOptions, useMutation, useQueryClient } from '@tanstack/react-qu
 import type { FlowDocument } from '../model/flow-document';
 
 import type { NewCredential } from './credential-source';
+import { type FlowAnswer, publishFlow, setFlowActivation } from './flow-operations';
 import type { LoadedDraft, SaveResult } from './draft-source';
 import { credentialSource, draftSource, editorKeys, LOCAL_ORGANIZATION } from './queries';
 
@@ -39,6 +40,8 @@ export function useSaveDraft(flowId: string): (input: SaveDraftInput) => Promise
     onSuccess: (result, input) => {
       if (result.kind === 'saved') {
         queryClient.setQueryData<LoadedDraft>(editorKeys.draft(LOCAL_ORGANIZATION, flowId), { document: input.document, revision: result.revision });
+        // The flow now has unpublished changes the server knows about: the publish controls read it again.
+        void queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) });
       }
     },
   });
@@ -59,5 +62,37 @@ export function useCreateCredential() {
     retry: false,
     gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: editorKeys.credentials(LOCAL_ORGANIZATION) }),
+  });
+}
+
+/**
+ * Publishes the draft with an optional release note (SPEC-014 ED10a). A publication is not retried: the
+ * person decides to publish again. Afterwards the flow state is read again, because the draft is now
+ * the published version.
+ */
+export function usePublishFlow(flowId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...editorKeys.flow(LOCAL_ORGANIZATION, flowId), 'publish'],
+    mutationFn: (note: string | undefined) => publishFlow(flowId, note),
+    retry: false,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) }),
+  });
+}
+
+/**
+ * Activates or deactivates a flow against the entity tag it was read at (SPEC-014 ED10a). The answer
+ * carries the new state and its tag, so the next change is based on it; a stale tag is a conflict and
+ * nothing changes.
+ */
+export function useSetFlowActivation(flowId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...editorKeys.flow(LOCAL_ORGANIZATION, flowId), 'activation'],
+    mutationFn: ({ active, etag }: { active: boolean; etag: string }) => setFlowActivation(flowId, active, etag),
+    retry: false,
+    onSuccess: (answer: FlowAnswer) => {
+      queryClient.setQueryData<FlowAnswer>(editorKeys.flow(LOCAL_ORGANIZATION, flowId), answer);
+    },
   });
 }

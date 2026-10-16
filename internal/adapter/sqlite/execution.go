@@ -20,12 +20,14 @@ import (
 )
 
 var (
-	_ store.Reader       = (*Store)(nil)
-	_ store.Inbox        = (*Store)(nil)
-	_ store.Transactor   = (*Store)(nil)
-	_ store.WorkQueue    = (*Store)(nil)
-	_ store.Deliveries   = (*Store)(nil)
-	_ store.WaitResolver = (*Store)(nil)
+	_ store.Reader        = (*Store)(nil)
+	_ store.EngineReader  = (*Store)(nil)
+	_ store.Inbox         = (*Store)(nil)
+	_ store.Transactor    = (*Store)(nil)
+	_ store.WorkQueue     = (*Store)(nil)
+	_ store.LeaseRecovery = (*Store)(nil)
+	_ store.Deliveries    = (*Store)(nil)
+	_ store.WaitResolver  = (*Store)(nil)
 )
 
 // decode collects the first error of a sequence of identity conversions.
@@ -61,6 +63,22 @@ func beforeCursor(c store.Cursor) (createdAt int64, identity []byte) {
 	return micros(c.CreatedAt), uuidBytes(c.ID)
 }
 
+// afterBound and beforeBound are the exclusive creation-time bounds of a list; the zero time opens
+// the bound.
+func afterBound(t time.Time) int64 {
+	if t.IsZero() {
+		return math.MinInt64
+	}
+	return micros(t)
+}
+
+func beforeBound(t time.Time) int64 {
+	if t.IsZero() {
+		return math.MaxInt64
+	}
+	return micros(t)
+}
+
 // afterCursor is the cursor of an oldest-first list: before everything.
 func afterCursor(c store.Cursor) (createdAt int64, identity []byte) {
 	if c.IsZero() {
@@ -84,6 +102,7 @@ func executionFrom(row *sqlcgen.GetExecutionRow) (store.Execution, error) {
 		RunnableCount:     row.RunnableCount, LeasedCount: row.LeasedCount, WaitingCount: row.WaitingCount, SuspendedCount: row.SuspendedCount,
 		StartedAt: nullInstant(row.StartedAt), FinishedAt: nullInstant(row.FinishedAt),
 		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		FlowVersionNumber: row.FlowVersionNumber, HasUncertainOperation: row.HasUncertainOperation != 0,
 	}
 	return e, d.err
 }
@@ -104,48 +123,17 @@ func (s *Store) GetExecution(ctx context.Context, org orgscope.Org, execID store
 
 // ListExecutions implements [store.Reader].
 func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
-	set := 0
-	if !filter.ProjectID.IsZero() {
-		set++
+	if filter.Uncertain {
+		return s.listUncertainExecutions(ctx, org, filter, after, limit)
 	}
-	if !filter.FlowID.IsZero() {
-		set++
+	if !filter.Valid() {
+		return nil, fmt.Errorf("list executions: the filter must name a project, or exactly one of flow and status: %w", flow.ErrInvalidRecord)
 	}
-	if filter.Status != "" {
-		set++
-	}
-	if set != 1 {
-		return nil, fmt.Errorf("list executions: exactly one filter field must be set, got %d: %w", set, flow.ErrInvalidRecord)
-	}
-	beforeAt, beforeID := beforeCursor(after)
 	var out []store.Execution
 	err := s.readOf(ctx, "list executions", org, func(ctx context.Context, q *sqlcgen.Queries) error {
-		var rows []sqlcgen.GetExecutionRow
-		switch {
-		case !filter.ProjectID.IsZero():
-			r, err := q.ListExecutions(ctx, sqlcgen.ListExecutionsParams{OrgID: uuidBytes(org.UUID()), ProjectID: uuidBytes(filter.ProjectID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		case !filter.FlowID.IsZero():
-			r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: uuidBytes(org.UUID()), FlowID: uuidBytes(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		default:
-			r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: uuidBytes(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
+		rows, err := listExecutionRows(ctx, q, org, filter, after, limit)
+		if err != nil {
+			return err
 		}
 		for i := range rows {
 			e, err := executionFrom(&rows[i])
@@ -157,6 +145,60 @@ func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter sto
 		return nil
 	})
 	return out, err
+}
+
+// listExecutionRows runs the list query the filter selects.
+func listExecutionRows(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]sqlcgen.GetExecutionRow, error) {
+	beforeAt, beforeID := beforeCursor(after)
+	var rows []sqlcgen.GetExecutionRow
+	switch {
+	case filter.Oldest:
+		afterAt, afterID := afterCursor(after)
+		r, err := q.ListProjectExecutionsAsc(ctx, sqlcgen.ListProjectExecutionsAscParams{
+			OrgID: uuidBytes(org.UUID()), ProjectID: uuidBytes(filter.ProjectID),
+			AnyFlow: boolInt(filter.FlowID.IsZero()), FlowID: uuidBytes(filter.FlowID),
+			AnyStatus: boolInt(filter.Status == ""), Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case filter.Refined() || !filter.ProjectID.IsZero():
+		r, err := q.ListProjectExecutions(ctx, sqlcgen.ListProjectExecutionsParams{
+			OrgID: uuidBytes(org.UUID()), ProjectID: uuidBytes(filter.ProjectID),
+			AnyFlow: boolInt(filter.FlowID.IsZero()), FlowID: uuidBytes(filter.FlowID),
+			AnyStatus: boolInt(filter.Status == ""), Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case !filter.FlowID.IsZero():
+		r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: uuidBytes(org.UUID()), FlowID: uuidBytes(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	default:
+		r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: uuidBytes(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	}
+	return rows, nil
 }
 
 // GetToken implements [store.Reader].
@@ -209,6 +251,65 @@ func (s *Store) ListExecutionEvents(ctx context.Context, org orgscope.Org, execI
 	return out, err
 }
 
+// ListNodeExecutions implements [store.Reader].
+func (s *Store) ListNodeExecutions(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeExecution, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeExecution
+	err := s.readOf(ctx, "list node executions", org, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeExecutionsByExecution(ctx, sqlcgen.ListNodeExecutionsByExecutionParams{
+			OrgID: uuidBytes(org.UUID()), ExecutionID: uuidBytes(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			var d decode
+			n := store.NodeExecution{
+				ID: uuidField[store.NodeExecutionID](&d, r.ID), OrgID: uuidField[identity.OrgID](&d, r.OrgID),
+				ExecutionID: uuidField[store.ExecutionID](&d, r.ExecutionID), TokenID: uuidField[store.TokenID](&d, r.TokenID),
+				NodeID: r.NodeID, ScopePath: r.ScopePath, Status: r.Status, AttemptCount: r.AttemptCount,
+				StartedAt: nullInstant(r.StartedAt), FinishedAt: nullInstant(r.FinishedAt),
+				CreatedAt: instant(r.CreatedAt), UpdatedAt: instant(r.UpdatedAt),
+			}
+			if d.err != nil {
+				return d.err
+			}
+			out = append(out, n)
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ListNodeOutputs implements [store.Reader].
+func (s *Store) ListNodeOutputs(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeOutputRecord, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeOutputRecord
+	err := s.readOf(ctx, "list node outputs", org, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeOutputsByExecution(ctx, sqlcgen.ListNodeOutputsByExecutionParams{
+			OrgID: uuidBytes(org.UUID()), ExecutionID: uuidBytes(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			var d decode
+			rec := store.NodeOutputRecord{
+				ID: uuidField[store.PayloadID](&d, r.ID), NodeExecutionID: uuidField[store.NodeExecutionID](&d, r.NodeExecutionID),
+				NodeID: r.NodeID, Port: r.Port, ItemCount: r.ItemCount, Document: r.InlineDocument, CreatedAt: instant(r.CreatedAt),
+			}
+			if d.err != nil {
+				return d.err
+			}
+			out = append(out, rec)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func operationFrom(row *sqlcgen.GetExternalOperationRow) (store.ExternalOperation, error) {
 	var d decode
 	o := store.ExternalOperation{
@@ -236,10 +337,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, oper
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
 	err := s.readOf(ctx, "list external operations", org, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: uuidBytes(org.UUID()), NodeExecutionID: uuidBytes(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: uuidBytes(org.UUID()), NodeExecutionID: uuidBytes(node), FromItemIndex: fromItem, FromID: uuidBytes(fromID), PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -331,13 +432,16 @@ func (s *Store) InTx(ctx context.Context, org orgscope.Org, fn func(ctx context.
 		return identity.ErrNoScope
 	}
 	return s.write(ctx, "transaction", func(ctx context.Context, q *sqlcgen.Queries) error {
-		return fn(ctx, &sqliteTx{q: q, org: identity.OrgID(org.UUID())})
+		return fn(ctx, &sqliteTx{q: q, org: identity.OrgID(org.UUID()), now: s.clock.Now})
 	})
 }
 
 type sqliteTx struct {
 	q   *sqlcgen.Queries
 	org identity.OrgID
+	// now is the clock of the store: the instants a lease and the availability of a
+	// token are counted from.
+	now func() time.Time
 }
 
 var errOtherOrganization = errors.New("the record belongs to another organization than the transaction")
@@ -394,13 +498,16 @@ func (t *sqliteTx) InsertExecution(ctx context.Context, e *store.Execution) erro
 	if root.IsZero() {
 		root = e.ID
 	}
-	return t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
+	if err := t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
 		ID: uuidBytes(e.ID), OrgID: uuidBytes(e.OrgID), ProjectID: uuidBytes(e.ProjectID), FlowID: uuidBytes(e.FlowID),
 		FlowVersionID: nullUUIDBytes(e.FlowVersionID), FlowSnapshotID: nullUUIDBytes(e.FlowSnapshotID),
 		Status: e.Status, Mode: e.Mode, Priority: e.Priority, ParentExecutionID: nullUUIDBytes(e.ParentExecutionID),
 		RootExecutionID: uuidBytes(root), CallDepth: e.CallDepth, RunnableCount: e.RunnableCount,
 		CreatedAt: micros(e.CreatedAt), UpdatedAt: micros(e.UpdatedAt),
-	})
+	}); err != nil {
+		return err
+	}
+	return countAcceptance(ctx, t.q, e)
 }
 
 func (t *sqliteTx) InsertToken(ctx context.Context, tok *store.Token) error {
@@ -411,8 +518,8 @@ func (t *sqliteTx) InsertToken(ctx context.Context, tok *store.Token) error {
 		ID: uuidBytes(tok.ID), OrgID: uuidBytes(tok.OrgID), ExecutionID: uuidBytes(tok.ExecutionID), Status: tok.Status,
 		NodeID: tok.NodeID, EdgeID: nullText(tok.EdgeID), ScopePath: tok.ScopePath, ForkLineageDocument: tok.ForkLineage,
 		PayloadReference: nullText(tok.PayloadReference), FairnessKey: tok.FairnessKey, EffectivePriority: tok.EffectivePriority,
-		AvailableAt: micros(tok.AvailableAt), LeaseOwner: nullUUIDBytes(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
-		LeaseExpiresAt: nullMicros(tok.LeaseExpiresAt), CreatedAt: micros(tok.CreatedAt), UpdatedAt: micros(tok.UpdatedAt),
+		AvailableAt: availableAt(tok.AvailableAt, t.now(), tok.QueueOrder), LeaseOwner: nullUUIDBytes(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
+		LeaseExpiresAt: leaseExpiry(tok, t.now()), CreatedAt: micros(tok.CreatedAt), UpdatedAt: micros(tok.UpdatedAt),
 	})
 }
 
@@ -422,7 +529,7 @@ func (t *sqliteTx) InsertNodeExecution(ctx context.Context, n store.NodeExecutio
 	}
 	return t.q.InsertNodeExecution(ctx, sqlcgen.InsertNodeExecutionParams{
 		ID: uuidBytes(n.ID), OrgID: uuidBytes(n.OrgID), ExecutionID: uuidBytes(n.ExecutionID), TokenID: uuidBytes(n.TokenID),
-		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt), FinishedAt: nullMicros(n.FinishedAt),
 		CreatedAt: micros(n.CreatedAt), UpdatedAt: micros(n.UpdatedAt),
 	})
 }
@@ -463,7 +570,38 @@ func (t *sqliteTx) AppendJournal(ctx context.Context, operations []store.Externa
 	return nil
 }
 
-func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+func (t *sqliteTx) UpsertNodeExecution(ctx context.Context, n store.NodeExecution) error {
+	if err := t.own(n.OrgID); err != nil {
+		return err
+	}
+	return t.q.UpsertNodeExecution(ctx, sqlcgen.UpsertNodeExecutionParams{
+		ID: uuidBytes(n.ID), OrgID: uuidBytes(n.OrgID), ExecutionID: uuidBytes(n.ExecutionID), TokenID: uuidBytes(n.TokenID),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullMicros(n.StartedAt), FinishedAt: nullMicros(n.FinishedAt),
+		CreatedAt: micros(n.CreatedAt), UpdatedAt: micros(n.UpdatedAt),
+	})
+}
+
+func (t *sqliteTx) InsertJournalIfAbsent(ctx context.Context, operations []store.ExternalOperation) error {
+	for i := range operations {
+		o := &operations[i]
+		if err := t.own(o.OrgID); err != nil {
+			return err
+		}
+		if _, err := t.q.InsertExternalOperationIfAbsent(ctx, sqlcgen.InsertExternalOperationIfAbsentParams{
+			ID: uuidBytes(o.ID), OrgID: uuidBytes(o.OrgID), ExecutionID: uuidBytes(o.ExecutionID), NodeExecutionID: uuidBytes(o.NodeExecutionID),
+			ItemIndex: o.ItemIndex, CorrelationKey: o.CorrelationKey, ContractReference: o.ContractReference, BatchKey: nullText(o.BatchKey),
+			CreatedAt: micros(o.CreatedAt), UpdatedAt: micros(o.CreatedAt),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
+	// SQLite runs in one process: the injected clock is the database clock here (TY-5).
+	now := t.now()
+	deadline := now.Add(attemptTimeout)
 	var moved int64
 	for _, op := range operations {
 		n, err := t.q.MarkExternalOperationDispatching(ctx, sqlcgen.MarkExternalOperationDispatchingParams{
@@ -475,6 +613,11 @@ func (t *sqliteTx) MarkDispatching(ctx context.Context, operations []store.Exter
 		moved += n
 	}
 	return moved, nil
+}
+
+// DatabaseNow implements [store.Tx]: the injected clock, as SQLite has one process.
+func (t *sqliteTx) DatabaseNow(context.Context) (time.Time, error) {
+	return t.now(), nil
 }
 
 func (t *sqliteTx) ResolveOperation(ctx context.Context, operation store.ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error) {
@@ -593,41 +736,149 @@ func boolToInt(b bool) int64 {
 }
 
 // ClaimTokens implements [store.WorkQueue].
-func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
-	var out []store.Claimed
-	keys := r.FairnessKeys
-	if len(keys) == 0 {
-		keys = []string{""} // the slice is never empty; AnyFairnessKey decides
+func executionLimitOf(r store.ClaimRequest) int64 {
+	if r.ExecutionLimit <= 0 {
+		return store.DefaultExecutionLimit
 	}
-	err := s.write(ctx, "claim tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
-			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(r.Now.Add(r.LeaseTTL)), Valid: true}, Now: micros(r.Now),
-			AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PageSize: clampPage(r.Limit),
-		})
+	return r.ExecutionLimit
+}
+
+// RunnableCounts implements [store.WorkQueue].
+func (s *Store) RunnableCounts(ctx context.Context, now time.Time) ([]store.RunnableCount, error) {
+	var out []store.RunnableCount
+	err := s.read(ctx, "count runnable tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.CountRunnableTokens(ctx, micros(now), store.MaxRunnableRows)
 		if err != nil {
 			return err
 		}
-		for i := range rows {
-			var d decode
-			row := &rows[i]
-			out = append(out, store.Claimed{
-				OrgID: uuidField[identity.OrgID](&d, row.OrgID), TokenID: uuidField[store.TokenID](&d, row.ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, row.ExecutionID), NodeID: row.NodeID, EdgeID: nullString(row.EdgeID),
-				ScopePath: row.ScopePath, ForkLineage: row.ForkLineageDocument, PayloadReference: nullString(row.PayloadReference),
-				FairnessKey: row.FairnessKey, LeaseEpoch: row.LeaseEpoch, LeaseExpiresAt: nullInstant(row.LeaseExpiresAt),
+		for _, r := range rows {
+			out = append(out, store.RunnableCount{
+				FairnessKey: r.FairnessKey, Priority: r.EffectivePriority, Runnable: r.RunnableCount,
+				Oldest: time.UnixMicro(r.OldestAvailableAt).UTC(),
 			})
-			if d.err != nil {
-				return d.err
-			}
 		}
 		return nil
 	})
 	return out, err
 }
 
+// ClaimTokens implements [store.WorkQueue].
+func (s *Store) ClaimTokens(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
+	// One process owns the file, so its clock is the database clock: the instant of the
+	// caller is not used, and a worker whose clock is off cannot make a lease
+	// expire early or late (ADR-0013 section 4).
+	now := s.clock.Now()
+	keys := r.FairnessKeys
+	if len(keys) == 0 {
+		keys = []string{""} // the slice is never empty; AnyFairnessKey decides
+	}
+	var out []store.Claimed
+	err := s.write(ctx, "claim tokens", func(ctx context.Context, q *sqlcgen.Queries) error {
+		var rows []claimedRow
+		var err error
+		if clampPage(r.Limit) == 1 {
+			// One token needs no count of the candidates ahead of it, which is quadratic for an execution at its cap.
+			var one []sqlcgen.ClaimOneTokenRow
+			one, err = q.ClaimOneToken(ctx, sqlcgen.ClaimOneTokenParams{
+				WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+				AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r),
+				ExecutionLimit: executionLimitOf(r),
+			})
+			for i := range one {
+				rows = append(rows, claimedRow(one[i]))
+			}
+		} else {
+			rows, err = q.ClaimTokens(ctx, sqlcgen.ClaimTokensParams{
+				WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+				AnyFairnessKey: boolToInt(len(r.FairnessKeys) == 0), FairnessKeys: keys, PoisonThreshold: thresholdOf(r), PageSize: clampPage(r.Limit),
+				ExecutionLimit: executionLimitOf(r),
+			})
+		}
+		if err != nil {
+			return err
+		}
+		out, err = s.afterClaim(ctx, q, rows, now)
+		return err
+	})
+	return out, err
+}
+
+// ClaimLastChanceToken implements [store.WorkQueue].
+func (s *Store) ClaimLastChanceToken(ctx context.Context, r store.ClaimRequest) ([]store.Claimed, error) {
+	now := s.clock.Now()
+	var out []store.Claimed
+	err := s.write(ctx, "claim last chance token", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ClaimLastChanceToken(ctx, sqlcgen.ClaimLastChanceTokenParams{
+			WorkerID: uuidBytes(r.Worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(r.LeaseTTL)), Valid: true}, Now: micros(now),
+			PoisonThreshold: thresholdOf(r),
+		})
+		if err != nil {
+			return err
+		}
+		claimed := make([]claimedRow, len(rows))
+		for i := range rows {
+			claimed[i] = claimedRow(rows[i])
+		}
+		out, err = s.afterClaim(ctx, q, claimed, now)
+		return err
+	})
+	return out, err
+}
+
+// LastChanceWaiting implements [store.WorkQueue].
+func (s *Store) LastChanceWaiting(ctx context.Context, poisonThreshold int64) (time.Time, bool, error) {
+	var since time.Time
+	var found bool
+	err := s.read(ctx, "read the oldest last chance token", func(ctx context.Context, q *sqlcgen.Queries) error {
+		v, err := q.GetOldestLastChance(ctx, s.clock.Now().UnixMicro(), poisonThreshold)
+		if err != nil {
+			return err
+		}
+		if m, ok := v.(int64); ok {
+			since, found = time.UnixMicro(m).UTC(), true
+		}
+		return nil
+	})
+	return since, found, err
+}
+
+// thresholdOf returns the poison threshold of a claim.
+func thresholdOf(r store.ClaimRequest) int64 {
+	if r.PoisonThreshold <= 0 {
+		return store.DefaultPoisonThreshold
+	}
+	return r.PoisonThreshold
+}
+
+// claimedRow is the row both claim statements return.
+type claimedRow = sqlcgen.ClaimTokensRow
+
+// afterClaim turns the rows of a claim into claims and starts the executions they belong to.
+func (s *Store) afterClaim(ctx context.Context, q *sqlcgen.Queries, rows []claimedRow, now time.Time) ([]store.Claimed, error) {
+	out := make([]store.Claimed, 0, len(rows))
+	for i := range rows {
+		var d decode
+		row := &rows[i]
+		out = append(out, store.Claimed{
+			OrgID: uuidField[identity.OrgID](&d, row.OrgID), TokenID: uuidField[store.TokenID](&d, row.ID),
+			ExecutionID: uuidField[store.ExecutionID](&d, row.ExecutionID), NodeID: row.NodeID, EdgeID: nullString(row.EdgeID),
+			ScopePath: row.ScopePath, ForkLineage: row.ForkLineageDocument, PayloadReference: nullString(row.PayloadReference),
+			FairnessKey: row.FairnessKey, LeaseEpoch: row.LeaseEpoch, LeaseExpiresAt: nullInstant(row.LeaseExpiresAt),
+		})
+		if d.err != nil {
+			return nil, d.err
+		}
+		if err := startExecution(ctx, q, s.outboxRule(), row.OrgID, row.ExecutionID, now); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 // RenewLeases implements [store.WorkQueue].
-func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]store.Renewed, error) {
+func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, _ time.Time) ([]store.Renewed, error) {
 	var out []store.Renewed
+	now := s.clock.Now()
 	err := s.write(ctx, "renew leases", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.RenewLeases(ctx, sql.NullInt64{Int64: micros(now.Add(ttl)), Valid: true}, micros(now), uuidBytes(worker))
 		if err != nil {
@@ -648,81 +899,10 @@ func (s *Store) RenewLeases(ctx context.Context, worker execution.WorkerID, ttl 
 	return out, err
 }
 
-// ReleaseExpiredLeases implements [store.WorkQueue].
-func (s *Store) ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]store.Reaped, error) {
-	var out []store.Reaped
-	err := s.write(ctx, "release expired leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ReleaseExpiredLeases(ctx, poisonThreshold, micros(now), clampPage(limit))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			r := store.Reaped{
-				OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TokenID: uuidField[store.TokenID](&d, rows[i].ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, rows[i].ExecutionID), AbandonedCount: rows[i].AbandonedCount,
-				Poisoned: rows[i].Column5 == 1,
-			}
-			if d.err != nil {
-				return d.err
-			}
-			if _, err := q.MarkTokenAttemptsAbandoned(ctx, sql.NullInt64{Int64: micros(now), Valid: true}, rows[i].OrgID, rows[i].ID); err != nil {
-				return err
-			}
-			out = append(out, r)
-		}
-		return nil
-	})
-	return out, err
-}
-
-// ReleaseWorkerLeases implements [store.WorkQueue].
-func (s *Store) ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, now time.Time) ([]store.TokenRef, error) {
-	var out []store.TokenRef
-	err := s.write(ctx, "release worker leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ReleaseWorkerLeases(ctx, micros(now), uuidBytes(worker))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			out = append(out, store.TokenRef{OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TokenID: uuidField[store.TokenID](&d, rows[i].ID)})
-			if d.err != nil {
-				return d.err
-			}
-		}
-		return nil
-	})
-	return out, err
-}
-
-// FireDueTimers implements [store.WorkQueue].
-func (s *Store) FireDueTimers(ctx context.Context, limit int, now time.Time) ([]store.FiredTimer, error) {
-	var out []store.FiredTimer
-	err := s.write(ctx, "fire due timers", func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.MarkDueTimersFired(ctx, micros(now), clampPage(limit))
-		if err != nil {
-			return err
-		}
-		for i := range rows {
-			var d decode
-			out = append(out, store.FiredTimer{
-				OrgID: uuidField[identity.OrgID](&d, rows[i].OrgID), TimerID: uuidField[store.TimerID](&d, rows[i].ID),
-				ExecutionID: uuidField[store.ExecutionID](&d, rows[i].ExecutionID), TokenID: uuidField[store.TokenID](&d, rows[i].TokenID),
-				Kind: rows[i].Kind, DueAt: instant(rows[i].DueAt),
-			})
-			if d.err != nil {
-				return d.err
-			}
-		}
-		return nil
-	})
-	return out, err
-}
-
 // ClaimOutbox implements [store.Deliveries].
-func (s *Store) ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, now time.Time) ([]store.ClaimedOutbox, error) {
+func (s *Store) ClaimOutbox(ctx context.Context, worker execution.WorkerID, limit int, ttl time.Duration, _ time.Time) ([]store.ClaimedOutbox, error) {
 	var out []store.ClaimedOutbox
+	now := s.clock.Now()
 	err := s.write(ctx, "claim outbox", func(ctx context.Context, q *sqlcgen.Queries) error {
 		rows, err := q.ClaimOutbox(ctx, sqlcgen.ClaimOutboxParams{
 			WorkerID: uuidBytes(worker), LeaseExpiresAt: sql.NullInt64{Int64: micros(now.Add(ttl)), Valid: true}, Now: micros(now), PageSize: clampPage(limit),
@@ -763,23 +943,19 @@ func (s *Store) ResolveWaitSecret(ctx context.Context, wait store.WaitID) (store
 	return out, err
 }
 
-// releaseAllLeases is what a standalone process does at start (ADR-0013
-// section 9): the lock file guarantees no other holder exists, so every token
-// still LEASED is released. It reports how many.
-func (s *Store) releaseAllLeases(ctx context.Context) (int64, error) {
-	var n int64
-	err := s.write(ctx, "release all leases", func(ctx context.Context, q *sqlcgen.Queries) error {
-		var err error
-		n, err = q.ReleaseAllLeases(ctx, micros(s.clock.Now()))
-		return err
-	})
-	return n, err
-}
-
 // defaultText returns v, or fallback when v is empty.
 func defaultText(v, fallback string) string {
 	if v == "" {
 		return fallback
 	}
 	return v
+}
+
+// listUncertainExecutions lists the executions of a project that need a review (SPEC-019 R-UX-BE-03).
+// The uncertain filter narrows a project listing and takes no other field.
+func (s *Store) listUncertainExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
+	if filter.ProjectID.IsZero() || !filter.FlowID.IsZero() || filter.Status != "" {
+		return nil, fmt.Errorf("list executions: the uncertain filter takes the project and no other field: %w", flow.ErrInvalidRecord)
+	}
+	return s.ListProjectExecutions(ctx, org, filter.ProjectID, store.ExecutionQuery{UncertainOnly: true}, after, limit)
 }

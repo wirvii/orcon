@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/wirvii/orcon/internal/flow"
 )
@@ -56,6 +57,9 @@ type token struct {
 	// roundHeld is set until the token reaches a terminal state; it keeps the
 	// rounds of its split instances open.
 	roundHeld bool
+	// availableAt is the instant a delayed token may be claimed again; zero when
+	// the token was not delayed.
+	availableAt time.Time
 }
 
 // nodeState is the completion tracker of a node in a scope (ADR-0010
@@ -136,6 +140,8 @@ type run struct {
 	in   *Interpreter
 	plan *Plan
 	req  Request
+	// checkpoint is the checkpoint of the segment being worked, nil outside a durable engine.
+	checkpoint ActivationCheckpoint
 
 	payloads Payloads
 	state    State
@@ -183,6 +189,26 @@ type run struct {
 	events  []Event
 	flushed int
 	ends    []EndArrival
+
+	// forks counts the forks the run made; a durable segment stops at one.
+	forks int
+	// owned receives the payload writes with their owner when the payload store
+	// is a durable session's; it is nil in memory.
+	owned ownedPayloads
+	// rec records and replays the activations of a durable session; it is nil in memory.
+	rec *recorder
+	// pendingGroups are the sequential groups read from a durable document until
+	// the live tokens are known.
+	pendingGroups []pendingGroup
+}
+
+// enqueue makes a token available to the next claim. A durable session also
+// keeps the order, which becomes the order of the claims.
+func (r *run) enqueue(t *token) {
+	r.queue = append(r.queue, t)
+	if r.rec != nil {
+		r.rec.queued = append(r.rec.queued, t.id)
+	}
 }
 
 func newRun(in *Interpreter, plan *Plan, req Request) *run {
@@ -217,12 +243,12 @@ func newRun(in *Interpreter, plan *Plan, req Request) *run {
 // execute runs the execution to its end.
 func (r *run) execute(ctx context.Context, start int) error {
 	ref := inputRef(r.req.Execution)
-	if err := r.payloads.Put(ctx, ref, r.req.Input); err != nil {
+	if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadInput, Token: rootTokenID(r.req.Execution), Batch: r.req.Input}); err != nil {
 		return fmt.Errorf("store execution input: %w", err)
 	}
 	root := r.spawn(rootTokenID(r.req.Execution), TokenRunnable, start, -1, "", nil, ref)
 	r.nodeOf(nodeKey{start, ""}).inflight++
-	r.queue = append(r.queue, root)
+	r.enqueue(root)
 	r.completeOtherStarts(start)
 	for r.failure == nil {
 		if err := ctx.Err(); err != nil {

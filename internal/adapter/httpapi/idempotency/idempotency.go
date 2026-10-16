@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package idempotency makes a POST safe to retry (ADR-0053 section 4): the
-// first request with an Idempotency-Key runs, and a repeat with the same key and
-// the same content gets the stored response with Idempotent-Replayed: true.
+// Package idempotency makes a POST safe to retry (ADR-0053 section 4): the first request
+// with an Idempotency-Key runs, and a repeat with the same key and the same content gets the
+// stored response with Idempotent-Replayed: true.
 //
-// The records live behind the [Store] port. A store is keyed by organization,
-// exact requester and key, so two API keys of one user never share a record.
-// Responses that disclose a freshly issued secret are stored without it: a
-// replay answers 409 secret-already-issued with the address of the resource.
+// The records live behind the [identity.IdempotencyStore] port. The change that a request
+// performs claims its key in the transaction of the change (see
+// internal/platform/idempotencyclaim), so a committed change always has its record. This
+// package reads the record before the change, stores the response after it, and answers a
+// repeat from the record: a completed record replays its response, an in-progress one answers
+// 409 while its first request runs, and an in-progress one left by a crash is rebuilt from the
+// resource it created (Amendment 8 section 8-2).
 package idempotency
 
 import (
@@ -25,8 +28,13 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/problem"
+	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/clock"
+	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/idempotencyclaim"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
 // Header names of the convention.
@@ -43,79 +51,52 @@ const (
 	maxKeyLength = 255
 )
 
-// maxStoredBody bounds a response the middleware keeps in memory to store; a
-// longer one is sent but not stored, and its key is released.
+// maxStoredBody bounds the response the middleware keeps in memory to store. A longer one
+// is sent but not stored: its record stays in progress and a repeat rebuilds it from the
+// resource.
 const maxStoredBody = 1 << 20
 
-// retryInProgress is the Retry-After of a request whose twin is still running.
+// retryInProgress is the Retry-After of a request whose first run is still going.
 const retryInProgress = time.Second
 
-// Key identifies one idempotent request: who sent it and under which key.
-type Key struct {
-	// Org is the organization of the requester.
-	Org string
-	// Requester is the exact requesting identity: the user or service account for
-	// sessions, the key or token for key-authenticated calls.
-	Requester string
-	// Value is the Idempotency-Key header.
-	Value string
-}
+// staleAfter is the age after which an in-progress record is taken to be left by a crash:
+// the write timeout of the server plus five seconds (Amendment 8 section 8-2).
+const staleAfter = 35 * time.Second
 
-// Response is what a completed request answered, as far as a replay needs it.
-type Response struct {
-	// Status is the HTTP status.
-	Status int
-	// Header holds the headers a replay repeats: Content-Type, Location and ETag.
-	Header http.Header
-	// Body is the response body; empty when SecretIssued.
-	Body []byte
-	// SecretIssued is true when the response disclosed a secret that is not stored.
-	SecretIssued bool
-	// Unstored is true when a successful response was too large to keep: a repeat
-	// is refused with 409 and the address of the resource, because the store has no
-	// way yet to rebuild the answer from the resource reference (Amendment 8 section
-	// 8-2); the durable store of API2-core replaces this with the rebuild.
-	Unstored bool
-}
+// ErrNoRebuild means the operation cannot rebuild the response of a record that was never
+// completed. The repeat then answers 409 idempotency-in-progress.
+var ErrNoRebuild = errors.New("the response cannot be rebuilt")
 
-// Record is the stored state of a key.
-type Record struct {
-	// Fingerprint is the SHA-256 of the request that claimed the key.
-	Fingerprint [sha256.Size]byte
-	// Completed is false while the first request is still running.
-	Completed bool
-	// Response is valid when Completed.
-	Response Response
-}
-
-// Store keeps the records. Implementations are safe for concurrent use.
-type Store interface {
-	// Begin claims key for the request with fingerprint. When a record exists it
-	// is returned and claimed is false; otherwise a record in progress is created
-	// and claimed is true.
-	Begin(ctx context.Context, key Key, fingerprint [sha256.Size]byte) (rec Record, claimed bool, err error)
-	// Complete stores the response of a claimed key.
-	Complete(ctx context.Context, key Key, resp *Response) error
-	// Abandon releases a claimed key whose request produced no response worth storing.
-	Abandon(ctx context.Context, key Key) error
-}
+// Rebuild returns the response that the resource named by rec implies, read in the organization
+// of the request (authz.OrgScopeFrom): it is the answer a completed first request would have given. It is called only for an in-progress record
+// whose change committed (it names its resource) and that is older than staleAfter.
+type Rebuild func(ctx context.Context, rec identity.IdempotencyRecord) (identity.IdempotencyResponse, error)
 
 // Config configures the middleware of one operation.
 type Config struct {
 	// Store keeps the records.
-	Store Store
+	Store identity.IdempotencyStore
+	// Clock stamps the records and decides when an in-progress record is stale.
+	Clock clock.Clock
+	// IDs creates the identity of the record a claiming transaction writes.
+	IDs id.Generator
 	// Logger receives store failures.
 	Logger *slog.Logger
 	// Required makes a missing key a 400 validation-failed.
 	Required bool
-	// IssuesSecret is true when a 2xx response of the operation carries a secret.
+	// IssuesSecret is true when a 2xx response of the operation discloses a secret: the record
+	// keeps no body, and a repeat is refused with 409 secret-already-issued.
 	IssuesSecret bool
 	// Route is the route template, "POST /api/v1/flows/{flowId}/executions".
 	Route string
+	// Rebuild answers the repeat of an in-progress record left by a crash. Nil means such a
+	// repeat answers 409 idempotency-in-progress.
+	Rebuild Rebuild
 }
 
-// Middleware returns the idempotency step of the pipeline (step 7) for one
-// operation. It must run after authentication.
+// Middleware returns the idempotency step of the pipeline for one operation. It must run after
+// authentication and authorization, because the record is kept in the organization that the
+// authorization decided.
 func Middleware(cfg Config) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -147,6 +128,13 @@ func serve(cfg *Config, next http.Handler, w http.ResponseWriter, r *http.Reques
 		next.ServeHTTP(w, r)
 		return
 	}
+	scope, ok := authz.OrgScopeFrom(r.Context())
+	if !ok {
+		cfg.Logger.ErrorContext(r.Context(), "idempotency: the request has no authorized organization",
+			"request_id", middleware.RequestIDFrom(r.Context()))
+		problem.Write(w, r, problem.InternalError)
+		return
+	}
 	body, err := readBody(r)
 	if err != nil {
 		bodyError(w, r, err)
@@ -157,86 +145,104 @@ func serve(cfg *Config, next http.Handler, w http.ResponseWriter, r *http.Reques
 		problem.Write(w, r, problem.ValidationFailed, problem.Detail("The body is not valid JSON."))
 		return
 	}
-	key := Key{Org: principal.OrgID.String(), Requester: requesterOf(principal), Value: value}
-	rec, claimed, err := cfg.Store.Begin(r.Context(), key, fingerprint)
+	key := identity.IdempotencyKey{Requester: requesterOf(principal), Value: value}
+	now := cfg.Clock.Now()
+	rec, found, err := cfg.Store.LookupIdempotency(r.Context(), scope, key, now)
 	if err != nil {
-		storeFailed(cfg, w, r, "begin", err)
+		storeFailed(cfg, w, r, "lookup", err)
 		return
 	}
-	if !claimed {
-		answerExisting(w, r, &rec, fingerprint)
+	if found {
+		answerExisting(cfg, w, r, scope, key, rec, fingerprint, now)
 		return
 	}
-	run(cfg, next, w, r, key)
+	run(cfg, next, w, r, scope, key, fingerprint, now)
 }
 
-// run executes the handler of a claimed key, stores the outcome and sends it.
-func run(cfg *Config, next http.Handler, w http.ResponseWriter, r *http.Request, key Key) {
+// run executes the operation with its claim in the context, stores the response of a success
+// and sends it.
+func run(cfg *Config, next http.Handler, w http.ResponseWriter, r *http.Request, scope orgscope.Org, key identity.IdempotencyKey, fingerprint [sha256.Size]byte, now time.Time) {
+	claim := idempotencyclaim.Claim{ID: cfg.IDs.New(), Requester: key.Requester, Value: key.Value, Fingerprint: fingerprint}
 	rec := &recorder{header: http.Header{}, status: http.StatusOK}
-	stored := false
 	// The bookkeeping outlives a client that went away.
 	ctx := context.WithoutCancel(r.Context())
-	requestID := middleware.RequestIDFrom(ctx)
-	defer func() {
-		if !stored {
-			// A panic or an early return: release the key so the client can retry.
-			if err := cfg.Store.Abandon(ctx, key); err != nil {
-				cfg.Logger.ErrorContext(ctx, "idempotency: abandon failed", "request_id", requestID, "error", err)
-			}
-		}
-	}()
-	next.ServeHTTP(rec, r)
+	next.ServeHTTP(rec, r.WithContext(idempotencyclaim.With(r.Context(), claim)))
 
-	resp := rec.response(cfg.IssuesSecret)
-	// Only a success is stored (Amendment 8 section 8-2(c)): a 4xx or a 5xx releases the
-	// key, so the client can correct the request and send it again under the same key.
-	if resp.Status < http.StatusOK || resp.Status >= http.StatusMultipleChoices {
+	if rec.status < http.StatusOK || rec.status >= http.StatusMultipleChoices {
 		flush(w, rec)
 		return
 	}
 	if rec.overflow {
-		resp = &Response{Status: resp.Status, Header: resp.Header, Unstored: true}
-	}
-	if err := cfg.Store.Complete(ctx, key, resp); err != nil {
-		cfg.Logger.ErrorContext(ctx, "idempotency: complete failed", "request_id", requestID, "error", err)
+		cfg.Logger.WarnContext(ctx, "idempotency: the response is too large to store; a repeat rebuilds it",
+			"request_id", middleware.RequestIDFrom(ctx))
 		flush(w, rec)
 		return
 	}
-	stored = true
+	resp := rec.response()
+	if cfg.IssuesSecret {
+		// The secret is shown once: the record keeps none of it, and a repeat is refused.
+		resp.SecretIssued = true
+		resp.Body = nil
+	}
+	c := identity.IdempotencyCompletion{ID: claim.ID, Fingerprint: fingerprint, Response: resp}
+	if err := cfg.Store.CompleteIdempotency(ctx, scope, key, c, now); err != nil {
+		cfg.Logger.ErrorContext(ctx, "idempotency: complete failed", "request_id", middleware.RequestIDFrom(ctx), "error", err)
+	}
 	flush(w, rec)
 }
 
-func answerExisting(w http.ResponseWriter, r *http.Request, rec *Record, fingerprint [sha256.Size]byte) {
+// answerExisting answers a request whose key already has a record.
+func answerExisting(cfg *Config, w http.ResponseWriter, r *http.Request, scope orgscope.Org, key identity.IdempotencyKey, rec identity.IdempotencyRecord, fingerprint [sha256.Size]byte, now time.Time) {
 	switch {
 	case rec.Fingerprint != fingerprint:
 		problem.Write(w, r, problem.IdempotencyKeyReused,
 			problem.Detail("The Idempotency-Key was used with a different request."))
-	case !rec.Completed:
-		problem.Write(w, r, problem.IdempotencyInProgress, problem.RetryAfter(retryInProgress),
-			problem.Detail("A request with this Idempotency-Key is still running."))
-	case rec.Response.Unstored:
-		opts := []problem.Option{problem.Detail("The response of the first request was too large to store; read the resource it created.")}
-		if loc := rec.Response.Header.Get("Location"); loc != "" {
-			opts = append(opts, problem.Header("Location", loc))
-		}
-		problem.Write(w, r, problem.Conflict, opts...)
-	case rec.Response.SecretIssued:
+	case rec.Completed && rec.Response.SecretIssued:
 		opts := []problem.Option{problem.Detail("The secret of this request was shown once and is not stored; read the resource instead.")}
-		if loc := rec.Response.Header.Get("Location"); loc != "" {
-			opts = append(opts, problem.Header("Location", loc))
+		if rec.Response.Location != "" {
+			opts = append(opts, problem.Header("Location", rec.Response.Location))
 		}
 		problem.Write(w, r, problem.SecretAlreadyIssued, opts...)
+	case rec.Completed:
+		replay(w, r, rec.Response)
+	case now.Sub(rec.CreatedAt) < staleAfter || cfg.Rebuild == nil || rec.ResourceRef == "":
+		problem.Write(w, r, problem.IdempotencyInProgress, problem.RetryAfter(retryInProgress),
+			problem.Detail("A request with this Idempotency-Key is still running."))
 	default:
-		for name, values := range rec.Response.Header {
-			for _, v := range values {
-				w.Header().Add(name, v)
-			}
+		resp, err := cfg.Rebuild(r.Context(), rec)
+		if errors.Is(err, ErrNoRebuild) {
+			problem.Write(w, r, problem.IdempotencyInProgress, problem.RetryAfter(retryInProgress),
+				problem.Detail("A request with this Idempotency-Key is still running."))
+			return
 		}
-		w.Header().Set(ReplayedHeader, "true")
-		w.WriteHeader(rec.Response.Status)
-		if r.Method != http.MethodHead {
-			_, _ = w.Write(rec.Response.Body)
+		if err != nil {
+			storeFailed(cfg, w, r, "rebuild", err)
+			return
 		}
+		c := identity.IdempotencyCompletion{ID: cfg.IDs.New(), Fingerprint: rec.Fingerprint, Response: resp}
+		if err := cfg.Store.CompleteIdempotency(context.WithoutCancel(r.Context()), scope, key, c, now); err != nil {
+			cfg.Logger.ErrorContext(r.Context(), "idempotency: complete after rebuild failed",
+				"request_id", middleware.RequestIDFrom(r.Context()), "error", err)
+		}
+		replay(w, r, resp)
+	}
+}
+
+// replay sends a stored response with Idempotent-Replayed: true. A HEAD request gets no body.
+func replay(w http.ResponseWriter, r *http.Request, resp identity.IdempotencyResponse) {
+	if resp.ContentType != "" {
+		w.Header().Set("Content-Type", resp.ContentType)
+	}
+	if resp.Location != "" {
+		w.Header().Set("Location", resp.Location)
+	}
+	if resp.ETag != "" {
+		w.Header().Set("ETag", resp.ETag)
+	}
+	w.Header().Set(ReplayedHeader, "true")
+	w.WriteHeader(resp.Status)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(resp.Body)
 	}
 }
 
@@ -301,10 +307,9 @@ func routeParams(pattern string) []string {
 	return names
 }
 
-// Fingerprint is the SHA-256 of the method and route template, the path
-// parameters and the canonical (RFC 8785) form of the body (ADR-0053 section 4).
-// Two bodies that differ only in whitespace or member order have the same
-// fingerprint. An empty body is allowed.
+// Fingerprint is the SHA-256 of the method and route template, the path parameters and the
+// canonical (RFC 8785) form of the body (ADR-0053 section 4). Two bodies that differ only in
+// whitespace or member order have the same fingerprint. An empty body is allowed.
 func Fingerprint(route string, pathParams []string, body []byte) ([sha256.Size]byte, error) {
 	canonical := []byte{}
 	if len(bytes.TrimSpace(body)) > 0 {
@@ -329,9 +334,9 @@ func Fingerprint(route string, pathParams []string, body []byte) ([sha256.Size]b
 	return out, nil
 }
 
-// requesterOf is the exact requesting identity of a principal: the credential
-// for keys and tokens, the principal itself for interactive sessions, so two
-// keys of one user never share a record.
+// requesterOf is the exact requesting identity of a principal: the credential for keys and
+// tokens, the principal itself for interactive sessions, so two keys of one user never share
+// a record.
 func requesterOf(p identity.Principal) string {
 	if p.CredentialType != identity.CredentialSession && p.CredentialID != "" {
 		return string(p.CredentialType) + ":" + p.CredentialID
@@ -381,22 +386,15 @@ func (rec *recorder) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// response builds the stored form: only the headers a replay repeats, and no
-// body when the response disclosed a secret.
-func (rec *recorder) response(issuesSecret bool) *Response {
-	header := http.Header{}
-	for _, name := range []string{"Content-Type", "Location", "ETag"} {
-		if v := rec.header.Get(name); v != "" {
-			header.Set(name, v)
-		}
+// response builds the stored form: the status, the headers a replay repeats and the body.
+func (rec *recorder) response() identity.IdempotencyResponse {
+	return identity.IdempotencyResponse{
+		Status:      rec.status,
+		ContentType: rec.header.Get("Content-Type"),
+		Location:    rec.header.Get("Location"),
+		ETag:        rec.header.Get("ETag"),
+		Body:        bytes.Clone(rec.body.Bytes()),
 	}
-	resp := &Response{Status: rec.status, Header: header}
-	if issuesSecret && rec.status >= 200 && rec.status < 300 {
-		resp.SecretIssued = true
-		return resp
-	}
-	resp.Body = bytes.Clone(rec.body.Bytes())
-	return resp
 }
 
 func flush(w http.ResponseWriter, rec *recorder) {

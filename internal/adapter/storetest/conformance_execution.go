@@ -97,6 +97,8 @@ func executionCases() []struct {
 		{"TransactionRollsBack", rollbackCase},
 		{"ClaimIsExclusive", claimCase},
 		{"ClaimOrderAndFilters", claimOrderCase},
+		{"ExecutionCapDoesNotStarveOthers", executionCapCase},
+		{"ClaimCostFlatBehindCappedExecution", claimCostFlatCase},
 		{"FencingStopsALostLease", fencingCase},
 		{"RenewAndReap", reapCase},
 		{"JoinArrivalIsAtomic", joinCase},
@@ -106,6 +108,8 @@ func executionCases() []struct {
 		{"WaitSecretLookup", waitCase},
 		{"AttentionInbox", attentionCase},
 		{"ExecutionIsolation", executionIsolationCase},
+		{"NodeReads", nodeReadsCase},
+		{"OrgAuditAppend", orgAuditCase},
 		{"EventsAreOrderedUnderConcurrency", eventsCase},
 		{"ConcurrentStepsOnOneExecution", stepsCase},
 		{"OneJoinInstancePerSplitInstance", splitJoinCase},
@@ -163,6 +167,26 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 			}
 		}
 	}
+	// A project narrowed by flow, status and a creation window is filtered by the store, in both
+	// directions, and every page is full until the last.
+	window := store.ExecutionFilter{ProjectID: e.projA, FlowID: e.flow.ID, Status: "QUEUED", CreatedAfter: created[0].CreatedAt, CreatedBefore: created[4].CreatedAt}
+	rows := page(window)
+	if len(rows) != 3 || rows[0].ID != created[3].ID || rows[2].ID != created[1].ID {
+		t.Fatalf("window newest first = %d rows %+v", len(rows), rows)
+	}
+	window.Oldest = true
+	rows = page(window)
+	if len(rows) != 3 || rows[0].ID != created[1].ID || rows[2].ID != created[3].ID {
+		t.Fatalf("window oldest first = %d rows %+v", len(rows), rows)
+	}
+	if rows := page(store.ExecutionFilter{ProjectID: e.projA, Status: "RUNNING"}); len(rows) != 0 {
+		t.Fatalf("project and another status listed %d executions", len(rows))
+	}
+	if rows := page(store.ExecutionFilter{ProjectID: e.projA, FlowID: next[flow.FlowID](e.ids)}); len(rows) != 0 {
+		t.Fatalf("project and another flow listed %d executions", len(rows))
+	}
+	_, err = e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "QUEUED", Oldest: true}, store.Cursor{}, 10)
+	wantErr(t, "an order without a project", err, flow.ErrInvalidRecord)
 	if rows, err := e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "RUNNING"}, store.Cursor{}, 10); err != nil || len(rows) != 0 {
 		t.Fatalf("running executions = %d, %v", len(rows), err)
 	}
@@ -417,6 +441,121 @@ func claimOrderCase(t *testing.T, newStore Factory) {
 	}
 }
 
+// executionCapCase: the per-execution cap holds inside one claim, and an execution at its
+// cap never crowds the other executions out of a claim (ADR-0014 section 2.2, SPEC-001
+// E-FAIR-2). The capped execution has the oldest tokens, so a claim that chose its page
+// before applying the cap would fill it with tokens it then has to refuse.
+func executionCapCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	for i := range 4 {
+		e.token(capped, "capped", 0, now.Add(-2*time.Hour+time.Duration(i)*time.Second))
+	}
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	// One claim of eight, a cap of one per execution: one token of each execution, not four of the first.
+	got, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 8, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("claim of 8 with a cap of 1 = %d tokens, %v; want one per execution", len(got), err)
+	}
+	seen := map[store.ExecutionID]int{}
+	for i := range got {
+		seen[got[i].ExecutionID]++
+	}
+	if seen[capped.ID] != 1 || seen[other.ID] != 1 {
+		t.Fatalf("tokens per execution = %v, want exactly one of each", seen)
+	}
+	if !slicesContainsToken(got, otherToken.ID) {
+		t.Fatal("the token of the second execution was not claimed")
+	}
+
+	// Both executions are at their cap now. A claim of one must reach a third execution behind them.
+	third := e.execution()
+	thirdToken := e.token(third, "third", 0, now.Add(-30*time.Minute))
+	got, err = e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now})
+	if err != nil || len(got) != 1 || got[0].TokenID != thirdToken.ID {
+		t.Fatalf("claim of 1 behind two capped executions = %+v, %v; want the token of the third", got, err)
+	}
+}
+
+// claimCostFlatCase: a claim of one token behind an execution at its cap must not cost quadratically more as that
+// execution's runnable tokens grow. The claim alone is timed (not the setup) at two sizes and the sizes are compared,
+// which holds under the race detector and on slow runners where an absolute bound does not: the cost may follow the
+// tokens it skips (a ratio near the 10x size ratio) but counting the candidates ahead of each token puts it near 100x.
+func claimCostFlatCase(t *testing.T, newStore Factory) {
+	t.Helper()
+	const small, large, maxRatio = 200, 2000, 30.0
+	// The best of two runs per size drops scheduler noise from the ratio.
+	best := func(n int) time.Duration {
+		fastest := time.Duration(1<<63 - 1)
+		for range 2 {
+			if d := claimBehindCapped(t, newStore, n); d < fastest {
+				fastest = d
+			}
+		}
+		return fastest
+	}
+	lo, hi := best(small), best(large)
+	if lo < 50*time.Microsecond {
+		lo = 50 * time.Microsecond // a clock-resolution floor, so a very fast small claim cannot inflate the ratio
+	}
+	ratio := float64(hi) / float64(lo)
+	t.Logf("claim behind a capped execution: %s at %d runnable tokens, %s at %d (ratio %.1f, bound %.0f)", lo, small, hi, large, ratio, maxRatio)
+	if ratio > maxRatio {
+		t.Fatalf("claim cost grew %.1fx for %dx the runnable tokens of a capped execution; it must not grow faster than they do", ratio, large/small)
+	}
+}
+
+// claimBehindCapped returns the time of one single-token claim that has to pass over n runnable tokens of an
+// execution at its cap before reaching the token of another execution.
+func claimBehindCapped(t *testing.T, newStore Factory, n int) time.Duration {
+	t.Helper()
+	e := newExecFixture(t, newStore)
+	now := realNow()
+	capped := e.execution()
+	first := e.token(capped, "first", 0, now.Add(-3*time.Hour))
+	mustTx(t, e.tx(capped.OrgID, func(ctx context.Context, tx store.Tx) error {
+		for i := range n {
+			tok := store.Token{
+				ID: next[store.TokenID](e.ids), OrgID: capped.OrgID, ExecutionID: capped.ID, Status: "RUNNABLE", NodeID: "bulk", ScopePath: "",
+				ForkLineage: []byte(`[]`), FairnessKey: "flow/" + capped.FlowID.String(), EffectivePriority: 0,
+				AvailableAt: now.Add(-2*time.Hour + time.Duration(i)*time.Millisecond), CreatedAt: base, UpdatedAt: base,
+			}
+			if err := tx.InsertToken(ctx, &tok); err != nil {
+				return err
+			}
+		}
+		return nil
+	}), "insert bulk tokens")
+	other := e.execution()
+	otherToken := e.token(other, "other", 0, now.Add(-time.Hour))
+
+	request := store.ClaimRequest{Worker: worker(e), Limit: 1, ExecutionLimit: 1, LeaseTTL: time.Hour, Now: now}
+	got, err := e.s.ClaimTokens(e.ctx(), request)
+	if err != nil || len(got) != 1 || got[0].TokenID != first.ID {
+		t.Fatalf("first claim = %+v, %v; want the oldest token of the capped execution", got, err)
+	}
+	start := time.Now()
+	got, err = e.s.ClaimTokens(e.ctx(), request)
+	elapsed := time.Since(start)
+	if err != nil || len(got) != 1 || got[0].TokenID != otherToken.ID {
+		t.Fatalf("claim behind a capped execution = %+v, %v; want the token of the other execution", got, err)
+	}
+	return elapsed
+}
+
+func slicesContainsToken(rows []store.Claimed, id store.TokenID) bool {
+	for i := range rows {
+		if rows[i].TokenID == id {
+			return true
+		}
+	}
+	return false
+}
+
 func fencingCase(t *testing.T, newStore Factory) {
 	t.Helper()
 	e := newExecFixture(t, newStore)
@@ -438,7 +577,9 @@ func fencingCase(t *testing.T, newStore Factory) {
 		err := e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AssertFence(ctx, bad, base) })
 		wantErr(t, name, err, store.ErrFenced)
 	}
-	// A fenced step that fails takes everything else of its transaction with it.
+	// A fenced step that fails takes everything else of its transaction with it. The claim started the execution, so
+	// its event is already there.
+	eventsBefore, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10)
 	err = e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		if _, err := tx.AppendEvent(ctx, store.Event{ID: next[store.EventID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, OccurredAt: base, Type: "lost", SchemaVersion: 1, Reference: []byte(`{}`), CreatedAt: base}); err != nil {
 			return err
@@ -446,8 +587,8 @@ func fencingCase(t *testing.T, newStore Factory) {
 		return tx.AssertFence(ctx, store.Fence{OrgID: e.orgA, Token: tok.ID, Epoch: fence.Epoch + 7, Owner: w}, base)
 	})
 	wantErr(t, "a step with a lost lease", err, store.ErrFenced)
-	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10); len(evs) != 0 {
-		t.Fatalf("a fenced transaction left %d events", len(evs))
+	if evs, _ := e.s.ListExecutionEvents(e.ctx(), e.scopeA, ex.ID, 0, 10); len(evs) != len(eventsBefore) {
+		t.Fatalf("a fenced transaction left %d events", len(evs)-len(eventsBefore))
 	}
 	// Moving the token ends the lease; the same fence then fails.
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.MoveToken(ctx, fence, "WAITING", base) }), "move the token")
@@ -503,7 +644,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	}
 	// The next claim raises the epoch; at the threshold the token is poisoned instead of retried.
 	for round := 2; round <= 3; round++ {
-		c, err := e.s.ClaimTokens(e.ctx(), store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now})
+		request := store.ClaimRequest{Worker: w2, FairnessKeys: []string{"flow/" + ex.FlowID.String()}, Limit: 10, LeaseTTL: -time.Second, Now: now}
+		claim := e.s.ClaimTokens
+		if round == 3 { // one abandonment short of the threshold: only the last chance claim takes it
+			claim = e.s.ClaimLastChanceToken
+		}
+		c, err := claim(e.ctx(), request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -535,12 +681,12 @@ func reapCase(t *testing.T, newStore Factory) { //nolint:gocognit // a conforman
 	if got.Status != "SUSPENDED" || got.SuspendReason != "POISON" || got.AbandonedCount != 3 {
 		t.Fatalf("poisoned token = %+v", got)
 	}
-	// Graceful shutdown gives every lease of a worker back at once.
-	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, now)
-	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID {
+	// Graceful shutdown gives every lease of a worker back at once, and gives it back: no abandonment is counted.
+	released, err := e.s.ReleaseWorkerLeases(e.ctx(), w1, 3, now)
+	if err != nil || len(released) != 1 || released[0].TokenID != long[0].TokenID || released[0].AbandonedCount != 0 || released[0].Poisoned {
 		t.Fatalf("released = %+v, %v", released, err)
 	}
-	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() {
+	if got := e.mustToken(e.orgA, long[0].TokenID); got.Status != "RUNNABLE" || !got.LeaseOwner.IsZero() || got.AbandonedCount != 0 {
 		t.Fatalf("released token = %+v", got)
 	}
 }
@@ -726,7 +872,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		}
 		return tx.AppendJournal(ctx, ops)
 	}), "journal intent")
-	listed, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 0, 100)
+	listed, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 0, store.ExternalOperationID{}, 100)
 	if err != nil || len(listed) != items {
 		t.Fatalf("journal has %d entries, %v", len(listed), err)
 	}
@@ -736,7 +882,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 			t.Fatalf("entry %d = %+v", i, o)
 		}
 	}
-	if rest, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 20, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
+	if rest, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 20, store.ExternalOperationID{}, 100); err != nil || len(rest) != 5 || rest[0].ItemIndex != 20 {
 		t.Fatalf("journal from item 20 = %d entries, %v", len(rest), err)
 	}
 	// A repeated correlation key rejects the whole batch.
@@ -745,18 +891,51 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		{ID: next[store.ExternalOperationID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, NodeExecutionID: ne.ID, ItemIndex: 101, CorrelationKey: "key-00", ContractReference: "c", CreatedAt: base},
 	}
 	wantErr(t, "a repeated correlation key", e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AppendJournal(ctx, dup) }), flow.ErrConflict)
-	if all, _ := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 100, 100); len(all) != 0 {
+	if all, _ := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, 100, store.ExternalOperationID{}, 100); len(all) != 0 {
 		t.Fatalf("a rejected batch left %d entries", len(all))
 	}
+	// Retries share an item index: one row per retry epoch. The list pages by the full
+	// (item index, id) key, so none of them is lost at a page boundary.
+	var retries []store.ExternalOperation
+	for epoch := int64(1); epoch <= 2; epoch++ {
+		retries = append(retries, store.ExternalOperation{ID: next[store.ExternalOperationID](e.ids), OrgID: e.orgA, ExecutionID: ex.ID, NodeExecutionID: ne.ID, ItemIndex: 3, RetryEpoch: epoch, CorrelationKey: fmt.Sprintf("retry-3-%d", epoch), ContractReference: "c", CreatedAt: base})
+	}
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error { return tx.AppendJournal(ctx, retries) }), "journal retry epochs")
+	var paged []store.ExternalOperation
+	var fromItem int64
+	var fromID store.ExternalOperationID
+	for {
+		page, err := e.s.ListExternalOperations(e.ctx(), e.scopeA, ne.ID, fromItem, fromID, 2)
+		if err != nil {
+			t.Fatalf("paged journal: %v", err)
+		}
+		paged = append(paged, page...)
+		if len(page) < 2 {
+			break
+		}
+		last := page[len(page)-1]
+		fromItem, fromID = last.ItemIndex, last.ID
+	}
+	if len(paged) != items+len(retries) {
+		t.Fatalf("paged journal has %d entries, want %d", len(paged), items+len(retries))
+	}
+	seen := map[store.ExternalOperationID]bool{}
+	for i := range paged {
+		if seen[paged[i].ID] {
+			t.Fatalf("paged journal repeats %s", paged[i].ID)
+		}
+		seen[paged[i].ID] = true
+	}
 	// DISPATCHING is marked under the fence, before any send; it moves only PREPARED entries once.
-	deadline := realNow().Add(time.Minute).Truncate(time.Microsecond)
+	// The deadline is set from the database clock (ADR-0012 section 5).
+	const attemptTimeout = time.Minute
 	var moved int64
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		if err := tx.AssertFence(ctx, fence, base); err != nil {
 			return err
 		}
 		var err error
-		moved, err = tx.MarkDispatching(ctx, ids[:10], deadline, base)
+		moved, err = tx.MarkDispatching(ctx, ids[:10], attemptTimeout)
 		return err
 	}), "mark dispatching")
 	if moved != 10 {
@@ -764,14 +943,26 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 	}
 	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
 		var err error
-		moved, err = tx.MarkDispatching(ctx, ids[5:15], deadline, base)
+		moved, err = tx.MarkDispatching(ctx, ids[5:15], attemptTimeout)
 		return err
 	}), "mark dispatching again")
 	if moved != 5 {
 		t.Fatalf("%d entries moved on the second call, want 5 (only PREPARED ones)", moved)
 	}
+	var dbNow, dbLater time.Time
+	mustTx(t, e.tx(e.orgA, func(ctx context.Context, tx store.Tx) error {
+		var err error
+		if dbNow, err = tx.DatabaseNow(ctx); err != nil {
+			return err
+		}
+		dbLater, err = tx.DatabaseNow(ctx)
+		return err
+	}), "database clock")
+	if dbNow.IsZero() || dbLater.Before(dbNow) {
+		t.Fatalf("database clock reads %v then %v", dbNow, dbLater)
+	}
 	gotOp, err := e.s.GetExternalOperation(e.ctx(), e.scopeA, ids[0])
-	if err != nil || gotOp.State != "DISPATCHING" || !gotOp.DispatchDeadlineAt.Equal(deadline) || gotOp.FirstDispatchedAt.IsZero() {
+	if err != nil || gotOp.State != "DISPATCHING" || gotOp.FirstDispatchedAt.IsZero() || !gotOp.DispatchDeadlineAt.Equal(gotOp.FirstDispatchedAt.Add(attemptTimeout)) {
 		t.Fatalf("dispatching entry = %+v, %v", gotOp, err)
 	}
 	// A lost lease stops the dispatch mark.
@@ -781,7 +972,7 @@ func journalCase(t *testing.T, newStore Factory) { //nolint:gocognit // a confor
 		if err := tx.AssertFence(ctx, stale, base); err != nil {
 			return err
 		}
-		_, err := tx.MarkDispatching(ctx, ids[20:], deadline, base)
+		_, err := tx.MarkDispatching(ctx, ids[20:], attemptTimeout)
 		return err
 	})
 	wantErr(t, "a dispatch mark with a lost lease", err, store.ErrFenced)

@@ -4,13 +4,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import { z } from 'zod';
 
+import { installApiDouble, org } from '../e2e/journeys/api-double';
+
 // The saved theme choice must survive a reload and be on <html> before the first paint. Each test
 // opens the page on a device whose own setting is the opposite of the choice, so a choice that
 // quietly falls back to the device setting shows up as the wrong colours.
 
 type Shown = 'light' | 'dark';
 
-const SETTINGS = '/settings/appearance';
+const SETTINGS = `/orgs/${org.slug}/settings/appearance`;
 
 /** What the page shows now: the attribute and the stored choice, and the colours the body really has. */
 async function shown(page: Page) {
@@ -41,16 +43,24 @@ async function tokenColours(page: Page, theme: Shown) {
   }, theme);
 }
 
-async function save(page: Page, choice: 'System' | 'Light' | 'Dark') {
-  await page.getByRole('radio', { name: choice, exact: true }).click();
-  await page.getByRole('button', { name: 'Save preferences' }).click();
-  await expect(page.getByText('Preferences saved')).toBeVisible();
+/** The page opened by a person who is signed in: settings live inside the organization. */
+async function openSettings(page: Page) {
+  await installApiDouble(page, { signedIn: true });
+  await page.goto(SETTINGS);
+  await expect(page.getByRole('heading', { level: 2, name: 'Appearance' })).toBeVisible();
+}
+
+/** A choice applies the moment it is made and is announced, so there is nothing to save. */
+async function save(page: Page, choice: 'Like the system' | 'Light' | 'Dark') {
+  // The radio itself is visually hidden: a person clicks the card or the segment drawn for it.
+  await page.locator('label', { has: page.getByRole('radio', { name: choice, exact: true }) }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved automatically' })).toBeVisible();
 }
 
 const cases = [
   { choice: 'Light', attribute: 'light', stored: 'light' },
   { choice: 'Dark', attribute: 'dark', stored: 'dark' },
-  { choice: 'System', attribute: null, stored: 'system' },
+  { choice: 'Like the system', attribute: null, stored: 'system' },
 ] as const;
 
 for (const device of ['light', 'dark'] as const) {
@@ -59,14 +69,15 @@ for (const device of ['light', 'dark'] as const) {
     test(`saving ${choice} keeps it after a reload on a ${device} device`, async ({ browser }) => {
       const context = await browser.newContext({ colorScheme: device, locale: 'en-US' });
       const page = await context.newPage();
-      await page.goto(SETTINGS);
-      // Nothing is written for System on a first visit, so move away from it first.
-      if (choice === 'System') await save(page, 'Dark');
+      await openSettings(page);
+      // A first visit is dark and nothing is written for it: choosing what is already chosen saves nothing, so go to
+      // a choice that is neither the one being tested nor the dark one first.
+      await save(page, choice === 'Light' ? 'Like the system' : 'Light');
       await save(page, choice);
 
       for (const moment of ['saved', 'reloaded', 'opened again'] as const) {
         if (moment === 'reloaded') await page.reload();
-        if (moment === 'opened again') await page.goto('/');
+        if (moment === 'opened again') await openSettings(page);
         await expect(page.locator('#root')).toBeVisible();
         const now = await shown(page);
         const colours = await tokenColours(page, expected);
@@ -77,13 +88,33 @@ for (const device of ['light', 'dark'] as const) {
   }
 }
 
+test('a first visit is dark, even on a light device', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'light', locale: 'en-US' });
+  const page = await context.newPage();
+  await page.goto('/login');
+  await expect(page.locator('#root')).toBeVisible();
+  expect(await shown(page)).toMatchObject({ attribute: 'dark', stored: null, scheme: 'dark' });
+  await context.close();
+});
+
+test('choosing the system theme follows the device again', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'light', locale: 'en-US' });
+  const page = await context.newPage();
+  await openSettings(page);
+  await save(page, 'Like the system');
+  await page.reload();
+  await expect(page.locator('#root')).toBeVisible();
+  expect(await shown(page)).toMatchObject({ attribute: null, stored: 'system', scheme: 'light' });
+  await context.close();
+});
+
 const seenSchema = z.array(z.object({ theme: z.string().nullable(), bodyExisted: z.boolean() }));
 
 test('the saved theme is on the page before it paints', async ({ browser }) => {
   // The device is dark and the saved choice is light: any late correction would flash dark.
   const context = await browser.newContext({ colorScheme: 'dark', locale: 'en-US' });
   const page = await context.newPage();
-  await page.goto(SETTINGS);
+  await openSettings(page);
   await save(page, 'Light');
 
   // Runs before any page script. <html> does not exist yet, so it watches the whole document.

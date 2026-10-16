@@ -87,12 +87,12 @@ func (r *run) siblingOrder(ems []emission) []emission {
 // deliver records that a live token travels an edge toward its target.
 func (r *run) deliver(edge int, dest ScopePath) {
 	e := &r.plan.edges[edge]
-	r.edgeLive[edgeKey{edge, dest}]++
 	if e.back {
 		// A back edge is not part of the completion accounting; the loop
 		// control counts the returning token through the loop instance.
 		return
 	}
+	r.edgeLive[edgeKey{edge, dest}]++
 	key := nodeKey{e.to, dest}
 	if r.plan.nodes[e.to].join != nil {
 		r.joinOf(key).send(e.slot)
@@ -115,6 +115,7 @@ func (r *run) advance(t *token, em emission, dest ScopePath) {
 // CONSUMED only after the children exist, so the counters of the branches it
 // belongs to never dip to zero in between.
 func (r *run) fork(t *token, n *planNode, neID NodeExecutionID, execScope ScopePath, ems []emission, dests []ScopePath) (*token, error) {
+	r.forks++
 	children := make([]*token, len(ems))
 	keys := make([]forkKey, len(ems))
 	ids := make([]TokenID, len(ems))
@@ -142,7 +143,7 @@ func (r *run) fork(t *token, n *planNode, neID NodeExecutionID, execScope ScopeP
 			r.event(Event{Type: EventTokenDeferred, Token: c.id, Node: n.node.ID, Scope: execScope})
 			continue
 		}
-		r.queue = append(r.queue, c)
+		r.enqueue(c)
 	}
 	if r.plan.sequential {
 		r.groups[neID] = &seqGroup{siblings: children, keys: keys}
@@ -213,7 +214,7 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 	}
 	contID := joinTokenID(r.req.Execution, n.node.ID, key.scope)
 	ref := joinedRef(contID)
-	if err := r.payloads.Put(ctx, ref, concat(batches)); err != nil {
+	if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadInput, Token: contID, Batch: concat(batches)}); err != nil {
 		return fmt.Errorf("store combined input of join %q: %w", n.node.ID, err)
 	}
 	var canceled []TokenID
@@ -234,7 +235,7 @@ func (r *run) fireJoin(ctx context.Context, key nodeKey, n *planNode, js *joinSt
 	cont := r.spawn(contID, TokenRunnable, key.node, -1, key.scope, continuationLineage(js.combined(), r.splitNode(n)), ref)
 	cont.passed = true
 	r.nodeOf(key).inflight++
-	r.queue = append(r.queue, cont)
+	r.enqueue(cont)
 	r.event(Event{Type: EventJoinFired, Token: contID, Node: n.node.ID, Scope: key.scope, Detail: string(js.mode), Round: 1, Tokens: canceled})
 	return nil
 }
@@ -277,6 +278,14 @@ func (r *run) lineageCanceled(lineage []ForkRef) bool {
 func (r *run) failJoin(key nodeKey, n *planNode, js *joinState) error {
 	contID := joinTokenID(r.req.Execution, n.node.ID, key.scope)
 	id := nodeExecutionID(r.req.Execution, contID, n.node.ID, key.scope)
+	// The node execution that records the failure hangs from the token the join
+	// would have continued with, so the join leaves a failed token behind (a
+	// node execution belongs to a token in storage).
+	cont := r.spawn(contID, TokenLeased, key.node, -1, key.scope, continuationLineage(js.combined(), r.splitNode(n)), "")
+	cont.passed = true
+	if err := r.setToken(cont, TokenFailed); err != nil {
+		return err
+	}
 	ne := &nodeExec{id: id, token: contID, node: key.node, scope: key.scope, state: NodeRunning}
 	r.nodeExecs[id] = ne
 	r.execOrder = append(r.execOrder, ne)
@@ -445,6 +454,9 @@ func (r *run) applySignal(ctx context.Context, sg signal) error {
 		Type: EventEdgeClosed, Edge: e.edge.ID, Scope: sg.scope, Node: r.nodeID(e.to),
 		Live: r.edgeLive[sg.edgeKey] > 0,
 	})
+	// An edge closes once per scope, so its count is read once; dropping it keeps
+	// the state a durable run persists from growing with the iterations of a loop.
+	delete(r.edgeLive, sg.edgeKey)
 	key := nodeKey{e.to, sg.scope}
 	n := &r.plan.nodes[e.to]
 	if n.join != nil {
@@ -469,7 +481,7 @@ func (r *run) releaseSiblings(g *seqGroup) error {
 		if err := r.setToken(next, TokenRunnable); err != nil {
 			return err
 		}
-		r.queue = append(r.queue, next)
+		r.enqueue(next)
 	}
 	return nil
 }
@@ -631,14 +643,14 @@ func (r *run) fireRound(ctx context.Context, key nodeKey, n *planNode, rd *joinR
 	}
 	contID := roundTokenID(r.req.Execution, n.node.ID, key.scope, rd.split)
 	ref := joinedRef(contID)
-	if err := r.payloads.Put(ctx, ref, batch); err != nil {
+	if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadInput, Token: contID, Batch: batch}); err != nil {
 		return fmt.Errorf("store input of join %q round %d: %w", n.node.ID, rd.number, err)
 	}
 	cont := r.spawn(contID, TokenRunnable, key.node, -1, key.scope, continuationLineage([]joinArrival{first}, r.splitNode(n)), ref)
 	cont.passed = true
 	rd.fired = true
 	r.nodeOf(key).inflight++
-	r.queue = append(r.queue, cont)
+	r.enqueue(cont)
 	r.event(Event{Type: EventJoinFired, Token: contID, Node: n.node.ID, Scope: key.scope, Detail: string(flow.JoinFirst), Round: rd.number})
 	return nil
 }
@@ -697,11 +709,11 @@ func (r *run) startNextIteration(ctx context.Context, iteration ScopePath) error
 	next := outer.Push(LoopFrame(frame.Node, frame.Entry, frame.Index+1))
 	id := TokenID(hashID(string(r.req.Execution), string(frame.Node), string(next)))
 	ref := joinedRef(id)
-	if err := r.payloads.Put(ctx, ref, concat(batches)); err != nil {
+	if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadInput, Token: id, Batch: concat(batches)}); err != nil {
 		return fmt.Errorf("store merged returns of loop %q: %w", frame.Node, err)
 	}
 	t := r.spawn(id, TokenRunnable, rec.loop, arrived[0].edge, iteration, continuationLineage(arrivals, ""), ref)
 	t.merged = true
-	r.queue = append(r.queue, t)
+	r.enqueue(t)
 	return nil
 }

@@ -62,6 +62,11 @@ type (
 	OutboxID id.UUID
 	// AttentionRequestID identifies a row of attention_request.
 	AttentionRequestID id.UUID
+	// PayloadID identifies a stored batch: a row of node_output or token_input.
+	// It is the deterministic payload reference of the engine (ADR-0008 section 6).
+	PayloadID id.UUID
+	// NondeterminismID identifies a row of nondeterminism_record.
+	NondeterminismID id.UUID
 )
 
 // String returns the lowercase hyphenated form.
@@ -140,6 +145,12 @@ type Execution struct {
 	FinishedAt     time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// The two fields below are read-only: the reads of executions fill them, the writes ignore them.
+	// FlowVersionNumber is the number of the flow version the execution runs; 0 for a snapshot run.
+	FlowVersionNumber int64
+	// HasUncertainOperation is true when an external operation of the execution has an outcome that is
+	// unknown (state UNCERTAIN), so a person must review it (SPEC-019 R-UX-BE-03).
+	HasUncertainOperation bool
 }
 
 // Token is a row of token: the unit of work.
@@ -157,12 +168,20 @@ type Token struct {
 	PayloadReference  string
 	FairnessKey       string
 	EffectivePriority int64
-	AvailableAt       time.Time
+	// AvailableAt is when the token becomes claimable. When it is the zero
+	// value, a token the engine creates becomes claimable at the database
+	// clock plus QueueOrder microseconds, so that tokens created together are
+	// claimed in the order they were created and a worker clock that is off
+	// cannot hide them (orcon-db TY-5).
+	AvailableAt time.Time
+	QueueOrder  int64
 	// LeaseOwner, LeaseEpoch and LeaseExpiresAt describe the lease while the
-	// status is LEASED.
+	// status is LEASED. When LeaseExpiresAt is the zero value and LeaseTTL is
+	// set, the lease expires LeaseTTL after the database clock.
 	LeaseOwner     execution.WorkerID
 	LeaseEpoch     int64
 	LeaseExpiresAt time.Time
+	LeaseTTL       time.Duration
 	ClaimCount     int64
 	AbandonedCount int64
 	// SuspendReason is empty unless the token is SUSPENDED.
@@ -190,8 +209,41 @@ type NodeExecution struct {
 	ScopePath   string
 	Status      string
 	StartedAt   time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// FinishedAt is the zero value until the node execution reaches a final state.
+	FinishedAt time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	// AttemptCount is the number of attempts made; the reads fill it, the writes ignore it.
+	AttemptCount int64
+}
+
+// NodeOutputRecord is a stored output batch as the read side of the API lists it: the batch
+// document with the node execution and the node it belongs to.
+type NodeOutputRecord struct {
+	ID              PayloadID
+	NodeExecutionID NodeExecutionID
+	NodeID          string
+	Port            string
+	ItemCount       int64
+	// Document is the orcon/items@1 document, nil when the batch lives in a blob.
+	Document  []byte
+	CreatedAt time.Time
+}
+
+// TaskAttempt is a row of task_attempt: one try of a node execution under a
+// lease epoch (ADR-0009 section 4).
+type TaskAttempt struct {
+	ID              id.UUID
+	OrgID           identity.OrgID
+	ExecutionID     ExecutionID
+	NodeExecutionID NodeExecutionID
+	AttemptNumber   int64
+	LeaseEpoch      int64
+	Worker          execution.WorkerID
+	// Status is STARTED, SUCCEEDED, FAILED, TIMED_OUT, ABANDONED or CANCELED.
+	Status     string
+	StartedAt  time.Time
+	FinishedAt time.Time
 }
 
 // Event is a row of execution_event. SequenceNumber is assigned by the store in
@@ -302,6 +354,24 @@ type Wait struct {
 	CreatedAt  time.Time
 }
 
+// OutboxRule decides which events leave the database and where to: it returns
+// the topic and payload of the row to insert in the transaction that persists
+// the event, or false for an event that stays inside (ADR-0013 section 8).
+type OutboxRule func(org identity.OrgID, execution ExecutionID, e execution.Event) (topic string, payload []byte, ok bool)
+
+// EventRouter is implemented by stores that append events themselves, in the
+// same transaction as the state change they make (claiming, reaping, firing
+// timers): they apply the rule to each such event, so that every event goes
+// through the same outbox rule as the ones the engine appends. A nil rule
+// publishes nothing.
+type EventRouter interface {
+	RouteEvents(rule OutboxRule)
+}
+
+// OutboxRowID is the identity of the outbox row of an event: derived from the
+// event, so that appending the same event twice cannot publish it twice.
+func OutboxRowID(event EventID) OutboxID { return OutboxID(id.Derive("outbox", event.String())) }
+
 // OutboxRow is a row of outbox.
 type OutboxRow struct {
 	ID        OutboxID
@@ -333,6 +403,103 @@ type AttentionRequest struct {
 	UpdatedAt      time.Time
 }
 
+// EngineState is the engine's view of an execution row: its status, the number
+// of commits that wrote its tracker document, and the document.
+type EngineState struct {
+	Status string
+	// Revision starts at zero and grows by one with every commit of the engine
+	// to the execution. A step built on an older revision is recomputed.
+	Revision int64
+	// Document is the tracker document (orcon/engine-state@1); nil until the
+	// first commit.
+	Document []byte
+}
+
+// EngineSnapshot is what a worker opens an execution from: the engine state and
+// every live token (not terminal), read together.
+type EngineSnapshot struct {
+	EngineState
+	Tokens []Token
+}
+
+// EngineStateUpdate commits the engine state of an execution.
+type EngineStateUpdate struct {
+	OrgID     identity.OrgID
+	Execution ExecutionID
+	// ExpectedRevision is the revision the committing step read; the commit
+	// fails with flow.ErrConflict if the row moved on.
+	ExpectedRevision int64
+	Status           string
+	// Document replaces the stored tracker document unless it is nil.
+	Document []byte
+	// StartedAt and FinishedAt are set when not zero; StartedAt only the first time.
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Now        time.Time
+}
+
+// TokenUpdate moves a token to a status and a position in the flow.
+type TokenUpdate struct {
+	OrgID  identity.OrgID
+	Token  TokenID
+	Status string
+	// From is the status the row must be in (UpdateToken only).
+	From             string
+	NodeID           string
+	EdgeID           string
+	ScopePath        string
+	ForkLineage      []byte
+	PayloadReference string
+	// AvailableAt orders the claims of a token that becomes RUNNABLE; when it
+	// is the zero value the token becomes claimable at the database clock plus
+	// QueueOrder microseconds.
+	AvailableAt time.Time
+	QueueOrder  int64
+	// ResetAbandoned sets the abandon count of the token back to zero in the same
+	// fenced statement: the step stored at least one new result of the token, so
+	// whatever abandoned it before is behind it (SPEC-001 Enmienda 12 section 12-1).
+	ResetAbandoned bool
+}
+
+// NodeOutput is the batch a node execution emitted on a port.
+type NodeOutput struct {
+	ID              PayloadID
+	OrgID           identity.OrgID
+	ExecutionID     ExecutionID
+	NodeExecutionID NodeExecutionID
+	Port            string
+	ItemCount       int64
+	Encoding        string
+	// Document is the orcon/items@1 document.
+	Document  []byte
+	CreatedAt time.Time
+}
+
+// TokenInput is a batch a token starts with: the execution input or the combined
+// input of a join continuation or a merged loop iteration.
+type TokenInput struct {
+	ID          PayloadID
+	OrgID       identity.OrgID
+	ExecutionID ExecutionID
+	ItemCount   int64
+	Encoding    string
+	Document    []byte
+	CreatedAt   time.Time
+}
+
+// Nondeterminism is the environment recorded for the activation of a node
+// execution (ADR-0013 section 7).
+type Nondeterminism struct {
+	ID              NondeterminismID
+	OrgID           identity.OrgID
+	ExecutionID     ExecutionID
+	NodeExecutionID NodeExecutionID
+	Sequence        int64
+	// Document is the orcon/value@1 document.
+	Document  []byte
+	CreatedAt time.Time
+}
+
 // Cursor positions a keyset page by creation time and identity. The zero
 // Cursor starts at the first page.
 type Cursor struct {
@@ -343,11 +510,65 @@ type Cursor struct {
 // IsZero reports whether c starts the first page.
 func (c Cursor) IsZero() bool { return c.CreatedAt.IsZero() && c.ID.IsZero() }
 
-// ExecutionFilter selects executions by exactly one of its fields.
+// ExecutionFilter selects executions: by exactly one of ProjectID, FlowID and
+// Status, or by ProjectID refined with any of FlowID, Status, CreatedAfter and
+// CreatedBefore. The refinements are applied by the store, so a page is never
+// short of rows that match.
 type ExecutionFilter struct {
 	ProjectID identity.ProjectID
 	FlowID    flow.FlowID
 	Status    string
+	// CreatedAfter and CreatedBefore bound the creation time exclusively; the
+	// zero time leaves the bound open. They need ProjectID.
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	// Oldest lists the oldest execution first, and the cursor is the last row of the previous
+	// page; it needs ProjectID.
+	Oldest bool
+	// Uncertain narrows a project listing to the executions that need a review (SPEC-019 R-UX-BE-03).
+	// It is not a filter field of its own: it needs ProjectID and no other field.
+	Uncertain bool
+}
+
+// Refined reports whether the filter narrows a project by more than the project.
+func (f ExecutionFilter) Refined() bool {
+	return !f.ProjectID.IsZero() && (!f.FlowID.IsZero() || f.Status != "" || !f.CreatedAfter.IsZero() || !f.CreatedBefore.IsZero() || f.Oldest)
+}
+
+// Valid reports whether the filter is one of the two accepted shapes.
+func (f ExecutionFilter) Valid() bool {
+	if !f.ProjectID.IsZero() {
+		return true
+	}
+	if !f.CreatedAfter.IsZero() || !f.CreatedBefore.IsZero() || f.Oldest {
+		return false
+	}
+	return !f.FlowID.IsZero() != (f.Status != "")
+}
+
+// ExecutionQuery narrows the executions of one project for the organization-wide listing (SPEC-019
+// R-UX-BE-03). A zero field matches everything.
+type ExecutionQuery struct {
+	FlowID flow.FlowID
+	Status string
+	// ID keeps the one execution with that identifier.
+	ID ExecutionID
+	// CreatedAfter keeps the executions accepted at or after it; CreatedBefore those accepted before it.
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	// UncertainOnly keeps the executions with an operation whose outcome is unknown.
+	UncertainOnly bool
+	// OldestFirst lists the oldest execution first, after the cursor; by default the newest comes first,
+	// before the cursor.
+	OldestFirst bool
+}
+
+// ProjectExecutionReader lists the executions of one project under a query. It is a port of its own,
+// so the organization-wide listing depends on it alone.
+type ProjectExecutionReader interface {
+	// ListProjectExecutions returns at most limit executions of the project that match the query,
+	// newest first (oldest first under query.OldestFirst), past the cursor in that direction.
+	ListProjectExecutions(ctx context.Context, org orgscope.Org, project identity.ProjectID, query ExecutionQuery, after Cursor, limit int) ([]Execution, error)
 }
 
 // Reader reads inside one organization.
@@ -355,7 +576,7 @@ type Reader interface {
 	// GetExecution returns an execution, or flow.ErrNotFound.
 	GetExecution(ctx context.Context, org orgscope.Org, execution ExecutionID) (Execution, error)
 	// ListExecutions returns at most limit executions matching the filter,
-	// newest first, after the cursor. Exactly one filter field must be set.
+	// newest first (oldest first with Oldest), after the cursor. The filter must satisfy [ExecutionFilter.Valid].
 	ListExecutions(ctx context.Context, org orgscope.Org, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
 	// GetToken returns a token, or flow.ErrNotFound.
 	GetToken(ctx context.Context, org orgscope.Org, token TokenID) (Token, error)
@@ -364,9 +585,45 @@ type Reader interface {
 	ListExecutionEvents(ctx context.Context, org orgscope.Org, execution ExecutionID, after int64, limit int) ([]Event, error)
 	// GetExternalOperation returns one journal entry, or flow.ErrNotFound.
 	GetExternalOperation(ctx context.Context, org orgscope.Org, operation ExternalOperationID) (ExternalOperation, error)
-	// ListExternalOperations returns the journal of a node execution from an
-	// item index on, in item order.
-	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, limit int) ([]ExternalOperation, error)
+	// ListExternalOperations returns up to limit operations of a node execution
+	// that come after the cursor (fromItem, fromID) in (item index, id) order.
+	// The zero ExternalOperationID with fromItem 0 starts the list. Operations
+	// sharing an item index (one per retry epoch) are all returned, page by page.
+	ListExternalOperations(ctx context.Context, org orgscope.Org, node NodeExecutionID, fromItem int64, fromID ExternalOperationID, limit int) ([]ExternalOperation, error)
+}
+
+// NodeReader reads the runs of the nodes of an execution inside one organization, for the read
+// side of the API.
+type NodeReader interface {
+	// ListNodeExecutions returns at most limit node executions of the execution that come after
+	// the cursor, oldest first, with the number of attempts of each.
+	ListNodeExecutions(ctx context.Context, org orgscope.Org, execution ExecutionID, after Cursor, limit int) ([]NodeExecution, error)
+	// ListNodeOutputs returns at most limit stored output batches of the execution that come
+	// after the cursor, oldest first, each with the node it belongs to.
+	ListNodeOutputs(ctx context.Context, org orgscope.Org, execution ExecutionID, after Cursor, limit int) ([]NodeOutputRecord, error)
+}
+
+// EngineReader reads what a worker needs to open an execution.
+type EngineReader interface {
+	// LoadSnapshot reads the engine state and the live tokens of an execution in
+	// one consistent read, or returns flow.ErrNotFound.
+	//
+	//orcon:scope engine the engine reads the snapshot of the execution it claimed (ADR-0047 section 2)
+	LoadSnapshot(ctx context.Context, org identity.OrgID, execution ExecutionID) (EngineSnapshot, error)
+	// GetPayload returns the orcon/items@1 document of a stored batch, or
+	// flow.ErrNotFound.
+	//
+	//orcon:scope engine the engine reads the payloads of the execution it claimed (ADR-0047 section 2)
+	GetPayload(ctx context.Context, org identity.OrgID, payload PayloadID) ([]byte, error)
+	// ListTokenNondeterminism returns the environments recorded for the node
+	// executions of a token.
+	//
+	//orcon:scope engine the engine reads the recorded environments of the token it claimed (ADR-0047 section 2)
+	ListTokenNondeterminism(ctx context.Context, org identity.OrgID, token TokenID, limit int) ([]Nondeterminism, error)
+	// ListAttempts returns the attempts of a node execution, in attempt order.
+	//
+	//orcon:scope engine the engine reads the attempts of the node execution it claimed (ADR-0047 section 2)
+	ListAttempts(ctx context.Context, org identity.OrgID, node NodeExecutionID, limit int) ([]TaskAttempt, error)
 }
 
 // Inbox reads the rows people and the editor look at.
@@ -404,10 +661,23 @@ type Tx interface {
 	// AppendJournal inserts the operations as PREPARED in one statement group
 	// (intent before dispatch, ADR-0012 section 4). A repeated correlation key
 	// fails with flow.ErrConflict and inserts none.
+	// InsertJournalIfAbsent writes the operations whose correlation key the journal
+	// does not hold yet; the rows already there are kept. It is the write of a
+	// checkpoint that may run again after a crash (ADR-0012 section 4).
+	InsertJournalIfAbsent(ctx context.Context, operations []ExternalOperation) error
+	// UpsertNodeExecution writes a node execution, or completes the row an earlier
+	// write made; the start instant of the first write is kept.
+	UpsertNodeExecution(ctx context.Context, n NodeExecution) error
 	AppendJournal(ctx context.Context, operations []ExternalOperation) error
-	// MarkDispatching moves PREPARED operations to DISPATCHING with their
-	// deadline and returns how many moved (ADR-0012 section 4, step 2).
-	MarkDispatching(ctx context.Context, operations []ExternalOperationID, deadline, now time.Time) (int64, error)
+	// MarkDispatching moves PREPARED operations to DISPATCHING and returns how
+	// many moved (ADR-0012 section 4, step 2). The dispatch deadline is the
+	// database clock read inside this transaction plus attemptTimeout
+	// (ADR-0012 section 5): the application clock is not used for it.
+	MarkDispatching(ctx context.Context, operations []ExternalOperationID, attemptTimeout time.Duration) (int64, error)
+	// DatabaseNow returns the instant of the database clock. PostgreSQL reads
+	// clock_timestamp(); SQLite runs in one process and returns the injected
+	// clock (orcon-db TY-5).
+	DatabaseNow(ctx context.Context) (time.Time, error)
 	// ResolveOperation moves an operation from one state to another and reports
 	// whether it was in the expected state.
 	ResolveOperation(ctx context.Context, operation ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error)
@@ -423,6 +693,45 @@ type Tx interface {
 	// MarkOutboxDelivered records delivery by the holder of the lease.
 	MarkOutboxDelivered(ctx context.Context, outbox OutboxID, holder execution.WorkerID, deliveredAt time.Time) (bool, error)
 	InsertAttentionRequest(ctx context.Context, a *AttentionRequest) error
+
+	// LockExecution takes the execution row for the rest of the transaction, so
+	// that the steps of one execution commit one after the other, and returns
+	// its engine state. On SQLite the single writer already serializes them.
+	LockExecution(ctx context.Context, org identity.OrgID, execution ExecutionID) (EngineState, error)
+	// LoadSnapshot is [Reader.LoadSnapshot] inside the transaction.
+	LoadSnapshot(ctx context.Context, org identity.OrgID, execution ExecutionID) (EngineSnapshot, error)
+	// GetPayload is [Reader.GetPayload] inside the transaction: it sees the
+	// batches of the commits that share the transaction, which a separate read
+	// does not (SQLite commits several steps together).
+	GetPayload(ctx context.Context, org identity.OrgID, payload PayloadID) ([]byte, error)
+	// SaveEngineState commits the engine state, failing with flow.ErrConflict
+	// when the revision is not the expected one.
+	SaveEngineState(ctx context.Context, u EngineStateUpdate) error
+	// RefreshCounters recomputes the token counters of the execution from its
+	// live tokens.
+	RefreshCounters(ctx context.Context, org identity.OrgID, execution ExecutionID, now time.Time) error
+	// AdvanceToken moves a token the holder of the fence keeps leased along the
+	// flow. Another holder or a lost lease fails with [ErrFenced].
+	AdvanceToken(ctx context.Context, f Fence, u TokenUpdate, now time.Time) error
+	// MoveHeldToken moves a token the holder of the fence leaves: to the status
+	// of the update, clearing the lease. A lost lease fails with [ErrFenced].
+	MoveHeldToken(ctx context.Context, f Fence, u TokenUpdate, now time.Time) error
+	// ReleaseDeferredToken makes a DEFERRED token RUNNABLE. It fails with
+	// flow.ErrConflict if the token is not DEFERRED.
+	ReleaseDeferredToken(ctx context.Context, org identity.OrgID, token TokenID, queueOrder int64, now time.Time) error
+	// CancelToken cancels a token that is not terminal, whoever leases it, and
+	// reports whether it was live.
+	CancelToken(ctx context.Context, org identity.OrgID, token TokenID, now time.Time) (bool, error)
+	// PutNodeOutput stores a batch under its deterministic id; storing it again is a no-op.
+	PutNodeOutput(ctx context.Context, o NodeOutput) error
+	// PutTokenInput stores a batch under its deterministic id; storing it again is a no-op.
+	PutTokenInput(ctx context.Context, i TokenInput) error
+	// RecordNondeterminism stores the environment of an activation; storing it
+	// again is a no-op.
+	RecordNondeterminism(ctx context.Context, n Nondeterminism) error
+	// InsertAttempt records the start of an attempt of a node execution, before
+	// the work it covers begins (effect nodes commit it first, ADR-0012).
+	InsertAttempt(ctx context.Context, a TaskAttempt) error
 }
 
 // Transactor runs a function in one transaction of one organization. The
@@ -442,7 +751,73 @@ type ClaimRequest struct {
 	// PostgreSQL and by Now on SQLite (one process).
 	LeaseTTL time.Duration
 	Now      time.Time
+	// PoisonThreshold is the number of abandonments that suspends a token. A normal
+	// claim skips the tokens one abandonment short of it ([WorkQueue.ClaimLastChanceToken]
+	// takes those); [DefaultPoisonThreshold] when zero.
+	PoisonThreshold int64
+	// ExecutionLimit is the most tokens of one execution that may be leased at
+	// once (ADR-0014 section 2.2); [DefaultExecutionLimit] when zero.
+	ExecutionLimit int64
 }
+
+// DefaultExecutionLimit is the execution token limit of new flows (ADR-0014 §2).
+const DefaultExecutionLimit = 64
+
+// Priority classes as stored on a token (token.effective_priority): the smaller
+// value is claimed first (SPEC-001 R-FAIR-01).
+const (
+	PriorityHigh   int64 = 0
+	PriorityNormal int64 = 1
+	PriorityLow    int64 = 2
+)
+
+// BucketRequest asks the bucket of one credential and service for permits.
+// Key names the bucket within the organization (the credential and the service).
+type BucketRequest struct {
+	Key             string
+	Capacity        int64
+	RefillPerSecond int64
+	Permits         int64
+	Now             time.Time
+}
+
+// BucketVerdict is the answer of a take: granted, or the instant of the retry.
+type BucketVerdict struct {
+	Granted bool
+	RetryAt time.Time
+}
+
+// LimitBuckets is the store of the shared rate buckets (ADR-0014 section 2.4).
+// Each call is one transaction: the bucket row is locked, its state is computed
+// with the arithmetic of internal/connector/limit and written back.
+type LimitBuckets interface {
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	TakeBucketPermits(ctx context.Context, org identity.OrgID, req BucketRequest) (BucketVerdict, error)
+	//
+	//orcon:scope engine the bucket belongs to the organization of a call the engine claimed (ADR-0047 section 2)
+	BlockBucket(ctx context.Context, org identity.OrgID, key string, until, now time.Time) error
+}
+
+// MaxRunnableRows bounds the claim snapshot: fairness keys times three classes.
+const MaxRunnableRows = 10000
+
+// RunnableCount is one row of the claim snapshot: the runnable tokens of a
+// fairness key at one stored priority, and when the oldest became claimable.
+type RunnableCount struct {
+	FairnessKey string
+	Priority    int64
+	Runnable    int64
+	Oldest      time.Time
+}
+
+// DefaultPoisonThreshold is the number of abandonments after which a token is
+// suspended as poison (ADR-0013 section 9).
+const DefaultPoisonThreshold = 3
+
+// MinPoisonThreshold is the smallest threshold allowed: with 1 every token would
+// have to run alone (SPEC-001 Enmienda 12 section 12-1).
+const MinPoisonThreshold = 2
 
 // Claimed is a leased token with the epoch the worker must present.
 type Claimed struct {
@@ -528,21 +903,103 @@ type WorkQueue interface {
 	//
 	//orcon:scope engine the engine renews the leases of its worker across organizations (ADR-0047 section 2)
 	RenewLeases(ctx context.Context, worker execution.WorkerID, ttl time.Duration, now time.Time) ([]Renewed, error)
-	// ReleaseExpiredLeases returns up to limit expired leases to RUNNABLE, or to
-	// SUSPENDED with reason POISON once a token was abandoned poisonThreshold
-	// times, and marks the started attempts of their node executions ABANDONED.
-	//
-	//orcon:scope engine the reaper sweeps expired leases of every organization (ADR-0047 section 2)
-	ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]Reaped, error)
-	// ReleaseWorkerLeases gives up every lease of the worker (graceful shutdown).
-	//
-	//orcon:scope engine the leases of one worker can name tokens of several organizations (ADR-0047 section 2)
-	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, now time.Time) ([]TokenRef, error)
-	// FireDueTimers marks up to limit due timers FIRED; concurrent callers never
+	// FireDueTimers marks up to limit due timers FIRED and, in the same
+	// transaction, wakes the WAITING token of each (RUNNABLE, counters and status
+	// of the execution refreshed, event timer.fired); concurrent callers never
 	// fire the same timer.
 	//
 	//orcon:scope engine the timer scan covers the due timers of every organization (ADR-0047 section 2)
 	FireDueTimers(ctx context.Context, limit int, now time.Time) ([]FiredTimer, error)
+	// RunnableCounts returns the claimable tokens grouped by fairness key and
+	// priority, at most a fixed number of rows. A worker plans its claims from
+	// it (ADR-0014 section 1); it is a snapshot, not a reservation.
+	//
+	//orcon:scope engine the engine reads the runnable tokens of every organization for fair claims (ADR-0047 section 2)
+	RunnableCounts(ctx context.Context, now time.Time) ([]RunnableCount, error)
+}
+
+// LeaseRecovery gives leases back: the reaper's expired ones, the ones an owner
+// returns or loses, and the one of a token whose step failed. Whether the abandon
+// count grows depends on who gave the lease up (SPEC-001 Enmienda 12 section 12-1).
+type LeaseRecovery interface {
+	// ReleaseExpiredLeases returns up to limit expired leases to RUNNABLE, or to
+	// SUSPENDED with reason POISON once a token was abandoned poisonThreshold
+	// times, marks the started attempts of their node executions ABANDONED, and in
+	// the same transaction appends the events lease.expired and token.poisoned,
+	// opens the attention request of a poisoned token (cause POISON_TOKEN) and
+	// refreshes the counters and status of the execution.
+	//
+	//orcon:scope engine the reaper sweeps expired leases of every organization (ADR-0047 section 2)
+	ReleaseExpiredLeases(ctx context.Context, limit int, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ReleaseWorkerLeases returns every lease of the worker that is still held to
+	// RUNNABLE (graceful shutdown, ADR-0013 section 9): the owner gives the tokens
+	// back, so the abandon count does not grow, no lease.expired event is appended
+	// and the started attempts of their node executions become ABANDONED.
+	//
+	//orcon:scope engine the leases of one worker can name tokens of several organizations (ADR-0047 section 2)
+	ReleaseWorkerLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ReleaseLostLeases gives up the leases a previous incarnation of the worker
+	// left behind. Nobody returned them, so each counts as an abandonment, like an
+	// expired lease: the token goes back to RUNNABLE, or to SUSPENDED with reason
+	// POISON at the threshold.
+	//
+	//orcon:scope engine the leases a previous incarnation of the worker left can name tokens of several organizations (ADR-0047 section 2)
+	ReleaseLostLeases(ctx context.Context, worker execution.WorkerID, poisonThreshold int64, now time.Time) ([]Reaped, error)
+	// ClaimLastChanceToken leases the one runnable token that is one abandonment
+	// short of the poison threshold, if there is one (same order as ClaimTokens).
+	// The caller must hold no other token and claim nothing else while it holds this
+	// one: the abandonment that reaches the threshold then happens with the token
+	// alone in its process (SPEC-001 Enmienda 12 section 12-1).
+	//
+	//orcon:scope engine the engine claims work of every organization (ADR-0047 section 2)
+	ClaimLastChanceToken(ctx context.Context, r ClaimRequest) ([]Claimed, error)
+	// LastChanceWaiting reports since when a runnable token one abandonment short
+	// of the threshold has been claimable, for the worker to decide that it must
+	// empty itself to take it.
+	//
+	//orcon:scope engine the engine looks for runnable work of every organization (ADR-0047 section 2)
+	LastChanceWaiting(ctx context.Context, poisonThreshold int64) (since time.Time, found bool, err error)
+	// ReleaseTokenLease gives up the lease of one token the worker could not go on
+	// with (the engine failed on a step of it). It counts as an abandonment, like an
+	// expired lease, but at once: renewing by worker would keep the lease alive for
+	// as long as the worker holds any other. It reports false when the fence no
+	// longer holds (the lease was lost or already released).
+	//
+	//orcon:scope engine the fence names one token; the engine returns the lease of a token it worked on (ADR-0047 section 2)
+	ReleaseTokenLease(ctx context.Context, f Fence, poisonThreshold int64, now time.Time) (Reaped, bool, error)
+}
+
+// Work is everything the workers of the engine do across organizations.
+type Work interface {
+	WorkQueue
+	LeaseRecovery
+}
+
+// Notifier is the optional port of a store that can wake the idle workers of
+// the other processes at once (SPEC-001 C4b, PostgreSQL LISTEN/NOTIFY). A store
+// that does not implement it is polled, which is the guarantee: a notification
+// only makes the claim sooner, and losing one costs at most one poll period
+// (ADR-0013 section 3).
+type Notifier interface {
+	//
+	//orcon:scope engine the notice is about the runnable tokens of every organization (ADR-0047 section 2)
+	// NotifyRunnable tells the listening processes that tokens may be runnable.
+	// It is sent after the commit that made them so; the notice carries no data.
+	NotifyRunnable(ctx context.Context) error
+	//
+	//orcon:scope engine the notices wake the workers of the process, whatever their organization (ADR-0047 section 2)
+	// ListenRunnable calls wake for each notice until ctx ends or the listening
+	// connection fails, in which case it returns the error; the caller starts it
+	// again. Notices that arrive while it is down are lost.
+	ListenRunnable(ctx context.Context, wake func()) error
+}
+
+// Scopes issues the scope of an organization from the id of a row the engine
+// read (ADR-0046 section 2). Only the storage adapters implement it: they wrap the
+// engine functions, so the engine's ids reach the scoped methods through them.
+type Scopes interface {
+	//orcon:scope engine the engine turns the organization of the rows it read into a scope (ADR-0047 section 2)
+	ScopeOf(org identity.OrgID) (orgscope.Org, error)
 }
 
 // Deliveries leases outbox rows to dispatchers (ADR-0013 section 8).

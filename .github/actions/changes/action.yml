@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Classifies the files of a pull request or merge queue run into areas (scripts/ci-changes.sh)
+# so a workflow runs only the checks of the areas the change touches. Workflows use job-level
+# `if:` on these outputs, never a workflow-level paths filter: a skipped job counts as passed
+# for a required check, a workflow that never starts does not. The caller checks out the
+# repository with full history first.
+name: Changed areas
+description: Computes which areas of the repository a change touches.
+outputs:
+  go:
+    description: Go code, tests or benchmarks changed (also true when the API contract changed).
+    value: ${{ steps.areas.outputs.go }}
+  web:
+    description: Web application or JS packages changed (also true when the API contract changed).
+    value: ${{ steps.areas.outputs.web }}
+  api:
+    description: The OpenAPI contract changed.
+    value: ${{ steps.areas.outputs.api }}
+  skills:
+    description: Project skills changed.
+    value: ${{ steps.areas.outputs.skills }}
+  docs:
+    description: Documentation changed.
+    value: ${{ steps.areas.outputs.docs }}
+  all:
+    description: A shared build input changed or the diff could not be computed.
+    value: ${{ steps.areas.outputs.all }}
+runs:
+  using: composite
+  steps:
+    - id: areas
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        HEAD: ${{ github.sha }}
+      run: sh scripts/ci-changes.sh

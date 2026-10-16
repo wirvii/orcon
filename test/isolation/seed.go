@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -56,7 +57,7 @@ func seedOrg(ctx context.Context, tb testing.TB, env *Env, o *Org) {
 		Handle: o.Sentinel("project-handle"), Environment: o.Sentinel("environment"), IsProtected: true,
 		CreatedAt: seededAt, UpdatedAt: seededAt,
 	}
-	must("project", s.CreateProject(ctx, o.Scope, o.Project))
+	must("project", s.CreateProject(ctx, o.Scope, o.Project, audittest.Org(tb, o.UUID, "project.created")))
 
 	o.Flow = flow.Record{
 		ID: flow.FlowID(env.IDs.New()), OrgID: orgID, ProjectID: o.Project.ID, Name: o.Sentinel("flow-name"),

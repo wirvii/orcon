@@ -16,23 +16,34 @@ import (
 	"github.com/wirvii/orcon/internal/flow"
 )
 
-// storeFlag selects the engine under test, like the -store of the other
-// conformance criteria. Only the in-memory interpreter exists so far; the
-// durable stores arrive with cuts C2 and C4.
-var storeFlag = flag.String("store", "memory", "engine under test: memory, sqlite, postgres or both")
+// storeFlag returns the engine under test, like the -store of the other conformance
+// criteria: memory is the in-memory interpreter, session the session driver over a
+// fake database (a development check of the snapshot and the delta). The durable
+// stores are not reachable from here: an area test does not import an adapter
+// (AL-2.1), so the suite runs on them from test/engine when the cut that repoints
+// the conformance criteria wires it.
+func storeFlag() string { return executiontest.StoreFlag("memory") }
 
 // requireStore fails the calling test when the selected store is not wired.
 // It never skips: a skipped suite exits 0 without running anything, and the
 // command of criterion E-CF-1 would then look satisfied.
 func requireStore(t *testing.T) {
 	t.Helper()
-	switch s := *storeFlag; s {
-	case "memory":
-	case "sqlite", "postgres", "both":
-		t.Fatalf("store %s: not wired until cut C4", s)
+	switch s := storeFlag(); s {
+	case "memory", "session":
+	case "sqlite", "postgres", "both", "auto":
+		t.Fatalf("store %s: the conformance suite does not run on the durable stores from here yet", s)
 	default:
-		t.Fatalf("store %q: want memory, sqlite, postgres or both", s)
+		t.Fatalf("store %q: want memory, session, sqlite, postgres or both", s)
 	}
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if storeFlag() == "session" {
+		executiontest.UseEngine(executiontest.SessionEngine)
+	}
+	m.Run()
 }
 
 // Status of a pattern in the matrix.

@@ -13,6 +13,7 @@ import { useEditorStore, useEditorStoreApi } from '../store/editor-context';
 
 import { editorMessages } from './messages';
 import { useNoticeChannel } from './notice-channel';
+import { PaletteNoMatch, usePaletteSuggest } from './PaletteSuggestions';
 import { useDescribeNode, useNodeCatalog } from './use-node-catalog';
 
 export interface EditorCanvasHandle {
@@ -68,6 +69,7 @@ export function EditorCanvas({ ref, onOpenDetails, onOpenPhoneDetails, syncNodes
   const epoch = useEditorStore((state) => state.canvasEpoch);
   const catalog = useNodeCatalog();
   const describe = useDescribeNode();
+  const suggest = usePaletteSuggest(catalog);
 
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<WorkflowCanvasHandle>(null);
@@ -303,6 +305,8 @@ export function EditorCanvas({ ref, onOpenDetails, onOpenPhoneDetails, syncNodes
         ref={canvas}
         defaultGraph={initial}
         catalog={catalog}
+        suggest={suggest}
+        renderPaletteEmpty={({ pick }) => <PaletteNoMatch pick={pick} />}
         onGraphChange={onGraphChange}
         onOpenDetails={onOpenDetails}
         onOpenPhoneDetails={onOpenPhoneDetails}

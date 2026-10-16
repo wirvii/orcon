@@ -23,7 +23,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	// The PostgreSQL test server runs for the whole package when it is on; the
+	// leak check runs after the tests and the server stops in the cleanup, after it.
+	stop := startPostgres()
+	goleak.VerifyTestMain(m, goleak.Cleanup(func(int) { stop() }))
 }
 
 // syncBuffer is a bytes.Buffer safe for concurrent use: run writes logs from
@@ -114,7 +117,9 @@ func TestUnknownSubcommandIsUsageError(t *testing.T) {
 // select PostgreSQL, so the api, scheduler and worker roles are valid. Nothing connects to it.
 func serveEnv(t *testing.T) []string {
 	t.Helper()
-	t.Setenv("ORCON_DATA_DIR", t.TempDir())
+	dir := t.TempDir()
+	t.Setenv("ORCON_DATA_DIR", dir)
+	provisionMasterKey(t, dir)
 	t.Setenv("ORCON_STORE_POSTGRES_DSN", "postgres://u:p@127.0.0.1:1/db")
 	return []string{"serve", "--store-driver=postgres"}
 }
@@ -178,7 +183,10 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("listen failure exits 1", func(t *testing.T) {
-		args := append(serveEnv(t), "--role=api", "--http-address=256.256.256.256:0")
+		// The store opens before the listener, so this case uses the SQLite file of the data directory;
+		// SQLite serves the standalone role only (one process owns the file).
+		_ = serveEnv(t)
+		args := []string{"serve", "--store-driver=sqlite", "--role=standalone", "--http-address=256.256.256.256:0"}
 		var stdout, stderr syncBuffer
 		if code := run(t.Context(), args, &stdout, &stderr); code != exitError {
 			t.Fatalf("exit code = %d, want %d", code, exitError)
@@ -187,10 +195,18 @@ func TestRun(t *testing.T) {
 
 	for _, role := range []string{"standalone", "api"} {
 		t.Run(role+" serves and shuts down on cancel", func(t *testing.T) {
-			args := serveEnv(t)
-			if role == "standalone" {
-				args = []string{"serve"}
-				t.Setenv("ORCON_STORE_POSTGRES_DSN", "")
+			_ = serveEnv(t)
+			args := []string{"serve"}
+			t.Setenv("ORCON_STORE_POSTGRES_DSN", "")
+			if role == "api" {
+				// The api role runs over PostgreSQL only; the process-level suite uses the
+				// server named by ORCON_TEST_POSTGRES_DSN when one is configured.
+				dsn := os.Getenv("ORCON_TEST_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("the api role needs PostgreSQL: set ORCON_TEST_POSTGRES_DSN")
+				}
+				t.Setenv("ORCON_STORE_POSTGRES_DSN", dsn)
+				args = []string{"serve", "--store-driver=postgres"}
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
@@ -227,7 +243,9 @@ func TestServeReadsConfig(t *testing.T) {
 	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("ORCON_DATA_DIR", t.TempDir())
+	dataDir := t.TempDir()
+	t.Setenv("ORCON_DATA_DIR", dataDir)
+	provisionMasterKey(t, dataDir)
 
 	cases := []struct {
 		name string

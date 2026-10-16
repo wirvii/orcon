@@ -173,6 +173,9 @@ var coreOperations = []struct {
 	id, method, path, permission, class, idempotency, tool string
 }{
 	{"listProjects", "GET", "/orgs/{orgId}/projects", "org:read", "read", "", "list_projects"},
+	{"listOrgFlows", "GET", "/orgs/{orgId}/flows", "flow:read", "read", "", ""},
+	{"listOrgExecutions", "GET", "/orgs/{orgId}/executions", "execution:read", "read", "", ""},
+	{"getOrgActivitySummary", "GET", "/orgs/{orgId}/activity-summary", "execution:read", "read", "", ""},
 	{"createProject", "POST", "/orgs/{orgId}/projects", "project:create", "write", "optional", ""},
 	{"getProject", "GET", "/projects/{projectId}", "project:read", "read", "", ""},
 	{"updateProject", "PATCH", "/projects/{projectId}", "project:update", "write", "", ""},

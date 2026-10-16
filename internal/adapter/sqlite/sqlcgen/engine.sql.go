@@ -14,6 +14,183 @@ import (
 	"strings"
 )
 
+const claimLastChanceToken = `-- name: ClaimLastChanceToken :many
+UPDATE token
+SET status = 'LEASED', lease_owner = ?1, lease_epoch = lease_epoch + 1, lease_expires_at = ?2,
+    claim_count = claim_count + 1, updated_at = ?3
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
+    AND t.abandoned_count > 0 AND t.abandoned_count = ?4 - 1
+  ORDER BY t.effective_priority, t.available_at, t.id
+  LIMIT 1)
+RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+          lease_epoch, lease_expires_at
+`
+
+type ClaimLastChanceTokenParams struct {
+	WorkerID        []byte
+	LeaseExpiresAt  sql.NullInt64
+	Now             int64
+	PoisonThreshold interface{}
+}
+
+type ClaimLastChanceTokenRow struct {
+	OrgID               []byte
+	ID                  []byte
+	ExecutionID         []byte
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	FairnessKey         string
+	LeaseEpoch          int64
+	LeaseExpiresAt      sql.NullInt64
+}
+
+// The token one abandonment short of the poison threshold runs alone in its process (SPEC-001 Enmienda 12 section 12-1).
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) ClaimLastChanceToken(ctx context.Context, arg ClaimLastChanceTokenParams) ([]ClaimLastChanceTokenRow, error) {
+	rows, err := q.db.QueryContext(ctx, claimLastChanceToken,
+		arg.WorkerID,
+		arg.LeaseExpiresAt,
+		arg.Now,
+		arg.PoisonThreshold,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimLastChanceTokenRow{}
+	for rows.Next() {
+		var i ClaimLastChanceTokenRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.NodeID,
+			&i.EdgeID,
+			&i.ScopePath,
+			&i.ForkLineageDocument,
+			&i.PayloadReference,
+			&i.FairnessKey,
+			&i.LeaseEpoch,
+			&i.LeaseExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const claimOneToken = `-- name: ClaimOneToken :many
+UPDATE token
+SET status = 'LEASED', lease_owner = ?1, lease_epoch = lease_epoch + 1, lease_expires_at = ?2,
+    claim_count = claim_count + 1, updated_at = ?3
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
+    AND (?4 = 1 OR t.fairness_key IN (/*SLICE:fairness_keys*/?))
+    AND t.abandoned_count < ?6 - 1
+    AND (t.org_id, t.execution_id) NOT IN (
+      SELECT l.org_id, l.execution_id FROM token l WHERE l.status = 'LEASED'
+      GROUP BY l.org_id, l.execution_id HAVING count(*) >= CAST(?7 AS INTEGER))
+  ORDER BY t.effective_priority, t.available_at, t.id
+  LIMIT 1)
+RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+          lease_epoch, lease_expires_at
+`
+
+type ClaimOneTokenParams struct {
+	WorkerID        []byte
+	LeaseExpiresAt  sql.NullInt64
+	Now             int64
+	AnyFairnessKey  interface{}
+	FairnessKeys    []string
+	PoisonThreshold interface{}
+	ExecutionLimit  int64
+}
+
+type ClaimOneTokenRow struct {
+	OrgID               []byte
+	ID                  []byte
+	ExecutionID         []byte
+	NodeID              string
+	EdgeID              sql.NullString
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    sql.NullString
+	FairnessKey         string
+	LeaseEpoch          int64
+	LeaseExpiresAt      sql.NullInt64
+}
+
+// A claim of one token needs no count of the candidates ahead of it: the cap is only the leased tokens of the
+// execution, and the executions at their cap are found once per claim from the leased tokens (few), so the cost does not grow with the
+// runnable tokens of an execution already at its cap. ClaimTokens is for claims of more than one token.
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) ClaimOneToken(ctx context.Context, arg ClaimOneTokenParams) ([]ClaimOneTokenRow, error) {
+	query := claimOneToken
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkerID)
+	queryParams = append(queryParams, arg.LeaseExpiresAt)
+	queryParams = append(queryParams, arg.Now)
+	queryParams = append(queryParams, arg.AnyFairnessKey)
+	if len(arg.FairnessKeys) > 0 {
+		for _, v := range arg.FairnessKeys {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", strings.Repeat(",?", len(arg.FairnessKeys))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.PoisonThreshold)
+	queryParams = append(queryParams, arg.ExecutionLimit)
+	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimOneTokenRow{}
+	for rows.Next() {
+		var i ClaimOneTokenRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.NodeID,
+			&i.EdgeID,
+			&i.ScopePath,
+			&i.ForkLineageDocument,
+			&i.PayloadReference,
+			&i.FairnessKey,
+			&i.LeaseEpoch,
+			&i.LeaseExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const claimOutbox = `-- name: ClaimOutbox :many
 UPDATE outbox
 SET lease_owner = ?1, lease_expires_at = ?2, attempt_count = attempt_count + 1,
@@ -84,22 +261,36 @@ UPDATE token
 SET status = 'LEASED', lease_owner = ?1, lease_epoch = lease_epoch + 1, lease_expires_at = ?2,
     claim_count = claim_count + 1, updated_at = ?3
 WHERE id IN (
+  -- The execution cap applies inside the selection, before the page limit: a token is a candidate only while its
+  -- execution has room for it, counting the tokens already leased and the candidates ahead of it in the same claim
+  -- (all the tokens of an execution share one fairness key, so the key filter needs no repeat in the inner count).
   SELECT t.id FROM token t
   WHERE t.status = 'RUNNABLE' AND t.available_at <= ?3
     AND (?4 = 1 OR t.fairness_key IN (/*SLICE:fairness_keys*/?))
+    AND t.abandoned_count < ?6 - 1
+    AND (SELECT count(*) FROM token l WHERE l.execution_id = t.execution_id AND l.status = 'LEASED')
+      + (SELECT count(*) FROM token a
+         WHERE a.execution_id = t.execution_id AND a.status = 'RUNNABLE' AND a.available_at <= ?3
+           AND a.abandoned_count < ?6 - 1
+           AND (a.effective_priority < t.effective_priority
+                OR (a.effective_priority = t.effective_priority
+                    AND (a.available_at < t.available_at OR (a.available_at = t.available_at AND a.id < t.id)))))
+      < CAST(?7 AS INTEGER)
   ORDER BY t.effective_priority, t.available_at, t.id
-  LIMIT ?6)
+  LIMIT ?8)
 RETURNING org_id, id, execution_id, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
           lease_epoch, lease_expires_at
 `
 
 type ClaimTokensParams struct {
-	WorkerID       []byte
-	LeaseExpiresAt sql.NullInt64
-	Now            int64
-	AnyFairnessKey interface{}
-	FairnessKeys   []string
-	PageSize       int64
+	WorkerID        []byte
+	LeaseExpiresAt  sql.NullInt64
+	Now             int64
+	AnyFairnessKey  interface{}
+	FairnessKeys    []string
+	PoisonThreshold interface{}
+	ExecutionLimit  int64
+	PageSize        int64
 }
 
 type ClaimTokensRow struct {
@@ -138,6 +329,8 @@ func (q *Queries) ClaimTokens(ctx context.Context, arg ClaimTokensParams) ([]Cla
 	} else {
 		query = strings.Replace(query, "/*SLICE:fairness_keys*/?", "NULL", 1)
 	}
+	queryParams = append(queryParams, arg.PoisonThreshold)
+	queryParams = append(queryParams, arg.ExecutionLimit)
 	queryParams = append(queryParams, arg.PageSize)
 	//orcon:dynamic-sql sqlc expands the fairness_keys slice parameter in the statement text
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
@@ -206,6 +399,67 @@ func (q *Queries) CountJoinArrivals(ctx context.Context, arg CountJoinArrivalsPa
 	var i CountJoinArrivalsRow
 	err := row.Scan(&i.ArrivalCount, &i.LiveCount)
 	return i, err
+}
+
+const countRunnableTokens = `-- name: CountRunnableTokens :many
+SELECT t.fairness_key, t.effective_priority, count(*) AS runnable_count, CAST(min(t.available_at) AS INTEGER) AS oldest_available_at
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= ?1
+GROUP BY t.fairness_key, t.effective_priority
+LIMIT ?2
+`
+
+type CountRunnableTokensRow struct {
+	FairnessKey       string
+	EffectivePriority int64
+	RunnableCount     int64
+	OldestAvailableAt int64
+}
+
+// The claimable tokens grouped by fairness key and priority: the snapshot a worker plans its claims from (ADR-0014 section 1).
+// orcon:scope engine
+// orcon:hot
+func (q *Queries) CountRunnableTokens(ctx context.Context, now int64, rowLimit int64) ([]CountRunnableTokensRow, error) {
+	rows, err := q.db.QueryContext(ctx, countRunnableTokens, now, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountRunnableTokensRow{}
+	for rows.Next() {
+		var i CountRunnableTokensRow
+		if err := rows.Scan(
+			&i.FairnessKey,
+			&i.EffectivePriority,
+			&i.RunnableCount,
+			&i.OldestAvailableAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOldestLastChance = `-- name: GetOldestLastChance :one
+SELECT min(t.available_at) AS since
+FROM token t
+WHERE t.status = 'RUNNABLE' AND t.available_at <= ?1
+  AND t.abandoned_count > 0 AND t.abandoned_count = ?2 - 1
+`
+
+// orcon:scope engine
+func (q *Queries) GetOldestLastChance(ctx context.Context, now int64, poisonThreshold interface{}) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getOldestLastChance, now, poisonThreshold)
+	var since interface{}
+	err := row.Scan(&since)
+	return since, err
 }
 
 const markDueTimersFired = `-- name: MarkDueTimersFired :many
@@ -278,34 +532,80 @@ func (q *Queries) MarkTokenAttemptsAbandoned(ctx context.Context, now sql.NullIn
 	return result.RowsAffected()
 }
 
-const releaseAllLeases = `-- name: ReleaseAllLeases :execrows
+const releaseAllLeases = `-- name: ReleaseAllLeases :many
 UPDATE token
-SET status = 'RUNNABLE', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?1
-WHERE status = 'LEASED'
+SET status = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= ?1 THEN token.available_at ELSE ?2 END,
+    updated_at = ?2
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.status = 'LEASED'
+  LIMIT ?3)
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
 `
 
+type ReleaseAllLeasesRow struct {
+	OrgID          []byte
+	ID             []byte
+	ExecutionID    []byte
+	AbandonedCount int64
+	LeaseEpoch     int64
+	NodeID         string
+	Column7        int64
+}
+
 // Startup of a standalone process: the lock file guarantees no other holder can exist, so every lease is released at
-// once (ADR-0013 section 9).
+// once (ADR-0013 section 9). A lease a crashed predecessor left counts as an abandonment, so that a token that
+// crashes the process every time reaches the poison threshold.
 // orcon:scope engine
-func (q *Queries) ReleaseAllLeases(ctx context.Context, now int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, releaseAllLeases, now)
+func (q *Queries) ReleaseAllLeases(ctx context.Context, poisonThreshold int64, now int64, pageSize int64) ([]ReleaseAllLeasesRow, error) {
+	rows, err := q.db.QueryContext(ctx, releaseAllLeases, poisonThreshold, now, pageSize)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected()
+	defer rows.Close()
+	items := []ReleaseAllLeasesRow{}
+	for rows.Next() {
+		var i ReleaseAllLeasesRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.AbandonedCount,
+			&i.LeaseEpoch,
+			&i.NodeID,
+			&i.Column7,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const releaseExpiredLeases = `-- name: ReleaseExpiredLeases :many
 UPDATE token
 SET status = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
     suspend_reason = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'POISON' ELSE NULL END,
-    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?2
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= ?1 THEN token.available_at ELSE ?2 END,
+    updated_at = ?2
 WHERE id IN (
   SELECT t.id FROM token t
   WHERE t.status = 'LEASED' AND t.lease_expires_at < ?2
   ORDER BY t.lease_expires_at
   LIMIT ?3)
-RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
 `
 
 type ReleaseExpiredLeasesRow struct {
@@ -313,7 +613,9 @@ type ReleaseExpiredLeasesRow struct {
 	ID             []byte
 	ExecutionID    []byte
 	AbandonedCount int64
-	Column5        int64
+	LeaseEpoch     int64
+	NodeID         string
+	Column7        int64
 }
 
 // orcon:scope engine
@@ -332,7 +634,82 @@ func (q *Queries) ReleaseExpiredLeases(ctx context.Context, poisonThreshold int6
 			&i.ID,
 			&i.ExecutionID,
 			&i.AbandonedCount,
-			&i.Column5,
+			&i.LeaseEpoch,
+			&i.NodeID,
+			&i.Column7,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const releaseTokenLease = `-- name: ReleaseTokenLease :many
+UPDATE token
+SET status = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN token.abandoned_count + 1 >= ?1 THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + 1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN token.abandoned_count + 1 >= ?1 THEN token.available_at ELSE ?2 END,
+    updated_at = ?2
+WHERE token.org_id = ?3 AND token.id = ?4 AND token.lease_epoch = ?5
+  AND token.lease_owner = ?6 AND token.status = 'LEASED'
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
+`
+
+type ReleaseTokenLeaseParams struct {
+	PoisonThreshold int64
+	Now             int64
+	OrgID           []byte
+	TokenID         []byte
+	LeaseEpoch      int64
+	WorkerID        []byte
+}
+
+type ReleaseTokenLeaseRow struct {
+	OrgID          []byte
+	ID             []byte
+	ExecutionID    []byte
+	AbandonedCount int64
+	LeaseEpoch     int64
+	NodeID         string
+	Column7        int64
+}
+
+// One token the worker could not go on with (ADR-0013 sections 4 and 9): the fence names the epoch and the owner, so
+// a lease that was lost meanwhile is left alone.
+// orcon:scope org
+func (q *Queries) ReleaseTokenLease(ctx context.Context, arg ReleaseTokenLeaseParams) ([]ReleaseTokenLeaseRow, error) {
+	rows, err := q.db.QueryContext(ctx, releaseTokenLease,
+		arg.PoisonThreshold,
+		arg.Now,
+		arg.OrgID,
+		arg.TokenID,
+		arg.LeaseEpoch,
+		arg.WorkerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReleaseTokenLeaseRow{}
+	for rows.Next() {
+		var i ReleaseTokenLeaseRow
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.AbandonedCount,
+			&i.LeaseEpoch,
+			&i.NodeID,
+			&i.Column7,
 		); err != nil {
 			return nil, err
 		}
@@ -349,20 +726,47 @@ func (q *Queries) ReleaseExpiredLeases(ctx context.Context, poisonThreshold int6
 
 const releaseWorkerLeases = `-- name: ReleaseWorkerLeases :many
 UPDATE token
-SET status = 'RUNNABLE', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?1
-WHERE lease_owner = ?2 AND status = 'LEASED'
-RETURNING org_id, id
+SET status = CASE WHEN ?1 = 1 AND token.abandoned_count + 1 >= ?2 THEN 'SUSPENDED' ELSE 'RUNNABLE' END,
+    suspend_reason = CASE WHEN ?1 = 1 AND token.abandoned_count + 1 >= ?2 THEN 'POISON' ELSE NULL END,
+    abandoned_count = token.abandoned_count + ?1, lease_owner = NULL, lease_expires_at = NULL,
+    available_at = CASE WHEN ?1 = 1 AND token.abandoned_count + 1 >= ?2 THEN token.available_at ELSE ?3 END,
+    updated_at = ?3
+WHERE id IN (
+  SELECT t.id FROM token t
+  WHERE t.lease_owner = ?4 AND t.status = 'LEASED'
+  LIMIT ?5)
+RETURNING token.org_id, token.id, token.execution_id, token.abandoned_count, token.lease_epoch, token.node_id,
+          CAST(token.status = 'SUSPENDED' AS INTEGER) AS is_poisoned
 `
 
+type ReleaseWorkerLeasesParams struct {
+	Counts          interface{}
+	PoisonThreshold int64
+	Now             int64
+	WorkerID        []byte
+	PageSize        int64
+}
+
 type ReleaseWorkerLeasesRow struct {
-	OrgID []byte
-	ID    []byte
+	OrgID          []byte
+	ID             []byte
+	ExecutionID    []byte
+	AbandonedCount int64
+	LeaseEpoch     int64
+	NodeID         string
+	Column7        int64
 }
 
 // orcon:scope engine
 // orcon:hot
-func (q *Queries) ReleaseWorkerLeases(ctx context.Context, now int64, workerID []byte) ([]ReleaseWorkerLeasesRow, error) {
-	rows, err := q.db.QueryContext(ctx, releaseWorkerLeases, now, workerID)
+func (q *Queries) ReleaseWorkerLeases(ctx context.Context, arg ReleaseWorkerLeasesParams) ([]ReleaseWorkerLeasesRow, error) {
+	rows, err := q.db.QueryContext(ctx, releaseWorkerLeases,
+		arg.Counts,
+		arg.PoisonThreshold,
+		arg.Now,
+		arg.WorkerID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +774,15 @@ func (q *Queries) ReleaseWorkerLeases(ctx context.Context, now int64, workerID [
 	items := []ReleaseWorkerLeasesRow{}
 	for rows.Next() {
 		var i ReleaseWorkerLeasesRow
-		if err := rows.Scan(&i.OrgID, &i.ID); err != nil {
+		if err := rows.Scan(
+			&i.OrgID,
+			&i.ID,
+			&i.ExecutionID,
+			&i.AbandonedCount,
+			&i.LeaseEpoch,
+			&i.NodeID,
+			&i.Column7,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -456,4 +868,65 @@ func (q *Queries) ResolveWaitSecret(ctx context.Context, id []byte) (ResolveWait
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const updateExecutionStatus = `-- name: UpdateExecutionStatus :execrows
+UPDATE execution
+SET status = ?1, updated_at = ?2
+WHERE execution.org_id = ?3 AND execution.id = ?4
+`
+
+type UpdateExecutionStatusParams struct {
+	Status string
+	Now    int64
+	OrgID  []byte
+	ID     []byte
+}
+
+// The status an execution takes from its counters after recovery or a wake-up (ADR-0009 section 1).
+// orcon:scope org
+func (q *Queries) UpdateExecutionStatus(ctx context.Context, arg UpdateExecutionStatusParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateExecutionStatus,
+		arg.Status,
+		arg.Now,
+		arg.OrgID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateStartedExecution = `-- name: UpdateStartedExecution :execrows
+UPDATE execution
+SET status = 'RUNNING', started_at = COALESCE(execution.started_at, ?1), updated_at = ?1
+WHERE execution.org_id = ?2 AND execution.id = ?3 AND execution.status = 'QUEUED'
+`
+
+// The first claim of a token of an execution starts it (ADR-0009 section 1: QUEUED to RUNNING when the first token is
+// claimed).
+// orcon:scope org
+func (q *Queries) UpdateStartedExecution(ctx context.Context, now int64, orgID []byte, iD []byte) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateStartedExecution, now, orgID, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateWokenToken = `-- name: UpdateWokenToken :execrows
+UPDATE token
+SET status = 'RUNNABLE', available_at = ?1, updated_at = ?1
+WHERE token.org_id = ?2 AND token.id = ?3 AND token.status = 'WAITING'
+`
+
+// A timer fired: the token that waits for it runs again. The conditional update leaves a token that moved on alone.
+// orcon:scope org
+func (q *Queries) UpdateWokenToken(ctx context.Context, now int64, orgID []byte, tokenID []byte) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWokenToken, now, orgID, tokenID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

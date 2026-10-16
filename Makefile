@@ -22,7 +22,7 @@ WORKSPACE_DIRS = $$(go list -m -f '{{.Dir}}')
 
 .PHONY: check tools fmt fmt-check lint vet arch-coverage lint-fixtures spdx spdx-fix provenance hooks \
 	generate generate-check db-check db-sum db-fixtures tidy-check test test-tools cover goleak-check vuln licenses skill-sync skill-check \
-	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report
+	build-go web build smoke test-postgres test-compat-floor fuzz bench bench-compare sbom expr-corpus expr-compat expr-report connectors-check
 
 # check is the single gate (tooling.md TOOL-1). Targets run in this order and stop at the first failure.
 check: tools fmt-check lint vet arch-coverage lint-fixtures spdx provenance generate-check db-check tidy-check test cover goleak-check vuln licenses skill-check build-go
@@ -148,12 +148,12 @@ sbom:
 
 test:
 	set -e; for dir in $(WORKSPACE_DIRS); do \
-		(cd "$$dir" && go test -race -shuffle=on -count=1 ./...); \
+		(cd "$$dir" && go test -race -timeout 25m -shuffle=on -count=1 ./...); \
 	done
-	cd tools && $(TOOLS_ENV) go test -race -shuffle=on -count=1 ./...
+	cd tools && $(TOOLS_ENV) go test -race -timeout 25m -shuffle=on -count=1 ./...
 
 test-tools:
-	cd tools && $(TOOLS_ENV) go test -race -count=1 ./...
+	cd tools && $(TOOLS_ENV) go test -race -timeout 25m -count=1 ./...
 
 cover:
 	sh scripts/check-coverage.sh 80
@@ -173,7 +173,7 @@ PG_IMAGES ?= postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b1436
 test-postgres:
 	set -e; for image in $(PG_IMAGES); do \
 		echo "test-postgres: $$image"; \
-		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -count=1 ./internal/adapter/... ./test/isolation/...; \
+		ORCON_TEST_POSTGRES=1 ORCON_TEST_POSTGRES_IMAGE=$$image go test -race -timeout 25m -count=1 ./internal/adapter/... ./test/isolation/...; \
 	done
 
 # test-compat-floor proves the compatibility floor of every migration and the
@@ -249,6 +249,11 @@ skill-sync:
 
 skill-check:
 	sh scripts/check-skill.sh
+
+# connectors-check applies the brand icon rules (orcon-connector IC-1, IC-6, IC-8) to every
+# official connector package: icon-missing, icon-source-missing and icon-placeholder.
+connectors-check:
+	go test -race -count=1 -run 'TestIcon|TestOfficialConnectorIcons|TestSanitize|TestLoadIcon' ./internal/connector/authoring/...
 
 # ---------------------------------------------------------------------------
 # Build

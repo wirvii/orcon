@@ -45,6 +45,9 @@ type Deps struct {
 	Authenticator identity.Authenticator
 	// Authorizer decides permissions; nil means authz.DenyAll.
 	Authorizer authz.Authorizer
+	// OrgSelector checks the membership behind the Orcon-Org header; nil means authz.DenyAll,
+	// which refuses every organization named in a header.
+	OrgSelector authz.OrgSelector
 	// Catalog, when set, makes New fail if the contract names a permission
 	// that is not in it.
 	Catalog *authz.Catalog
@@ -63,10 +66,17 @@ type Deps struct {
 	// a store in the memory of the process survives neither a restart nor a second api
 	// process. The composition root wires the durable store, or
 	// idempotency.UnavailableStore while there is none.
-	Idempotency idempotency.Store
+	Idempotency identity.IdempotencyStore
+	// Rebuilds answers the repeats of an in-progress idempotency record left by a crash, by
+	// operation identifier (for example "createProject"). An operation without one answers 409
+	// idempotency-in-progress to such a repeat.
+	Rebuilds map[string]idempotency.Rebuild
 	// Reference is the file system of the reference site; nil means the
 	// embedded one.
 	Reference fs.FS
+	// Webhooks accepts the public trigger addresses under /hooks/ (SPEC-002 T2).
+	// Nil means the process serves none, for example a process without an engine.
+	Webhooks WebhookIngress
 }
 
 // RouteKind says what a registered route is.
@@ -184,6 +194,9 @@ func build(supplied *Deps, rawSpec []byte, register func(mux apigen.ServeMux, ba
 	routes = append(routes, mountReference(mux, reference.Handler(site))...)
 	mux.Handle("/api/", fallback(mux))
 	routes = append(routes, Route{Pattern: "/api/", Kind: KindFallback})
+	if deps.Webhooks != nil {
+		mux.Handle(WebhookPrefix, webhookHandler(deps.Webhooks, deps.Logger))
+	}
 
 	handler := middleware.Chain(mux,
 		middleware.RequestID(deps.IDs),
@@ -208,6 +221,9 @@ func (d *Deps) withDefaults() *Deps {
 	}
 	if d.Authenticator == nil {
 		d.Authenticator = identity.RejectAll{}
+	}
+	if d.OrgSelector == nil {
+		d.OrgSelector = authz.DenyAll{}
 	}
 	if d.Authorizer == nil {
 		d.Authorizer = authz.DenyAll{}
@@ -274,10 +290,11 @@ func checkPermissions(spec *Spec, cat *authz.Catalog) error {
 // the stability gate; the per-address limit of the global chain protects them.
 func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body middleware.Middleware) []middleware.Middleware {
 	// Step 1 of the pipeline: the body limit of the operation, before anything reads the request.
-	chain := []middleware.Middleware{withOperation(op), middleware.BodyLimit(BodyLimitFor(op.ID))}
+	chain := []middleware.Middleware{withOperation(op), withLocale(), middleware.BodyLimit(BodyLimitFor(op.ID)), middleware.CarryCredentials(deps.Auth)}
 	if !op.Public {
 		chain = append(chain,
 			middleware.Authenticate(deps.Authenticator, deps.Logger, deps.Auth),
+			middleware.SelectOrganization(deps.OrgSelector, deps.Logger, deps.Auth),
 			middleware.LimitPrincipal(limiter, op.Class),
 		)
 	}
@@ -293,7 +310,8 @@ func operationChain(deps *Deps, limiter *middleware.Limiter, op *Operation, body
 	}
 	if !op.Public && op.IdempotencyKey != "" {
 		chain = append(chain, idempotency.Middleware(idempotency.Config{
-			Store: deps.Idempotency, Logger: deps.Logger, Required: op.IdempotencyKey == "required",
+			Store: deps.Idempotency, Clock: deps.Clock, IDs: deps.IDs, Rebuild: deps.Rebuilds[op.ID],
+			Logger: deps.Logger, Required: op.IdempotencyKey == "required",
 			IssuesSecret: op.IssuesSecret, Route: op.Pattern,
 		}))
 	}

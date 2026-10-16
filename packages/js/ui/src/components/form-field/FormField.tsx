@@ -32,6 +32,8 @@ export interface FormFieldProps {
   /** Error text. When set the control is marked invalid and the text is linked to it. */
   error?: ReactNode | undefined;
   required?: boolean | undefined;
+  /** A control at the end of the label row, such as "Forgot it?" next to a password label. Not for a group. */
+  labelAction?: ReactNode | undefined;
   /**
    * The field is a group (radio group, checkbox group): the label becomes a
    * legend and no single control id is needed.
@@ -54,7 +56,7 @@ export interface FormFieldProps {
  * the invalid and required state from here, so a control placed inside needs no
  * extra wiring. A server error maps to a field by its `name` (see ProblemAlert).
  */
-export function FormField({ label, description, error: errorProp, required = false, group = false, name, id, className, children }: FormFieldProps) {
+export function FormField({ label, description, error: errorProp, required = false, labelAction, group = false, name, id, className, children }: FormFieldProps) {
   const intl = useIntl();
   const generated = useId();
   const problemError = useFieldProblemError(name);
@@ -83,6 +85,20 @@ export function FormField({ label, description, error: errorProp, required = fal
     </>
   );
   const labelClass = 'text-fg text-sm font-medium';
+  const labelElement = (
+    <label id={value.labelId} htmlFor={controlId} className={labelClass}>
+      {labelContent}
+    </label>
+  );
+  // The label sits alone, as it always did, unless there is an action to put at the end of its row.
+  const labelRow = labelAction ? (
+    <div className="flex items-center justify-between gap-2">
+      {labelElement}
+      {labelAction}
+    </div>
+  ) : (
+    labelElement
+  );
 
   const body = (
     <>
@@ -91,9 +107,7 @@ export function FormField({ label, description, error: errorProp, required = fal
           {labelContent}
         </legend>
       ) : (
-        <label id={value.labelId} htmlFor={controlId} className={labelClass}>
-          {labelContent}
-        </label>
+        labelRow
       )}
       {description ? (
         <p id={value.descriptionId} className="text-fg-muted text-sm">

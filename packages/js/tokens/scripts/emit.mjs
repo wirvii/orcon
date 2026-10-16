@@ -166,6 +166,7 @@ export function emitTailwindTheme(model) {
   const target = scales.find((x) => x.key === 'size.target-min');
   add('--spacing-target', v(target));
   add('--spacing-port', v(scales.find((x) => x.key === 'size.port')));
+  add('--spacing-form-width', v(scales.find((x) => x.key === 'size.form-width')));
   // Canvas and editor geometry: `canvas.node-size` is the utility suffix `canvas-node`.
   for (const t of scales.filter((x) => (x.path[0] === 'canvas' || x.path[0] === 'editor') && x.type === 'dimension')) {
     add(`--spacing-${t.path[0]}-${t.path[1].replace(/-size$/, '')}`, v(t));

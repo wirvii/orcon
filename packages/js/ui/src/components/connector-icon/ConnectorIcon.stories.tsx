@@ -37,6 +37,19 @@ export const Tile: Story = {
   },
 };
 
+export const Fallback: Story = {
+  args: { src: undefined },
+  play: async ({ canvasElement }) => {
+    // No logo: the Plug glyph stands in, named after the connector.
+    await expect(within(canvasElement).getByRole('img', { name: 'Example connector' }).tagName.toLowerCase()).toBe('svg');
+  },
+};
+
+/** The variant the brand publishes for dark backgrounds replaces the logo only in the dark theme. */
+export const DarkVariant: Story = {
+  args: { darkSrc: logo },
+};
+
 export const Matrix: Story = {
   render: () => (
     <MatrixTable
@@ -45,6 +58,8 @@ export const Matrix: Story = {
       rows={[
         { label: 'frame', cells: [<ConnectorIcon key="c" src={logo} name="Example connector" />] },
         { label: 'tile', cells: [<ConnectorIcon key="t" variant="tile" src={logo} name="Example connector" />] },
+        { label: 'fallback frame', cells: [<ConnectorIcon key="f" name="Example connector" />] },
+        { label: 'fallback tile', cells: [<ConnectorIcon key="ft" variant="tile" name="Example connector" />] },
       ]}
     />
   ),

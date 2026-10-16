@@ -13,6 +13,65 @@ import (
 	"database/sql"
 )
 
+const countActiveFlows = `-- name: CountActiveFlows :one
+SELECT COUNT(*)
+FROM flow
+WHERE org_id = ?1 AND project_id = ?2 AND activation_state = 'ACTIVE' AND deleted_at IS NULL
+`
+
+// orcon:scope org
+func (q *Queries) CountActiveFlows(ctx context.Context, orgID []byte, projectID []byte) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveFlows, orgID, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countFlows = `-- name: CountFlows :one
+SELECT COUNT(*)
+FROM flow
+WHERE org_id = ?1 AND project_id = ?2 AND deleted_at IS NULL
+`
+
+// orcon:scope org
+func (q *Queries) CountFlows(ctx context.Context, orgID []byte, projectID []byte) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countFlows, orgID, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSucceededTriggerExecutions = `-- name: CountSucceededTriggerExecutions :one
+SELECT CAST(COALESCE(SUM(execution_count), 0) AS INTEGER) AS succeeded
+FROM execution_hour_count
+WHERE org_id = ?1 AND project_id = ?2 AND status = 'SUCCEEDED' AND mode = 'TRIGGER' AND hour_started_at >= ?3
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) CountSucceededTriggerExecutions(ctx context.Context, orgID []byte, projectID []byte, sinceAt int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSucceededTriggerExecutions, orgID, projectID, sinceAt)
+	var succeeded int64
+	err := row.Scan(&succeeded)
+	return succeeded, err
+}
+
+const countUncertainExecutions = `-- name: CountUncertainExecutions :one
+SELECT COUNT(DISTINCT o.execution_id)
+FROM external_operation AS o
+WHERE o.org_id = ?1 AND o.state = 'UNCERTAIN'
+  AND EXISTS (SELECT 1 FROM execution AS e WHERE e.org_id = o.org_id AND e.id = o.execution_id AND e.project_id = ?2 AND e.created_at >= ?3)
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) CountUncertainExecutions(ctx context.Context, orgID []byte, projectID []byte, sinceAt int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUncertainExecutions, orgID, projectID, sinceAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getFlow = `-- name: GetFlow :one
 SELECT id, org_id, project_id, name, draft_document, draft_revision, active_flow_version_id, activation_state, deleted_at, deleted_by_principal_id, created_at, updated_at
 FROM flow
@@ -337,6 +396,135 @@ func (q *Queries) InsertFlowVersion(ctx context.Context, arg InsertFlowVersionPa
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const listExecutionHourCounts = `-- name: ListExecutionHourCounts :many
+SELECT hour_started_at, mode, status, execution_count
+FROM execution_hour_count
+WHERE org_id = ?1 AND project_id = ?2 AND hour_started_at >= ?3
+LIMIT 1000
+`
+
+type ListExecutionHourCountsRow struct {
+	HourStartedAt  int64
+	Mode           string
+	Status         string
+	ExecutionCount int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListExecutionHourCounts(ctx context.Context, orgID []byte, projectID []byte, sinceAt int64) ([]ListExecutionHourCountsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listExecutionHourCounts, orgID, projectID, sinceAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExecutionHourCountsRow{}
+	for rows.Next() {
+		var i ListExecutionHourCountsRow
+		if err := rows.Scan(
+			&i.HourStartedAt,
+			&i.Mode,
+			&i.Status,
+			&i.ExecutionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFlowActivity = `-- name: ListFlowActivity :many
+SELECT f.id, f.org_id, f.project_id, f.name, f.draft_revision, f.active_flow_version_id, f.activation_state, f.created_at, f.updated_at,
+       le.id AS last_execution_id, le.status AS last_execution_status, le.created_at AS last_execution_created_at, le.finished_at AS last_execution_finished_at,
+       CAST(EXISTS (SELECT 1 FROM external_operation o WHERE o.org_id = le.org_id AND o.execution_id = le.id AND o.state = 'UNCERTAIN') AS INTEGER) AS last_execution_has_uncertain_operation,
+       (SELECT COUNT(*) FROM execution c WHERE c.org_id = f.org_id AND c.flow_id = f.id AND c.created_at >= ?1) AS execution_count_last_24h
+FROM flow f
+LEFT JOIN execution le ON le.org_id = f.org_id AND le.id = (SELECT l.id FROM execution l WHERE l.org_id = f.org_id AND l.flow_id = f.id ORDER BY l.created_at DESC, l.id DESC LIMIT 1)
+WHERE f.org_id = ?2 AND f.project_id = ?3 AND f.id > ?4 AND f.deleted_at IS NULL
+ORDER BY f.id
+LIMIT ?5
+`
+
+type ListFlowActivityParams struct {
+	SinceAt   int64
+	OrgID     []byte
+	ProjectID []byte
+	AfterID   []byte
+	PageSize  int64
+}
+
+type ListFlowActivityRow struct {
+	ID                                 []byte
+	OrgID                              []byte
+	ProjectID                          []byte
+	Name                               string
+	DraftRevision                      int64
+	ActiveFlowVersionID                []byte
+	ActivationState                    string
+	CreatedAt                          int64
+	UpdatedAt                          int64
+	LastExecutionID                    []byte
+	LastExecutionStatus                sql.NullString
+	LastExecutionCreatedAt             sql.NullInt64
+	LastExecutionFinishedAt            sql.NullInt64
+	LastExecutionHasUncertainOperation int64
+	ExecutionCountLast24h              int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListFlowActivity(ctx context.Context, arg ListFlowActivityParams) ([]ListFlowActivityRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFlowActivity,
+		arg.SinceAt,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFlowActivityRow{}
+	for rows.Next() {
+		var i ListFlowActivityRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.Name,
+			&i.DraftRevision,
+			&i.ActiveFlowVersionID,
+			&i.ActivationState,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastExecutionID,
+			&i.LastExecutionStatus,
+			&i.LastExecutionCreatedAt,
+			&i.LastExecutionFinishedAt,
+			&i.LastExecutionHasUncertainOperation,
+			&i.ExecutionCountLast24h,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listFlowVersions = `-- name: ListFlowVersions :many

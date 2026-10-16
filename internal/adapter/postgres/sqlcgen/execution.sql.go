@@ -62,37 +62,76 @@ func (q *Queries) AppendExecutionEvent(ctx context.Context, arg AppendExecutionE
 	return sequence_number, err
 }
 
-const getExecution = `-- name: GetExecution :one
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
+const getDatabaseTime = `-- name: GetDatabaseTime :one
+SELECT clock_timestamp()::timestamptz AS database_time
+`
+
+// orcon:scope instance
+func (q *Queries) GetDatabaseTime(ctx context.Context) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getDatabaseTime)
+	var database_time pgtype.Timestamptz
+	err := row.Scan(&database_time)
+	return database_time, err
+}
+
+const getEngineState = `-- name: GetEngineState :one
+SELECT status, engine_state_revision, engine_state_document
 FROM execution
 WHERE org_id = $1 AND id = $2
 `
 
+type GetEngineStateRow struct {
+	Status              string
+	EngineStateRevision int64
+	EngineStateDocument []byte
+}
+
+// The engine state of an execution: its status, the number of commits that wrote its tracker document and the
+// document (SPEC-001 C4a). A worker opens an execution from this row and its live tokens.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetEngineState(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) (GetEngineStateRow, error) {
+	row := q.db.QueryRow(ctx, getEngineState, orgID, iD)
+	var i GetEngineStateRow
+	err := row.Scan(&i.Status, &i.EngineStateRevision, &i.EngineStateDocument)
+	return i, err
+}
+
+const getExecution = `-- name: GetExecution :one
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.id = $2
+`
+
 type GetExecutionRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -122,6 +161,34 @@ func (q *Queries) GetExecution(ctx context.Context, orgID pgtype.UUID, iD pgtype
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.FlowVersionNumber,
+		&i.HasUncertainOperation,
+	)
+	return i, err
+}
+
+const getExecutionCountKey = `-- name: GetExecutionCountKey :one
+SELECT project_id, status, mode, created_at
+FROM execution
+WHERE org_id = $1 AND id = $2
+`
+
+type GetExecutionCountKeyRow struct {
+	ProjectID pgtype.UUID
+	Status    string
+	Mode      string
+	CreatedAt pgtype.Timestamptz
+}
+
+// orcon:scope org
+func (q *Queries) GetExecutionCountKey(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) (GetExecutionCountKeyRow, error) {
+	row := q.db.QueryRow(ctx, getExecutionCountKey, orgID, iD)
+	var i GetExecutionCountKeyRow
+	err := row.Scan(
+		&i.ProjectID,
+		&i.Status,
+		&i.Mode,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -221,6 +288,21 @@ func (q *Queries) GetJoinInstance(ctx context.Context, arg GetJoinInstanceParams
 	return i, err
 }
 
+const getNodeOutputDocument = `-- name: GetNodeOutputDocument :one
+SELECT inline_document
+FROM node_output
+WHERE org_id = $1 AND id = $2
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetNodeOutputDocument(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getNodeOutputDocument, orgID, iD)
+	var inline_document []byte
+	err := row.Scan(&inline_document)
+	return inline_document, err
+}
+
 const getTimer = `-- name: GetTimer :one
 SELECT id, org_id, execution_id, token_id, kind, due_at, status
 FROM timer
@@ -306,6 +388,21 @@ func (q *Queries) GetToken(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUI
 		&i.SuspendReason,
 	)
 	return i, err
+}
+
+const getTokenInputDocument = `-- name: GetTokenInputDocument :one
+SELECT inline_document
+FROM token_input
+WHERE org_id = $1 AND id = $2
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) GetTokenInputDocument(ctx context.Context, orgID pgtype.UUID, iD pgtype.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getTokenInputDocument, orgID, iD)
+	var inline_document []byte
+	err := row.Scan(&inline_document)
+	return inline_document, err
 }
 
 const insertAttentionRequest = `-- name: InsertAttentionRequest :exec
@@ -457,6 +554,51 @@ func (q *Queries) InsertExternalOperation(ctx context.Context, arg InsertExterna
 	return err
 }
 
+const insertExternalOperationIfAbsent = `-- name: InsertExternalOperationIfAbsent :execrows
+INSERT INTO external_operation (id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state,
+                                batch_key, retry_epoch, compensation_state, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5,
+        $6, $7, 'PREPARED', $8, 0, 'NONE',
+        $9, $10)
+ON CONFLICT (org_id, correlation_key) DO NOTHING
+`
+
+type InsertExternalOperationIfAbsentParams struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	ExecutionID       pgtype.UUID
+	NodeExecutionID   pgtype.UUID
+	ItemIndex         int64
+	CorrelationKey    string
+	ContractReference string
+	BatchKey          pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+// The checkpoint before an effect may run again after a crash: an operation already written with the same
+// correlation key keeps its row, and the caller reloads the rows of the node execution.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertExternalOperationIfAbsent(ctx context.Context, arg InsertExternalOperationIfAbsentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertExternalOperationIfAbsent,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.ItemIndex,
+		arg.CorrelationKey,
+		arg.ContractReference,
+		arg.BatchKey,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertJoinArrival = `-- name: InsertJoinArrival :execrows
 INSERT INTO join_arrival (id, org_id, execution_id, node_id, scope_path, round_number, edge_index, token_id, payload_reference,
                           is_live, arrived_at, created_at, updated_at)
@@ -547,9 +689,9 @@ func (q *Queries) InsertJoinInstance(ctx context.Context, arg InsertJoinInstance
 }
 
 const insertNodeExecution = `-- name: InsertNodeExecution :exec
-INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, created_at, updated_at)
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6,
-        $7, 0, $8, $9, $10)
+        $7, 0, $8, $9, $10, $11)
 `
 
 type InsertNodeExecutionParams struct {
@@ -561,6 +703,7 @@ type InsertNodeExecutionParams struct {
 	ScopePath   string
 	Status      string
 	StartedAt   pgtype.Timestamptz
+	FinishedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 }
@@ -576,8 +719,78 @@ func (q *Queries) InsertNodeExecution(ctx context.Context, arg InsertNodeExecuti
 		arg.ScopePath,
 		arg.Status,
 		arg.StartedAt,
+		arg.FinishedAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertNodeOutput = `-- name: InsertNodeOutput :exec
+INSERT INTO node_output (id, org_id, execution_id, node_execution_id, port, item_count, encoding, inline_document,
+                         inline_document_format, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        $7, $8, 'orcon/items@1', $9, $9)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertNodeOutputParams struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	ExecutionID     pgtype.UUID
+	NodeExecutionID pgtype.UUID
+	Port            string
+	ItemCount       int64
+	Encoding        string
+	InlineDocument  []byte
+	CreatedAt       pgtype.Timestamptz
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertNodeOutput(ctx context.Context, arg InsertNodeOutputParams) error {
+	_, err := q.db.Exec(ctx, insertNodeOutput,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.Port,
+		arg.ItemCount,
+		arg.Encoding,
+		arg.InlineDocument,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertNondeterminismRecord = `-- name: InsertNondeterminismRecord :exec
+INSERT INTO nondeterminism_record (id, org_id, execution_id, node_execution_id, sequence_number, value_document, value_document_format, created_at)
+VALUES ($1, $2, $3, $4, $5,
+        $6, 'orcon/value@1', $7)
+ON CONFLICT (org_id, node_execution_id, sequence_number) DO NOTHING
+`
+
+type InsertNondeterminismRecordParams struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	ExecutionID     pgtype.UUID
+	NodeExecutionID pgtype.UUID
+	SequenceNumber  int64
+	ValueDocument   []byte
+	CreatedAt       pgtype.Timestamptz
+}
+
+// The environment (activation instant and seed) recorded for an activation: sequence 1 of its node execution.
+// orcon:scope org
+func (q *Queries) InsertNondeterminismRecord(ctx context.Context, arg InsertNondeterminismRecordParams) error {
+	_, err := q.db.Exec(ctx, insertNondeterminismRecord,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.SequenceNumber,
+		arg.ValueDocument,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -606,6 +819,45 @@ func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) erro
 		arg.PayloadDocument,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertTaskAttempt = `-- name: InsertTaskAttempt :exec
+INSERT INTO task_attempt (id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at,
+                          created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, $11)
+`
+
+type InsertTaskAttemptParams struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	ExecutionID     pgtype.UUID
+	NodeExecutionID pgtype.UUID
+	AttemptNumber   int64
+	LeaseEpoch      int64
+	WorkerID        pgtype.UUID
+	Status          string
+	StartedAt       pgtype.Timestamptz
+	FinishedAt      pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+// orcon:scope org
+func (q *Queries) InsertTaskAttempt(ctx context.Context, arg InsertTaskAttemptParams) error {
+	_, err := q.db.Exec(ctx, insertTaskAttempt,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.NodeExecutionID,
+		arg.AttemptNumber,
+		arg.LeaseEpoch,
+		arg.WorkerID,
+		arg.Status,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -648,8 +900,11 @@ INSERT INTO token (id, org_id, execution_id, status, node_id, edge_id, scope_pat
                    claim_count, abandoned_count, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
         $8, 'orcon/fork-lineage@1', $9, $10,
-        $11, $12, $13, $14, $15,
-        0, 0, $16, $17)
+        $11, COALESCE($12, clock_timestamp() + $13::bigint * interval '1 microsecond'),
+        $14, $15,
+        CASE WHEN $16::bigint > 0 THEN clock_timestamp() + $16::bigint * interval '1 millisecond'
+             ELSE $17 END,
+        0, 0, $18, $19)
 `
 
 type InsertTokenParams struct {
@@ -664,10 +919,12 @@ type InsertTokenParams struct {
 	PayloadReference    pgtype.Text
 	FairnessKey         string
 	EffectivePriority   int64
-	AvailableAt         pgtype.Timestamptz
+	AvailableAt         interface{}
+	QueueOrder          int64
 	LeaseOwner          pgtype.UUID
 	LeaseEpoch          int64
-	LeaseExpiresAt      pgtype.Timestamptz
+	LeaseMilliseconds   int64
+	LeaseExpiresAt      interface{}
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
 }
@@ -687,11 +944,45 @@ func (q *Queries) InsertToken(ctx context.Context, arg InsertTokenParams) error 
 		arg.FairnessKey,
 		arg.EffectivePriority,
 		arg.AvailableAt,
+		arg.QueueOrder,
 		arg.LeaseOwner,
 		arg.LeaseEpoch,
+		arg.LeaseMilliseconds,
 		arg.LeaseExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertTokenInput = `-- name: InsertTokenInput :exec
+INSERT INTO token_input (id, org_id, execution_id, item_count, encoding, inline_document, inline_document_format, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        'orcon/items@1', $7, $7)
+ON CONFLICT (id) DO NOTHING
+`
+
+type InsertTokenInputParams struct {
+	ID             pgtype.UUID
+	OrgID          pgtype.UUID
+	ExecutionID    pgtype.UUID
+	ItemCount      int64
+	Encoding       string
+	InlineDocument []byte
+	CreatedAt      pgtype.Timestamptz
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) InsertTokenInput(ctx context.Context, arg InsertTokenInputParams) error {
+	_, err := q.db.Exec(ctx, insertTokenInput,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.ItemCount,
+		arg.Encoding,
+		arg.InlineDocument,
+		arg.CreatedAt,
 	)
 	return err
 }
@@ -886,109 +1177,16 @@ func (q *Queries) ListExecutionEvents(ctx context.Context, arg ListExecutionEven
 	return items, nil
 }
 
-const listExecutions = `-- name: ListExecutions :many
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND project_id = $2
-  AND (created_at, id) < ($3::timestamptz, $4::uuid)
-ORDER BY created_at DESC, id DESC
-LIMIT $5
-`
-
-type ListExecutionsParams struct {
-	OrgID           pgtype.UUID
-	ProjectID       pgtype.UUID
-	BeforeCreatedAt pgtype.Timestamptz
-	BeforeID        pgtype.UUID
-	PageSize        int32
-}
-
-type ListExecutionsRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
-}
-
-// orcon:scope org
-// orcon:hot
-func (q *Queries) ListExecutions(ctx context.Context, arg ListExecutionsParams) ([]ListExecutionsRow, error) {
-	rows, err := q.db.Query(ctx, listExecutions,
-		arg.OrgID,
-		arg.ProjectID,
-		arg.BeforeCreatedAt,
-		arg.BeforeID,
-		arg.PageSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListExecutionsRow{}
-	for rows.Next() {
-		var i ListExecutionsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.ProjectID,
-			&i.FlowID,
-			&i.FlowVersionID,
-			&i.FlowSnapshotID,
-			&i.Status,
-			&i.Mode,
-			&i.Priority,
-			&i.ParentExecutionID,
-			&i.RootExecutionID,
-			&i.CallDepth,
-			&i.RunGeneration,
-			&i.CancelRequestedAt,
-			&i.RunnableCount,
-			&i.LeasedCount,
-			&i.WaitingCount,
-			&i.SuspendedCount,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listExecutionsByStatus = `-- name: ListExecutionsByStatus :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND status = $2
-  AND (created_at, id) < ($3::timestamptz, $4::uuid)
-ORDER BY created_at DESC, id DESC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.status = $2
+  AND (e.created_at, e.id) < ($3::timestamptz, $4::uuid)
+ORDER BY e.created_at DESC, e.id DESC
 LIMIT $5
 `
 
@@ -1001,28 +1199,30 @@ type ListExecutionsByStatusParams struct {
 }
 
 type ListExecutionsByStatusRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1065,6 +1265,8 @@ func (q *Queries) ListExecutionsByStatus(ctx context.Context, arg ListExecutions
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
 			return nil, err
 		}
@@ -1080,15 +1282,17 @@ const listExternalOperations = `-- name: ListExternalOperations :many
 SELECT id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state, batch_key,
        dispatch_deadline_at, first_dispatched_at, retry_epoch, response_reference
 FROM external_operation
-WHERE org_id = $1 AND node_execution_id = $2 AND item_index >= $3
+WHERE org_id = $1 AND node_execution_id = $2
+  AND (item_index > $3 OR (item_index = $3 AND id > $4))
 ORDER BY item_index, id
-LIMIT $4
+LIMIT $5
 `
 
 type ListExternalOperationsParams struct {
 	OrgID           pgtype.UUID
 	NodeExecutionID pgtype.UUID
 	FromItemIndex   int64
+	FromID          pgtype.UUID
 	PageSize        int32
 }
 
@@ -1115,6 +1319,7 @@ func (q *Queries) ListExternalOperations(ctx context.Context, arg ListExternalOp
 		arg.OrgID,
 		arg.NodeExecutionID,
 		arg.FromItemIndex,
+		arg.FromID,
 		arg.PageSize,
 	)
 	if err != nil {
@@ -1152,11 +1357,13 @@ func (q *Queries) ListExternalOperations(ctx context.Context, arg ListExternalOp
 const listFlowExecutions = `-- name: ListFlowExecutions :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = $1 AND flow_id = $2
-  AND (created_at, id) < ($3::timestamptz, $4::uuid)
-ORDER BY created_at DESC, id DESC
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.flow_id = $2
+  AND (e.created_at, e.id) < ($3::timestamptz, $4::uuid)
+ORDER BY e.created_at DESC, e.id DESC
 LIMIT $5
 `
 
@@ -1169,28 +1376,30 @@ type ListFlowExecutionsParams struct {
 }
 
 type ListFlowExecutionsRow struct {
-	ID                pgtype.UUID
-	OrgID             pgtype.UUID
-	ProjectID         pgtype.UUID
-	FlowID            pgtype.UUID
-	FlowVersionID     pgtype.UUID
-	FlowSnapshotID    pgtype.UUID
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID pgtype.UUID
-	RootExecutionID   pgtype.UUID
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt pgtype.Timestamptz
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         pgtype.Timestamptz
-	FinishedAt        pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
 }
 
 // orcon:scope org
@@ -1233,7 +1442,795 @@ func (q *Queries) ListFlowExecutions(ctx context.Context, arg ListFlowExecutions
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLiveTokens = `-- name: ListLiveTokens :many
+SELECT id, org_id, execution_id, status, node_id, edge_id, scope_path, fork_lineage_document, payload_reference, fairness_key,
+       effective_priority, available_at, lease_owner, lease_epoch, lease_expires_at, claim_count, abandoned_count, suspend_reason
+FROM token
+WHERE org_id = $1 AND execution_id = $2
+  AND status IN ('RUNNABLE', 'LEASED', 'WAITING', 'DEFERRED', 'SUSPENDED') AND id > $3
+ORDER BY id
+LIMIT $4
+`
+
+type ListLiveTokensParams struct {
+	OrgID       pgtype.UUID
+	ExecutionID pgtype.UUID
+	AfterID     pgtype.UUID
+	PageSize    int32
+}
+
+type ListLiveTokensRow struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	ExecutionID         pgtype.UUID
+	Status              string
+	NodeID              string
+	EdgeID              pgtype.Text
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    pgtype.Text
+	FairnessKey         string
+	EffectivePriority   int64
+	AvailableAt         pgtype.Timestamptz
+	LeaseOwner          pgtype.UUID
+	LeaseEpoch          int64
+	LeaseExpiresAt      pgtype.Timestamptz
+	ClaimCount          int64
+	AbandonedCount      int64
+	SuspendReason       pgtype.Text
+}
+
+// The tokens of an execution that are not terminal, in id order, one page at a time (the page size is clamped).
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListLiveTokens(ctx context.Context, arg ListLiveTokensParams) ([]ListLiveTokensRow, error) {
+	rows, err := q.db.Query(ctx, listLiveTokens,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveTokensRow{}
+	for rows.Next() {
+		var i ListLiveTokensRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.Status,
+			&i.NodeID,
+			&i.EdgeID,
+			&i.ScopePath,
+			&i.ForkLineageDocument,
+			&i.PayloadReference,
+			&i.FairnessKey,
+			&i.EffectivePriority,
+			&i.AvailableAt,
+			&i.LeaseOwner,
+			&i.LeaseEpoch,
+			&i.LeaseExpiresAt,
+			&i.ClaimCount,
+			&i.AbandonedCount,
+			&i.SuspendReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNodeExecutionsByExecution = `-- name: ListNodeExecutionsByExecution :many
+SELECT n.id AS id, n.org_id AS org_id, n.execution_id AS execution_id, n.token_id AS token_id, n.node_id AS node_id,
+       n.scope_path AS scope_path, n.status AS status,
+       CAST((SELECT count(*) FROM task_attempt a WHERE a.org_id = n.org_id AND a.node_execution_id = n.id) AS BIGINT) AS attempt_count,
+       n.started_at AS started_at, n.finished_at AS finished_at, n.created_at AS created_at, n.updated_at AS updated_at
+FROM node_execution n
+WHERE n.org_id = $1 AND n.execution_id = $2
+  AND (n.created_at, n.id) > ($3::timestamptz, $4::uuid)
+ORDER BY n.created_at, n.id
+LIMIT $5
+`
+
+type ListNodeExecutionsByExecutionParams struct {
+	OrgID          pgtype.UUID
+	ExecutionID    pgtype.UUID
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageSize       int32
+}
+
+type ListNodeExecutionsByExecutionRow struct {
+	ID           pgtype.UUID
+	OrgID        pgtype.UUID
+	ExecutionID  pgtype.UUID
+	TokenID      pgtype.UUID
+	NodeID       string
+	ScopePath    string
+	Status       string
+	AttemptCount int64
+	StartedAt    pgtype.Timestamptz
+	FinishedAt   pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+// The node executions of one execution, oldest first, for the read side of the API (the run of every node).
+// orcon:scope org
+func (q *Queries) ListNodeExecutionsByExecution(ctx context.Context, arg ListNodeExecutionsByExecutionParams) ([]ListNodeExecutionsByExecutionRow, error) {
+	rows, err := q.db.Query(ctx, listNodeExecutionsByExecution,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNodeExecutionsByExecutionRow{}
+	for rows.Next() {
+		var i ListNodeExecutionsByExecutionRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.TokenID,
+			&i.NodeID,
+			&i.ScopePath,
+			&i.Status,
+			&i.AttemptCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNodeOutputsByExecution = `-- name: ListNodeOutputsByExecution :many
+SELECT o.id AS id, o.node_execution_id AS node_execution_id, n.node_id AS node_id, o.port AS port, o.item_count AS item_count,
+       o.inline_document AS inline_document, o.created_at AS created_at
+FROM node_output o
+JOIN node_execution n ON n.org_id = o.org_id AND n.id = o.node_execution_id
+WHERE o.org_id = $1 AND o.execution_id = $2
+  AND (o.created_at, o.id) > ($3::timestamptz, $4::uuid)
+ORDER BY o.created_at, o.id
+LIMIT $5
+`
+
+type ListNodeOutputsByExecutionParams struct {
+	OrgID          pgtype.UUID
+	ExecutionID    pgtype.UUID
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageSize       int32
+}
+
+type ListNodeOutputsByExecutionRow struct {
+	ID              pgtype.UUID
+	NodeExecutionID pgtype.UUID
+	NodeID          string
+	Port            string
+	ItemCount       int64
+	InlineDocument  []byte
+	CreatedAt       pgtype.Timestamptz
+}
+
+// The stored output batches of one execution with the node each belongs to, oldest first.
+// orcon:scope org
+func (q *Queries) ListNodeOutputsByExecution(ctx context.Context, arg ListNodeOutputsByExecutionParams) ([]ListNodeOutputsByExecutionRow, error) {
+	rows, err := q.db.Query(ctx, listNodeOutputsByExecution,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNodeOutputsByExecutionRow{}
+	for rows.Next() {
+		var i ListNodeOutputsByExecutionRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NodeExecutionID,
+			&i.NodeID,
+			&i.Port,
+			&i.ItemCount,
+			&i.InlineDocument,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgProjectExecutions = `-- name: ListOrgProjectExecutions :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND (CAST($3 AS uuid) IS NULL OR e.flow_id = CAST($3 AS uuid))
+  AND (CAST($4 AS text) IS NULL OR e.status = CAST($4 AS text))
+  AND (CAST($5 AS uuid) IS NULL OR e.id = CAST($5 AS uuid))
+  AND (CAST($6 AS timestamptz) IS NULL OR e.created_at >= CAST($6 AS timestamptz))
+  AND (CAST($7 AS timestamptz) IS NULL OR e.created_at < CAST($7 AS timestamptz))
+  AND (CAST($8 AS boolean) = FALSE OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) < ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT $11
+`
+
+type ListOrgProjectExecutionsParams struct {
+	OrgID           pgtype.UUID
+	ProjectID       pgtype.UUID
+	FlowID          pgtype.UUID
+	Status          pgtype.Text
+	ExecutionID     pgtype.UUID
+	CreatedAfter    pgtype.Timestamptz
+	CreatedBefore   pgtype.Timestamptz
+	UncertainOnly   bool
+	BeforeCreatedAt pgtype.Timestamptz
+	BeforeID        pgtype.UUID
+	PageSize        int32
+}
+
+type ListOrgProjectExecutionsRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutions(ctx context.Context, arg ListOrgProjectExecutionsParams) ([]ListOrgProjectExecutionsRow, error) {
+	rows, err := q.db.Query(ctx, listOrgProjectExecutions,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgProjectExecutionsOldest = `-- name: ListOrgProjectExecutionsOldest :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND (CAST($3 AS uuid) IS NULL OR e.flow_id = CAST($3 AS uuid))
+  AND (CAST($4 AS text) IS NULL OR e.status = CAST($4 AS text))
+  AND (CAST($5 AS uuid) IS NULL OR e.id = CAST($5 AS uuid))
+  AND (CAST($6 AS timestamptz) IS NULL OR e.created_at >= CAST($6 AS timestamptz))
+  AND (CAST($7 AS timestamptz) IS NULL OR e.created_at < CAST($7 AS timestamptz))
+  AND (CAST($8 AS boolean) = FALSE OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) > ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at ASC, e.id ASC
+LIMIT $11
+`
+
+type ListOrgProjectExecutionsOldestParams struct {
+	OrgID          pgtype.UUID
+	ProjectID      pgtype.UUID
+	FlowID         pgtype.UUID
+	Status         pgtype.Text
+	ExecutionID    pgtype.UUID
+	CreatedAfter   pgtype.Timestamptz
+	CreatedBefore  pgtype.Timestamptz
+	UncertainOnly  bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageSize       int32
+}
+
+type ListOrgProjectExecutionsOldestRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// The same list oldest first, after the cursor.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutionsOldest(ctx context.Context, arg ListOrgProjectExecutionsOldestParams) ([]ListOrgProjectExecutionsOldestRow, error) {
+	rows, err := q.db.Query(ctx, listOrgProjectExecutionsOldest,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsOldestRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsOldestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectExecutions = `-- name: ListProjectExecutions :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND ($3::boolean OR e.flow_id = $4::uuid)
+  AND ($5::boolean OR e.status = $6::text)
+  AND e.created_at > $7::timestamptz AND e.created_at < $8::timestamptz
+  AND (e.created_at, e.id) < ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT $11
+`
+
+type ListProjectExecutionsParams struct {
+	OrgID           pgtype.UUID
+	ProjectID       pgtype.UUID
+	AnyFlow         bool
+	FlowID          pgtype.UUID
+	AnyStatus       bool
+	Status          string
+	CreatedAfter    pgtype.Timestamptz
+	CreatedBefore   pgtype.Timestamptz
+	BeforeCreatedAt pgtype.Timestamptz
+	BeforeID        pgtype.UUID
+	PageSize        int32
+}
+
+type ListProjectExecutionsRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExecutionsParams) ([]ListProjectExecutionsRow, error) {
+	rows, err := q.db.Query(ctx, listProjectExecutions,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.AnyFlow,
+		arg.FlowID,
+		arg.AnyStatus,
+		arg.Status,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectExecutionsRow{}
+	for rows.Next() {
+		var i ListProjectExecutionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectExecutionsAsc = `-- name: ListProjectExecutionsAsc :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS bigint) AS flow_version_number,
+       EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = $1 AND e.project_id = $2
+  AND ($3::boolean OR e.flow_id = $4::uuid)
+  AND ($5::boolean OR e.status = $6::text)
+  AND e.created_at > $7::timestamptz AND e.created_at < $8::timestamptz
+  AND (e.created_at, e.id) > ($9::timestamptz, $10::uuid)
+ORDER BY e.created_at ASC, e.id ASC
+LIMIT $11
+`
+
+type ListProjectExecutionsAscParams struct {
+	OrgID          pgtype.UUID
+	ProjectID      pgtype.UUID
+	AnyFlow        bool
+	FlowID         pgtype.UUID
+	AnyStatus      bool
+	Status         string
+	CreatedAfter   pgtype.Timestamptz
+	CreatedBefore  pgtype.Timestamptz
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageSize       int32
+}
+
+type ListProjectExecutionsAscRow struct {
+	ID                    pgtype.UUID
+	OrgID                 pgtype.UUID
+	ProjectID             pgtype.UUID
+	FlowID                pgtype.UUID
+	FlowVersionID         pgtype.UUID
+	FlowSnapshotID        pgtype.UUID
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     pgtype.UUID
+	RootExecutionID       pgtype.UUID
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     pgtype.Timestamptz
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             pgtype.Timestamptz
+	FinishedAt            pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FlowVersionNumber     int64
+	HasUncertainOperation bool
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListProjectExecutionsAsc(ctx context.Context, arg ListProjectExecutionsAscParams) ([]ListProjectExecutionsAscRow, error) {
+	rows, err := q.db.Query(ctx, listProjectExecutionsAsc,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.AnyFlow,
+		arg.FlowID,
+		arg.AnyStatus,
+		arg.Status,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectExecutionsAscRow{}
+	for rows.Next() {
+		var i ListProjectExecutionsAscRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskAttempts = `-- name: ListTaskAttempts :many
+SELECT id, org_id, execution_id, node_execution_id, attempt_number, lease_epoch, worker_id, status, started_at, finished_at
+FROM task_attempt
+WHERE org_id = $1 AND node_execution_id = $2
+ORDER BY attempt_number, id
+LIMIT $3
+`
+
+type ListTaskAttemptsRow struct {
+	ID              pgtype.UUID
+	OrgID           pgtype.UUID
+	ExecutionID     pgtype.UUID
+	NodeExecutionID pgtype.UUID
+	AttemptNumber   int64
+	LeaseEpoch      int64
+	WorkerID        pgtype.UUID
+	Status          string
+	StartedAt       pgtype.Timestamptz
+	FinishedAt      pgtype.Timestamptz
+}
+
+// orcon:scope org
+func (q *Queries) ListTaskAttempts(ctx context.Context, orgID pgtype.UUID, nodeExecutionID pgtype.UUID, pageSize int32) ([]ListTaskAttemptsRow, error) {
+	rows, err := q.db.Query(ctx, listTaskAttempts, orgID, nodeExecutionID, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaskAttemptsRow{}
+	for rows.Next() {
+		var i ListTaskAttemptsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExecutionID,
+			&i.NodeExecutionID,
+			&i.AttemptNumber,
+			&i.LeaseEpoch,
+			&i.WorkerID,
+			&i.Status,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTokenNondeterminism = `-- name: ListTokenNondeterminism :many
+SELECT r.node_execution_id, r.sequence_number, r.value_document
+FROM nondeterminism_record r
+JOIN node_execution n ON n.org_id = r.org_id AND n.id = r.node_execution_id
+WHERE r.org_id = $1 AND n.token_id = $2
+ORDER BY r.node_execution_id, r.sequence_number
+LIMIT $3
+`
+
+type ListTokenNondeterminismRow struct {
+	NodeExecutionID pgtype.UUID
+	SequenceNumber  int64
+	ValueDocument   []byte
+}
+
+// orcon:scope org
+func (q *Queries) ListTokenNondeterminism(ctx context.Context, orgID pgtype.UUID, tokenID pgtype.UUID, pageSize int32) ([]ListTokenNondeterminismRow, error) {
+	rows, err := q.db.Query(ctx, listTokenNondeterminism, orgID, tokenID, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTokenNondeterminismRow{}
+	for rows.Next() {
+		var i ListTokenNondeterminismRow
+		if err := rows.Scan(&i.NodeExecutionID, &i.SequenceNumber, &i.ValueDocument); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1401,6 +2398,255 @@ func (q *Queries) MarkTokenFenced(ctx context.Context, arg MarkTokenFencedParams
 	return result.RowsAffected(), nil
 }
 
+const releaseDeferredToken = `-- name: ReleaseDeferredToken :execrows
+UPDATE token
+SET status = 'RUNNABLE', available_at = clock_timestamp() + $1::bigint * interval '1 microsecond', updated_at = $2
+WHERE org_id = $3 AND id = $4 AND status = 'DEFERRED'
+`
+
+type ReleaseDeferredTokenParams struct {
+	QueueOrder int64
+	UpdatedAt  pgtype.Timestamptz
+	OrgID      pgtype.UUID
+	ID         pgtype.UUID
+}
+
+// A token the step does not hold changes state: a deferred sibling is released.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ReleaseDeferredToken(ctx context.Context, arg ReleaseDeferredTokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseDeferredToken,
+		arg.QueueOrder,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateAdvancedToken = `-- name: UpdateAdvancedToken :execrows
+UPDATE token
+SET node_id = $1, edge_id = $2, scope_path = $3,
+    fork_lineage_document = $4, payload_reference = $5,
+    abandoned_count = CASE WHEN $6::boolean THEN 0 ELSE abandoned_count END,
+    updated_at = $7
+WHERE org_id = $8 AND id = $9 AND lease_epoch = $10
+  AND lease_owner = $11 AND status = 'LEASED'
+`
+
+type UpdateAdvancedTokenParams struct {
+	NodeID              string
+	EdgeID              pgtype.Text
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    pgtype.Text
+	ResetAbandoned      bool
+	UpdatedAt           pgtype.Timestamptz
+	OrgID               pgtype.UUID
+	ID                  pgtype.UUID
+	LeaseEpoch          int64
+	LeaseOwner          pgtype.UUID
+}
+
+// A held token moves along the flow and stays leased: the fence is the one of every write of a lease holder.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateAdvancedToken(ctx context.Context, arg UpdateAdvancedTokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateAdvancedToken,
+		arg.NodeID,
+		arg.EdgeID,
+		arg.ScopePath,
+		arg.ForkLineageDocument,
+		arg.PayloadReference,
+		arg.ResetAbandoned,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.LeaseEpoch,
+		arg.LeaseOwner,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateCanceledToken = `-- name: UpdateCanceledToken :execrows
+UPDATE token
+SET status = 'CANCELED', lease_owner = NULL, lease_expires_at = NULL, updated_at = $1
+WHERE org_id = $2 AND id = $3 AND status NOT IN ('CONSUMED', 'COMPLETED', 'CANCELED', 'FAILED')
+`
+
+// A token is canceled whatever lease it holds: its holder is fenced out when it next commits.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateCanceledToken(ctx context.Context, updatedAt pgtype.Timestamptz, orgID pgtype.UUID, iD pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, updateCanceledToken, updatedAt, orgID, iD)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateEngineState = `-- name: UpdateEngineState :execrows
+UPDATE execution
+SET status = $1,
+    engine_state_document = COALESCE($2, engine_state_document),
+    engine_state_document_format = CASE WHEN $2 IS NULL THEN engine_state_document_format ELSE 'orcon/engine-state@1' END,
+    engine_state_revision = engine_state_revision + 1,
+    started_at = COALESCE(started_at, $3),
+    finished_at = COALESCE($4, finished_at),
+    updated_at = $5
+WHERE org_id = $6 AND id = $7 AND engine_state_revision = $8
+`
+
+type UpdateEngineStateParams struct {
+	Status           string
+	Document         []byte
+	StartedAt        pgtype.Timestamptz
+	FinishedAt       pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	OrgID            pgtype.UUID
+	ID               pgtype.UUID
+	ExpectedRevision int64
+}
+
+// Commits the engine state of an execution. The revision must still be the one the committing step read, so a step
+// built on an older state cannot overwrite a newer one; the caller already holds the row (single writer on SQLite,
+// LockExecution on PostgreSQL), so a mismatch means the step has to be recomputed.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateEngineState(ctx context.Context, arg UpdateEngineStateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateEngineState,
+		arg.Status,
+		arg.Document,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.ExpectedRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateExecutionCounters = `-- name: UpdateExecutionCounters :exec
+UPDATE execution
+SET runnable_count = c.runnable, leased_count = c.leased, waiting_count = c.waiting, suspended_count = c.suspended,
+    updated_at = $1
+FROM (
+  SELECT count(*) FILTER (WHERE t.status = 'RUNNABLE') AS runnable, count(*) FILTER (WHERE t.status = 'LEASED') AS leased,
+         count(*) FILTER (WHERE t.status = 'WAITING') AS waiting, count(*) FILTER (WHERE t.status = 'SUSPENDED') AS suspended
+  FROM token t
+  WHERE t.org_id = $2 AND t.execution_id = $3
+    AND t.status IN ('RUNNABLE', 'LEASED', 'WAITING', 'DEFERRED', 'SUSPENDED')
+) AS c
+WHERE execution.org_id = $2 AND execution.id = $3
+`
+
+// Recomputes the token counters of an execution from its live tokens (ADR-0009 section 1).
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateExecutionCounters(ctx context.Context, updatedAt pgtype.Timestamptz, orgID pgtype.UUID, iD pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateExecutionCounters, updatedAt, orgID, iD)
+	return err
+}
+
+const updateExecutionHourCountDown = `-- name: UpdateExecutionHourCountDown :execrows
+UPDATE execution_hour_count
+SET execution_count = execution_count - 1, updated_at = $1
+WHERE org_id = $2 AND project_id = $3 AND hour_started_at = $4
+  AND mode = $5 AND status = $6 AND execution_count > 0
+`
+
+type UpdateExecutionHourCountDownParams struct {
+	Now           pgtype.Timestamptz
+	OrgID         pgtype.UUID
+	ProjectID     pgtype.UUID
+	HourStartedAt pgtype.Timestamptz
+	Mode          string
+	Status        string
+}
+
+// orcon:scope org
+func (q *Queries) UpdateExecutionHourCountDown(ctx context.Context, arg UpdateExecutionHourCountDownParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateExecutionHourCountDown,
+		arg.Now,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.HourStartedAt,
+		arg.Mode,
+		arg.Status,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateMovedToken = `-- name: UpdateMovedToken :execrows
+UPDATE token
+SET status = $1, node_id = $2, edge_id = $3, scope_path = $4,
+    fork_lineage_document = $5, payload_reference = $6,
+    available_at = COALESCE($7,
+                            CASE WHEN $1 = 'RUNNABLE' THEN clock_timestamp() + $8::bigint * interval '1 microsecond'
+                                 ELSE available_at END),
+    lease_owner = NULL, lease_expires_at = NULL,
+    abandoned_count = CASE WHEN $9::boolean THEN 0 ELSE abandoned_count END,
+    updated_at = $10
+WHERE org_id = $11 AND id = $12 AND lease_epoch = $13
+  AND lease_owner = $14 AND status = 'LEASED'
+`
+
+type UpdateMovedTokenParams struct {
+	Status              string
+	NodeID              string
+	EdgeID              pgtype.Text
+	ScopePath           string
+	ForkLineageDocument []byte
+	PayloadReference    pgtype.Text
+	AvailableAt         pgtype.Timestamptz
+	QueueOrder          int64
+	ResetAbandoned      bool
+	UpdatedAt           pgtype.Timestamptz
+	OrgID               pgtype.UUID
+	ID                  pgtype.UUID
+	LeaseEpoch          int64
+	LeaseOwner          pgtype.UUID
+}
+
+// A held token ends its lease while it moves: it ends, waits, or goes back to RUNNABLE.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) UpdateMovedToken(ctx context.Context, arg UpdateMovedTokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateMovedToken,
+		arg.Status,
+		arg.NodeID,
+		arg.EdgeID,
+		arg.ScopePath,
+		arg.ForkLineageDocument,
+		arg.PayloadReference,
+		arg.AvailableAt,
+		arg.QueueOrder,
+		arg.ResetAbandoned,
+		arg.UpdatedAt,
+		arg.OrgID,
+		arg.ID,
+		arg.LeaseEpoch,
+		arg.LeaseOwner,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateTokenFenced = `-- name: UpdateTokenFenced :execrows
 UPDATE token
 SET status = $1, lease_owner = NULL, lease_expires_at = NULL, updated_at = $2
@@ -1431,4 +2677,77 @@ func (q *Queries) UpdateTokenFenced(ctx context.Context, arg UpdateTokenFencedPa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertExecutionHourCount = `-- name: UpsertExecutionHourCount :exec
+INSERT INTO execution_hour_count (id, org_id, project_id, hour_started_at, mode, status, execution_count, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7)
+ON CONFLICT (org_id, project_id, hour_started_at, mode, status) DO UPDATE
+SET execution_count = execution_hour_count.execution_count + 1, updated_at = excluded.updated_at
+`
+
+type UpsertExecutionHourCountParams struct {
+	ID            pgtype.UUID
+	OrgID         pgtype.UUID
+	ProjectID     pgtype.UUID
+	HourStartedAt pgtype.Timestamptz
+	Mode          string
+	Status        string
+	Now           pgtype.Timestamptz
+}
+
+// orcon:scope org
+func (q *Queries) UpsertExecutionHourCount(ctx context.Context, arg UpsertExecutionHourCountParams) error {
+	_, err := q.db.Exec(ctx, upsertExecutionHourCount,
+		arg.ID,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.HourStartedAt,
+		arg.Mode,
+		arg.Status,
+		arg.Now,
+	)
+	return err
+}
+
+const upsertNodeExecution = `-- name: UpsertNodeExecution :exec
+INSERT INTO node_execution (id, org_id, execution_id, token_id, node_id, scope_path, status, attempt_count, started_at, finished_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        $7, 0, $8, $9, $10, $11)
+ON CONFLICT (org_id, id) DO UPDATE
+SET status = excluded.status, finished_at = excluded.finished_at, updated_at = excluded.updated_at
+`
+
+type UpsertNodeExecutionParams struct {
+	ID          pgtype.UUID
+	OrgID       pgtype.UUID
+	ExecutionID pgtype.UUID
+	TokenID     pgtype.UUID
+	NodeID      string
+	ScopePath   string
+	Status      string
+	StartedAt   pgtype.Timestamptz
+	FinishedAt  pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+// The checkpoint before an external effect records the node execution as RUNNING; the commit of the activation
+// completes the same row. The start instant is kept from the first write.
+// orcon:scope org
+func (q *Queries) UpsertNodeExecution(ctx context.Context, arg UpsertNodeExecutionParams) error {
+	_, err := q.db.Exec(ctx, upsertNodeExecution,
+		arg.ID,
+		arg.OrgID,
+		arg.ExecutionID,
+		arg.TokenID,
+		arg.NodeID,
+		arg.ScopePath,
+		arg.Status,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }

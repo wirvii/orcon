@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Components
 
-Status: Accepted | Version: 1.2.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
+Status: Accepted | Version: 1.3.0 | Source: SPEC-007 (owner decisions BL-007 Q1–Q13, P1–P3)
 
 This document is normative. The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as described in RFC 2119. Components live in `@orcon/ui` (`packages/js/ui`). Values are never written here; they come from tokens ([tokens.md](tokens.md)).
 
@@ -33,7 +33,7 @@ Base components under owner review. Each one has a row in "Owner review status" 
 |---|---|
 | Button | Variants primary, secondary, ghost, danger. Height from `size.control` per density. States: default, hover, focus-visible, active, disabled, loading (spinner plus label kept for width; `aria-busy`). Primary uses `action.primary.*`; danger uses `action.danger.*`. At most one primary button per view region. |
 | IconButton | Requires an accessible label prop (from the catalog); shows a Tooltip with the same label on hover and focus. Square, `size.control`. |
-| Link | `fg.link`, underlined in prose; external links show an external icon and a visually hidden "opens in a new tab" text when they open a new tab. |
+| Link | `fg.link`; variant `prose` (underlined, inside running text) or `plain` (default, never underlined; navigation, rows, menus, actions). Rows open with a click on the whole row, never through an underlined text link. External links show an external icon and a visually hidden "opens in a new tab" text when they open a new tab. |
 | Input | `border.control`, height `size.control`; states default, focus-visible, disabled, read-only, invalid (`aria-invalid`). Never clears user input on error. |
 | Textarea | As Input; resizable vertically; optional character counter announced politely. |
 | Select | Radix Select; trigger as Input; keyboard type-ahead. |
@@ -82,6 +82,27 @@ Base components under owner review. Each one has a row in "Owner review status" 
 | ThemeSwitcher | System, Light, Dark ([foundations.md#themes](foundations.md#themes)). |
 | DensitySwitcher | Comfortable, Compact ([foundations.md#density](foundations.md#density)). |
 | LocaleSwitcher | English, Español; each language name written in its own language. |
+| ComingSoon | Feature whose backend does not exist yet: icon, title, one sentence saying what is missing; no mascot, no action (SPEC-019 R-UX-GEN-11). Owner review Pending. |
+| OrgSwitcher | New in SPEC-019 §7. Owner review Pending. |
+| UserMenu | New in SPEC-019 §7. Owner review Pending. |
+| SidebarNav | New in SPEC-019 §7 (sidebar over AppShell and NavItem, with collapse). Owner review Pending. |
+| BottomTabBar | New in SPEC-019 §7 (phone navigation, five destinations with text). Owner review Pending. |
+| PageHeader | New in SPEC-019 §7. Owner review Pending. |
+| StatCard | New in SPEC-019 §7. Owner review Pending. |
+| HourlyBars | New in SPEC-019 §7 (CSS and SVG bars with an accessible table). Owner review Pending. |
+| CountTabs | New in SPEC-019 §7. Owner review Pending. |
+| FilterChip | New in SPEC-019 §7. Owner review Pending. |
+| ListRow / DenseList | New in SPEC-019 §7 (whole-row click target, declared truncation). Owner review Pending. |
+| ActiveToggle | New in SPEC-019 §7 (Switch with busy state and a disabled reason). Owner review Pending. |
+| ChooserDialog | New in SPEC-019 §7 (options opened with keys). Owner review Pending. |
+| ImportReport | New in SPEC-019 §7. Owner review Pending. |
+| ExpressionChips | New in SPEC-019 §7 (CodeMirror decoration: chip, result and switch to raw text). Owner review Pending. |
+| CredentialBadge | New in SPEC-019 §7 (account and health). Owner review Pending. |
+| DuplicateProtectionBox | New in SPEC-019 §7. Owner review Pending. |
+| ExecutionTimeline | New in SPEC-019 §7. Owner review Pending. |
+| PlainError | New in SPEC-019 §7 (plain error, original error, suggested fix). Owner review Pending. |
+| SessionList | New in SPEC-019 §7. Owner review Pending. |
+| RoleCards | New in SPEC-019 §7. Owner review Pending. |
 
 Canvas primitives (CanvasNode, NodeStatusBadge, NodeStatusChip, PinnedBadge, NodePort, PortAddButton, OutputStub, CanvasEdge, EdgeLabel, EdgeActions, NodeToolbar, StickyNote, CanvasControls, CanvasMinimap, AddFirstStep, AiBlock, NodePalettePanel, CanvasOutline) and editor components (NodeDetailsView, PaneSplitter, DataPane, DataTableView, JsonTreeView, SchemaView) follow [canvas.md](canvas.md) and the same contract. Each has a row in "Owner review status".
 
@@ -108,7 +129,7 @@ Normative map (`src/components/status-badge/status-map.ts`). State names come fr
 | SUCCEEDED | Succeeded | CircleCheck | success |
 | Node SUCCEEDED_WITH_ERRORS | Succeeded with errors | CircleAlert | warning |
 | FAILED / item ERROR_FINAL | Failed | CircleX | danger |
-| Item UNCERTAIN | Uncertain | ShieldQuestion | attention |
+| Item UNCERTAIN | Needs review (es: `Para revisar`) | ShieldQuestion | attention |
 | Item RETRY_SCHEDULED | Retry scheduled | RotateCw | neutral |
 | Item NOT_DISPATCHED | Not sent | CircleOff | neutral |
 | Node not run (closed path) | Not run | CircleDashed | neutral |

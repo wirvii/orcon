@@ -73,8 +73,8 @@ export const statusMessages = defineMessages({
   failed: { id: 'status.failed', defaultMessage: 'Failed', description: 'Status of an execution, node or item that failed for good.' },
   uncertain: {
     id: 'status.uncertain',
-    defaultMessage: 'Uncertain',
-    description: 'Status of an item whose external operation may or may not have been applied.',
+    defaultMessage: 'Needs review',
+    description: 'Status of an item whose external operation may or may not have been applied, so a person has to review it. Never worded as a failure or a success.',
   },
   retryScheduled: {
     id: 'status.retryScheduled',

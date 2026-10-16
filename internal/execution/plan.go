@@ -95,12 +95,21 @@ type Plan struct {
 	nodes      []planNode
 	edges      []planEdge
 	index      map[flow.NodeID]int
+	edgeIndex  map[flow.EdgeID]int
 	starts     []int
 	sequential bool
 
 	usesConditions bool
 	usesRouting    bool
 	usesActivities bool
+}
+
+// IsJoin reports whether the node has a join block. The durable engine
+// persists the completion signals that reach a join (ADR-0009 section 8) and
+// streams the others live only.
+func (p *Plan) IsJoin(id flow.NodeID) bool {
+	i, ok := p.index[id]
+	return ok && p.nodes[i].join != nil
 }
 
 // FlowID returns the id of the compiled flow.
@@ -120,6 +129,7 @@ func Compile(doc *flow.Document) (*Plan, error) {
 		plan: &Plan{
 			flowID:     doc.ID,
 			index:      make(map[flow.NodeID]int, len(doc.Nodes)),
+			edgeIndex:  make(map[flow.EdgeID]int, len(doc.Edges)),
 			sequential: doc.Settings.BranchMode == flow.BranchSequential,
 		},
 	}
@@ -303,6 +313,7 @@ func (c *compiler) edges(edges []flow.Edge) {
 		e := &edges[i]
 		from, to := p.index[e.From.Node], p.index[e.To]
 		pe := &p.edges[i]
+		p.edgeIndex[e.ID] = i
 		*pe = planEdge{edge: e, from: from, to: to, back: e.Kind == flow.EdgeBack, slot: -1}
 		src := &p.nodes[from]
 		pe.outPos = len(src.out)

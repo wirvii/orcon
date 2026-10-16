@@ -19,6 +19,7 @@ type ApplicationUser struct {
 	Status          string
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	PasswordHash    pgtype.Text
 }
 
 type AttentionRequest struct {
@@ -68,6 +69,47 @@ type AttentionRouting struct {
 	Revision                   int64
 	CreatedAt                  pgtype.Timestamptz
 	UpdatedAt                  pgtype.Timestamptz
+}
+
+type AuditBlock struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           pgtype.Timestamptz
+}
+
+type AuditEvent struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	SequenceNumber     int64
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          pgtype.Timestamptz
+}
+
+type AuditPending struct {
+	ID                 pgtype.UUID
+	OrgID              pgtype.UUID
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 type Blob struct {
@@ -144,41 +186,62 @@ type ConnectorReference struct {
 	UpdatedAt        pgtype.Timestamptz
 }
 
+type CustomRole struct {
+	ID        pgtype.UUID
+	OrgID     pgtype.UUID
+	Name      string
+	ScopeKind string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type CustomRolePermission struct {
+	ID           pgtype.UUID
+	OrgID        pgtype.UUID
+	CustomRoleID pgtype.UUID
+	Permission   string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type Execution struct {
-	ID                      pgtype.UUID
-	OrgID                   pgtype.UUID
-	ProjectID               pgtype.UUID
-	FlowID                  pgtype.UUID
-	FlowVersionID           pgtype.UUID
-	FlowSnapshotID          pgtype.UUID
-	Status                  string
-	Mode                    string
-	Priority                int64
-	ParentExecutionID       pgtype.UUID
-	ParentTokenID           pgtype.UUID
-	RootExecutionID         pgtype.UUID
-	CallDepth               int64
-	CallChainDocument       []byte
-	CallChainDocumentFormat pgtype.Text
-	RetriedExecutionID      pgtype.UUID
-	RunGeneration           int64
-	CancelRequestedAt       pgtype.Timestamptz
-	UndoRequestedAt         pgtype.Timestamptz
-	RunnableCount           int64
-	LeasedCount             int64
-	WaitingCount            int64
-	SuspendedCount          int64
-	ActiveMilliseconds      int64
-	ThrottleKind            pgtype.Text
-	ErrorDocument           []byte
-	ErrorDocumentFormat     pgtype.Text
-	SummaryDocument         []byte
-	SummaryDocumentFormat   pgtype.Text
-	DataKeyWrapped          []byte
-	StartedAt               pgtype.Timestamptz
-	FinishedAt              pgtype.Timestamptz
-	CreatedAt               pgtype.Timestamptz
-	UpdatedAt               pgtype.Timestamptz
+	ID                        pgtype.UUID
+	OrgID                     pgtype.UUID
+	ProjectID                 pgtype.UUID
+	FlowID                    pgtype.UUID
+	FlowVersionID             pgtype.UUID
+	FlowSnapshotID            pgtype.UUID
+	Status                    string
+	Mode                      string
+	Priority                  int64
+	ParentExecutionID         pgtype.UUID
+	ParentTokenID             pgtype.UUID
+	RootExecutionID           pgtype.UUID
+	CallDepth                 int64
+	CallChainDocument         []byte
+	CallChainDocumentFormat   pgtype.Text
+	RetriedExecutionID        pgtype.UUID
+	RunGeneration             int64
+	CancelRequestedAt         pgtype.Timestamptz
+	UndoRequestedAt           pgtype.Timestamptz
+	RunnableCount             int64
+	LeasedCount               int64
+	WaitingCount              int64
+	SuspendedCount            int64
+	ActiveMilliseconds        int64
+	ThrottleKind              pgtype.Text
+	ErrorDocument             []byte
+	ErrorDocumentFormat       pgtype.Text
+	SummaryDocument           []byte
+	SummaryDocumentFormat     pgtype.Text
+	DataKeyWrapped            []byte
+	StartedAt                 pgtype.Timestamptz
+	FinishedAt                pgtype.Timestamptz
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+	EngineStateDocument       []byte
+	EngineStateDocumentFormat pgtype.Text
+	EngineStateRevision       int64
 }
 
 type ExecutionEvent struct {
@@ -195,6 +258,18 @@ type ExecutionEvent struct {
 	DataDocument            []byte
 	DataDocumentFormat      pgtype.Text
 	CreatedAt               pgtype.Timestamptz
+}
+
+type ExecutionHourCount struct {
+	ID             pgtype.UUID
+	OrgID          pgtype.UUID
+	ProjectID      pgtype.UUID
+	HourStartedAt  pgtype.Timestamptz
+	Mode           string
+	Status         string
+	ExecutionCount int64
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type ExternalOperation struct {
@@ -321,6 +396,25 @@ type HumanTask struct {
 	UpdatedAt              pgtype.Timestamptz
 }
 
+type IdempotencyRecord struct {
+	ID                  pgtype.UUID
+	OrgID               pgtype.UUID
+	Requester           string
+	IdempotencyKey      string
+	Fingerprint         []byte
+	Status              string
+	ResourceReference   pgtype.Text
+	ResponseStatus      pgtype.Int4
+	ResponseContentType pgtype.Text
+	ResponseLocation    pgtype.Text
+	ResponseEtag        pgtype.Text
+	ResponseBody        []byte
+	IsSecretIssued      bool
+	ExpiresAt           pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
 type InstanceAlert struct {
 	ID                              pgtype.UUID
 	Kind                            string
@@ -337,6 +431,64 @@ type InstanceAlert struct {
 	ClosedReason                    pgtype.Text
 	CreatedAt                       pgtype.Timestamptz
 	UpdatedAt                       pgtype.Timestamptz
+}
+
+type InstanceAuditBlock struct {
+	ID                  pgtype.UUID
+	FirstSequenceNumber int64
+	LastSequenceNumber  int64
+	HeadHash            []byte
+	Mac                 []byte
+	KeyVersion          int64
+	CreatedAt           pgtype.Timestamptz
+}
+
+type InstanceAuditEvent struct {
+	ID                 pgtype.UUID
+	SequenceNumber     int64
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	PreviousHash       []byte
+	Hash               []byte
+	CreatedAt          pgtype.Timestamptz
+}
+
+type InstanceAuditPending struct {
+	ID                 pgtype.UUID
+	OccurredAt         pgtype.Timestamptz
+	ActorPrincipalID   pgtype.UUID
+	ActorKind          pgtype.Text
+	ActionName         string
+	Outcome            string
+	BodyDocument       []byte
+	BodyDocumentFormat string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type InstanceKey struct {
+	ID                 int64
+	KeyLevel           string
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type InstanceKeyCanary struct {
+	ID         int64
+	KeyLevel   string
+	KeyVersion int64
+	Probe      []byte
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
 }
 
 type JoinArrival struct {
@@ -382,6 +534,14 @@ type LimitBucket struct {
 	BlockedUntilAt  pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+}
+
+type LoginThrottle struct {
+	ID            []byte
+	Failures      int64
+	LockedUntilAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 }
 
 type Membership struct {
@@ -518,13 +678,27 @@ type OperationalAlert struct {
 }
 
 type Org struct {
-	ID                  pgtype.UUID
-	Name                string
-	Slug                string
-	Status              string
-	DeletionScheduledAt pgtype.Timestamptz
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
+	ID                           pgtype.UUID
+	Name                         string
+	Slug                         string
+	Status                       string
+	DeletionScheduledAt          pgtype.Timestamptz
+	CreatedAt                    pgtype.Timestamptz
+	UpdatedAt                    pgtype.Timestamptz
+	AuthorizationEpoch           int64
+	TimeSavedMinutesPerExecution int32
+}
+
+type OrgKey struct {
+	ID                 int64
+	OrgID              pgtype.UUID
+	KeyVersion         int64
+	Wrapped            []byte
+	MasterKeyReference string
+	Status             string
+	Probe              []byte
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 type Outbox struct {
@@ -560,6 +734,17 @@ type Project struct {
 	Handle      pgtype.Text
 }
 
+type RoleBinding struct {
+	ID                pgtype.UUID
+	OrgID             pgtype.UUID
+	ScopeKind         string
+	ProjectID         pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	RoleName          string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
 type SchemaMigration struct {
 	Version            int64
 	Checksum           string
@@ -567,6 +752,19 @@ type SchemaMigration struct {
 	BinaryVersion      string
 	CompatibilityFloor string
 	CreatedAt          pgtype.Timestamptz
+}
+
+type Session struct {
+	ID                pgtype.UUID
+	ApplicationUserID pgtype.UUID
+	TokenHash         []byte
+	AssuranceLevel    string
+	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type TaskAttempt struct {
@@ -625,6 +823,18 @@ type Token struct {
 	SuspendReason             pgtype.Text
 	CreatedAt                 pgtype.Timestamptz
 	UpdatedAt                 pgtype.Timestamptz
+}
+
+type TokenInput struct {
+	ID                   pgtype.UUID
+	OrgID                pgtype.UUID
+	ExecutionID          pgtype.UUID
+	ItemCount            int64
+	Encoding             string
+	InlineDocument       []byte
+	InlineDocumentFormat string
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
 }
 
 type TriggerAddress struct {

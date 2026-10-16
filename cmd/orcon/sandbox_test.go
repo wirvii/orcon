@@ -4,16 +4,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/expr"
 )
 
@@ -126,6 +130,28 @@ func TestRunRejectsAnInvalidAbandonLimit(t *testing.T) {
 // environment of the test and a fast poll for reload requests.
 func testDeps(t *testing.T, factory sandboxFactory) serveDeps {
 	t.Helper()
-	t.Setenv("ORCON_DATA_DIR", t.TempDir())
+	dir := t.TempDir()
+	t.Setenv("ORCON_DATA_DIR", dir)
+	provisionMasterKey(t, dir)
 	return serveDeps{newSandbox: factory, environ: os.Environ(), reloadPoll: 20 * time.Millisecond}
+}
+
+// provisionMasterKey writes the master key file the tests run with into dataDir and sets
+// the backup acknowledgement of its fingerprint, as an operator does before the first start
+// (the serving roles refuse to start without a verified master key).
+func provisionMasterKey(t *testing.T, dataDir string) {
+	t.Helper()
+	raw := bytes.Repeat([]byte{0x42}, envelope.KeySize)
+	material, err := envelope.NewKey(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataDir, "keys"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(raw)
+	if err := os.WriteFile(filepath.Join(dataDir, "keys", "master.key"), []byte(encoded), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORCON_MASTER_KEY_BACKUP_ACK", envelope.Fingerprint(material))
 }

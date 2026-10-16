@@ -11,7 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
+	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -71,9 +75,22 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	identity.OrgStore
 	identity.PrincipalStore
 	identity.UserStore
+	identity.SessionStore
+	identity.AuditLog
+	audit.Store
+	identity.LoginThrottleStore
+	identity.OrganizationResolver
+	envelope.KeyStore
+	identity.OrgKeyGapStore
+	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore
+	identity.IdempotencyStore
 	flow.Store
+	flow.DraftStore
+	flow.ActivityStore
+	store.Transactor
+	store.ProjectExecutionReader
 	flow.VersionStore
 	flow.SnapshotStore
 	execution.WorkerStore
@@ -283,6 +300,21 @@ func (r *Registry) Len() int { return len(r.cases) }
 // EnvFactory returns the environment of one case. A run that needs a store gives
 // every case a fresh, seeded one, so no case sees what another did.
 type EnvFactory func(t *testing.T) *Env
+
+// RunSubjects runs the cases of the named subjects only, as subtests, each in a fresh environment.
+// A subject without a case fails: a battery that names a case must have it.
+func (r *Registry) RunSubjects(ctx context.Context, t *testing.T, newEnv EnvFactory, subjects ...Subject) {
+	t.Helper()
+	for _, sub := range subjects {
+		c, ok := r.cases[sub]
+		if !ok {
+			t.Fatalf("no isolation case for %s", sub)
+		}
+		t.Run(sub.String(), func(t *testing.T) {
+			c.Run(ctx, t, newEnv(t))
+		})
+	}
+}
 
 // Run runs every case as a subtest, in subject order, each in the environment
 // newEnv returns for it.

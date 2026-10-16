@@ -90,6 +90,11 @@ export function ThemeProvider({
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+/** The theme being shown, or `undefined` outside a ThemeProvider (a component that only refines its look by theme). */
+export function useResolvedTheme(): 'light' | 'dark' | undefined {
+  return useContext(ThemeContext)?.resolved;
+}
+
 export function useTheme(): ThemeContextValue {
   const value = useContext(ThemeContext);
   if (!value) throw new Error('useTheme must be used inside a ThemeProvider');

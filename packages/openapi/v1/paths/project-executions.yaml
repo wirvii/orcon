@@ -99,6 +99,14 @@ get:
         format: date-time
         examples:
           - '2026-10-12T15:10:00Z'
+    - name: uncertain
+      in: query
+      required: false
+      description: >-
+        Pass true to return only the executions that have an operation whose outcome is unknown and need a
+        review.
+      schema:
+        type: boolean
   responses:
     '200':
       description: One page of executions.
@@ -127,6 +135,7 @@ get:
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
                     finishedAt: '2026-10-12T15:04:09Z'
+                    hasUncertainOperation: false
                     dataHidden: false
     '400':
       $ref: ../openapi.yaml#/components/responses/ValidationFailed

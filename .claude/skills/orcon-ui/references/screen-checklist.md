@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Screen checklist
 
-Status: Accepted | Version: 1.2.0 | Source: SPEC-007
+Status: Accepted | Version: 1.3.0 | Source: SPEC-007
 
 Step-by-step procedure for every screen template in `@orcon/ui` (`src/screens/`) and every screen in `apps/web`. Copy the checklist into the pull request and tick each item. Each step links to the rule that governs it.
 

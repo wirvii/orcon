@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
 )
 
 // The interfaces below are the ports the interpreter consumes (go-style.md
@@ -31,6 +32,8 @@ type EvalEnv struct {
 	// Items is the batch the token carries. Conditions of exclusive and
 	// inclusive gateways are token-level: they see the whole batch.
 	Items Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
 }
 
 // ConditionEvaluator decides edge conditions (ADR-0010 section 4). The
@@ -50,6 +53,8 @@ type RouteCall struct {
 	Node  *flow.Node
 	Scope ScopePath
 	Items Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
 }
 
 // ItemRouter tells which output ports each item of a batch matches (ADR-0010
@@ -66,6 +71,7 @@ type ItemRouter interface {
 
 // NodeCall is what a [NodeRunner] receives for one activation.
 type NodeCall struct {
+	Org           identity.OrgID
 	Execution     ID
 	Token         TokenID
 	NodeExecution NodeExecutionID
@@ -74,7 +80,20 @@ type NodeCall struct {
 	Scope ScopePath
 	// Input is the batch the token carries.
 	Input Batch
+	// Env is the recorded nondeterminism of the activation.
+	Env NodeEnv
+	// Checkpoint runs fn in the checkpoint transaction of this activation, which a
+	// node calls before any external effect starts (ADR-0013 section 6): one
+	// transaction, fenced by the lease of the token, that records the node
+	// execution as RUNNING. fn receives that transaction as an opaque value the
+	// node asserts to its store type; this package cannot name the store, which
+	// imports it. Nil when no durable engine runs the activation.
+	Checkpoint func(ctx context.Context, fn func(ctx context.Context, tx any) error) error
 }
+
+// ActivationCheckpoint opens the checkpoint transaction of one activation; see
+// [NodeCall.Checkpoint]. The durable engine supplies it through [WorkOptions].
+type ActivationCheckpoint func(ctx context.Context, call NodeCall, fn func(ctx context.Context, tx any) error) error
 
 // PortBatch is the batch a node emitted on one output port.
 type PortBatch struct {

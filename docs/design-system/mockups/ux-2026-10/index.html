@@ -1,0 +1,1727 @@
+<!-- SPDX-FileCopyrightText: The Orcon Authors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orcon UX mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens (values from packages/js/tokens, dark default) ===== */
+:root,[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0B1120; --surface:#0F172A; --raised:#1E293B; --sunken:#020617; --hover:#162033;
+  --fg:#F8FAFC; --muted:#CBD5E1; --subtle:#94A3B8; --disabled:#64748B;
+  --link:#22D3EE; --accent:#4ADE80;
+  --primary:#4ADE80; --primary-h:#86EFAC; --primary-fg:#0F172A;
+  --danger-btn:#F87171;
+  --border:#1E293B; --border-strong:#334155; --control:#64748B; --focus:#67E8F9;
+  --n-fg:#CBD5E1; --n-bg:#1E293B;
+  --a-fg:#67E8F9; --a-bg:#083344;
+  --s-fg:#86EFAC; --s-bg:#052E16;
+  --w-fg:#FCD34D; --w-bg:#451A03;
+  --d-fg:#FCA5A5; --d-bg:#450A0A;
+  --u-fg:#C4B5FD; --u-bg:#2E1065;
+  --scrim:rgba(2,6,23,.72);
+  --sh-sm:0 1px 2px #0206174D; --sh-md:0 4px 8px -2px #02061759; --sh-lg:0 12px 24px -4px #02061766, 0 0 0 1px #1E293B;
+  --cv-bg:#0B1120; --cv-grid:#1E293B; --cv-edge:#94A3B8; --cv-node:#0F172A; --cv-node-b:#334155; --cv-sel:#22C55E; --cv-ok:#22C55E;
+  --st1-bg:#083344; --st1-b:#22D3EE;
+  --mascot-panel:#475569;
+  --brand-grad:linear-gradient(135deg,#84EB72 0%,#22C55E 55%,#06B6D4 100%);
+  --glow:radial-gradient(60% 50% at 20% 0%, #22C55E22 0%, transparent 70%);
+}
+[data-theme="light"]{
+  color-scheme:light;
+  --bg:#F8FAFC; --surface:#FFFFFF; --raised:#FFFFFF; --sunken:#F1F5F9; --hover:#F1F5F9;
+  --fg:#0F172A; --muted:#475569; --subtle:#64748B; --disabled:#94A3B8;
+  --link:#0E7490; --accent:#15803D;
+  --primary:#15803D; --primary-h:#166534; --primary-fg:#FFFFFF;
+  --danger-btn:#B91C1C;
+  --border:#E2E8F0; --border-strong:#CBD5E1; --control:#64748B; --focus:#0E7490;
+  --n-fg:#475569; --n-bg:#F1F5F9;
+  --a-fg:#155E75; --a-bg:#ECFEFF;
+  --s-fg:#166534; --s-bg:#F0FDF4;
+  --w-fg:#92400E; --w-bg:#FFFBEB;
+  --d-fg:#B91C1C; --d-bg:#FEF2F2;
+  --u-fg:#6D28D9; --u-bg:#F5F3FF;
+  --scrim:rgba(15,23,42,.45);
+  --sh-sm:0 1px 2px #0F172A14; --sh-md:0 4px 8px -2px #0F172A1A, 0 2px 4px -2px #0F172A0F; --sh-lg:0 12px 24px -4px #0F172A24, 0 0 0 1px #E2E8F0;
+  --cv-bg:#F8FAFC; --cv-grid:#CBD5E1; --cv-edge:#64748B; --cv-node:#FFFFFF; --cv-node-b:#CBD5E1; --cv-sel:#16A34A; --cv-ok:#16A34A;
+  --st1-bg:#ECFEFF; --st1-b:#0E7490;
+  --mascot-panel:#E2E8F0;
+  --glow:radial-gradient(60% 50% at 20% 0%, #22C55E14 0%, transparent 70%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:20px;background:var(--sunken);color:var(--fg);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:inherit;text-decoration:none}
+.prose a{color:var(--link);text-decoration:underline;text-underline-offset:2px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
+.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:13px}
+.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.s14{width:14px;height:14px}.ico.s12{width:12px;height:12px}.ico.s20{width:20px;height:20px}.ico.s24{width:24px;height:24px}.ico.s36{width:36px;height:36px}
+.muted{color:var(--muted)}.subtle{color:var(--subtle)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ===== Design review chrome (not product) ===== */
+.dz-bar{height:56px;display:flex;align-items:center;gap:12px;padding:0 16px;background:#020617;color:#E2E8F0;border-bottom:1px solid #1E293B;position:relative;z-index:100}
+[data-theme="light"] .dz-bar{background:#0F172A}
+.dz-title{display:flex;align-items:center;gap:8px;font-weight:600;white-space:nowrap;font-size:13px}
+.dz-title img{height:22px}
+.dz-title small{color:#94A3B8;font-weight:500}
+.dz-tabs{display:flex;gap:2px;overflow-x:auto;flex:1;scrollbar-width:none;padding:4px 0}
+.dz-tab{padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;color:#94A3B8;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.dz-tab b{font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748B;font-weight:500}
+.dz-tab:hover{background:#1E293B;color:#F8FAFC}
+.dz-tab[aria-selected="true"]{background:#1E293B;color:#F8FAFC;box-shadow:inset 0 -2px 0 #84EB72}
+.dz-ctrl{display:flex;gap:6px;align-items:center}
+.dz-seg{display:flex;background:#0F172A;border:1px solid #334155;border-radius:8px;padding:2px}
+.dz-seg button{padding:4px 8px;border-radius:6px;color:#94A3B8;display:flex;align-items:center;gap:4px;font-size:12px}
+.dz-seg button[aria-pressed="true"]{background:#334155;color:#F8FAFC}
+.dz-seg button:disabled{opacity:.35;cursor:not-allowed}
+.dz-variants{height:40px;display:none;align-items:center;gap:8px;padding:0 16px;background:#020617;border-bottom:1px solid #1E293B;color:#94A3B8;font-size:12px;position:relative;z-index:99}
+.dz-variants.on{display:flex}
+.dz-variants .dz-seg button{font-size:12px}
+.dz-stage{position:absolute;left:0;right:0;bottom:0;top:56px;overflow:auto;background:
+  radial-gradient(circle at 1px 1px,#1E293B 1px,transparent 0) 0 0/16px 16px, #020617}
+.has-variants .dz-stage{top:96px}
+[data-theme="light"] .dz-stage{background:radial-gradient(circle at 1px 1px,#CBD5E1 1px,transparent 0) 0 0/16px 16px,#E2E8F0}
+.dz-scaler{transform-origin:0 0;position:relative}
+.device{width:1440px;height:900px;background:var(--bg);position:relative;overflow:hidden;container-type:inline-size;container-name:dev}
+.mode-phone .device{width:390px;height:844px;border-radius:44px;box-shadow:0 0 0 10px #0F172A,0 0 0 11px #334155,0 30px 60px #0008}
+.mode-phone .dz-scaler{margin:32px auto}
+
+/* annotation markers */
+.ann-layer{position:absolute;inset:0;pointer-events:none;z-index:500}
+.ann{position:absolute;pointer-events:auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 11px/1 Inter;color:#0F172A;box-shadow:0 0 0 2px #0F172A,0 2px 8px #0008;cursor:help}
+.ann.parity{background:#67E8F9}
+.ann.better{background:#84EB72}
+.ann .tip{display:none;position:absolute;left:28px;top:-4px;width:260px;background:#0F172A;color:#E2E8F0;border:1px solid #334155;border-radius:8px;padding:8px 10px;font:500 12px/16px Inter;text-align:left;box-shadow:0 8px 24px #000a;z-index:10}
+.ann .tip i{font-style:normal;font-weight:700;display:block;margin-bottom:2px}
+.ann.parity .tip i{color:#67E8F9}.ann.better .tip i{color:#84EB72}
+.ann:hover .tip,.ann.hl .tip{display:block}
+.ann.left .tip{left:auto;right:28px}
+.ann-target{outline:2px dashed #84EB72!important;outline-offset:3px}
+.no-notes .ann-layer,.no-notes .dz-notes{display:none}
+.dz-notes{position:fixed;right:16px;bottom:16px;width:340px;max-height:46vh;background:#0F172AF2;backdrop-filter:blur(8px);color:#E2E8F0;border:1px solid #334155;border-radius:12px;z-index:200;display:flex;flex-direction:column;box-shadow:0 12px 32px #000a}
+.dz-notes header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1E293B;font-weight:600;font-size:13px}
+.dz-notes header span{display:flex;gap:8px;align-items:center}
+.dz-legend{display:flex;gap:10px;font-size:11px;color:#94A3B8;font-weight:500}
+.dz-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.dz-notes ol{list-style:none;overflow:auto;padding:6px}
+.dz-notes li{display:flex;gap:8px;padding:6px;border-radius:8px;font-size:12px;line-height:16px;cursor:default}
+.dz-notes li:hover{background:#1E293B}
+.dz-notes li b{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#0F172A;font-size:11px}
+.dz-notes li.parity b{background:#67E8F9}.dz-notes li.better b{background:#84EB72}
+.dz-notes li em{font-style:normal;font-weight:600;display:block}
+.dz-notes.min ol{display:none}
+.dz-notes.min{width:auto}.dz-notes.min .dz-legend{display:none}
+.dz-notes header,.dz-notes header span{white-space:nowrap}
+.dz-notes .dz-x{color:#94A3B8;padding:2px 6px;border-radius:6px}
+.dz-notes .dz-x:hover{background:#1E293B}
+
+/* ===== Product primitives ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;font-weight:600;font-size:14px;white-space:nowrap;transition:background .12s,border-color .12s}
+.btn.sm{height:28px;padding:0 10px;font-size:13px;gap:6px;border-radius:6px}
+.btn.lg{height:44px;padding:0 18px;font-size:15px}
+.btn.primary{background:var(--primary);color:var(--primary-fg)}
+.btn.primary:hover{background:var(--primary-h)}
+.btn.secondary{background:var(--surface);border:1px solid var(--border-strong);color:var(--fg)}
+.btn.secondary:hover{background:var(--hover)}
+.btn.ghost{color:var(--muted)}
+.btn.ghost:hover{background:var(--hover);color:var(--fg)}
+.btn.danger{background:var(--danger-btn);color:var(--primary-fg)}
+.btn.block{width:100%}
+.btn .kbd{margin-left:4px}
+.ibtn{width:32px;height:32px;display:inline-grid;place-items:center;border-radius:8px;color:var(--muted)}
+.ibtn:hover{background:var(--hover);color:var(--fg)}
+.ibtn.sm{width:28px;height:28px;border-radius:6px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--sunken);font:500 11px/1 'JetBrains Mono',monospace;color:var(--subtle)}
+.btn.primary .kbd{background:transparent;border-color:color-mix(in srgb,var(--primary-fg) 35%,transparent);color:var(--primary-fg);opacity:.8}
+.chip{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.chip .ico{width:12px;height:12px;stroke-width:2.5}
+.chip.n{background:var(--n-bg);color:var(--n-fg)}
+.chip.a{background:var(--a-bg);color:var(--a-fg);border-color:color-mix(in srgb,var(--a-fg) 30%,transparent)}
+.chip.s{background:var(--s-bg);color:var(--s-fg);border-color:color-mix(in srgb,var(--s-fg) 30%,transparent)}
+.chip.w{background:var(--w-bg);color:var(--w-fg);border-color:color-mix(in srgb,var(--w-fg) 30%,transparent)}
+.chip.d{background:var(--d-bg);color:var(--d-fg);border-color:color-mix(in srgb,var(--d-fg) 30%,transparent)}
+.chip.u{background:var(--u-bg);color:var(--u-fg);border-color:color-mix(in srgb,var(--u-fg) 30%,transparent)}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:500;background:var(--sunken);color:var(--muted);border:1px solid var(--border)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#0F172A;flex:none}
+.avatar.sm{width:22px;height:22px;font-size:10px}
+.av1{background:#86EFAC}.av2{background:#67E8F9}.av3{background:#FCD34D}.av4{background:#C4B5FD}.av5{background:#FCA5A5}
+.toggle{position:relative;width:36px;height:20px;border-radius:999px;background:var(--border-strong);flex:none;transition:background .16s;border:1px solid var(--control)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--fg);transition:transform .16s}
+.toggle[aria-checked="true"]{background:var(--primary);border-color:var(--primary)}
+.toggle[aria-checked="true"]::after{transform:translateX(16px);background:var(--primary-fg)}
+.tgl-wrap{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.lbl{font-size:13px;font-weight:500;color:var(--fg);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hint{font-size:12px;line-height:16px;color:var(--subtle)}
+.input{height:36px;border-radius:8px;border:1px solid var(--control);background:var(--sunken);padding:0 12px;width:100%;display:flex;align-items:center;gap:8px;color:var(--fg)}
+[data-theme="light"] .input{background:#fff}
+.input:focus-within,.input:focus{outline:2px solid var(--focus);outline-offset:1px}
+.input input{background:none;border:0;outline:0;flex:1;min-width:0;height:100%}
+.input .ico{color:var(--subtle)}
+textarea.input{height:auto;padding:10px 12px;resize:none;line-height:20px}
+.select{justify-content:space-between;cursor:pointer}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px}
+[data-theme="light"] .card{box-shadow:var(--sh-sm)}
+.h1{font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.01em}
+.h2{font-size:16px;line-height:24px;font-weight:600}
+.h3{font-size:14px;line-height:20px;font-weight:600}
+.seg{display:inline-flex;background:var(--sunken);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px}
+.seg button{height:26px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);font-weight:600}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border)}
+.tabs button{height:40px;padding:0 12px;font-weight:500;color:var(--subtle);position:relative;display:flex;align-items:center;gap:6px}
+.tabs button:hover{color:var(--fg)}
+.tabs button[aria-selected="true"]{color:var(--fg);font-weight:600}
+.tabs button[aria-selected="true"]::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--cv-sel);border-radius:2px}
+.tabs .count{font-size:11px;padding:0 6px;border-radius:999px;background:var(--n-bg);color:var(--n-fg);font-weight:600;line-height:18px}
+.menu{position:absolute;z-index:60;min-width:220px;background:var(--raised);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--sh-lg);padding:4px}
+.menu .mi{display:flex;align-items:center;gap:10px;padding:0 8px;height:32px;border-radius:6px;font-size:13px;color:var(--fg);width:100%}
+.menu .mi:hover,.menu .mi.on{background:var(--hover)}
+.menu .mi .ico{color:var(--subtle)}
+.menu .mi .kbd{margin-left:auto}
+.menu hr{border:0;border-top:1px solid var(--border-strong);margin:4px}
+.menu .mh{padding:6px 8px 4px;font-size:11px;font-weight:600;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em}
+.hide{display:none!important}
+
+/* ===== App shell ===== */
+.screen{position:absolute;inset:0;display:none}
+.screen.on{display:flex}
+.app{position:absolute;inset:0;display:none}
+.app.on{display:flex}
+.sidebar{width:240px;flex:none;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 8px;gap:4px;position:relative;transition:width .16s}
+.sb-top{display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 8px;height:36px}
+.sb-logo{height:22px}
+.sb-org{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);margin:8px 0 4px;width:100%;text-align:left}
+.sb-org:hover{background:var(--hover)}
+.sb-org .org-av{width:24px;height:24px;border-radius:6px;background:var(--brand-grad);display:grid;place-items:center;color:#0F172A;font-weight:800;font-size:12px;flex:none}
+.sb-org div{flex:1;min-width:0;line-height:16px}
+.sb-org b{font-size:13px;display:block}
+.sb-org small{font-size:11px;color:var(--subtle)}
+.sb-create{margin:4px 0 8px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nv{display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:8px;color:var(--muted);font-weight:500;font-size:13px;position:relative;width:100%;text-align:left}
+.nv:hover{background:var(--hover);color:var(--fg)}
+.nv.on{background:var(--hover);color:var(--fg);font-weight:600}
+.nv.on::before{content:"";position:absolute;left:-8px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--brand-grad)}
+.nv .nv-r{margin-left:auto;font-size:11px;color:var(--subtle);font-weight:500}
+.nv .pdot{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:700;color:#0F172A;flex:none}
+.sb-sec{display:flex;align-items:center;justify-content:space-between;padding:12px 8px 4px;font-size:11px;font-weight:600;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em}
+.sb-sec .ibtn{width:22px;height:22px}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:2px}
+.sb-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;margin-top:6px;border-top:1px solid var(--border);border-radius:0;padding-top:12px;width:100%;text-align:left}
+.sb-user:hover{background:var(--hover)}
+.sb-user div{flex:1;min-width:0;line-height:16px}
+.sb-user b{font-size:13px;display:block}
+.sb-user small{font-size:11px;color:var(--subtle)}
+.sidebar.collapsed{width:64px}
+.sidebar.collapsed .lbl-x,.sidebar.collapsed .sb-sec,.sidebar.collapsed .sb-org div,.sidebar.collapsed .sb-org>.ico,.sidebar.collapsed .nv-r,.sidebar.collapsed .sb-user div,.sidebar.collapsed .sb-user>.ico,.sidebar.collapsed .sb-logo-word{display:none}
+.sidebar.collapsed .nv{justify-content:center;padding:0}
+.sidebar.collapsed .sb-top{flex-direction:column;height:auto;gap:8px;padding:0}
+.sidebar.collapsed .sb-org{justify-content:center;padding:6px 0}
+.sidebar.collapsed .sb-create .btn{padding:0;width:36px;margin:0 auto}
+.sidebar.collapsed .sb-user{justify-content:center}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.view{display:none;flex:1;min-height:0;flex-direction:column;overflow:auto}
+.view.on{display:flex}
+.page{padding:24px 32px 48px;max-width:1240px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--subtle)}
+.crumbs a:hover{color:var(--fg)}
+.crumbs .ico{width:14px;height:14px}
+.crumbs b{color:var(--fg);font-weight:600}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.page-head p{color:var(--muted);margin-top:4px}
+.phone-top,.tabbar{display:none}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.stat{padding:16px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.stat .k{font-size:12px;font-weight:500;color:var(--subtle);display:flex;align-items:center;gap:6px}
+.stat .v{font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:13px;color:var(--subtle);font-weight:500;margin-left:4px}
+.stat .d{font-size:12px;color:var(--subtle);display:flex;align-items:center;gap:4px}
+.stat .d.up{color:var(--s-fg)}
+.stat.attn{border-color:color-mix(in srgb,var(--u-fg) 45%,var(--border))}
+.stat.attn .v{color:var(--u-fg)}
+.spark{display:flex;align-items:flex-end;gap:2px;height:24px;margin-top:2px}
+.spark i{flex:1;background:color-mix(in srgb,var(--cv-ok) 55%,transparent);border-radius:2px 2px 0 0;min-height:2px}
+.spark i.f{background:var(--d-fg)}
+
+/* list toolbar & rows */
+.toolbar{display:flex;align-items:center;gap:8px}
+.toolbar .input{width:280px;height:32px}
+.toolbar .btn{height:32px}
+.list{overflow:hidden}
+.rh,.rw{display:grid;align-items:center;gap:16px;padding:0 16px}
+.rh{height:36px;font-size:12px;font-weight:600;color:var(--subtle);border-bottom:1px solid var(--border);background:var(--sunken)}
+[data-theme="light"] .rh{background:#F8FAFC}
+.rw{min-height:56px;border-bottom:1px solid var(--border);font-size:13px}
+.rw:last-child{border-bottom:0}
+.rw:hover{background:var(--hover)}
+.rw .nm{display:flex;flex-direction:column;gap:4px;min-width:0}
+.rw .nm b{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rw .nm b:hover{color:var(--accent)}
+.rw .nm .tags{display:flex;gap:4px;align-items:center}
+.rw .st,.rw .pjc{display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap;min-width:0}
+.rw .st>span,.rw .pjc{overflow:hidden;text-overflow:ellipsis}
+.rw>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cols-flows{grid-template-columns:minmax(0,2.3fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,.5fr) minmax(0,.8fr) 28px 104px 32px}
+.cols-flows-p{grid-template-columns:minmax(0,2.6fr) minmax(0,1.6fr) minmax(0,.6fr) minmax(0,.9fr) 28px 104px 32px}
+.stat-ic{width:16px;height:16px;flex:none}
+.ok{color:var(--s-fg)}.bad{color:var(--d-fg)}.unc{color:var(--u-fg)}.run{color:var(--a-fg)}.warn{color:var(--w-fg)}
+.num{font-variant-numeric:tabular-nums}
+.tgl-cell{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600}
+.tgl-cell span{width:44px}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:48px 24px}
+.empty .mascot{width:120px;height:120px;border-radius:24px;background:var(--mascot-panel);display:grid;place-items:end center;overflow:hidden}
+.empty .mascot img{width:112px}
+.empty p{color:var(--muted);max-width:420px}
+
+/* modal */
+.modal-wrap{position:absolute;inset:0;background:var(--scrim);display:none;align-items:center;justify-content:center;z-index:80;padding:24px}
+.modal-wrap.on{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;box-shadow:var(--sh-lg);width:880px;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 24px 12px}
+.modal-h p{color:var(--muted);margin-top:2px}
+.modal-b{padding:8px 24px 24px;overflow:auto}
+.modal-f{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 24px;border-top:1px solid var(--border);background:var(--sunken)}
+[data-theme="light"] .modal-f{background:#F8FAFC}
+</style>
+<style>
+/* ===== Login ===== */
+#s-login{background:var(--bg)}
+.lg-brand{width:46%;position:relative;overflow:hidden;background:#0F172A;color:#F8FAFC;display:flex;flex-direction:column;padding:40px 48px}
+.lg-brand::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 60% at 85% 100%,#22C55E33 0%,transparent 60%),radial-gradient(50% 40% at 0% 0%,#06B6D426 0%,transparent 70%)}
+.lg-brand::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 1px 1px,#ffffff14 1px,transparent 0) 0 0/20px 20px;mask-image:linear-gradient(180deg,transparent,#000 40%,#000 70%,transparent)}
+.lg-brand>*{position:relative;z-index:1}
+.lg-brand .wm{height:36px;align-self:flex-start}
+.lg-brand h2{font-size:32px;line-height:40px;font-weight:700;letter-spacing:-.02em;margin-top:auto;max-width:360px}
+.lg-brand h2 span{background:var(--brand-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lg-brand ul{list-style:none;display:flex;flex-direction:column;gap:12px;margin:24px 0 0;max-width:340px}
+.lg-brand li{display:flex;gap:10px;color:#CBD5E1}
+.lg-brand li .ico{color:#4ADE80;margin-top:2px}
+.lg-mascot{position:absolute!important;right:16px;bottom:0;width:250px;filter:drop-shadow(0 20px 40px #0008)}
+.lg-foot{margin-top:40px;font-size:12px;color:#94A3B8;display:flex;gap:16px}
+.lg-form{flex:1;display:flex;align-items:center;justify-content:center;padding:40px;position:relative}
+.lg-card{width:380px;display:flex;flex-direction:column;gap:20px}
+.lg-card .h1{font-size:28px;line-height:36px}
+.lg-card p.sub{color:var(--muted);margin-top:4px}
+.pw-eye{color:var(--subtle);display:grid;place-items:center;width:28px;height:28px;border-radius:6px}
+.pw-eye:hover{background:var(--hover);color:var(--fg)}
+.lg-row{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.lnk{color:var(--link);font-weight:500}
+.lnk:hover{text-decoration:underline;text-underline-offset:2px}
+.check{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
+.check i{width:16px;height:16px;border-radius:4px;border:1px solid var(--control);display:grid;place-items:center;background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.or{display:flex;align-items:center;gap:12px;color:var(--subtle);font-size:12px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--border-strong)}
+.alert{display:flex;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:18px;border:1px solid}
+.alert.d{background:var(--d-bg);color:var(--d-fg);border-color:color-mix(in srgb,var(--d-fg) 40%,transparent)}
+.alert.s{background:var(--s-bg);color:var(--s-fg);border-color:color-mix(in srgb,var(--s-fg) 40%,transparent)}
+.alert.u{background:var(--u-bg);color:var(--u-fg);border-color:color-mix(in srgb,var(--u-fg) 40%,transparent)}
+.alert.w{background:var(--w-bg);color:var(--w-fg);border-color:color-mix(in srgb,var(--w-fg) 40%,transparent)}
+.alert.a{background:var(--a-bg);color:var(--a-fg);border-color:color-mix(in srgb,var(--a-fg) 40%,transparent)}
+.alert .ico{margin-top:1px}
+.alert b{display:block;color:inherit}
+.alert span{color:var(--fg);opacity:.9}
+.input.err{border-color:var(--d-fg)}
+.lg-prefs{position:absolute;top:24px;right:24px;display:flex;gap:4px}
+.lg-legal{position:absolute;bottom:24px;font-size:12px;color:var(--subtle)}
+
+/* ===== New flow chooser ===== */
+.nf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.nf-opt{border:1px solid var(--border-strong);border-radius:12px;padding:16px;text-align:left;display:flex;flex-direction:column;gap:8px;background:var(--surface);position:relative;min-height:124px}
+.nf-opt:hover{border-color:var(--control)}
+.nf-opt[aria-pressed="true"]{border-color:var(--cv-sel);box-shadow:0 0 0 1px var(--cv-sel);background:color-mix(in srgb,var(--cv-sel) 6%,var(--surface))}
+.nf-opt .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--sunken);border:1px solid var(--border)}
+.nf-opt b{font-size:14px}
+.nf-opt small{color:var(--muted);font-size:12px;line-height:16px}
+.nf-opt .badge{position:absolute;top:12px;right:12px}
+.nf-pane{margin-top:20px;display:none}
+.nf-pane.on{display:block}
+.tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tpl{border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface);text-align:left}
+.tpl:hover{border-color:var(--control)}
+.tpl .icons{display:flex;gap:4px}
+.ni{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--border);background:var(--sunken);flex:none}
+.ni .ico{width:16px;height:16px}
+.ni.wa{color:#25D366}.ni.ai{color:#C4B5FD}.ni.http{color:var(--link)}.ni.logic{color:var(--link)}.ni.data{color:#FCD34D}.ni.slack{color:#E879F9}.ni.db{color:#93C5FD}.ni.shop{color:#86EFAC}
+[data-theme="light"] .ni.ai{color:#6D28D9}[data-theme="light"] .ni.data{color:#B45309}[data-theme="light"] .ni.slack{color:#A21CAF}[data-theme="light"] .ni.db{color:#1D4ED8}[data-theme="light"] .ni.shop{color:#15803D}[data-theme="light"] .ni.wa{color:#15803D}
+.tpl b{font-size:13px}
+.tpl small{color:var(--subtle);font-size:12px;line-height:16px}
+.tpl .meta{display:flex;justify-content:space-between;font-size:11px;color:var(--subtle)}
+.imp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.drop{border:1.5px dashed var(--control);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;background:var(--sunken)}
+.drop textarea{flex:1;min-height:160px;font-size:12px}
+.report{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.report-h{display:flex;gap:12px;padding:16px;align-items:center;background:color-mix(in srgb,var(--cv-sel) 8%,var(--surface));border-bottom:1px solid var(--border)}
+.report-h img{width:56px;height:56px;border-radius:12px;background:var(--mascot-panel)}
+.rp-bar{display:flex;height:8px;border-radius:999px;overflow:hidden;gap:2px;margin:12px 16px 4px}
+.rp-legend{display:flex;gap:12px;padding:0 16px 8px;font-size:12px;color:var(--muted)}
+.rp-row{display:flex;align-items:center;gap:10px;padding:7px 16px;border-top:1px solid var(--border);font-size:13px}
+.rp-row .grow{flex:1;min-width:0}
+.rp-row small{display:block;color:var(--subtle);font-size:12px}
+.ai-box{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg button{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border-strong);color:var(--muted)}
+.sugg button:hover{color:var(--fg);border-color:var(--control)}
+.plan{border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--sunken)}
+.plan-step{display:flex;gap:10px;align-items:center;font-size:13px}
+.plan-step .n{width:20px;height:20px;border-radius:50%;background:var(--raised);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--muted);flex:none}
+
+/* ===== Editor ===== */
+.ed{position:absolute;inset:0;display:flex;flex-direction:column}
+.ed-top{height:56px;flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,auto);align-items:center;padding:0 12px 0 16px;border-bottom:1px solid var(--border);background:var(--surface);gap:12px}
+.ed-l{display:flex;align-items:center;gap:8px;min-width:0}
+.ed-l .crumbs{white-space:nowrap}
+.ed-name{font-weight:600;font-size:14px;color:var(--fg);padding:4px 6px;border-radius:6px}
+.ed-name:hover{background:var(--hover)}
+.ed-mid .seg button{height:28px;padding:0 14px;font-size:13px}
+.ed-r{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.saved{font-size:12px;color:var(--subtle);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.saved .ico{color:var(--s-fg)}
+.pub{display:flex}
+.pub .btn{border-radius:8px 0 0 8px}
+.pub .btn+.btn{border-radius:0 8px 8px 0;padding:0 8px;border-left:1px solid color-mix(in srgb,var(--primary-fg) 25%,transparent)}
+.pub-n{background:var(--primary-fg);color:var(--primary);border-radius:999px;font-size:11px;padding:0 6px;line-height:16px}
+.vsep{width:1px;height:24px;background:var(--border-strong)}
+.ed-body{flex:1;display:flex;min-height:0;position:relative}
+.cv{flex:1;position:relative;overflow:hidden;background:var(--cv-bg) radial-gradient(circle at 1.4px 1.4px,var(--cv-grid) 1.4px,transparent 0) 0 0/20px 20px}
+.cv-world{position:absolute;left:0;top:0;transform-origin:0 0}
+.cv-world svg.edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.edge{fill:none;stroke-width:2;stroke-linecap:round}
+.edge.ok{stroke:var(--cv-ok)}
+.edge.dt{stroke:var(--cv-edge)}
+.edge.nr{stroke:var(--cv-edge);stroke-dasharray:3 5;opacity:.8}
+.edge.sub{stroke:var(--cv-edge);stroke-dasharray:5 5}
+.elabel{position:absolute;transform:translate(-50%,-50%);height:20px;padding:0 8px;border-radius:999px;background:var(--cv-node);border:1px solid var(--s-fg);color:var(--s-fg);font-size:12px;font-weight:500;display:flex;align-items:center;white-space:nowrap;box-shadow:var(--sh-sm)}
+.elabel.nr{border-color:var(--cv-edge);color:var(--subtle)}
+.node{position:absolute;width:100px;height:100px;border-radius:18px;background:var(--cv-node);border:1px solid var(--cv-node-b);display:grid;place-items:center;box-shadow:var(--sh-sm);cursor:grab}
+.node:hover{border-color:var(--cv-edge)}
+.node.trig{border-radius:50px 18px 18px 50px}
+.node.wide{width:200px}
+.node.sel{outline:2px solid var(--cv-sel);outline-offset:4px}
+.node .nic{width:44px;height:44px;display:grid;place-items:center}
+.node .nic .ico{width:36px;height:36px;stroke-width:1.6}
+.node .tmark{position:absolute;left:-11px;top:39px;width:22px;height:22px;border-radius:50%;background:var(--cv-node);border:2px solid var(--accent);display:grid;place-items:center;color:var(--accent)}
+.node .tmark .ico{width:12px;height:12px}
+.node .badge{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 0 2px var(--cv-bg)}
+.node .badge.ok{background:var(--s-fg);color:var(--s-bg)}
+.node .badge .ico{width:14px;height:14px;stroke-width:3}
+.port{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--cv-node);border:2px solid var(--cv-edge)}
+.port.in{left:-6px;top:44px}.port.out{right:-6px;top:44px}
+.port.o1{top:19px}.port.o2{top:71px}
+.olbl{position:absolute;right:10px;font:600 11px/14px 'JetBrains Mono',monospace;color:var(--muted)}
+.nlabel{position:absolute;width:160px;text-align:center;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none}
+.nlabel b{font-size:13px;line-height:18px;font-weight:600}
+.nlabel small{font-size:12px;line-height:16px;color:var(--muted)}
+.nlabel .chip{margin-top:2px;height:20px;font-size:11px}
+.stub{position:absolute;display:flex;align-items:center}
+.stub i{width:30px;border-top:2px dashed var(--cv-edge)}
+.stub button{width:22px;height:22px;border:1.5px dashed var(--cv-edge);border-radius:6px;background:var(--cv-node);display:grid;place-items:center;color:var(--subtle)}
+.stub button:hover{border-color:var(--primary);color:var(--primary)}
+.aib{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px;width:84px;transform:translateX(-50%)}
+.aib .c{width:48px;height:48px;border-radius:50%;background:var(--cv-node);border:1px solid var(--cv-node-b);display:grid;place-items:center;box-shadow:var(--sh-sm)}
+.aib .c .ico{width:22px;height:22px}
+.aib .c.add{border-style:dashed;color:var(--subtle)}
+.aib small{font:600 11px/14px 'JetBrains Mono',monospace;color:var(--muted)}
+.aib em{font-style:normal;font-size:11px;color:var(--subtle);text-align:center;line-height:14px}
+.ailine{position:absolute;border-left:2px dashed var(--cv-edge);opacity:.7}
+.sticky{position:absolute;border-radius:8px;padding:10px 12px;background:var(--st1-bg);border:1px solid var(--st1-b);font-size:12px;line-height:16px}
+.sticky .sh{display:flex;align-items:center;gap:6px;color:var(--st1-b);font-weight:600;margin-bottom:4px}
+.ntb{position:absolute;display:flex;gap:2px;padding:3px;background:var(--raised);border:1px solid var(--cv-node-b);border-radius:8px;box-shadow:var(--sh-md);transform:translateX(-50%)}
+.ntb button{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--fg)}
+.ntb button:hover{background:var(--sunken)}
+.cv-ctrl{position:absolute;left:12px;bottom:12px;display:flex;gap:4px;z-index:5}
+.cv-ctrl button{width:32px;height:32px;border-radius:8px;background:var(--raised);border:1px solid var(--border-strong);display:grid;place-items:center;color:var(--muted)}
+.cv-ctrl button:hover{color:var(--fg)}
+.cv-run{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;z-index:5;align-items:center}
+.cv-run .btn{box-shadow:var(--sh-md)}
+.cv-add{position:absolute;right:12px;top:12px;z-index:5;display:flex;flex-direction:column;gap:6px}
+.cv-add button{width:40px;height:40px;border-radius:10px;background:var(--raised);border:1px solid var(--border-strong);display:grid;place-items:center;color:var(--fg);box-shadow:var(--sh-sm)}
+.cv-add button:hover{border-color:var(--control)}
+.cv-tip{position:absolute;left:16px;top:16px;z-index:4;font-size:12px;color:var(--subtle);display:flex;gap:8px;align-items:center;background:color-mix(in srgb,var(--surface) 80%,transparent);padding:4px 8px;border-radius:8px;border:1px solid var(--border)}
+.palette{width:360px;flex:none;background:var(--raised);border-left:1px solid var(--border-strong);display:flex;flex-direction:column;box-shadow:var(--sh-lg);z-index:6;position:relative}
+[data-theme="light"] .palette{background:#fff}
+.pal-h{padding:12px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--border)}
+.pal-h .row{display:flex;align-items:center;justify-content:space-between}
+.pal-b{overflow:auto;flex:1;padding:6px}
+.pal-sec{font-size:11px;font-weight:600;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em;padding:10px 8px 4px}
+.pal-it{display:flex;gap:12px;align-items:center;padding:8px;border-radius:8px;width:100%;text-align:left}
+.pal-it:hover,.pal-it.on{background:var(--hover)}
+.pal-it .ni{width:36px;height:36px;border-radius:10px}
+.pal-it .ni .ico{width:20px;height:20px}
+.pal-it div{flex:1;min-width:0}
+.pal-it b{font-size:13px;font-weight:600;display:block}
+.pal-it small{font-size:12px;color:var(--subtle);display:block;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pal-it>.ico{color:var(--subtle)}
+.pal-f{padding:8px 12px;border-top:1px solid var(--border);font-size:12px;color:var(--subtle);display:flex;gap:12px}
+.pal-f span{display:flex;align-items:center;gap:4px}
+.logs{flex:none;border-top:1px solid var(--border-strong);background:var(--surface);display:flex;flex-direction:column}
+.logs-h{height:40px;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:13px}
+.logs-h b{font-weight:600}
+.logs-b{height:230px;display:none;border-top:1px solid var(--border);grid-template-columns:320px 1fr 340px}
+.logs.open .logs-b{display:grid}
+.lg-steps{border-right:1px solid var(--border);overflow:auto;padding:6px}
+.lg-step{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;font-size:13px}
+.lg-step.on{background:var(--hover)}
+.lg-step small{color:var(--subtle);font-size:12px}
+.lg-step.child{padding-left:28px}
+.lg-io{padding:12px;overflow:auto;border-right:1px solid var(--border)}
+.chat{display:flex;flex-direction:column;background:var(--sunken)}
+.chat-h{padding:8px 12px;font-size:12px;font-weight:600;color:var(--subtle);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.chat-b{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+.bub{max-width:85%;padding:6px 10px;border-radius:10px;font-size:12px;line-height:16px}
+.bub.in{background:var(--raised);align-self:flex-start;border-top-left-radius:2px}
+.bub.out{background:color-mix(in srgb,var(--cv-ok) 22%,var(--surface));align-self:flex-end;border-top-right-radius:2px}
+.bub time{display:block;font-size:10px;color:var(--subtle);text-align:right}
+.chat-i{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border)}
+.chat-i .input{height:32px}
+
+/* ===== NDV ===== */
+.ndv-wrap{position:absolute;inset:0;background:var(--scrim);z-index:40;padding:24px;display:none}
+.ndv-wrap.on{display:block}
+.ndv{background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;height:100%;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden}
+.ndv-h{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--border)}
+.ndv-h .nic{width:36px;height:36px;border-radius:10px;background:var(--sunken);display:grid;place-items:center;color:#25D366}
+[data-theme="light"] .ndv-h .nic{color:#15803D}
+.ndv-h .t{line-height:18px}
+.ndv-h .t b{font-size:16px;line-height:24px;font-weight:600;display:block}
+.ndv-h .t small{font-size:12px;color:var(--muted)}
+.ndv-b{flex:1;display:grid;grid-template-columns:1fr 6px minmax(420px,34%) 6px 1fr;min-height:0}
+.split{background:var(--border);cursor:col-resize;position:relative}
+.split::after{content:"";position:absolute;left:1px;top:50%;width:4px;height:32px;margin-top:-16px;border-radius:4px;background:var(--border-strong)}
+.dp{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.dp-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.dp-h .ttl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle)}
+.dp-h .src{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:2px 6px}
+.dp-h .cnt{font-size:12px;color:var(--subtle);margin-left:auto}
+.dp-b{flex:1;overflow:auto;padding:12px}
+.schema{display:flex;flex-direction:column;gap:2px}
+.sf{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px}
+.sf:hover{background:var(--hover)}
+.sf.l2{padding-left:24px}
+.sf .ty{font:600 10px/16px 'JetBrains Mono',monospace;padding:0 4px;border-radius:4px;background:var(--n-bg);color:var(--n-fg);min-width:24px;text-align:center}
+.pill{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font:500 12px/1 'JetBrains Mono',monospace;background:color-mix(in srgb,var(--cv-ok) 14%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--cv-ok) 40%,transparent);cursor:grab;white-space:nowrap}
+.pill.exp{cursor:default}
+.sf .ex{font:12px 'JetBrains Mono',monospace;color:var(--subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.sf .grip{color:var(--disabled);opacity:0}
+.sf:hover .grip{opacity:1}
+.prm{display:flex;flex-direction:column;min-width:0}
+.prm .tabs{padding:0 12px}
+.prm-b{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.fx{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.fx button{font-size:11px;padding:2px 8px;color:var(--subtle);font-weight:600}
+.fx button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.expr{min-height:36px;border:1px solid var(--control);border-radius:8px;padding:6px 8px;background:var(--sunken);display:flex;flex-wrap:wrap;gap:4px;align-items:center;font:13px/20px 'JetBrains Mono',monospace;transition:box-shadow .12s}
+[data-theme="light"] .expr{background:#fff}
+.expr.drop-on{border-color:var(--cv-sel);box-shadow:0 0 0 3px color-mix(in srgb,var(--cv-sel) 30%,transparent);background:color-mix(in srgb,var(--cv-sel) 8%,var(--sunken))}
+.expr .ph{color:var(--subtle);font-family:Inter;font-size:12px}
+.preview{font-size:12px;color:var(--subtle);display:flex;gap:6px;align-items:baseline}
+.preview code{font:12px 'JetBrains Mono',monospace;color:var(--muted);background:var(--sunken);padding:1px 6px;border-radius:4px;border:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cred{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--control);border-radius:8px;background:var(--sunken)}
+[data-theme="light"] .cred{background:#fff}
+.cred div{flex:1;min-width:0;line-height:16px}
+.cred b{font-size:13px}
+.cred small{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--s-fg)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.safe{border:1px solid color-mix(in srgb,var(--a-fg) 40%,var(--border));background:var(--a-bg);border-radius:10px;padding:12px;display:flex;gap:10px;font-size:13px;line-height:18px}
+.safe .ico{color:var(--a-fg);margin-top:1px}
+.safe b{color:var(--a-fg)}
+.safe p{color:var(--fg);opacity:.9}
+.ai-pop{border:1px solid color-mix(in srgb,var(--u-fg) 40%,var(--border));background:var(--u-bg);border-radius:10px;padding:10px 12px;font-size:12px;line-height:16px;display:flex;flex-direction:column;gap:8px}
+.ai-pop .hd{display:flex;align-items:center;gap:6px;color:var(--u-fg);font-weight:600}
+.ai-pop p{color:var(--fg)}
+.ai-btn{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--u-fg);padding:2px 6px;border-radius:6px}
+.ai-btn:hover{background:var(--u-bg)}
+.tbl{width:100%;border-collapse:collapse;font:13px/20px 'JetBrains Mono',monospace}
+.tbl th{position:sticky;top:0;background:var(--sunken);font:600 12px/16px Inter;color:var(--subtle);text-align:left;padding:8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:8px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.tbl td:first-child,.tbl th:first-child{width:32px;color:var(--subtle)}
+.json{font:13px/20px 'JetBrains Mono',monospace;white-space:pre;color:var(--fg)}
+.json .k{color:var(--fg)}.json .s{color:var(--accent)}.json .n{color:var(--link)}.json .z{color:var(--subtle)}
+
+/* ===== Executions ===== */
+.ex-wrap{display:grid;grid-template-columns:400px minmax(0,1fr);flex:1;min-height:0}
+.ex-list{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.ex-filters{padding:12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border)}
+.ex-filters .r{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--border-strong);font-size:12px;font-weight:500;color:var(--muted)}
+.fchip:hover{color:var(--fg)}
+.fchip.on{border-color:var(--control);color:var(--fg);background:var(--hover)}
+.ex-items{overflow:auto;flex:1}
+.ex-it{display:grid;grid-template-columns:20px 1fr auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;width:100%;align-items:start}
+.ex-it:hover{background:var(--hover)}
+.ex-it.on{background:var(--hover);box-shadow:inset 3px 0 0 var(--cv-sel)}
+.ex-it b{font-size:13px;font-weight:600;display:block}
+.ex-it small{font-size:12px;color:var(--subtle)}
+.ex-it .r{text-align:right;font-size:12px;color:var(--subtle);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.ex-d{display:flex;flex-direction:column;min-height:0;overflow:auto}
+.ex-dh{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.ex-dh .r1{display:flex;align-items:center;gap:10px}
+.ex-dh .meta{display:flex;gap:16px;font-size:12px;color:var(--subtle);flex-wrap:wrap}
+.ex-dh .meta span{display:flex;gap:4px;align-items:center}
+.ex-dh .meta b{color:var(--muted);font-weight:500}
+.gantt{padding:16px 24px;display:flex;flex-direction:column;gap:2px}
+.g-row{display:grid;grid-template-columns:260px 1fr 64px;gap:12px;align-items:center;padding:6px 8px;border-radius:8px;font-size:13px;width:100%;text-align:left}
+.g-row:hover{background:var(--hover)}
+.g-row.on{background:var(--hover);box-shadow:inset 0 0 0 1px var(--d-fg)}
+.g-row .nmc{display:flex;align-items:center;gap:8px;min-width:0}
+.g-row .nmc span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-row.child .nmc{padding-left:22px}
+.g-track{height:10px;position:relative;background:var(--sunken);border-radius:999px}
+.g-bar{position:absolute;top:0;height:10px;border-radius:999px;background:var(--cv-ok)}
+.g-bar.f{background:var(--d-fg)}.g-bar.nr{background:transparent;border:1px dashed var(--cv-edge);box-sizing:border-box}
+.g-axis{display:grid;grid-template-columns:260px 1fr 64px;gap:12px;padding:0 8px;font-size:11px;color:var(--subtle)}
+.g-axis div{display:flex;justify-content:space-between}
+.ex-node{margin:0 24px 24px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+.ex-node .tabs{padding:0 12px}
+.err-box{padding:16px;display:flex;flex-direction:column;gap:12px}
+.err-code{font:12px/18px 'JetBrains Mono',monospace;background:var(--sunken);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--d-fg);white-space:pre-wrap}
+.fix{border:1px solid color-mix(in srgb,var(--u-fg) 40%,var(--border));background:var(--u-bg);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:18px}
+.fix .hd{display:flex;gap:6px;align-items:center;color:var(--u-fg);font-weight:600}
+.fix p{color:var(--fg)}
+.fix .acts{display:flex;gap:8px}
+
+/* ===== Credentials ===== */
+.cols-cred{grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1.3fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,1.2fr) 32px}
+.cr-type{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.cm{width:960px;height:640px}
+.cm .modal-b{padding:0;display:grid;grid-template-columns:240px 1fr 280px;flex:1;min-height:0}
+.cm-types{border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:2px;overflow:auto;background:var(--sunken)}
+[data-theme="light"] .cm-types{background:#F8FAFC}
+.cm-types .input{height:32px;margin-bottom:8px}
+.ct{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;font-size:13px;font-weight:500;width:100%;text-align:left;color:var(--muted)}
+.ct:hover{background:var(--hover);color:var(--fg)}
+.ct[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.cm-form{padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow:auto}
+.cm-help{border-left:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:18px;overflow:auto}
+.cm-help ol{padding-left:18px;display:flex;flex-direction:column;gap:8px;color:var(--muted)}
+.cm-help b{color:var(--fg)}
+.secret{font-family:'JetBrains Mono',monospace;letter-spacing:.1em}
+
+/* ===== Settings ===== */
+.st-wrap{display:grid;grid-template-columns:220px 1fr;gap:32px;align-items:start}
+.st-nav{display:flex;flex-direction:column;gap:2px;position:sticky;top:0}
+.st-nav .nv.on::before{display:none}
+.st-sec{display:none;flex-direction:column;gap:20px}
+.st-sec.on{display:flex}
+.st-card{padding:20px;display:flex;flex-direction:column;gap:16px}
+.st-card>.h2+p{color:var(--muted);margin-top:-12px}
+.st-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+.cols-mem{grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,1fr) 72px}
+.cols-key{grid-template-columns:minmax(0,1.6fr) minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,.8fr) minmax(0,.8fr) 32px}
+.theme-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.thc{border:1px solid var(--border-strong);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px;text-align:left;font-size:13px;font-weight:600}
+.thc[aria-pressed="true"]{border-color:var(--cv-sel);box-shadow:0 0 0 1px var(--cv-sel)}
+.thc .pv{height:84px;border-radius:8px;display:flex;overflow:hidden;border:1px solid var(--border)}
+.thc .pv i{width:28%;display:block}
+.thc .pv span{flex:1;padding:8px;display:flex;flex-direction:column;gap:5px}
+.thc .pv span em{display:block;height:6px;border-radius:3px}
+.role-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.role{border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12px;line-height:16px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.role b{font-size:13px;color:var(--fg)}
+.inline-ok{font-size:12px;color:var(--s-fg);display:flex;align-items:center;gap:4px}
+
+/* ===== Phone (container) ===== */
+@container dev (max-width: 600px){
+  .sidebar{display:none}
+  .kbd{display:none}
+  .ed-r .pub,.ed-r .ibtn{display:none}
+  .phone-top{display:flex;height:56px;flex:none;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--surface);padding-top:0}
+  .phone-top .ctx{flex:1;min-width:0;line-height:16px}
+  .phone-top .ctx small{display:block;font-size:11px;color:var(--subtle)}
+  .phone-top .ctx b{font-size:15px;line-height:20px}
+  .phone-top img{height:24px}
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);height:64px;flex:none;border-top:1px solid var(--border);background:var(--surface);padding-bottom:6px}
+  .tabbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:500;color:var(--subtle)}
+  .tabbar button.on{color:var(--fg);font-weight:600}
+  .tabbar button.on .ico{color:var(--accent)}
+  .tabbar .ico{width:20px;height:20px}
+  .app.on{flex-direction:column}
+  .page{padding:16px 16px 32px;gap:16px}
+  .page-head{flex-direction:column;align-items:stretch}
+  .page-head .btn{width:100%}
+  .h1{font-size:22px;line-height:28px}
+  .stats{grid-template-columns:1fr 1fr;gap:8px}
+  .stat{padding:12px}.stat .v{font-size:20px;line-height:28px}
+  .stat.wide-ph{grid-column:span 2}
+  .toolbar{flex-wrap:wrap}.toolbar .input{width:100%}
+  .toolbar .hide-ph{display:none}
+  .rh{display:none}
+  .rw{grid-template-columns:1fr auto!important;grid-template-areas:"n t" "s s";padding:12px;gap:6px 12px}
+  .rw>*{display:none}
+  .rw>.nm{display:flex;grid-area:n}
+  .rw>.tgl-cell{display:flex;grid-area:t}
+  .rw>.tgl-cell span{display:none}
+  .rw>.st{display:flex;grid-area:s;font-size:12px}
+  .rw>.ph-show{display:flex;grid-area:t}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .crumbs.hide-ph,.hide-ph{display:none!important}
+  .ex-wrap{grid-template-columns:1fr}
+  .ex-d{display:none}
+  .ex-list{border-right:0}
+  .st-wrap{grid-template-columns:1fr;gap:16px}
+  .st-nav{flex-direction:row;overflow-x:auto;scrollbar-width:none;gap:6px;position:static}
+  .st-nav .nv{width:auto;white-space:nowrap;border:1px solid var(--border);border-radius:999px;height:32px;padding:0 12px}
+  .st-nav .nv .ico{display:none}
+  .row2{grid-template-columns:1fr}
+  .theme-cards{grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .thc .pv{height:56px}
+  .role-grid{grid-template-columns:1fr 1fr}
+  .lg-brand{display:none}
+  .lg-form{padding:24px;align-items:flex-start;padding-top:72px}
+  .lg-card{width:100%}
+  .lg-ph-logo{display:flex!important}
+  .lg-legal{left:24px;right:24px;text-align:center}
+  .ed-top{grid-template-columns:1fr auto;padding:0 8px}
+  .ed-mid,.ed-r .hide-ph,.palette,.cv-add,.cv-ctrl,.cv-run,.logs,.ed-l .crumbs,.ntb,.cv-tip{display:none!important}
+  .ph-ro{display:flex!important}
+  .cv-world{transform:translate(8px,40px) scale(.33)!important}
+  .ph-sheet{display:flex!important}
+}
+.lg-ph-logo,.ph-ro,.ph-sheet{display:none}
+</style>
+</head>
+<body>
+<!-- ============ Design review bar (not part of the product) ============ -->
+<header class="dz-bar" aria-label="Controles de la maqueta">
+  <div class="dz-title"><img src="assets/orcon-symbol.svg" alt=""> Orcon <small>· maquetas UX</small></div>
+  <nav class="dz-tabs" role="tablist" id="dzTabs" aria-label="Pantallas"></nav>
+  <div class="dz-ctrl">
+    <div class="dz-seg" role="group" aria-label="Tema">
+      <button data-theme-set="dark" aria-pressed="true" title="Oscuro"><i data-i="moon" class="s14"></i></button>
+      <button data-theme-set="light" aria-pressed="false" title="Claro"><i data-i="sun" class="s14"></i></button>
+    </div>
+    <div class="dz-seg" role="group" aria-label="Dispositivo">
+      <button data-dev="desktop" aria-pressed="true" title="Escritorio"><i data-i="monitor" class="s14"></i></button>
+      <button data-dev="phone" aria-pressed="false" title="Teléfono"><i data-i="phone" class="s14"></i></button>
+    </div>
+    <div class="dz-seg" role="group" aria-label="Notas">
+      <button id="dzNotesBtn" aria-pressed="true" title="Mostrar u ocultar notas n8n / mejora"><i data-i="sticky" class="s14"></i> Notas</button>
+    </div>
+  </div>
+</header>
+<div class="dz-variants" id="dzVariants"><span id="dzVarLabel">Estado:</span><div class="dz-seg" id="dzVarSeg"></div></div>
+
+<main class="dz-stage" id="stage">
+<div class="dz-scaler" id="scaler">
+<div class="device" id="device">
+
+<!-- ================= 1. LOGIN ================= -->
+<section class="screen" id="s-login" data-screen="login">
+  <aside class="lg-brand" data-ann="lg-brand">
+    <img class="wm" src="assets/orcon-lockup-on-dark.svg" alt="Orcon">
+    <h2>Construye, orquesta y ejecuta <span>a tu manera.</span></h2>
+    <ul>
+      <li><i data-i="upload"></i><span>Trae tus flujos de n8n: los importamos y te decimos qué cambió.</span></li>
+      <li><i data-i="shield"></i><span>Cada paso que envía algo afuera nunca lo envía dos veces.</span></li>
+      <li><i data-i="code"></i><span>Código abierto (Apache-2.0). Tus datos, en tu servidor.</span></li>
+    </ul>
+    <div class="lg-foot"><span>v0.9 · vista previa</span><span>docs.orcon.dev</span></div>
+    <img class="lg-mascot" src="assets/mascot-crossed-arms.png" alt="">
+  </aside>
+  <div class="lg-form">
+    <div class="lg-prefs" data-ann="lg-prefs">
+      <button class="btn ghost sm"><i data-i="globe" class="s14"></i> Español</button>
+      <button class="ibtn sm" data-theme-toggle title="Cambiar tema"><i data-i="moon" class="s14"></i></button>
+    </div>
+    <!-- sign in -->
+    <form class="lg-card" id="lgSignin" onsubmit="return false">
+      <div class="lg-ph-logo" style="align-items:center;gap:10px"><img src="assets/orcon-symbol.svg" alt="" style="height:32px"><b style="font-size:20px">Orcon</b></div>
+      <div><h1 class="h1">Inicia sesión</h1><p class="sub">Bienvenido de nuevo a <b>Orcon</b>.</p></div>
+      <div class="alert d hide" id="lgErr" role="alert"><i data-i="xcircle"></i><div><b>El correo o la contraseña no coinciden.</b><span>Revisa los datos o recupera tu contraseña. Te quedan 4 intentos antes de una pausa de 5 minutos.</span></div></div>
+      <div class="field"><label for="lgMail">Correo electrónico</label>
+        <div class="input" id="lgMailBox"><i data-i="mail"></i><input id="lgMail" type="email" value="juan.tamayo@wirvii.com" autocomplete="email"></div></div>
+      <div class="field"><label for="lgPw">Contraseña <a class="lnk" href="#" data-variant-go="forgot" style="font-size:13px">¿La olvidaste?</a></label>
+        <div class="input" id="lgPwBox"><i data-i="lock"></i><input id="lgPw" type="password" value="contraseña-segura"><button type="button" class="pw-eye" id="pwEye" aria-label="Mostrar contraseña"><i data-i="eye"></i></button></div></div>
+      <div class="lg-row"><label class="check"><i><i data-i="check" class="s12"></i></i> Mantener la sesión 30 días</label></div>
+      <button class="btn primary lg block" data-ann="lg-submit">Iniciar sesión <span class="kbd">↵</span></button>
+      <div class="or">o</div>
+      <button class="btn secondary lg block" type="button" data-ann="lg-sso"><i data-i="building"></i> Continuar con SSO de tu empresa</button>
+      <p class="hint" style="text-align:center">¿No tienes cuenta? Pide una invitación a quien administra tu organización.</p>
+    </form>
+    <!-- forgot -->
+    <form class="lg-card hide" id="lgForgot" onsubmit="return false">
+      <button type="button" class="btn ghost sm" style="align-self:flex-start;margin-left:-10px" data-variant-go="normal"><i data-i="arrowl" class="s14"></i> Volver</button>
+      <div><h1 class="h1">Recupera tu contraseña</h1><p class="sub">Te enviaremos un enlace para crear una nueva. Vence en 30 minutos.</p></div>
+      <div class="field"><label>Correo electrónico</label><div class="input"><i data-i="mail"></i><input value="juan.tamayo@wirvii.com"></div></div>
+      <button class="btn primary lg block" id="sendReset">Enviar enlace</button>
+      <div class="alert s hide" id="resetOk"><i data-i="check"></i><div><b>Revisa tu correo.</b><span>Si existe una cuenta con ese correo, recibirás el enlace en un minuto. Revisa también la carpeta de spam.</span></div></div>
+    </form>
+    <p class="lg-legal">Al continuar aceptas los términos de uso de tu organización.</p>
+  </div>
+</section>
+
+<!-- ================= APP SHELL ================= -->
+<div class="app" id="app">
+  <nav class="sidebar" id="sidebar" aria-label="Navegación principal" data-ann="sidebar">
+    <div class="sb-top">
+      <span style="display:flex;align-items:center;gap:8px"><img class="sb-logo" src="assets/orcon-symbol.svg" alt=""><b class="sb-logo-word" style="font-size:16px;letter-spacing:-.01em">Orcon</b></span>
+      <button class="ibtn sm" id="sbCollapse" title="Contraer barra lateral  [" aria-label="Contraer barra lateral"><i data-i="panel"></i></button>
+    </div>
+    <div style="position:relative">
+      <button class="sb-org" id="orgBtn" data-ann="org"><span class="org-av">W</span><div><b>Wirvii</b><small>Organización · 9 personas</small></div><i data-i="updown" class="s14"></i></button>
+      <div class="menu hide" id="orgMenu" style="left:0;top:52px;width:240px">
+        <div class="mh">Organizaciones</div>
+        <button class="mi on"><span class="org-av" style="width:20px;height:20px;border-radius:5px;background:var(--brand-grad);display:grid;place-items:center;color:#0F172A;font-weight:800;font-size:10px">W</span>Wirvii<i data-i="check" class="s14" style="margin-left:auto;color:var(--accent)"></i></button>
+        <button class="mi"><span style="width:20px;height:20px;border-radius:5px;background:#C4B5FD;display:grid;place-items:center;color:#0F172A;font-weight:800;font-size:10px">Q</span>Quantium Ingeniería</button>
+        <button class="mi"><span style="width:20px;height:20px;border-radius:5px;background:#FCD34D;display:grid;place-items:center;color:#0F172A;font-weight:800;font-size:10px">G</span>Guía Migratoria</button>
+        <hr><button class="mi"><i data-i="settings"></i>Ajustes de la organización</button><button class="mi"><i data-i="plus"></i>Crear organización</button>
+      </div>
+    </div>
+    <div class="sb-create" style="position:relative">
+      <button class="btn primary block" data-open-newflow><i data-i="plus"></i><span class="lbl-x">Crear flujo</span><span class="kbd lbl-x" style="margin-left:auto">N</span></button>
+    </div>
+    <div class="nav">
+      <button class="nv" data-go="overview"><i data-i="home"></i><span class="lbl-x">Inicio</span></button>
+      <button class="nv" data-go="project" data-proj="personal"><i data-i="user"></i><span class="lbl-x">Personal</span></button>
+    </div>
+    <div class="sb-sec"><span>Proyectos</span><button class="ibtn" title="Crear proyecto"><i data-i="plus" class="s14"></i></button></div>
+    <div class="nav">
+      <button class="nv" data-go="project" data-proj="ventas"><span class="pdot" style="background:#86EFAC">V</span><span class="lbl-x">Ventas WhatsApp</span><span class="nv-r">7</span></button>
+      <button class="nv" data-go="project" data-proj="soporte"><span class="pdot" style="background:#67E8F9">S</span><span class="lbl-x">Soporte</span><span class="nv-r">4</span></button>
+      <button class="nv" data-go="project" data-proj="ops"><span class="pdot" style="background:#FCD34D">O</span><span class="lbl-x">Operaciones</span><span class="nv-r">0</span></button>
+    </div>
+    <div class="sb-sec" style="padding-top:16px"><span>Recursos</span></div>
+    <div class="nav">
+      <button class="nv" data-go="templates"><i data-i="template"></i><span class="lbl-x">Plantillas</span></button>
+      <button class="nv" data-go="credentials"><i data-i="key"></i><span class="lbl-x">Credenciales</span></button>
+      <button class="nv" data-go="executions"><i data-i="activity"></i><span class="lbl-x">Ejecuciones</span><span class="nv-r" style="color:var(--u-fg);font-weight:700">2</span></button>
+    </div>
+    <div class="sb-bottom">
+      <div style="position:relative">
+        <button class="nv" id="helpBtn"><i data-i="help"></i><span class="lbl-x">Ayuda</span></button>
+        <div class="menu hide" id="helpMenu" style="left:0;bottom:36px">
+          <button class="mi"><i data-i="book"></i>Documentación</button>
+          <button class="mi"><i data-i="msg"></i>Foro de la comunidad</button>
+          <button class="mi"><i data-i="upload"></i>Guía para venir desde n8n</button>
+          <button class="mi"><i data-i="keyboard"></i>Atajos de teclado<span class="kbd">?</span></button>
+          <hr><button class="mi"><i data-i="sparkles"></i>Novedades<span class="chip a" style="margin-left:auto;height:18px">3</span></button>
+        </div>
+      </div>
+      <button class="nv" data-go="settings"><i data-i="settings"></i><span class="lbl-x">Ajustes</span></button>
+      <div style="position:relative">
+        <button class="sb-user" id="userBtn" data-ann="user"><span class="avatar av1">JT</span><div><b>Juan Tamayo</b><small>Propietario · Wirvii</small></div><i data-i="more" class="s14"></i></button>
+        <div class="menu hide" id="userMenu" style="left:0;bottom:56px;width:240px">
+          <div style="padding:8px;display:flex;gap:10px;align-items:center"><span class="avatar av1">JT</span><div style="line-height:16px"><b style="font-size:13px">Juan Tamayo</b><br><small class="subtle" style="font-size:12px">juan.tamayo@wirvii.com</small></div></div>
+          <hr>
+          <button class="mi" data-go="settings" data-st="perfil"><i data-i="user"></i>Mi perfil</button>
+          <button class="mi" data-go="settings" data-st="apariencia"><i data-i="sun"></i>Apariencia</button>
+          <button class="mi" data-go="settings" data-st="api"><i data-i="code"></i>Claves de API</button>
+          <button class="mi"><i data-i="keyboard"></i>Atajos de teclado<span class="kbd">?</span></button>
+          <hr>
+          <button class="mi" data-screen-go="login"><i data-i="logout"></i>Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- phone top bar -->
+  <div class="phone-top" data-ann="ph-top">
+    <img src="assets/orcon-symbol.svg" alt="">
+    <div class="ctx"><small id="phCtx">Wirvii</small><b id="phTitle">Inicio</b></div>
+    <button class="ibtn"><i data-i="search"></i></button>
+    <span class="avatar av1">JT</span>
+  </div>
+
+  <div class="main" id="main">
+
+  <!-- ============ 2. OVERVIEW ============ -->
+  <section class="view" data-view="overview">
+    <div class="page">
+      <div class="page-head">
+        <div><div class="crumbs hide-ph"><span>Wirvii</span><i data-i="chevr"></i><b>Inicio</b></div>
+          <h1 class="h1" style="margin-top:6px">Buenas tardes, Juan</h1>
+          <p>Todo lo que corre en <b>Wirvii</b>, de todos tus proyectos, en un solo lugar.</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn secondary hide-ph" data-open-newflow="import"><i data-i="upload"></i>Importar de n8n</button>
+          <button class="btn primary" data-open-newflow data-ann="ov-cta"><i data-i="plus"></i>Crear flujo <span class="kbd">N</span></button>
+        </div>
+      </div>
+      <div class="stats" data-ann="ov-stats">
+        <div class="card stat"><span class="k"><i data-i="zap" class="s14"></i>Flujos activos</span><span class="v num">12<small>de 18</small></span><span class="d">3 proyectos</span></div>
+        <div class="card stat"><span class="k"><i data-i="activity" class="s14"></i>Ejecuciones · 24 h</span><span class="v num">4.812</span><div class="spark" aria-hidden="true"><i style="height:30%"></i><i style="height:22%"></i><i style="height:18%"></i><i style="height:25%"></i><i style="height:40%"></i><i style="height:62%"></i><i style="height:80%"></i><i style="height:95%"></i><i style="height:88%"></i><i style="height:76%"></i><i style="height:70%"></i><i style="height:82%"></i></div><span class="d up"><i data-i="trend" class="s12"></i>12 % más que ayer</span></div>
+        <div class="card stat"><span class="k"><i data-i="xcircle" class="s14"></i>Fallidas · 24 h</span><span class="v num">7<small>0,15 %</small></span><span class="d">5 en “Recordatorio de pago”</span></div>
+        <div class="card stat attn" data-ann="ov-uncertain"><span class="k"><i data-i="shieldq" class="s14"></i>Para revisar</span><span class="v num">2</span><span class="d">No sabemos si el envío llegó</span></div>
+        <div class="card stat wide-ph"><span class="k"><i data-i="clock" class="s14"></i>Tiempo ahorrado · 7 días</span><span class="v num">31 h</span><span class="d">Estimado con 3 min por tarea</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="tabs" role="tablist" data-ann="ov-tabs">
+          <button role="tab" aria-selected="true" data-ovtab="flows">Flujos <span class="count">18</span></button>
+          <button role="tab" aria-selected="false" data-ovtab="creds">Credenciales <span class="count">9</span></button>
+          <button role="tab" aria-selected="false" data-ovtab="execs">Ejecuciones</button>
+        </div>
+        <div class="toolbar">
+          <div class="input"><i data-i="search"></i><input placeholder="Buscar flujos, etiquetas o personas"><span class="kbd">/</span></div>
+          <button class="fchip hide-ph"><i data-i="filter" class="s14"></i>Estado: todos</button>
+          <button class="fchip hide-ph"><i data-i="folder" class="s14"></i>Proyecto: todos</button>
+          <button class="fchip hide-ph"><i data-i="tag" class="s14"></i>Etiquetas</button>
+          <span style="flex:1" class="hide-ph"></span>
+          <button class="fchip hide-ph">Ordenar: última ejecución<i data-i="chevd" class="s14"></i></button>
+        </div>
+        <div class="card list" id="ovFlows">
+          <div class="rh cols-flows"><span>Nombre</span><span>Proyecto</span><span>Última ejecución</span><span>24 h</span><span>Actualizado</span><span></span><span>Activo</span><span></span></div>
+          <div id="ovRows"></div>
+        </div>
+        <div class="card list hide" id="ovCreds"><div class="empty" style="padding:32px"><p>Las 9 credenciales de la organización aparecen aquí (misma tabla que la pantalla 9).</p><button class="btn secondary" data-go="credentials">Ir a credenciales</button></div></div>
+        <div class="card list hide" id="ovExecs"><div class="empty" style="padding:32px"><p>Todas las ejecuciones de todos los proyectos (misma vista que la pantalla 8).</p><button class="btn secondary" data-go="executions">Ir a ejecuciones</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. PROJECT ============ -->
+  <section class="view" data-view="project">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <div class="crumbs hide-ph"><span>Wirvii</span><i data-i="chevr"></i><span>Proyectos</span><i data-i="chevr"></i><b id="pjCrumb">Ventas WhatsApp</b></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px"><span class="pdot" id="pjDot" style="width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-weight:800;color:#0F172A;background:#86EFAC">V</span><h1 class="h1" id="pjTitle">Ventas WhatsApp</h1></div>
+          <p id="pjDesc">Agentes que venden y hacen seguimiento por WhatsApp para la tienda Wirvii.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="hide-ph" style="display:flex;margin-right:4px" title="5 personas en el proyecto"><span class="avatar sm av1" style="box-shadow:0 0 0 2px var(--bg)">JT</span><span class="avatar sm av2" style="margin-left:-6px;box-shadow:0 0 0 2px var(--bg)">LM</span><span class="avatar sm av3" style="margin-left:-6px;box-shadow:0 0 0 2px var(--bg)">CR</span><span class="avatar sm" style="margin-left:-6px;box-shadow:0 0 0 2px var(--bg);background:var(--raised);color:var(--muted)">+2</span></div>
+          <button class="btn secondary hide-ph"><i data-i="share" class="s14"></i>Compartir</button>
+          <button class="btn primary" data-open-newflow><i data-i="plus"></i>Crear flujo <span class="kbd">N</span></button>
+        </div>
+      </div>
+      <div class="tabs" role="tablist" data-ann="pj-tabs">
+        <button role="tab" aria-selected="true" data-pjtab="flows">Flujos <span class="count" id="pjCount">7</span></button>
+        <button role="tab" aria-selected="false" data-pjtab="creds">Credenciales <span class="count">4</span></button>
+        <button role="tab" aria-selected="false" data-pjtab="execs">Ejecuciones</button>
+        <button role="tab" aria-selected="false" data-pjtab="settings">Ajustes</button>
+      </div>
+      <div id="pjFlowsWrap" style="display:flex;flex-direction:column;gap:12px">
+        <div class="toolbar">
+          <div class="input"><i data-i="search"></i><input placeholder="Buscar en Ventas WhatsApp"><span class="kbd">/</span></div>
+          <div class="seg hide-ph" role="group" aria-label="Filtro rápido"><button aria-pressed="true">Todos</button><button aria-pressed="false">Activos</button><button aria-pressed="false">Con fallos</button></div>
+          <span style="flex:1" class="hide-ph"></span>
+          <button class="fchip hide-ph"><i data-i="tag" class="s14"></i>Etiquetas</button>
+          <button class="fchip hide-ph">Ordenar: actualizado<i data-i="chevd" class="s14"></i></button>
+        </div>
+        <div class="card list" id="pjList" data-ann="pj-list">
+          <div class="rh cols-flows-p"><span>Nombre</span><span>Última ejecución</span><span>24 h</span><span>Actualizado</span><span></span><span>Activo</span><span></span></div>
+          <div id="pjRows"></div>
+        </div>
+      </div>
+      <div class="card hide" id="pjEmpty">
+        <div class="empty" data-ann="pj-empty">
+          <div class="mascot"><img src="assets/mascot-thinking.png" alt=""></div>
+          <h2 class="h2">Operaciones está listo para su primer flujo</h2>
+          <p>Empieza desde cero, usa una plantilla o trae un flujo que ya tengas en n8n. Lo puedes mover a otro proyecto después.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn primary" data-open-newflow><i data-i="plus"></i>Crear flujo</button><button class="btn secondary" data-open-newflow="import"><i data-i="upload"></i>Importar de n8n</button><button class="btn ghost" data-open-newflow="template"><i data-i="template"></i>Ver plantillas</button></div>
+        </div>
+      </div>
+      <div class="card hide" id="pjOther"><div class="empty"><p id="pjOtherTxt"></p></div></div>
+    </div>
+  </section>
+
+  <!-- ============ 6. EDITOR ============ -->
+  <section class="view" data-view="editor" style="overflow:hidden">
+    <div style="position:relative;flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="ed-top" data-ann="ed-top">
+        <div class="ed-l">
+          <div class="crumbs"><a href="#" data-go="project" data-proj="ventas">Ventas WhatsApp</a><i data-i="chevr"></i></div>
+          <button class="ed-name" title="Renombrar (F2)">Agente de ventas WhatsApp</button>
+          <span class="tag hide-ph">ventas</span><span class="tag hide-ph">ia</span>
+          <button class="btn ghost sm hide-ph" style="height:22px;padding:0 6px;font-size:12px"><i data-i="plus" class="s12"></i>Etiqueta</button>
+        </div>
+        <div class="ed-mid"><div class="seg" role="tablist"><button aria-pressed="true">Editor</button><button aria-pressed="false" data-go="executions">Ejecuciones</button><button aria-pressed="false">Versiones</button></div></div>
+        <div class="ed-r">
+          <span class="saved hide-ph" data-ann="ed-saved"><i data-i="check" class="s14"></i>Guardado · hace 4 s</span>
+          <span class="vsep hide-ph"></span>
+          <label class="tgl-wrap hide-ph" data-ann="ed-active"><button class="toggle" role="switch" aria-checked="true" data-toggle-label="edActLbl"></button><span id="edActLbl" style="width:44px">Activo</span></label>
+          <button class="btn secondary sm hide-ph"><i data-i="share" class="s14"></i>Compartir</button>
+          <div class="pub" data-ann="ed-publish"><button class="btn primary sm">Publicar <span class="pub-n">2</span></button><button class="btn primary sm" aria-label="Más opciones de publicación"><i data-i="chevd" class="s14"></i></button></div>
+          <button class="ibtn sm hide-ph"><i data-i="more"></i></button>
+        </div>
+      </div>
+      <div class="ph-ro alert a" style="margin:8px;align-items:center"><i data-i="monitor"></i><div><b>Solo lectura en el teléfono</b><span>Para editar, abre este flujo en un computador o tablet.</span></div></div>
+      <div class="ed-body">
+        <div class="cv" id="canvas" data-ann="cv">
+          <div class="cv-tip"><i data-i="info" class="s14"></i>Última prueba: <b style="color:var(--s-fg)">correcta</b> · 2,4 s · hace 3 min</div>
+          <div class="cv-world" id="cvWorld" style="transform:translate(24px,44px) scale(.85)">
+            <svg class="edges" width="1200" height="600" aria-hidden="true">
+              <defs><marker id="ah-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--cv-ok)"/></marker>
+              <marker id="ah-dt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--cv-edge)"/></marker></defs>
+              <path class="edge ok" d="M146 310 C190 310 190 310 234 310" marker-end="url(#ah-ok)"/>
+              <path class="edge ok" d="M346 310 C390 310 390 310 434 310" marker-end="url(#ah-ok)"/>
+              <path class="edge ok" d="M646 310 C690 310 690 310 734 310" marker-end="url(#ah-ok)"/>
+              <path class="edge nr" d="M846 284 C890 284 890 170 934 170" marker-end="url(#ah-dt)"/>
+              <path class="edge ok" d="M846 336 C890 336 890 450 934 450" marker-end="url(#ah-ok)"/>
+              <path class="edge sub" d="M480 360 C480 400 460 400 460 432"/>
+              <path class="edge sub" d="M520 360 C520 400 540 400 540 432"/>
+              <path class="edge sub" d="M570 360 C570 400 620 400 620 432"/>
+              <path class="edge sub" d="M610 360 C610 400 700 400 700 432"/>
+            </svg>
+            <div class="sticky" style="left:40px;top:40px;width:380px;height:150px">
+              <div class="sh"><i data-i="sticky" class="s14"></i>Cómo funciona</div>
+              Responde dudas del catálogo y toma pedidos por WhatsApp para la tienda <b>Wirvii</b>.<br>
+              • Si el cliente pide hablar con una persona, avisa al equipo en Slack.<br>
+              • Las respuestas usan la clave <code class="mono" style="font-size:11px">wamid</code>: un reintento nunca envía el mensaje dos veces.
+            </div>
+            <!-- trigger -->
+            <div class="node trig" style="left:40px;top:260px" tabindex="0" aria-label="Mensaje de WhatsApp recibido, disparador. Estado: correcto">
+              <span class="tmark"><i data-i="zap"></i></span><span class="nic" style="color:#25D366"><i data-i="wa"></i></span>
+              <span class="badge ok"><i data-i="check"></i></span><span class="port out"></span></div>
+            <div class="nlabel" style="left:90px;top:366px"><b>Mensaje recibido</b><small>WhatsApp · disparador</small></div>
+            <!-- normalize -->
+            <div class="node" style="left:240px;top:260px" tabindex="0"><span class="nic" style="color:#FCD34D"><i data-i="pen"></i></span><span class="badge ok"><i data-i="check"></i></span><span class="port in"></span><span class="port out"></span></div>
+            <div class="nlabel" style="left:290px;top:366px"><b>Preparar mensaje</b><small>Editar campos</small></div>
+            <!-- agent -->
+            <div class="ntb" style="left:540px;top:208px" data-ann="cv-toolbar"><button title="Ejecutar paso (R)"><i data-i="play"></i></button><button title="Desactivar (D)"><i data-i="power"></i></button><button title="Abrir detalles (Enter)" data-open-ndv><i data-i="maximize"></i></button><button title="Eliminar (Supr)"><i data-i="trash"></i></button><button title="Más"><i data-i="more"></i></button></div>
+            <div class="node wide sel" style="left:440px;top:260px" tabindex="0" data-ann="cv-agent"><span class="nic" style="color:#C4B5FD;display:flex;gap:10px;width:auto"><i data-i="bot"></i></span><span class="badge ok"><i data-i="check"></i></span><span class="port in"></span><span class="port out"></span></div>
+            <div class="nlabel" style="left:540px;top:366px"><b style="background:var(--cv-bg);padding:0 4px">Agente de ventas</b><small style="background:var(--cv-bg);padding:0 4px">Agente de IA · 3 herramientas</small></div>
+            <div class="aib" style="left:460px;top:432px"><span class="c" style="color:#C4B5FD"><i data-i="sparkles"></i></span><small>Modelo</small><em>gpt-4.1-mini</em></div>
+            <div class="aib" style="left:540px;top:432px"><span class="c" style="color:#93C5FD"><i data-i="db"></i></span><small>Memoria</small><em>Postgres · 20 msj</em></div>
+            <div class="aib" style="left:620px;top:432px"><span class="c" style="color:#86EFAC"><i data-i="cart"></i></span><small>Herram.</small><em>Catálogo Shopify</em></div>
+            <div class="aib" style="left:700px;top:432px"><span class="c" style="color:#86EFAC"><i data-i="wrench"></i></span><small>Herram.</small><em>Crear pedido</em></div>
+            <div class="aib" style="left:780px;top:432px"><span class="c add"><i data-i="plus"></i></span><small>Añadir</small></div>
+            <!-- if -->
+            <div class="node" style="left:740px;top:260px" tabindex="0"><span class="nic" style="color:var(--link)"><i data-i="branch"></i></span><span class="badge ok"><i data-i="check"></i></span><span class="port in"></span><span class="port out o1"></span><span class="port out o2"></span><span class="olbl" style="top:16px">sí</span><span class="olbl" style="top:68px">no</span></div>
+            <div class="nlabel" style="left:790px;top:366px"><b>¿Pide un asesor?</b><small>Si</small></div>
+            <!-- escalate -->
+            <div class="node" style="left:940px;top:120px" tabindex="0"><span class="nic" style="color:#E879F9"><i data-i="msg"></i></span><span class="port in"></span></div>
+            <div class="nlabel" style="left:990px;top:226px"><b>Avisar al equipo</b><small>Slack · #ventas</small><span class="chip n"><i data-i="ban"></i>No se ejecutó</span></div>
+            <div class="stub" style="left:1046px;top:159px"><i></i><button aria-label="Añadir paso después de Avisar al equipo"><i data-i="plus" class="s14"></i></button></div>
+            <!-- reply -->
+            <div class="node" style="left:940px;top:400px" tabindex="0" data-open-ndv style="cursor:pointer"><span class="nic" style="color:#25D366"><i data-i="wa"></i></span><span class="badge ok"><i data-i="check"></i></span><span class="port in"></span><span class="port out"></span></div>
+            <div class="nlabel" style="left:990px;top:506px"><b>Responder por WhatsApp</b><small>Enviar mensaje</small><span class="chip a"><i data-i="shield"></i>Nunca envía dos veces</span></div>
+            <div class="stub" style="left:1046px;top:439px"><i></i><button aria-label="Añadir paso después de Responder"><i data-i="plus" class="s14"></i></button></div>
+            <!-- edge labels -->
+            <span class="elabel" style="left:190px;top:310px">1 elemento</span>
+            <span class="elabel" style="left:390px;top:310px">1 elemento</span>
+            <span class="elabel" style="left:690px;top:310px">1 elemento</span>
+            <span class="elabel nr" style="left:890px;top:222px">0</span>
+            <span class="elabel" style="left:890px;top:398px">1 elemento</span>
+          </div>
+          <div class="cv-ctrl"><button title="Ajustar a la vista (1)"><i data-i="maximize"></i></button><button title="Acercar (+)"><i data-i="zoomin"></i></button><button title="Alejar (-)"><i data-i="zoomout"></i></button><button title="Ordenar (Mayús+Alt+T)"><i data-i="wand"></i></button><button title="Nota adhesiva (Mayús+S)"><i data-i="sticky"></i></button></div>
+          <div class="cv-run" data-ann="cv-run">
+            <button class="btn primary lg"><i data-i="play"></i>Probar flujo <span class="kbd">Ctrl ↵</span></button>
+            <button class="btn secondary lg" data-open-logs><i data-i="msg"></i>Chat de prueba</button>
+          </div>
+          <div class="cv-add"><button title="Abrir panel de nodos (A)" id="palToggle"><i data-i="plus"></i></button><button title="Pedir a la IA que edite el flujo"><i data-i="sparkles"></i></button></div>
+          <div class="ph-sheet card" style="position:absolute;left:8px;right:8px;bottom:8px;padding:12px;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><b>6 pasos · última ejecución correcta</b><span class="chip s"><i data-i="check"></i>Correcta</span></div>
+            <p class="hint">Toca un paso para ver su estado y sus datos.</p>
+            <button class="btn secondary block" data-go="executions">Ver ejecuciones</button>
+          </div>
+        </div>
+        <aside class="palette" id="palette" aria-label="Panel de nodos" data-ann="palette">
+          <div class="pal-h">
+            <div class="row"><b>Añadir un paso</b><button class="ibtn sm" id="palClose" aria-label="Cerrar (Esc)"><i data-i="x"></i></button></div>
+            <div class="input" style="height:36px"><i data-i="search"></i><input id="palSearch" placeholder="Busca: WhatsApp, IA, HTTP, Sheets…" autocomplete="off"></div>
+          </div>
+          <div class="pal-b" id="palBody"></div>
+          <div class="pal-f"><span><span class="kbd">↑</span><span class="kbd">↓</span> moverse</span><span><span class="kbd">↵</span> insertar</span><span><span class="kbd">Esc</span> cerrar</span></div>
+        </aside>
+      </div>
+      <div class="logs" id="logs" data-ann="logs">
+        <div class="logs-h">
+          <button class="ibtn sm" id="logsToggle" aria-label="Abrir registros"><i data-i="chevu"></i></button>
+          <b>Registros</b><span class="chip s"><i data-i="check"></i>Correcta</span><span class="subtle">6 pasos · 2,4 s · 1.284 tokens · hace 3 min</span>
+          <span style="flex:1"></span>
+          <button class="btn ghost sm"><i data-i="history" class="s14"></i>Ejecuciones anteriores</button>
+        </div>
+        <div class="logs-b">
+          <div class="lg-steps">
+            <div class="lg-step"><i data-i="check" class="s14 ok"></i>Mensaje recibido<small>0 ms</small></div>
+            <div class="lg-step"><i data-i="check" class="s14 ok"></i>Preparar mensaje<small>3 ms</small></div>
+            <div class="lg-step on"><i data-i="check" class="s14 ok"></i>Agente de ventas<small>2,1 s</small></div>
+            <div class="lg-step child"><i data-i="check" class="s14 ok"></i>Memoria · leer<small>18 ms</small></div>
+            <div class="lg-step child"><i data-i="check" class="s14 ok"></i>Catálogo Shopify<small>412 ms</small></div>
+            <div class="lg-step child"><i data-i="check" class="s14 ok"></i>Modelo · 2 llamadas<small>1,5 s</small></div>
+            <div class="lg-step"><i data-i="check" class="s14 ok"></i>¿Pide un asesor?<small>1 ms</small></div>
+            <div class="lg-step"><i data-i="check" class="s14 ok"></i>Responder por WhatsApp<small>288 ms</small></div>
+          </div>
+          <div class="lg-io"><div class="h3" style="margin-bottom:8px">Agente de ventas · salida</div><div class="json"><span class="k">"output"</span>: <span class="s">"¡Hola Camila! Sí tenemos la chaqueta Andes en talla M, color verde oliva, a $289.900. ¿Te la separo?"</span>,
+<span class="k">"intencion"</span>: <span class="s">"compra"</span>,
+<span class="k">"pideAsesor"</span>: <span class="n">false</span>,
+<span class="k">"herramientasUsadas"</span>: [<span class="s">"catalogo_shopify"</span>]</div></div>
+          <div class="chat"><div class="chat-h"><span>Chat de prueba · simula WhatsApp</span><span>+57 310 456 7890</span></div>
+            <div class="chat-b"><div class="bub in">Hola, ¿tienen la chaqueta Andes en talla M?<time>10:41</time></div><div class="bub out">¡Hola Camila! Sí tenemos la chaqueta Andes en talla M, color verde oliva, a $289.900. ¿Te la separo?<time>10:41 ✓✓</time></div></div>
+            <div class="chat-i"><div class="input"><input placeholder="Escribe como si fueras el cliente…"></div><button class="btn primary sm" style="height:32px"><i data-i="send" class="s14"></i></button></div></div>
+        </div>
+      </div>
+
+      <!-- ============ 7. NDV ============ -->
+      <div class="ndv-wrap" id="ndv" role="dialog" aria-modal="true" aria-label="Responder por WhatsApp">
+        <div class="ndv">
+          <div class="ndv-h">
+            <button class="btn ghost sm" data-close-ndv><i data-i="arrowl" class="s14"></i>Volver al lienzo <span class="kbd">Esc</span></button>
+            <span class="vsep"></span>
+            <span class="nic"><i data-i="wa" class="s20"></i></span>
+            <div class="t"><b>Responder por WhatsApp</b><small>WhatsApp Cloud API · Enviar mensaje</small></div>
+            <span class="chip s"><i data-i="check"></i>Correcto · 288 ms</span>
+            <span class="chip a" data-ann="ndv-safe"><i data-i="shield"></i>Nunca envía dos veces</span>
+            <span style="flex:1"></span>
+            <button class="btn ghost sm"><i data-i="book" class="s14"></i>Documentación</button>
+            <button class="btn primary sm"><i data-i="play" class="s14"></i>Ejecutar paso <span class="kbd">R</span></button>
+          </div>
+          <div class="ndv-b">
+            <!-- INPUT -->
+            <section class="dp" data-ann="ndv-input">
+              <div class="dp-h"><span class="ttl">Entrada</span><span class="src">de <b>¿Pide un asesor?</b> · rama “no”<i data-i="chevd" class="s12"></i></span>
+                <span class="cnt">1 elemento</span>
+                <div class="seg" style="width:100%;margin-top:4px" data-segtabs="in"><button aria-pressed="true" data-t="schema">Esquema</button><button aria-pressed="false" data-t="table">Tabla</button><button aria-pressed="false" data-t="json">JSON</button></div></div>
+              <div class="dp-b">
+                <p class="hint" style="margin-bottom:8px;display:flex;gap:6px;align-items:center"><i data-i="grip" class="s14"></i>Arrastra un campo hasta un parámetro para usarlo.</p>
+                <div class="schema" data-pane="in-schema">
+                  <div class="sf" draggable="true" data-expr="output"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">output</span><span class="ex">¡Hola Camila! Sí tenemos la chaqueta…</span></div>
+                  <div class="sf"><i data-i="chevd" class="s14 subtle"></i><span class="ty">{}</span><b style="font-size:13px">cliente</b></div>
+                  <div class="sf l2" draggable="true" data-expr="cliente.nombre"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">nombre</span><span class="ex">Camila Rojas</span></div>
+                  <div class="sf l2" draggable="true" data-expr="cliente.telefono"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">telefono</span><span class="ex">573104567890</span></div>
+                  <div class="sf"><i data-i="chevd" class="s14 subtle"></i><span class="ty">{}</span><b style="font-size:13px">mensaje</b></div>
+                  <div class="sf l2" draggable="true" data-expr="mensaje.wamid"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">wamid</span><span class="ex">wamid.HBgMNTczMTA0NTY3ODkw…</span></div>
+                  <div class="sf l2" draggable="true" data-expr="mensaje.texto"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">texto</span><span class="ex">Hola, ¿tienen la chaqueta Andes en talla M?</span></div>
+                  <div class="sf l2" draggable="true" data-expr="mensaje.recibido"><i data-i="grip" class="s14 grip"></i><span class="ty">⏱</span><span class="pill">recibido</span><span class="ex">2026-10-15T10:41:07-05:00</span></div>
+                  <div class="sf" draggable="true" data-expr="intencion"><i data-i="grip" class="s14 grip"></i><span class="ty">T</span><span class="pill">intencion</span><span class="ex">compra</span></div>
+                  <div class="sf" draggable="true" data-expr="pideAsesor"><i data-i="grip" class="s14 grip"></i><span class="ty">B</span><span class="pill">pideAsesor</span><span class="ex">false</span></div>
+                </div>
+                <table class="tbl hide" data-pane="in-table"><thead><tr><th>#</th><th>output</th><th>cliente.nombre</th><th>cliente.telefono</th><th>intencion</th></tr></thead><tbody><tr><td>1</td><td>¡Hola Camila! Sí tenemos…</td><td>Camila Rojas</td><td>573104567890</td><td>compra</td></tr></tbody></table>
+                <div class="json hide" data-pane="in-json">[
+  {
+    <span class="k">"output"</span>: <span class="s">"¡Hola Camila! Sí tenemos…"</span>,
+    <span class="k">"cliente"</span>: { <span class="k">"nombre"</span>: <span class="s">"Camila Rojas"</span>, <span class="k">"telefono"</span>: <span class="s">"573104567890"</span> },
+    <span class="k">"mensaje"</span>: { <span class="k">"wamid"</span>: <span class="s">"wamid.HBgMNTcz…"</span> },
+    <span class="k">"intencion"</span>: <span class="s">"compra"</span>,
+    <span class="k">"pideAsesor"</span>: <span class="n">false</span>
+  }
+]</div>
+              </div>
+            </section>
+            <div class="split" role="separator" aria-valuenow="30" tabindex="0"></div>
+            <!-- PARAMETERS -->
+            <section class="prm" data-ann="ndv-params">
+              <div class="tabs" role="tablist"><button role="tab" aria-selected="true">Parámetros</button><button role="tab" aria-selected="false">Ajustes</button><button role="tab" aria-selected="false">Reintentos y seguridad</button></div>
+              <div class="prm-b">
+                <div class="field" data-ann="ndv-cred"><span class="lbl">Credencial</span>
+                  <div class="cred"><span class="ni wa"><i data-i="wa"></i></span><div><b>Wirvii Ventas · +57 310 555 0142</b><small><span class="dot" style="background:var(--s-fg)"></span>Conectada · probada hace 2 h · usada en 4 flujos</small></div><button class="btn ghost sm">Cambiar<i data-i="chevd" class="s14"></i></button></div></div>
+                <div class="row2">
+                  <div class="field"><span class="lbl">Recurso</span><div class="input select">Mensaje<i data-i="chevd"></i></div></div>
+                  <div class="field"><span class="lbl">Operación</span><div class="input select">Enviar texto<i data-i="chevd"></i></div></div>
+                </div>
+                <div class="field"><span class="lbl">Para (número del cliente)<span class="fx"><button aria-pressed="false">Fijo</button><button aria-pressed="true">Expresión</button></span></span>
+                  <div class="expr dz-target" id="exTo"><span class="pill exp">cliente.telefono</span></div>
+                  <div class="preview">Resultado: <code>573104567890</code></div></div>
+                <div class="field"><span class="lbl">Mensaje<span style="display:flex;gap:6px;align-items:center"><button class="ai-btn" id="aiBtn"><i data-i="sparkles" class="s12"></i>Pedir a la IA</button><span class="fx"><button aria-pressed="false">Fijo</button><button aria-pressed="true">Expresión</button></span></span></span>
+                  <div class="expr dz-target" id="exMsg" data-ann="ndv-drop"><span class="pill exp">output</span><span class="ph">Arrastra aquí más campos de la entrada</span></div>
+                  <div class="preview">Resultado: <code>¡Hola Camila! Sí tenemos la chaqueta Andes en talla M…</code> <span style="white-space:nowrap">112 / 4096</span></div></div>
+                <div class="ai-pop hide" id="aiPop"><div class="hd"><i data-i="sparkles" class="s14"></i>Asistente</div>
+                  <div class="input" style="height:32px;background:var(--surface)"><input value="Saluda por el nombre y cierra con el enlace de pago si la intención es compra"></div>
+                  <p>Propuesta: <code class="mono" style="font-size:12px">Hola {{ cliente.nombre }} 👋 {{ output }}{{ intencion == "compra" ? "\nPaga aquí: " + pedido.enlace : "" }}</code></p>
+                  <div style="display:flex;gap:6px"><button class="btn primary sm">Usar</button><button class="btn ghost sm">Explicar</button><button class="btn ghost sm" id="aiClose">Descartar</button></div></div>
+                <div class="safe" data-ann="ndv-idem"><i data-i="shield" class="s20"></i><div><b>Protección contra mensajes duplicados</b><p>Si este paso se reintenta, Orcon primero confirma con WhatsApp si el mensaje ya salió. Clave única: <span class="pill exp" style="height:20px">mensaje.wamid</span></p><a class="lnk" href="#" style="font-size:12px">Cambiar la clave</a></div></div>
+                <div class="field"><span class="lbl">Opciones</span><div class="input select" style="color:var(--subtle)"><span style="display:flex;gap:6px;align-items:center"><i data-i="plus" class="s14"></i>Añadir opción</span></div></div>
+              </div>
+            </section>
+            <div class="split" role="separator" aria-valuenow="70" tabindex="0"></div>
+            <!-- OUTPUT -->
+            <section class="dp" data-ann="ndv-output">
+              <div class="dp-h"><span class="ttl">Salida</span><span class="cnt">1 elemento</span><button class="ibtn sm" title="Fijar datos (P)"><i data-i="pin" class="s14"></i></button><button class="ibtn sm" title="Editar"><i data-i="pen" class="s14"></i></button>
+                <div class="seg" style="width:100%;margin-top:4px" data-segtabs="out"><button aria-pressed="false" data-t="schema">Esquema</button><button aria-pressed="true" data-t="table">Tabla</button><button aria-pressed="false" data-t="json">JSON</button></div></div>
+              <div class="dp-b">
+                <table class="tbl" data-pane="out-table"><thead><tr><th>#</th><th>messages[0].id</th><th>contacts[0].wa_id</th><th>estado</th></tr></thead><tbody><tr><td>1</td><td>wamid.HBgMNTczMTA0NTY3ODkwFQIAERgS…</td><td>573104567890</td><td style="color:var(--s-fg)">aceptado</td></tr></tbody></table>
+                <div class="json hide" data-pane="out-json">{
+  <span class="k">"messaging_product"</span>: <span class="s">"whatsapp"</span>,
+  <span class="k">"contacts"</span>: [{ <span class="k">"wa_id"</span>: <span class="s">"573104567890"</span> }],
+  <span class="k">"messages"</span>: [{ <span class="k">"id"</span>: <span class="s">"wamid.HBgMNTcz…"</span> }],
+  <span class="k">"estado"</span>: <span class="s">"aceptado"</span>
+}</div>
+                <div class="schema hide" data-pane="out-schema"><div class="sf"><span class="ty">T</span><span class="pill exp">messages[0].id</span><span class="ex">wamid.HBgM…</span></div><div class="sf"><span class="ty">T</span><span class="pill exp">contacts[0].wa_id</span><span class="ex">573104567890</span></div><div class="sf"><span class="ty">T</span><span class="pill exp">estado</span><span class="ex">aceptado</span></div></div>
+                <div class="alert a" style="margin-top:12px"><i data-i="info"></i><div><b>Entrega confirmada a las 10:41:09</b><span>WhatsApp aceptó el mensaje y luego avisó que fue entregado. Esto queda en el historial de la ejecución.</span></div></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8. EXECUTIONS ============ -->
+  <section class="view" data-view="executions" style="overflow:hidden">
+    <div style="padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div><div class="crumbs hide-ph"><span>Wirvii</span><i data-i="chevr"></i><b>Ejecuciones</b></div><h1 class="h1" style="font-size:20px;line-height:28px;margin-top:2px">Ejecuciones</h1></div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="chip a hide-ph"><span class="dot" style="background:var(--a-fg)"></span>En vivo</span><button class="btn secondary sm hide-ph"><i data-i="settings" class="s14"></i>Retención: 30 días</button></div>
+    </div>
+    <div class="ex-wrap">
+      <div class="ex-list" data-ann="ex-list">
+        <div class="ex-filters">
+          <div class="input" style="height:32px"><i data-i="search"></i><input placeholder="Buscar por ID, teléfono o texto del mensaje"></div>
+          <div class="r"><button class="fchip on">Todas</button><button class="fchip"><i data-i="xcircle" class="s14 bad"></i>Fallidas 7</button><button class="fchip"><i data-i="shieldq" class="s14 unc"></i>Para revisar 2</button><button class="fchip"><i data-i="clock" class="s14"></i>24 h<i data-i="chevd" class="s12"></i></button><button class="fchip">Flujo<i data-i="chevd" class="s12"></i></button></div>
+        </div>
+        <div class="ex-items" id="exItems"></div>
+      </div>
+      <div class="ex-d">
+        <div class="ex-dh">
+          <div class="r1"><span class="chip d"><i data-i="xcircle"></i>Fallida</span><b style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">#48207 · Recordatorio de pago</b><span style="flex:1"></span>
+            <button class="btn secondary sm" data-go="editor"><i data-i="external" class="s14"></i>Depurar en el editor</button>
+            <button class="btn primary sm" data-ann="ex-retry"><i data-i="retry" class="s14"></i>Reintentar desde el fallo</button></div>
+          <div class="meta"><span><i data-i="clock" class="s12"></i><b>Hoy 10:42:13</b></span><span>Duración <b>3,8 s</b></span><span>Modo <b>Producción</b></span><span>Disparada por <b>Programación · cada hora</b></span><span>Versión <b>v14 · publicada ayer</b></span><span>Proyecto <b>Ventas WhatsApp</b></span></div>
+        </div>
+        <div class="gantt" data-ann="ex-gantt">
+          <div class="g-axis"><span>Paso</span><div><span>0 s</span><span>1 s</span><span>2 s</span><span>3 s</span><span>3,8 s</span></div><span style="text-align:right">Tiempo</span></div>
+          <button class="g-row"><span class="nmc"><i data-i="check" class="s14 ok"></i><span>Cada hora</span></span><span class="g-track"><span class="g-bar" style="left:0;width:1%"></span></span><span class="subtle num" style="text-align:right">2 ms</span></button>
+          <button class="g-row"><span class="nmc"><i data-i="check" class="s14 ok"></i><span>Pedidos sin pagar (Shopify)</span></span><span class="g-track"><span class="g-bar" style="left:1%;width:28%"></span></span><span class="subtle num" style="text-align:right">1,1 s</span></button>
+          <button class="g-row"><span class="nmc"><i data-i="check" class="s14 ok"></i><span>Por cada pedido · 12 elementos</span></span><span class="g-track"><span class="g-bar" style="left:29%;width:2%"></span></span><span class="subtle num" style="text-align:right">40 ms</span></button>
+          <button class="g-row"><span class="nmc"><i data-i="check" class="s14 ok"></i><span>Redactar recordatorio (IA)</span></span><span class="g-track"><span class="g-bar" style="left:31%;width:44%"></span></span><span class="subtle num" style="text-align:right">1,7 s</span></button>
+          <button class="g-row on"><span class="nmc"><i data-i="xcircle" class="s14 bad"></i><span><b>Enviar por WhatsApp</b> · 7 de 12 fallaron</span></span><span class="g-track"><span class="g-bar f" style="left:75%;width:24%"></span></span><span class="num bad" style="text-align:right">0,9 s</span></button>
+          <button class="g-row"><span class="nmc"><i data-i="ban" class="s14 subtle"></i><span class="subtle">Marcar como recordado</span></span><span class="g-track"><span class="g-bar nr" style="left:99%;width:1%"></span></span><span class="subtle" style="text-align:right">No corrió</span></button>
+        </div>
+        <div class="ex-node">
+          <div class="tabs"><button aria-selected="true">Error</button><button aria-selected="false">Entrada <span class="count">12</span></button><button aria-selected="false">Salida <span class="count">5</span></button><button aria-selected="false">Intentos</button></div>
+          <div class="err-box">
+            <div class="alert d"><i data-i="xcircle"></i><div><b>WhatsApp rechazó 7 mensajes: la ventana de 24 horas está cerrada.</b><span>Estos clientes no te escriben hace más de un día. WhatsApp solo permite escribirles con una plantilla aprobada.</span></div></div>
+            <div class="err-code">(#131047) Re-engagement message
+Message failed to send because more than 24 hours have passed since the customer last replied to this number.
+elementos afectados: 2, 3, 5, 7, 8, 10, 11</div>
+            <div class="fix" data-ann="ex-fix"><div class="hd"><i data-i="sparkles" class="s14"></i>Cómo arreglarlo</div>
+              <p>Cambia la operación a <b>Enviar plantilla</b> y usa la plantilla aprobada <b>recordatorio_pago_v2</b> (es_CO) cuando el último mensaje del cliente tenga más de 24 h. Los 5 mensajes que sí salieron no se volverán a enviar al reintentar.</p>
+              <div class="acts"><button class="btn primary sm" data-go="editor">Aplicar en el editor</button><button class="btn ghost sm">Ver la plantilla</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 9. CREDENTIALS ============ -->
+  <section class="view" data-view="credentials">
+    <div class="page">
+      <div class="page-head">
+        <div><div class="crumbs hide-ph"><span>Wirvii</span><i data-i="chevr"></i><b>Credenciales</b></div>
+          <h1 class="h1" style="margin-top:6px">Credenciales</h1><p>Las cuentas que tus flujos usan para conectarse. Las claves se guardan cifradas y nadie puede volver a leerlas.</p></div>
+        <button class="btn primary" data-open-cred><i data-i="plus"></i>Crear credencial</button>
+      </div>
+      <div class="alert w" data-ann="cr-expiring"><i data-i="alert"></i><div><b>1 credencial vence en 5 días y otra falló su última prueba.</b><span>Shopify tienda Wirvii se desconectará el 20 de octubre y afectará 2 flujos activos.</span></div><button class="btn secondary sm" style="margin-left:auto">Reconectar</button></div>
+      <div class="toolbar"><div class="input"><i data-i="search"></i><input placeholder="Buscar credenciales"></div><button class="fchip hide-ph">Tipo<i data-i="chevd" class="s12"></i></button><button class="fchip hide-ph">Proyecto<i data-i="chevd" class="s12"></i></button></div>
+      <div class="card list" data-ann="cr-list">
+        <div class="rh cols-cred"><span>Nombre</span><span>Tipo</span><span>Proyecto</span><span>Usada en</span><span>Último uso</span><span>Estado</span><span></span></div>
+        <div id="crRows"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 10. SETTINGS ============ -->
+  <section class="view" data-view="settings">
+    <div class="page">
+      <div><div class="crumbs hide-ph"><span>Wirvii</span><i data-i="chevr"></i><b>Ajustes</b></div><h1 class="h1" style="margin-top:6px">Ajustes</h1></div>
+      <div class="st-wrap">
+        <nav class="st-nav" data-ann="st-nav">
+          <div class="sb-sec hide-ph" style="padding-top:0">Tu cuenta</div>
+          <button class="nv on" data-st="perfil"><i data-i="user"></i>Perfil</button>
+          <button class="nv" data-st="seguridad"><i data-i="lock"></i>Contraseña y sesiones</button>
+          <button class="nv" data-st="apariencia"><i data-i="sun"></i>Apariencia</button>
+          <div class="sb-sec hide-ph">Organización · Wirvii</div>
+          <button class="nv" data-st="org"><i data-i="building"></i>General</button>
+          <button class="nv" data-st="miembros"><i data-i="users"></i>Personas y roles</button>
+          <button class="nv" data-st="api"><i data-i="code"></i>Claves de API</button>
+        </nav>
+        <div>
+          <div class="st-sec on" data-sts="perfil">
+            <div class="card st-card"><h2 class="h2">Perfil</h2><p>Así te ven las demás personas de Wirvii.</p>
+              <div style="display:flex;align-items:center;gap:16px"><span class="avatar av1" style="width:56px;height:56px;font-size:18px">JT</span><div style="display:flex;gap:8px"><button class="btn secondary sm">Subir foto</button><button class="btn ghost sm">Quitar</button></div></div>
+              <div class="row2"><div class="field"><label>Nombre</label><div class="input"><input value="Juan Fernando"></div></div><div class="field"><label>Apellido</label><div class="input"><input value="Tamayo Puertas"></div></div></div>
+              <div class="field"><label>Correo electrónico</label><div class="input"><i data-i="mail"></i><input value="juan.tamayo@wirvii.com"></div><span class="hint">Si lo cambias, te enviaremos un enlace para confirmarlo.</span></div>
+              <div class="row2"><div class="field"><label>Idioma</label><div class="input select">Español (Colombia)<i data-i="chevd"></i></div></div><div class="field"><label>Zona horaria</label><div class="input select">Bogotá (GMT-5)<i data-i="chevd"></i></div></div></div>
+              <div class="st-foot"><button class="btn ghost">Descartar</button><button class="btn primary">Guardar cambios</button></div></div>
+          </div>
+          <div class="st-sec" data-sts="seguridad">
+            <div class="card st-card"><h2 class="h2">Cambiar contraseña</h2><p>Usa al menos 12 caracteres. Cerraremos tus otras sesiones al cambiarla.</p>
+              <div class="field"><label>Contraseña actual</label><div class="input"><input type="password" value="xxxxxxxxxxxx"></div></div>
+              <div class="row2"><div class="field"><label>Nueva contraseña</label><div class="input"><input type="password" value="xxxxxxxxxxxxxxx"></div><div style="display:flex;gap:4px;margin-top:2px"><i style="flex:1;height:4px;border-radius:2px;background:var(--s-fg)"></i><i style="flex:1;height:4px;border-radius:2px;background:var(--s-fg)"></i><i style="flex:1;height:4px;border-radius:2px;background:var(--s-fg)"></i><i style="flex:1;height:4px;border-radius:2px;background:var(--border-strong)"></i></div><span class="hint">Fuerte</span></div><div class="field"><label>Repite la nueva contraseña</label><div class="input"><input type="password" value="xxxxxxxxxxxxxxx"></div><span class="inline-ok"><i data-i="check" class="s12"></i>Coinciden</span></div></div>
+              <div class="st-foot"><button class="btn primary">Cambiar contraseña</button></div></div>
+            <div class="card st-card"><h2 class="h2">Sesiones abiertas</h2><p>Dispositivos donde tu cuenta está abierta ahora.</p>
+              <div class="rw" style="grid-template-columns:1fr auto;border:1px solid var(--border);border-radius:8px"><div class="nm"><b>Chrome · macOS · Neiva</b><span class="hint">Esta sesión</span></div><span class="chip s">Activa ahora</span></div>
+              <div class="rw" style="grid-template-columns:1fr auto;border:1px solid var(--border);border-radius:8px"><div class="nm"><b>Safari · iPhone · Bogotá</b><span class="hint">Hace 2 días</span></div><button class="btn ghost sm">Cerrar sesión</button></div></div>
+          </div>
+          <div class="st-sec" data-sts="apariencia">
+            <div class="card st-card" data-ann="st-appearance"><h2 class="h2">Apariencia</h2><p>Se aplica al instante y solo en tu cuenta. No hace falta guardar.</p>
+              <div class="field"><span class="lbl">Tema</span><div class="theme-cards">
+                <button class="thc" data-theme-set="dark" aria-pressed="true"><span class="pv" style="background:#0B1120"><i style="background:#0F172A;border-right:1px solid #1E293B"></i><span><em style="background:#334155;width:70%"></em><em style="background:#4ADE80;width:40%"></em><em style="background:#1E293B;width:85%"></em></span></span>Oscuro</button>
+                <button class="thc" data-theme-set="light" aria-pressed="false"><span class="pv" style="background:#F8FAFC"><i style="background:#fff;border-right:1px solid #E2E8F0"></i><span><em style="background:#CBD5E1;width:70%"></em><em style="background:#15803D;width:40%"></em><em style="background:#E2E8F0;width:85%"></em></span></span>Claro</button>
+                <button class="thc" data-theme-set="system" aria-pressed="false"><span class="pv" style="background:linear-gradient(90deg,#F8FAFC 50%,#0B1120 50%)"><i style="background:transparent"></i><span><em style="background:#94A3B8;width:70%"></em><em style="background:#22C55E;width:40%"></em></span></span>Como el sistema</button></div></div>
+              <div class="row2"><div class="field"><span class="lbl">Densidad</span><div class="seg"><button aria-pressed="true">Cómoda</button><button aria-pressed="false">Compacta</button></div></div><div class="field"><span class="lbl">Idioma de la interfaz</span><div class="seg"><button aria-pressed="true">Español</button><button aria-pressed="false">English</button></div></div></div>
+              <label class="tgl-wrap"><button class="toggle" role="switch" aria-checked="false"></button>Reducir animaciones</label>
+              <span class="inline-ok"><i data-i="check" class="s12"></i>Guardado automáticamente</span></div>
+          </div>
+          <div class="st-sec" data-sts="org">
+            <div class="card st-card"><h2 class="h2">Organización</h2><p>Datos de Wirvii que ven todas las personas.</p>
+              <div class="row2"><div class="field"><label>Nombre</label><div class="input"><input value="Wirvii"></div></div><div class="field"><label>Dirección web</label><div class="input"><span class="subtle">orcon.wirvii.com/</span><input value="wirvii"></div><span class="hint">Cambiarla rompe los enlaces guardados.</span></div></div>
+              <div class="row2"><div class="field"><label>Zona horaria por defecto</label><div class="input select">Bogotá (GMT-5)<i data-i="chevd"></i></div><span class="hint">Las programaciones usan esta hora.</span></div><div class="field"><label>Guardar ejecuciones durante</label><div class="input select">30 días<i data-i="chevd"></i></div></div></div>
+              <div class="st-foot"><button class="btn primary">Guardar cambios</button></div></div>
+            <div class="card st-card" style="border-color:color-mix(in srgb,var(--d-fg) 40%,var(--border))"><h2 class="h2">Zona de peligro</h2><p>Eliminar la organización borra sus 18 flujos, 9 credenciales y todo el historial. No se puede deshacer.</p><div><button class="btn secondary" style="color:var(--d-fg)">Eliminar organización…</button></div></div>
+          </div>
+          <div class="st-sec" data-sts="miembros">
+            <div class="card st-card" data-ann="st-members"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2 class="h2">Personas y roles</h2><p class="muted">9 personas en Wirvii · 1 invitación pendiente</p></div><button class="btn primary sm"><i data-i="plus" class="s14"></i>Invitar personas</button></div>
+              <div class="role-grid">
+                <div class="role"><b>Propietario</b>Todo, incluida la facturación y borrar la organización.</div>
+                <div class="role"><b>Administrador</b>Gestiona personas, proyectos y credenciales.</div>
+                <div class="role"><b>Editor</b>Crea y publica flujos en sus proyectos.</div>
+                <div class="role"><b>Solo lectura</b>Ve flujos y ejecuciones; no cambia nada.</div></div>
+              <div class="list" style="border:1px solid var(--border);border-radius:10px">
+                <div class="rh cols-mem"><span>Persona</span><span>Rol</span><span>Proyectos</span><span>Última actividad</span><span></span></div>
+                <div class="rw cols-mem"><div class="nm" style="flex-direction:row;align-items:center;gap:10px"><span class="avatar av1">JT</span><div><b>Juan Tamayo (tú)</b><br><span class="hint">juan.tamayo@wirvii.com</span></div></div><span><span class="chip s">Propietario</span></span><span class="muted">Todos</span><span class="muted">Ahora</span><span></span></div>
+                <div class="rw cols-mem"><div class="nm" style="flex-direction:row;align-items:center;gap:10px"><span class="avatar av2">LM</span><div><b>Laura Medina</b><br><span class="hint">laura.medina@wirvii.com</span></div></div><span><button class="fchip">Administradora<i data-i="chevd" class="s12"></i></button></span><span class="muted">Todos</span><span class="muted">Hace 1 h</span><button class="ibtn sm"><i data-i="more"></i></button></div>
+                <div class="rw cols-mem"><div class="nm" style="flex-direction:row;align-items:center;gap:10px"><span class="avatar av3">CR</span><div><b>Carlos Ramírez</b><br><span class="hint">carlos.ramirez@wirvii.com</span></div></div><span><button class="fchip">Editor<i data-i="chevd" class="s12"></i></button></span><span class="muted">Ventas, Soporte</span><span class="muted">Ayer</span><button class="ibtn sm"><i data-i="more"></i></button></div>
+                <div class="rw cols-mem"><div class="nm" style="flex-direction:row;align-items:center;gap:10px"><span class="avatar av4">VP</span><div><b>Valentina Pérez</b><br><span class="hint">valentina@wirvii.com</span></div></div><span><span class="chip w"><i data-i="clock"></i>Invitación enviada</span></span><span class="muted">Soporte</span><span class="muted">—</span><button class="btn ghost sm">Reenviar</button></div>
+              </div></div>
+          </div>
+          <div class="st-sec" data-sts="api">
+            <div class="card st-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2 class="h2">Claves de API</h2><p class="muted">Para usar Orcon desde tus sistemas, la línea de comandos o un asistente de IA. Cada clave actúa con tus permisos.</p></div><button class="btn primary sm"><i data-i="plus" class="s14"></i>Crear clave</button></div>
+              <div class="alert s"><i data-i="check"></i><div><b>Clave “Despliegues CI” creada. Cópiala ahora: no la volveremos a mostrar.</b><div style="display:flex;gap:8px;margin-top:6px;align-items:center"><code class="mono" style="background:var(--sunken);border:1px solid var(--border);padding:4px 8px;border-radius:6px;color:var(--fg)">orc_live_7f3a9c2e41b8d…</code><button class="btn secondary sm"><i data-i="copy" class="s14"></i>Copiar</button></div></div></div>
+              <div class="list" style="border:1px solid var(--border);border-radius:10px">
+                <div class="rh cols-key"><span>Nombre</span><span>Clave</span><span>Permisos</span><span>Creada</span><span>Último uso</span><span></span></div>
+                <div class="rw cols-key"><div class="nm"><b>Despliegues CI</b></div><code class="mono subtle">orc_live_7f3a…</code><span class="muted">Flujos: leer y publicar</span><span class="muted">Hoy</span><span class="muted">Nunca</span><button class="ibtn sm"><i data-i="more"></i></button></div>
+                <div class="rw cols-key"><div class="nm"><b>Asistente de IA (MCP)</b></div><code class="mono subtle">orc_live_19bd…</code><span class="muted">Solo lectura</span><span class="muted">2 sep</span><span class="muted">Hace 3 h</span><button class="ibtn sm"><i data-i="more"></i></button></div>
+              </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- /main -->
+  <nav class="tabbar" aria-label="Navegación" data-ann="tabbar">
+    <button data-go="overview"><i data-i="home"></i>Inicio</button>
+    <button data-go="project" data-proj="ventas"><i data-i="folder"></i>Flujos</button>
+    <button data-go="executions"><i data-i="activity"></i>Ejecuciones</button>
+    <button data-go="credentials"><i data-i="key"></i>Credenciales</button>
+    <button data-go="settings"><i data-i="settings"></i>Ajustes</button>
+  </nav>
+</div><!-- /app -->
+
+<!-- ============ 5. NEW FLOW MODAL ============ -->
+<div class="modal-wrap" id="nfModal" role="dialog" aria-modal="true" aria-labelledby="nfT">
+  <div class="modal" style="width:980px;height:800px">
+    <div class="modal-h"><div><h2 class="h2" id="nfT" style="font-size:20px;line-height:28px">Crear flujo en <span style="color:var(--accent)">Ventas WhatsApp</span></h2><p>Elige cómo quieres empezar. Siempre empieza inactivo: nada corre hasta que lo publiques.</p></div><button class="ibtn" data-close aria-label="Cerrar (Esc)"><i data-i="x"></i></button></div>
+    <div class="modal-b" style="flex:1">
+      <div class="nf-grid" data-ann="nf-options">
+        <button class="nf-opt" data-nf="blank" aria-pressed="false"><span class="ic"><i data-i="plus" class="s20"></i></span><b>En blanco</b><small>Abre el editor con un lienzo vacío.</small><span class="kbd badge">B</span></button>
+        <button class="nf-opt" data-nf="template" aria-pressed="false"><span class="ic"><i data-i="template" class="s20"></i></span><b>Desde una plantilla</b><small>142 flujos listos, revisados por el equipo.</small><span class="kbd badge">T</span></button>
+        <button class="nf-opt" data-nf="import" aria-pressed="true"><span class="ic" style="color:var(--accent)"><i data-i="upload" class="s20"></i></span><b>Importar de n8n</b><small>Pega o sube el JSON. Te mostramos qué cambia antes de crear.</small><span class="kbd badge">I</span></button>
+        <button class="nf-opt" data-nf="ai" aria-pressed="false"><span class="ic" style="color:var(--u-fg)"><i data-i="sparkles" class="s20"></i></span><b>Descríbelo y la IA lo arma</b><small>Escribe lo que necesitas en tus palabras.</small><span class="chip u badge" style="height:18px;font-size:10px">Beta</span></button>
+      </div>
+      <div class="nf-pane" data-nfp="blank"><div class="field" style="max-width:480px"><label>Nombre del flujo</label><div class="input"><input value="Flujo sin título" ></div><span class="hint">Puedes cambiarlo después con F2 dentro del editor.</span></div></div>
+      <div class="nf-pane" data-nfp="template">
+        <div class="toolbar" style="margin-bottom:12px"><div class="input"><i data-i="search"></i><input placeholder="Buscar plantillas"></div><div class="seg"><button aria-pressed="true">Todas</button><button aria-pressed="false">WhatsApp</button><button aria-pressed="false">IA</button><button aria-pressed="false">Ventas</button><button aria-pressed="false">Operaciones</button></div></div>
+        <div class="tpl-grid">
+          <button class="tpl"><span class="icons"><span class="ni wa"><i data-i="wa"></i></span><span class="ni ai"><i data-i="bot"></i></span><span class="ni shop"><i data-i="cart"></i></span></span><b>Agente de ventas por WhatsApp con catálogo</b><small>Responde preguntas y toma pedidos usando tu catálogo de Shopify.</small><span class="meta"><span>6 pasos · 3 credenciales</span><span>★ 4,8 · 2,1 mil usos</span></span></button>
+          <button class="tpl"><span class="icons"><span class="ni http"><i data-i="globe"></i></span><span class="ni ai"><i data-i="sparkles"></i></span><span class="ni db"><i data-i="db"></i></span></span><b>Calificar leads de Meta Ads</b><small>Puntúa cada lead con IA y lo guarda en tu CRM.</small><span class="meta"><span>5 pasos · 2 credenciales</span><span>★ 4,7 · 1,4 mil</span></span></button>
+          <button class="tpl"><span class="icons"><span class="ni logic"><i data-i="clock"></i></span><span class="ni wa"><i data-i="wa"></i></span></span><b>Recordatorio de pago con plantilla</b><small>Cada hora busca pedidos sin pagar y avisa por WhatsApp.</small><span class="meta"><span>4 pasos · 2 credenciales</span><span>★ 4,6 · 980</span></span></button>
+          <button class="tpl"><span class="icons"><span class="ni wa"><i data-i="wa"></i></span><span class="ni slack"><i data-i="msg"></i></span></span><b>Pasar a un asesor humano</b><small>Detecta cuándo el cliente pide una persona y avisa al equipo.</small><span class="meta"><span>4 pasos · 2 credenciales</span><span>★ 4,9 · 760</span></span></button>
+          <button class="tpl"><span class="icons"><span class="ni shop"><i data-i="cart"></i></span><span class="ni data"><i data-i="pen"></i></span><span class="ni http"><i data-i="globe"></i></span></span><b>Pedidos de Shopify a Siigo</b><small>Crea la factura electrónica cuando se paga un pedido.</small><span class="meta"><span>5 pasos · 2 credenciales</span><span>★ 4,5 · 610</span></span></button>
+          <button class="tpl"><span class="icons"><span class="ni logic"><i data-i="clock"></i></span><span class="ni db"><i data-i="db"></i></span><span class="ni slack"><i data-i="msg"></i></span></span><b>Resumen diario de ventas a Slack</b><small>A las 7 p. m. envía ventas, ticket promedio y top productos.</small><span class="meta"><span>4 pasos · 2 credenciales</span><span>★ 4,4 · 530</span></span></button>
+        </div>
+      </div>
+      <div class="nf-pane on" data-nfp="import">
+        <div class="imp">
+          <div class="drop" data-ann="nf-drop">
+            <div style="display:flex;gap:10px;align-items:center"><i data-i="upload" class="s20" style="color:var(--accent)"></i><div><b>Pega el JSON del flujo de n8n</b><div class="hint">En n8n: menú ⋯ → Descargar, o selecciona todo en el lienzo y copia (Ctrl C).</div></div></div>
+            <textarea class="input mono" id="impJson">{
+  "name": "WhatsApp Sales Agent",
+  "nodes": [
+    { "type": "n8n-nodes-base.whatsAppTrigger", ... },
+    { "type": "@n8n/n8n-nodes-langchain.agent", ... },
+    { "type": "n8n-nodes-base.code", ... },
+    … 14 nodos
+  ],
+  "connections": { … }
+}</textarea>
+            <div style="display:flex;gap:8px;align-items:center"><button class="btn secondary sm"><i data-i="file" class="s14"></i>Subir archivo .json</button><span class="hint">o arrastra aquí varios archivos a la vez</span></div>
+          </div>
+          <div class="report" data-ann="nf-report">
+            <div class="report-h"><img src="assets/mascot-happy.png" alt=""><div><b>Listo para importar: 13 de 14 pasos funcionan igual</b><div class="hint">“WhatsApp Sales Agent” · exportado de n8n 1.112</div></div></div>
+            <div class="rp-bar"><i style="flex:11;background:var(--s-fg)"></i><i style="flex:2;background:var(--w-fg)"></i><i style="flex:1;background:var(--d-fg)"></i></div>
+            <div class="rp-legend"><span><span class="dot" style="background:var(--s-fg)"></span> 11 iguales</span><span><span class="dot" style="background:var(--w-fg)"></span> 2 con ajustes</span><span><span class="dot" style="background:var(--d-fg)"></span> 1 a revisar</span></div>
+            <div class="rp-row"><i data-i="alert" class="s14 warn"></i><div class="grow">Expresiones <code class="mono" style="font-size:12px">$('Webhook').item</code> convertidas<small>2 pasos · se reescribieron solas, mismo resultado</small></div></div>
+            <div class="rp-row"><i data-i="xcircle" class="s14 bad"></i><div class="grow">Code (Python) · “Limpiar teléfono”<small>Queda como paso pendiente; sugerimos el paso “Editar campos”</small></div><button class="btn ghost sm">Ver</button></div>
+            <div class="rp-row"><i data-i="key" class="s14 subtle"></i><div class="grow">Credenciales a conectar: 2<small>WhatsApp → “Wirvii Ventas” (ya existe) · OpenAI → crear</small></div></div>
+            <div class="rp-row"><i data-i="shield" class="s14 run"></i><div class="grow">2 pasos que envían mensajes ganan protección contra duplicados<small>Algo que n8n no hace</small></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="nf-pane" data-nfp="ai">
+        <div class="ai-box">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="field"><label>¿Qué debe hacer el flujo?</label><textarea class="input" style="height:140px">Cuando un cliente escriba por WhatsApp, responde con la información del catálogo de Shopify. Si quiere comprar, crea el pedido y mándale el enlace de pago. Si pide hablar con alguien, avisa en Slack al canal #ventas.</textarea></div>
+            <div class="sugg"><button>+ Responder audios</button><button>+ Horario de atención</button><button>+ Guardar en Google Sheets</button><button>+ Usar plantilla fuera de 24 h</button></div>
+            <p class="hint">La IA arma un borrador. Tú lo revisas en el editor antes de activarlo; nunca se publica solo.</p>
+          </div>
+          <div class="plan"><b style="font-size:13px">Borrador propuesto · 7 pasos</b>
+            <div class="plan-step"><span class="n">1</span><span class="ni wa"><i data-i="wa"></i></span>Mensaje de WhatsApp recibido</div>
+            <div class="plan-step"><span class="n">2</span><span class="ni ai"><i data-i="bot"></i></span>Agente de IA con memoria</div>
+            <div class="plan-step" style="padding-left:30px"><span class="ni shop"><i data-i="cart"></i></span>Herramienta: buscar en catálogo</div>
+            <div class="plan-step" style="padding-left:30px"><span class="ni shop"><i data-i="wrench"></i></span>Herramienta: crear pedido</div>
+            <div class="plan-step"><span class="n">3</span><span class="ni logic"><i data-i="branch"></i></span>¿Pide un asesor?</div>
+            <div class="plan-step"><span class="n">4</span><span class="ni slack"><i data-i="msg"></i></span>Avisar en Slack #ventas</div>
+            <div class="plan-step"><span class="n">5</span><span class="ni wa"><i data-i="wa"></i></span>Responder por WhatsApp</div>
+            <div class="hint" style="margin-top:4px">Necesitarás: WhatsApp (ya conectada), OpenAI (conectada), Shopify (vence en 5 días), Slack.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-f"><span class="hint" style="display:flex;gap:6px;align-items:center"><i data-i="folder" class="s14"></i>Proyecto: <b style="color:var(--fg)">Ventas WhatsApp</b> <a class="lnk" href="#">cambiar</a></span><div style="display:flex;gap:8px"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="nfGo" data-go="editor">Importar y abrir <span class="kbd">↵</span></button></div></div>
+  </div>
+</div>
+
+<!-- ============ 9b. CREDENTIAL MODAL ============ -->
+<div class="modal-wrap" id="crModal" role="dialog" aria-modal="true" aria-labelledby="crT">
+  <div class="modal cm">
+    <div class="modal-h" style="border-bottom:1px solid var(--border);padding-bottom:16px"><div><h2 class="h2" id="crT" style="font-size:20px;line-height:28px">Crear credencial</h2><p>Se guardará en <b>Ventas WhatsApp</b>. Puedes compartirla con otros proyectos después.</p></div><button class="ibtn" data-close aria-label="Cerrar"><i data-i="x"></i></button></div>
+    <div class="modal-b">
+      <div class="cm-types" data-ann="cm-types">
+        <div class="input"><i data-i="search"></i><input placeholder="Buscar servicio"></div>
+        <div class="pal-sec" style="padding-left:4px">Sugeridas</div>
+        <button class="ct" data-ct="wa" aria-pressed="true"><span class="ni wa"><i data-i="wa"></i></span>WhatsApp Cloud API</button>
+        <button class="ct" data-ct="openai" aria-pressed="false"><span class="ni ai"><i data-i="sparkles"></i></span>OpenAI</button>
+        <button class="ct" data-ct="http" aria-pressed="false"><span class="ni http"><i data-i="globe"></i></span>Encabezado HTTP</button>
+        <div class="pal-sec" style="padding-left:4px">Todas · 380</div>
+        <button class="ct" aria-pressed="false"><span class="ni shop"><i data-i="cart"></i></span>Shopify</button>
+        <button class="ct" aria-pressed="false"><span class="ni slack"><i data-i="msg"></i></span>Slack</button>
+        <button class="ct" aria-pressed="false"><span class="ni db"><i data-i="db"></i></span>Postgres</button>
+        <button class="ct" aria-pressed="false"><span class="ni data"><i data-i="table"></i></span>Google Sheets</button>
+      </div>
+      <div class="cm-form" id="cmForm"></div>
+      <aside class="cm-help" id="cmHelp" data-ann="cm-help"></aside>
+    </div>
+    <div class="modal-f"><button class="btn secondary" id="cmTest"><i data-i="plug" class="s14"></i>Probar conexión</button><span id="cmTestRes" class="inline-ok hide"><i data-i="check" class="s12"></i>Conectada: <b>Wirvii Ventas · +57 310 555 0142</b> · calidad alta</span><div style="display:flex;gap:8px;margin-left:auto"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary">Guardar</button></div></div>
+  </div>
+</div>
+
+<div class="ann-layer" id="annLayer"></div>
+</div><!-- /device -->
+</div></main>
+
+<aside class="dz-notes min" id="dzNotes" aria-label="Notas de diseño">
+  <header><span>Notas de diseño <b id="dzCount" style="font-weight:600;color:#94A3B8"></b> <span class="dz-legend"><span><i style="background:#67E8F9"></i>igual que n8n</span><span><i style="background:#84EB72"></i>mejora</span></span></span><button class="dz-x" id="dzMin" aria-label="Mostrar u ocultar la lista">Ver lista</button></header>
+  <ol id="dzList"></ol>
+</aside>
+
+<script>
+(function(){
+'use strict';
+/* ---------- Icons (Lucide-style strokes, drawn inline) ---------- */
+const I={
+home:'<path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',
+user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+help:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+template:'<rect x="3" y="3" width="18" height="7" rx="1"/><rect x="3" y="14" width="9" height="7" rx="1"/><rect x="16" y="14" width="5" height="7" rx="1"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',
+xcircle:'<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>',
+x:'<path d="M18 6 6 18M6 6l12 12"/>',
+loader:'<path d="M21 12a9 9 0 1 1-6.22-8.56"/>',
+clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+chevd:'<path d="m6 9 6 6 6-6"/>',chevu:'<path d="m18 15-6-6-6 6"/>',chevr:'<path d="m9 18 6-6-6-6"/>',
+updown:'<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
+wa:'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9 10c.5 2 2 3.5 4.5 4.5l1.2-1.2 2 .8-.5 1.7c-3.6.4-7.6-3.6-7.2-7.2l1.7-.5.8 2z" fill="currentColor" stroke="none"/>',
+bot:'<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/>',
+sparkles:'<path d="M12 3l1.9 5.8L20 10.7l-6.1 1.9L12 18.5l-1.9-5.9L4 10.7l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+db:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+branch:'<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+shieldq:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3M12 17h.01"/>',
+upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
+share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/>',
+retry:'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+panel:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
+logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
+eye:'<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+eyeoff:'<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M2 2l20 20"/>',
+lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/>',
+info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+pin:'<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+sticky:'<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
+maximize:'<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',
+zoomin:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/>',
+zoomout:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M8 11h6"/>',
+arrowl:'<path d="m12 19-7-7 7-7M19 12H5"/>',
+copy:'<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+building:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>',
+sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+phone:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>',
+table:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+tag:'<path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/>',
+power:'<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+trash:'<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+cart:'<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+keyboard:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/>',
+book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+msg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+grip:'<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
+ban:'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+wand:'<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9"/>',
+external:'<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+file:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+pen:'<path d="M12 20h9"/><path d="M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.85.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.85z"/>',
+filter:'<path d="M22 3H2l8 9.46V19l4 2v-8.54z"/>',
+trend:'<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+plug:'<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+merge:'<path d="m8 6 4-4 4 4M12 2v10.3a4 4 0 0 1-1.17 2.87L4 22M20 22l-5-5"/>',
+repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+hand:'<path d="M18 11V6a2 2 0 0 0-4 0v1M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>'
+};
+const ico=(n,c='')=>`<svg class="ico ${c}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||''}</svg>`;
+function hydrate(root){root.querySelectorAll('i[data-i]').forEach(el=>{const t=document.createElement('span');t.innerHTML=ico(el.dataset.i,el.className);const sv=t.firstChild;if(el.getAttribute('style'))sv.setAttribute('style',el.getAttribute('style'));el.replaceWith(sv);});}
+
+/* ---------- Data ---------- */
+const ST={ok:['check','ok','Correcta'],bad:['xcircle','bad','Fallida'],unc:['shieldq','unc','Para revisar'],run:['loader','run','En curso'],none:['clock','subtle','Sin ejecuciones']};
+const PJ={ventas:{n:'Ventas WhatsApp',c:'#86EFAC',l:'V',d:'Agentes que venden y hacen seguimiento por WhatsApp para la tienda Wirvii.'},soporte:{n:'Soporte',c:'#67E8F9',l:'S',d:'Atención posventa y paso a asesores humanos.'},ops:{n:'Operaciones',c:'#FCD34D',l:'O',d:'Facturación, inventario y logística.'},personal:{n:'Personal',c:'#C4B5FD',l:'JT',d:'Tus flujos privados. Solo tú los ves hasta que los compartas.'}};
+const FLOWS=[
+{n:'Agente de ventas WhatsApp',tags:['ventas','ia'],p:'ventas',s:'ok',t:'hace 2 min',c:'1.204',u:'hace 1 h',o:['JT','av1'],a:true,open:true},
+{n:'Recordatorio de pago',tags:['cobranza'],p:'ventas',s:'bad',t:'hace 18 min · 7 fallos',c:'312',u:'ayer',o:['LM','av2'],a:true},
+{n:'Calificar leads de Meta Ads',tags:['marketing','ia'],p:'ventas',s:'ok',t:'hace 6 min',c:'486',u:'hace 3 días',o:['CR','av3'],a:true},
+{n:'Confirmación de envío (Coordinadora)',tags:['logística'],p:'ventas',s:'unc',t:'hace 40 min',c:'97',u:'12 oct',o:['JT','av1'],a:true},
+{n:'Pasar a asesor humano',tags:['soporte'],p:'soporte',s:'ok',t:'hace 9 min',c:'64',u:'8 oct',o:['LM','av2'],a:true},
+{n:'Encuesta de satisfacción posventa',tags:['soporte'],p:'soporte',s:'run',t:'ahora',c:'211',u:'2 oct',o:['VP','av4'],a:true},
+{n:'Pedidos de Shopify a Siigo',tags:['facturación'],p:'ventas',s:'ok',t:'hace 1 h',c:'58',u:'30 sep',o:['CR','av3'],a:true},
+{n:'Resumen diario de ventas a Slack',tags:['reportes'],p:'ventas',s:'ok',t:'ayer 7:00 p. m.',c:'1',u:'27 sep',o:['JT','av1'],a:true},
+{n:'Carrito abandonado',tags:['borrador'],p:'ventas',s:'none',t:'Nunca se ha ejecutado',c:'—',u:'hace 2 días',o:['JT','av1'],a:false},
+{n:'Prueba: responder audios con IA',tags:['borrador'],p:'personal',s:'none',t:'Nunca se ha ejecutado',c:'—',u:'hoy',o:['JT','av1'],a:false}];
+const EXECS=[
+{s:'run',id:'48212',f:'Encuesta de satisfacción posventa',t:'10:44:02',d:'12 s…',m:'Producción',x:'Esperando respuesta del cliente'},
+{s:'ok',id:'48211',f:'Agente de ventas WhatsApp',t:'10:43:58',d:'2,2 s',m:'Producción'},
+{s:'bad',id:'48207',f:'Recordatorio de pago',t:'10:42:13',d:'3,8 s',m:'Producción',x:'7 de 12 mensajes fallaron',on:true},
+{s:'ok',id:'48203',f:'Calificar leads de Meta Ads',t:'10:38:40',d:'1,4 s',m:'Producción'},
+{s:'unc',id:'48190',f:'Confirmación de envío (Coordinadora)',t:'10:05:41',d:'31 s',m:'Producción',x:'No sabemos si la guía se creó: la API no respondió'},
+{s:'ok',id:'48185',f:'Agente de ventas WhatsApp',t:'10:03:50',d:'2,9 s',m:'Prueba'},
+{s:'ok',id:'48177',f:'Pasar a asesor humano',t:'09:58:12',d:'0,8 s',m:'Producción'},
+{s:'bad',id:'48160',f:'Pedidos de Shopify a Siigo',t:'09:31:05',d:'0,6 s',m:'Producción',x:'Siigo: la clave de acceso venció'},
+{s:'ok',id:'48151',f:'Agente de ventas WhatsApp',t:'09:29:44',d:'2,4 s',m:'Producción'},
+{s:'unc',id:'48122',f:'Confirmación de envío (Coordinadora)',t:'08:12:09',d:'30 s',m:'Producción',x:'No sabemos si la guía se creó'},
+{s:'ok',id:'48119',f:'Calificar leads de Meta Ads',t:'08:10:51',d:'1,2 s',m:'Producción'}];
+const CREDS=[
+{n:'Wirvii Ventas',sub:'+57 310 555 0142',t:'WhatsApp Cloud API',ic:'wa',cl:'wa',p:'Ventas WhatsApp',u:'4 flujos',l:'hace 2 min',s:['s','check','Conectada']},
+{n:'OpenAI producción',sub:'Límite: USD 200/mes',t:'OpenAI',ic:'sparkles',cl:'ai',p:'Compartida · 3 proyectos',u:'6 flujos',l:'hace 2 min',s:['s','check','Conectada']},
+{n:'Shopify tienda Wirvii',sub:'wirvii.myshopify.com',t:'Shopify',ic:'cart',cl:'shop',p:'Ventas WhatsApp',u:'2 flujos',l:'hace 1 h',s:['w','alert','Vence en 5 días']},
+{n:'Siigo API',sub:'api.siigo.com',t:'Encabezado HTTP',ic:'globe',cl:'http',p:'Operaciones',u:'1 flujo',l:'hace 3 días',s:['d','xcircle','Falló la prueba']},
+{n:'Postgres memoria agentes',sub:'db.wirvii.internal',t:'Postgres',ic:'db',cl:'db',p:'Ventas WhatsApp',u:'3 flujos',l:'hace 2 min',s:['s','check','Conectada']},
+{n:'Slack #ventas',sub:'Espacio Wirvii',t:'Slack',ic:'msg',cl:'slack',p:'Soporte',u:'2 flujos',l:'ayer',s:['s','check','Conectada']},
+{n:'Coordinadora envíos',sub:'api.coordinadora.com',t:'Encabezado HTTP',ic:'globe',cl:'http',p:'Ventas WhatsApp',u:'1 flujo',l:'hace 40 min',s:['n','clock','Sin probar']}];
+const PAL=[
+['Disparadores','zap',[['Mensaje de WhatsApp recibido','Cuando llega un mensaje o cambia un estado','wa','wa'],['Webhook','Cuando otro sistema llama a una dirección','link','http'],['Programación','Cada hora, cada día o a una hora fija','clock','logic'],['Formulario','Cuando alguien envía un formulario','file','logic'],['Al probar','Cuando haces clic en Probar flujo','play','logic']]],
+['IA','sparkles',[['Agente de IA','Conversa, recuerda y usa herramientas','bot','ai'],['Clasificar texto','Pone cada mensaje en una categoría','sparkles','ai'],['Extraer datos','Saca nombre, ciudad, pedido… de un texto','sparkles','ai'],['Resumir','Resume conversaciones o documentos','sparkles','ai']]],
+['WhatsApp','wa',[['Enviar mensaje','Texto, imagen, audio o documento','wa','wa'],['Enviar plantilla','Para escribir fuera de la ventana de 24 h','wa','wa'],['Enviar botones o lista','Respuestas rápidas para el cliente','wa','wa'],['Esperar respuesta','Pausa el flujo hasta que el cliente conteste','clock','wa']]],
+['HTTP y webhooks','globe',[['Solicitud HTTP','Llama a cualquier API','globe','http'],['Responder al webhook','Devuelve una respuesta a quien llamó','link','http']]],
+['Transformar datos','pen',[['Editar campos','Crea, cambia o quita campos','pen','data'],['Filtrar','Deja pasar solo lo que cumple una condición','filter','data'],['Agrupar y sumar','Totales, promedios y conteos','table','data'],['Código','JavaScript o Python cuando lo necesites','code','data']]],
+['Lógica del flujo','branch',[['Si','Divide el camino en sí / no','branch','logic'],['Según el caso','Varios caminos según un valor','branch','logic'],['Unir','Junta dos caminos en uno','merge','logic'],['Repetir en lotes','Procesa elementos de a pocos','repeat','logic'],['Esperar','Pausa un tiempo o hasta una fecha','clock','logic']]],
+['Personas','hand',[['Pedir aprobación','Pausa hasta que alguien apruebe por Slack o correo','hand','slack']]]];
+const SUGG=[['Esperar respuesta','Pausa hasta que el cliente conteste','clock','wa'],['Guardar en Postgres','Registra la conversación','db','db'],['Enviar plantilla','Si la ventana de 24 h se cerró','wa','wa']];
+
+/* ---------- Renderers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+function stCell(s,t){const [i,c,l]=ST[s];return `<span class="st">${ico(i,'stat-ic '+c)}<span><b style="font-weight:600" class="${c==='subtle'?'subtle':''}">${s==='none'?'':l}</b>${s==='none'?'':' · '}<span class="subtle">${t}</span></span></span>`;}
+function flowRow(f,withProj){const p=PJ[f.p];const tgl=`<div class="tgl-cell"><button class="toggle" role="switch" aria-checked="${f.a}" aria-label="Activo: ${f.n}" data-toggle-label></button><span class="${f.a?'ok':'subtle'}">${f.a?'Activo':'Inactivo'}</span></div>`;
+ return `<div class="rw ${withProj?'cols-flows':'cols-flows-p'}"><div class="nm"><b ${f.open?'data-go="editor" style="cursor:pointer"':''}>${f.n}</b><span class="tags">${f.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</span></div>${withProj?`<span class="pjc"><span class="pdot" style="width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#0F172A;background:${p.c}">${p.l}</span>${p.n}</span>`:''}${stCell(f.s,f.t)}<span class="num muted">${f.c}</span><span class="muted">${f.u}</span><span class="avatar sm ${f.o[1]}" title="Propietario">${f.o[0]}</span>${tgl}<button class="ibtn sm" aria-label="Más acciones">${ico('more')}</button></div>`;}
+function renderFlows(){ $('#ovRows').innerHTML=FLOWS.map(f=>flowRow(f,true)).join('')+`<div class="rw" style="grid-template-columns:1fr;min-height:44px;color:var(--subtle);font-size:12px">Mostrando 10 de 18 · <span class="lnk" style="display:inline">Ver más</span></div>`; }
+function renderProject(k){const p=PJ[k];$('#pjTitle').textContent=p.n;$('#pjCrumb').textContent=p.n;$('#pjDesc').textContent=p.d;const d=$('#pjDot');d.textContent=p.l;d.style.background=p.c;
+ const rows=FLOWS.filter(f=>f.p===k);$('#pjCount').textContent=rows.length;$('#pjRows').innerHTML=rows.map(f=>flowRow(f,false)).join('');
+ const empty=rows.length===0;$('#pjFlowsWrap').classList.toggle('hide',empty);$('#pjEmpty').classList.toggle('hide',!empty);$('#pjOther').classList.add('hide');
+ $$('.tabs [data-pjtab]').forEach(b=>b.setAttribute('aria-selected',b.dataset.pjtab==='flows'));
+ $$('.nv[data-proj]').forEach(n=>n.classList.toggle('on',n.dataset.proj===k));setPhoneTitle(p.n,'Wirvii · Proyecto');hydrate($('#pjRows'));}
+function renderExecs(){$('#exItems').innerHTML=EXECS.map(e=>{const [i,c,l]=ST[e.s];return `<button class="ex-it ${e.on?'on':''}">${ico(i,'s16 '+c)}<span><b>${e.f}</b><small>#${e.id} · ${e.m}${e.x?` · <span class="${c}">${e.x}</span>`:''}</small></span><span class="r"><span>${e.t}</span><span class="num">${e.d}</span></span></button>`;}).join('');}
+function renderCreds(){$('#crRows').innerHTML=CREDS.map(c=>`<div class="rw cols-cred"><div class="nm" style="flex-direction:row;align-items:center;gap:10px"><span class="ni ${c.cl}">${ico(c.ic)}</span><div style="min-width:0"><b>${c.n}</b><br><span class="hint">${c.sub}</span></div></div><span class="cr-type">${c.t}</span><span class="muted">${c.p}</span><span class="muted">${c.u}</span><span class="muted">${c.l}</span><span class="st"><span class="chip ${c.s[0]}">${ico(c.s[1])}${c.s[2]}</span></span><button class="ibtn sm" aria-label="Más">${ico('more')}</button></div>`).join('');}
+function palItem(it,cat){return `<button class="pal-it"><span class="ni ${it[3]}">${ico(it[2])}</span><div><b>${it[0]}</b><small>${cat?cat+' · ':''}${it[1]}</small></div></button>`;}
+function renderPalette(q){const b=$('#palBody');q=(q||'').trim().toLowerCase();
+ if(q){const res=[];PAL.forEach(([c,,its])=>its.forEach(it=>{if((it[0]+' '+it[1]+' '+c).toLowerCase().includes(q))res.push(palItem(it,c));}));
+  b.innerHTML=res.length?`<div class="pal-sec">${res.length} resultados</div>`+res.join(''):`<div class="empty" style="padding:24px"><p>No encontramos “${q}”.</p><button class="btn secondary sm">${ico('globe','s14')}Usar Solicitud HTTP</button><button class="btn ghost sm">${ico('sparkles','s14')}Pedir a la IA que lo cree</button></div>`;return;}
+ b.innerHTML=`<div class="pal-sec">Sugeridos después de “Responder por WhatsApp”</div>${SUGG.map(s=>palItem(s)).join('')}<div class="pal-sec">Categorías</div>`+PAL.map(([c,i,its],k)=>`<button class="pal-it" data-cat="${k}"><span class="ni">${ico(i)}</span><div><b>${c}</b><small>${its.map(x=>x[0]).slice(0,3).join(', ')}…</small></div>${ico('chevr')}</button><div class="hide" data-catb="${k}" style="padding-left:12px">${its.map(it=>palItem(it)).join('')}</div>`).join('');}
+
+/* ---------- Credential forms ---------- */
+const CF={
+wa:{f:`<div style="display:flex;gap:12px;align-items:center"><span class="ni wa" style="width:40px;height:40px">${ico('wa','s20')}</span><div><b style="font-size:16px">WhatsApp Cloud API</b><div class="hint">Envía y recibe mensajes con la API oficial de Meta.</div></div></div>
+<div class="field"><label>Nombre de la credencial</label><div class="input"><input value="Wirvii Ventas"></div><span class="hint">Así la verás al elegirla en un paso.</span></div>
+<div class="field"><label>Token de acceso permanente <span class="chip n" style="height:18px">${ico('lock')}Cifrado</span></label><div class="input"><input class="secret" type="password" value="EAAGm0PX4ZCpsBAKZB8xZC3"><button class="pw-eye" type="button">${ico('eye')}</button></div><span class="hint">Usa un token de “usuario del sistema”. Los tokens temporales vencen en 24 h.</span></div>
+<div class="row2"><div class="field"><label>ID del número de teléfono</label><div class="input"><input class="mono" value="109283746501234"></div></div><div class="field"><label>ID de la cuenta de WhatsApp Business</label><div class="input"><input class="mono" value="238475610293847"></div></div></div>
+<div class="field"><label>Secreto de la app <span class="subtle" style="font-weight:400">Opcional</span></label><div class="input"><input class="secret" type="password" value=""></div><span class="hint">Sirve para comprobar que los avisos que llegan a Orcon vienen de verdad de Meta.</span></div>`,
+h:`<b>Dónde encontrar estos datos</b><ol><li>Entra a <b>developers.facebook.com</b> → tu app → WhatsApp → <b>Configuración de la API</b>.</li><li>Copia el <b>ID del número</b> y el <b>ID de la cuenta</b>.</li><li>En <b>Configuración del negocio → Usuarios del sistema</b>, genera un token con los permisos <span class="mono" style="font-size:12px">whatsapp_business_messaging</span> y <span class="mono" style="font-size:12px">whatsapp_business_management</span>.</li><li>Pégalo y pulsa <b>Probar conexión</b>.</li></ol><div class="alert a"><span>${ico('info')}</span><div><b>¿Vienes de n8n?</b><span>Son los mismos datos de tu credencial “WhatsApp API”. Si importaste el flujo, ya la reconocimos.</span></div></div>`},
+openai:{f:`<div style="display:flex;gap:12px;align-items:center"><span class="ni ai" style="width:40px;height:40px">${ico('sparkles','s20')}</span><div><b style="font-size:16px">OpenAI</b><div class="hint">Modelos de lenguaje para agentes, clasificación y resúmenes.</div></div></div>
+<div class="field"><label>Nombre de la credencial</label><div class="input"><input value="OpenAI producción"></div></div>
+<div class="field"><label>Clave de API <span class="chip n" style="height:18px">${ico('lock')}Cifrado</span></label><div class="input"><input class="secret" type="password" value="sk-proj-xxxxxxxxxxxx"><button class="pw-eye" type="button">${ico('eye')}</button></div></div>
+<div class="row2"><div class="field"><label>Organización <span class="subtle" style="font-weight:400">Opcional</span></label><div class="input"><input class="mono" placeholder="org-…"></div></div><div class="field"><label>Dirección base <span class="subtle" style="font-weight:400">Opcional</span></label><div class="input"><input class="mono" placeholder="https://api.openai.com/v1"></div><span class="hint">Cámbiala para Azure u otro servicio compatible.</span></div></div>
+<div class="field"><label>Límite de gasto mensual en Orcon</label><div class="input"><span class="subtle">USD</span><input value="200"></div><span class="hint">Al llegar al límite, los pasos de IA se pausan y te avisamos.</span></div>`,
+h:`<b>Dónde encontrar la clave</b><ol><li>Entra a <b>platform.openai.com</b> → <b>API keys</b>.</li><li>Crea una clave de proyecto con permisos de solo modelos.</li><li>Cópiala: OpenAI no la vuelve a mostrar.</li></ol><div class="alert a"><span>${ico('info')}</span><div><b>Consejo</b><span>Usa una clave distinta por entorno para ver el gasto por separado.</span></div></div>`},
+http:{f:`<div style="display:flex;gap:12px;align-items:center"><span class="ni http" style="width:40px;height:40px">${ico('globe','s20')}</span><div><b style="font-size:16px">Encabezado HTTP</b><div class="hint">Para cualquier API que pide una clave en un encabezado.</div></div></div>
+<div class="field"><label>Nombre de la credencial</label><div class="input"><input value="Siigo API"></div></div>
+<div class="row2"><div class="field"><label>Nombre del encabezado</label><div class="input"><input class="mono" value="Authorization"></div></div><div class="field"><label>Valor <span class="chip n" style="height:18px">${ico('lock')}Cifrado</span></label><div class="input"><input class="secret" type="password" value="Bearer eyJhbGciOi"><button class="pw-eye" type="button">${ico('eye')}</button></div></div></div>
+<div class="field"><label>Enviar solo a estos dominios</label><div class="input" style="flex-wrap:wrap;height:auto;min-height:36px;padding:4px 8px;gap:4px"><span class="tag mono">api.siigo.com</span><input placeholder="Añadir dominio"></div><span class="hint">Orcon nunca enviará esta clave a otro sitio, aunque un paso lo pida.</span></div>`,
+h:`<b>Cuándo usarla</b><ol><li>La API te dio una clave o token fijo.</li><li>La documentación dice “envía el encabezado Authorization” o “X-API-Key”.</li><li>Si la API usa inicio de sesión con su página (OAuth), busca su credencial propia en la lista.</li></ol><div class="alert a"><span>${ico('shield')}</span><div><b>Protección</b><span>La lista de dominios evita que un flujo mal hecho filtre tu clave.</span></div></div>`}};
+function setCred(t){$('#cmForm').innerHTML=CF[t].f;$('#cmHelp').innerHTML=CF[t].h;$$('.ct[data-ct]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ct===t));$('#cmTestRes').classList.add('hide');}
+
+/* ---------- Screens ---------- */
+const SCREENS=[
+{id:'login',l:'Inicio de sesión',kind:'login',vars:[['normal','Normal'],['error','Error'],['forgot','Recuperar contraseña']],
+ ann:[['lg-brand','better','Pantalla que explica el producto','A la izquierda, por qué Orcon y qué ganas al venir de n8n. n8n solo muestra el formulario.'],['lg-submit','parity','Igual que n8n','Correo y contraseña, botón principal a todo el ancho; Enter envía.'],['lg-sso','better','SSO a la vista','Entrada con el sistema de tu empresa para todas las instalaciones. En n8n es del plan Enterprise.'],['lg-prefs','better','Idioma y tema discretos','Arriba a la derecha, en vez del enlace subrayado bajo el formulario.']]},
+{id:'overview',l:'Inicio (Overview)',view:'overview',
+ ann:[['sidebar','parity','Barra lateral como n8n','Inicio, Personal, Proyectos, Plantillas, Credenciales, Ejecuciones, Ayuda y Ajustes, en el mismo orden mental.'],['ov-cta','parity','Crear arriba a la derecha','Mismo lugar que n8n. Atajo N desde cualquier pantalla.'],['ov-stats','better','Resumen con tendencia','n8n tiene un resumen parecido; aquí se suma la tendencia por hora y lo que necesita tu atención.'],['ov-uncertain','better','“Para revisar”','Cuando no sabemos si algo salió (p. ej. la API no respondió). n8n lo marca como éxito o error sin matiz.'],['ov-tabs','parity','Pestañas como el Overview de n8n','Flujos, Credenciales y Ejecuciones de todos los proyectos.'],['#ovFlows','better','Filas densas, no tarjetas','Última ejecución, ejecuciones 24 h, dueño e interruptor Activo en una sola línea.']]},
+{id:'sidebar',l:'Barra lateral',view:'overview',nophone:1,vars:[['menus','Menús abiertos'],['collapsed','Contraída']],
+ ann:[['org','better','Organización siempre visible','Nombre y selector arriba. En n8n no puedes tener varias organizaciones en una cuenta.'],['user','parity','Usuario abajo como n8n','Nombre real, iniciales y rol (antes decía “Owner” y una “O”).'],['#helpBtn','better','Ayuda para migrar','Incluye la guía para venir desde n8n y los atajos.'],['#sbCollapse','parity','Contraer a íconos','Igual que n8n; atajo [.']]},
+{id:'project',l:'Proyecto',view:'project',vars:[['ventas','Con flujos'],['ops','Proyecto vacío']],
+ ann:[['pj-tabs','parity','Pestañas del proyecto','Flujos, Credenciales, Ejecuciones y Ajustes, como los proyectos de n8n.'],['pj-list','better','Activo desde la lista','Interruptor con texto; estado de la última ejecución con color, ícono y palabra.'],['pj-empty','better','Vacío con salidas','Mascota y tres caminos: crear, importar de n8n o plantilla.']]},
+{id:'newflow',l:'Crear flujo',view:'project',nophone:1,vars:[['import','Importar de n8n'],['template','Plantilla'],['ai','Describir con IA'],['blank','En blanco']],
+ ann:[['nf-options','better','Elegir cómo empezar','n8n abre un lienzo vacío. Aquí, en un solo paso: vacío, plantilla, importar o IA.'],['nf-drop','parity','Pegar el JSON de n8n','Igual que pegar en el lienzo de n8n, o subir varios archivos.'],['nf-report','better','Informe antes de crear','Qué queda igual, qué cambió y qué credenciales faltan, antes de tocar nada.']]},
+{id:'editor',l:'Editor',view:'editor',vars:[['palette','Panel de nodos'],['logs','Registros y chat']],
+ ann:[['ed-top','parity','Barra superior como n8n','Proyecto / nombre, etiquetas y pestañas Editor · Ejecuciones.'],['ed-saved','parity','Guardado automático','Como n8n 2.x: no hay botón Guardar.'],['ed-active','better','Activo y Publicar, juntos','Activo = ¿está escuchando? Publicar = qué versión corre. n8n 2.x quitó el interruptor.'],['ed-publish','parity','Publicar con cambios pendientes','Contador de cambios sin publicar; Mayús+P.'],['cv-agent','parity','Agente con piezas abajo','Modelo, memoria y herramientas colgando del agente, como en n8n.'],['cv-toolbar','parity','Barra flotante del paso','Ejecutar, desactivar, abrir, borrar.'],['palette','better','Panel de nodos + sugerencias','Derecha, búsqueda y categorías como n8n; además propone el siguiente paso según el anterior.'],['cv-run','parity','Probar flujo abajo al centro','Como “Execute workflow”. El chat de prueba simula WhatsApp.'],['logs','better','Registros con detalle del agente','Tiempo y tokens por herramienta, y un chat que imita WhatsApp.']]},
+{id:'ndv',l:'Detalle del paso',view:'editor',nophone:1,
+ ann:[['ndv-input','parity','Entrada | Parámetros | Salida','Tres paneles con Esquema, Tabla y JSON, como n8n.'],['ndv-drop','parity','Arrastrar para mapear','Arrastra un campo de la entrada hasta “Mensaje”: se crea la ficha. Pruébalo.'],['ndv-params','better','Expresiones legibles','Fichas como cliente.telefono en vez de {{ $json.cliente.telefono }}, con el resultado debajo y ayuda de IA.'],['ndv-cred','better','Credencial con contexto','Muestra la cuenta real, si está conectada y cuándo se probó.'],['ndv-idem','better','Nunca envía dos veces','La protección contra duplicados se ve y se explica.'],['ndv-output','parity','Salida con fijar datos','Fijar (P) y editar, como n8n.']]},
+{id:'executions',l:'Ejecuciones',view:'executions',
+ ann:[['ex-list','better','Buscar por contenido','Teléfono o texto del mensaje. En n8n solo con datos personalizados y planes pagos.'],['ex-gantt','better','Línea de tiempo por paso','Ves de un vistazo dónde se fue el tiempo y qué no corrió.'],['ex-fix','better','Error explicado y cómo arreglarlo','En palabras simples, con el arreglo a un clic.'],['ex-retry','parity','Reintentar desde el paso fallido','Como n8n; además solo repite los 7 elementos que fallaron y nunca reenvía los 5 que salieron.']]},
+{id:'credentials',l:'Credenciales',view:'credentials',vars:[['list','Lista'],['create','Crear credencial']],
+ ann:[['cr-list','better','Salud de cada credencial','Dónde se usa, último uso, si vence o falló. n8n no avisa vencimientos.'],['cr-expiring','better','Aviso antes de que algo se rompa','Con el número de flujos afectados.'],['cm-types','parity','Buscar el servicio','Lista a la izquierda, como el selector de n8n.'],['cm-help','better','Guía al lado del formulario','Dónde sacar cada dato, sin salir a la documentación.']]},
+{id:'settings',l:'Ajustes',view:'settings',vars:[['perfil','Perfil'],['seguridad','Contraseña'],['apariencia','Apariencia'],['org','Organización'],['miembros','Personas y roles'],['api','Claves de API']],
+ ann:[['st-nav','better','Todo en un sitio','Cuenta y organización en la misma página, sin perder la barra lateral.'],['st-appearance','better','Se aplica al instante','Sin botón Guardar para preferencias.'],['st-members','parity','Roles como n8n','Explicados en una línea cada uno.']]}];
+const PHONE_ANN=[['ph-top','better','Siempre sabes dónde estás','Organización y sección arriba.'],['tabbar','better','Barra inferior con texto','Cinco destinos con nombre; antes eran 3 íconos sin texto.']];
+const VIEW2SCREEN={overview:'overview',project:'project',editor:'editor',executions:'executions',credentials:'credentials',settings:'settings'};
+
+let cur=null,curVar=null,dev='desktop';
+const app=$('#app'),login=$('#s-login');
+
+function closeAll(){$$('.menu').forEach(m=>m.classList.add('hide'));$$('.modal-wrap').forEach(m=>m.classList.remove('on'));$('#ndv').classList.remove('on');}
+function showView(v){$$('.view').forEach(x=>x.classList.toggle('on',x.dataset.view===v));
+ $$('.sidebar .nv[data-go]').forEach(n=>n.classList.toggle('on',n.dataset.go===v&&!n.dataset.proj));
+ $$('.tabbar button').forEach(n=>n.classList.toggle('on',n.dataset.go===v));
+ $('#sidebar').classList.toggle('collapsed',v==='editor');
+ const T={overview:'Inicio',executions:'Ejecuciones',credentials:'Credenciales',settings:'Ajustes',editor:'Agente de ventas'};if(T[v])setPhoneTitle(T[v],v==='editor'?'Ventas WhatsApp':'Wirvii');
+ $$('.view.on').forEach(x=>x.scrollTop=0);}
+function setPhoneTitle(t,c){$('#phTitle').textContent=t;$('#phCtx').textContent=c;}
+function setSettings(k){$$('[data-sts]').forEach(s=>s.classList.toggle('on',s.dataset.sts===k));$$('.st-nav [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===k));}
+function newflow(k){$$('.nf-opt').forEach(o=>o.setAttribute('aria-pressed',o.dataset.nf===k));$$('.nf-pane').forEach(p=>p.classList.toggle('on',p.dataset.nfp===k));
+ $('#nfGo').innerHTML={import:'Importar y abrir',template:'Usar plantilla',ai:'Crear borrador con IA',blank:'Crear y abrir'}[k]+' <span class="kbd">↵</span>';$('#nfModal').classList.add('on');}
+
+function show(id,v){const s=SCREENS.find(x=>x.id===id);cur=s;curVar=v||(s.vars?s.vars[0][0]:null);closeAll();
+ $('#sidebar').classList.remove('collapsed');
+ if(s.nophone&&dev==='phone'){setDev('desktop',true);}
+ $$('[data-dev="phone"]').forEach(b=>{b.disabled=!!s.nophone;b.title=s.nophone?'Esta pantalla solo aplica en escritorio':'Teléfono';});
+ login.classList.toggle('on',s.kind==='login');app.classList.toggle('on',s.kind!=='login');
+ if(s.kind==='login'){const f=curVar==='forgot';$('#lgSignin').classList.toggle('hide',f);$('#lgForgot').classList.toggle('hide',!f);$('#resetOk').classList.add('hide');
+  const e=curVar==='error';$('#lgErr').classList.toggle('hide',!e);$('#lgMailBox').classList.toggle('err',e);$('#lgPwBox').classList.toggle('err',e);$('#lgPw').value=e?'':'contraseña-segura';}
+ else{showView(s.view);
+  if(id==='project')renderProject(curVar);
+  if(id==='newflow'){renderProject('ventas');newflow(curVar);}
+  if(id==='sidebar'){if(curVar==='collapsed'){$('#sidebar').classList.add('collapsed');}else{$('#orgMenu').classList.remove('hide');$('#userMenu').classList.remove('hide');}}
+  if(id==='editor'){$('#palette').classList.toggle('hide',curVar!=='palette');$('#logs').classList.toggle('open',curVar==='logs');}
+  if(id==='ndv'){$('#palette').classList.add('hide');$('#logs').classList.remove('open');$('#ndv').classList.add('on');}
+  if(id==='credentials'&&curVar==='create'){setCred('wa');$('#crModal').classList.add('on');}
+  if(id==='settings')setSettings(curVar);
+  if(id==='overview'){$$('[data-ovtab]').forEach(b=>b.setAttribute('aria-selected',b.dataset.ovtab==='flows'));$('#ovFlows').classList.remove('hide');$('#ovCreds').classList.add('hide');$('#ovExecs').classList.add('hide');}
+ }
+ $$('.dz-tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.s===id));
+ const vb=$('#dzVariants');document.body.classList.toggle('has-variants',!!s.vars);vb.classList.toggle('on',!!s.vars);
+ if(s.vars){$('#dzVarSeg').innerHTML=s.vars.map(([k,l])=>`<button data-var="${k}" aria-pressed="${k===curVar}">${l}</button>`).join('');}
+ try{history.replaceState(null,'','#'+id+(curVar?':'+curVar:''));}catch(e){}
+ requestAnimationFrame(()=>{fit();placeAnn();});}
+
+/* ---------- Annotations ---------- */
+function placeAnn(){const layer=$('#annLayer'),list=$('#dzList');layer.innerHTML='';list.innerHTML='';if(!cur)return;
+ const dv=$('#device').getBoundingClientRect();const sc=dv.width/$('#device').offsetWidth||1;let n=0;
+ const anns=cur.ann.concat(dev==='phone'&&cur.kind!=='login'?PHONE_ANN:[]);
+ anns.forEach(([sel,k,h,x])=>{const el=sel.startsWith('#')?$(sel):$(`[data-ann="${sel}"]`);if(!el)return;const ov=$('.modal-wrap.on')||$('.ndv-wrap.on');if(ov&&!ov.contains(el))return;const r=el.getBoundingClientRect();if(!r.width||!r.height)return;
+  let left=(r.right-dv.left)/sc-14,top=(r.top-dv.top)/sc-10;const W=$('#device').offsetWidth,H=$('#device').offsetHeight;
+  if(left>W-30)left=W-30;if(left<6)left=6;if(top<6)top=6;if(top>H-30)top=H-30;
+  n++;const m=document.createElement('div');m.className='ann '+k+(left>W-300?' left':'');m.style.left=left+'px';m.style.top=top+'px';m.tabIndex=0;
+  m.innerHTML=`${n}<span class="tip"><i>${k==='parity'?'Igual que n8n':'Mejora sobre n8n'} · ${h}</i>${x}</span>`;layer.appendChild(m);
+  $('#dzCount').textContent='('+n+')';const li=document.createElement('li');li.className=k;li.innerHTML=`<b>${n}</b><span><em>${h}</em>${x}</span>`;
+  li.onmouseenter=()=>{el.classList.add('ann-target');m.classList.add('hl');};li.onmouseleave=()=>{el.classList.remove('ann-target');m.classList.remove('hl');};list.appendChild(li);});}
+
+/* ---------- Fit / device ---------- */
+function fit(){const st=$('#stage'),d=$('#device'),sc=$('#scaler');const W=d.offsetWidth,H=d.offsetHeight;
+ let s=dev==='desktop'?Math.min(1,(st.clientWidth-32)/W):Math.min(1,(st.clientHeight-64)/H);s=Math.max(s,.35);
+ d.style.transform=`scale(${s})`;d.style.transformOrigin='0 0';sc.style.width=W*s+'px';sc.style.height=H*s+'px';sc.style.margin=dev==='desktop'?'16px':'32px auto';}
+function setDev(m,silent){dev=m;document.body.classList.toggle('mode-phone',m==='phone');$$('[data-dev]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dev===m));if(!silent)requestAnimationFrame(()=>{fit();placeAnn();});}
+function setTheme(t){const real=t==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=real;
+ $$('[data-theme-set]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.themeSet===t||(t!=='system'&&b.closest('.dz-seg')&&b.dataset.themeSet===real)));
+ $$('.lg-brand .wm').forEach(()=>{});}
+
+/* ---------- Wire up ---------- */
+hydrate(document);renderFlows();renderExecs();renderCreds();renderPalette();hydrate(document);
+$('#dzTabs').innerHTML=SCREENS.map((s,i)=>`<button class="dz-tab" role="tab" data-s="${s.id}"><b>${i+1}</b>${s.l}</button>`).join('');
+
+document.addEventListener('click',e=>{const t=e.target;
+ const tab=t.closest('.dz-tab');if(tab)return show(tab.dataset.s);
+ const vr=t.closest('[data-var]');if(vr)return show(cur.id,vr.dataset.var);
+ const th=t.closest('[data-theme-set]');if(th){setTheme(th.dataset.themeSet);return;}
+ if(t.closest('[data-theme-toggle]')){setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');return;}
+ const dv=t.closest('[data-dev]');if(dv&&!dv.disabled)return setDev(dv.dataset.dev);
+ const vg=t.closest('[data-variant-go]');if(vg){e.preventDefault();return show('login',vg.dataset.variantGo);}
+ const sg=t.closest('[data-screen-go]');if(sg)return show(sg.dataset.screenGo);
+ const tg=t.closest('.toggle');if(tg){const on=tg.getAttribute('aria-checked')!=='true';tg.setAttribute('aria-checked',on);const lab=tg.dataset.toggleLabel?$('#'+tg.dataset.toggleLabel):tg.nextElementSibling;if(lab&&lab.tagName==='SPAN'&&tg.hasAttribute('data-toggle-label')){lab.textContent=on?'Activo':'Inactivo';lab.className=lab.id?'':(on?'ok':'subtle');}return;}
+ const nf=t.closest('[data-open-newflow]');if(nf){closeAll();newflow(nf.dataset.openNewflow||'blank');return;}
+ const go=t.closest('[data-go]');if(go){e.preventDefault();const v=go.dataset.go;
+  if(v==='templates'){show('newflow','template');return;}
+  const sid=VIEW2SCREEN[v];if(sid){show(sid,v==='project'?(go.dataset.proj||'ventas'):(go.dataset.st||undefined));if(v==='project'&&go.dataset.proj&&!['ventas','ops'].includes(go.dataset.proj))renderProject(go.dataset.proj);}return;}
+ const nfo=t.closest('.nf-opt');if(nfo)return newflow(nfo.dataset.nf);
+ if(t.closest('[data-close]')){t.closest('.modal-wrap').classList.remove('on');requestAnimationFrame(placeAnn);return;}
+ if(t.closest('[data-open-cred]')){setCred('wa');$('#crModal').classList.add('on');return;}
+ const ct=t.closest('.ct[data-ct]');if(ct)return setCred(ct.dataset.ct);
+ if(t.closest('#cmTest')){$('#cmTestRes').classList.remove('hide');return;}
+ if(t.closest('[data-open-ndv]')){$('#ndv').classList.add('on');return;}
+ if(t.closest('[data-close-ndv]')){$('#ndv').classList.remove('on');return;}
+ if(t.closest('[data-open-logs]')||t.closest('#logsToggle')){$('#logs').classList.toggle('open');return;}
+ if(t.closest('#palClose')){$('#palette').classList.add('hide');return;}
+ if(t.closest('#palToggle')){$('#palette').classList.toggle('hide');$('#palSearch').focus();return;}
+ const cat=t.closest('[data-cat]');if(cat){$(`[data-catb="${cat.dataset.cat}"]`).classList.toggle('hide');return;}
+ const st=t.closest('.st-nav [data-st]');if(st)return setSettings(st.dataset.st);
+ const ov=t.closest('[data-ovtab]');if(ov){$$('[data-ovtab]').forEach(b=>b.setAttribute('aria-selected',b===ov));$('#ovFlows').classList.toggle('hide',ov.dataset.ovtab!=='flows');$('#ovCreds').classList.toggle('hide',ov.dataset.ovtab!=='creds');$('#ovExecs').classList.toggle('hide',ov.dataset.ovtab!=='execs');return;}
+ const pj=t.closest('[data-pjtab]');if(pj){$$('[data-pjtab]').forEach(b=>b.setAttribute('aria-selected',b===pj));const f=pj.dataset.pjtab==='flows';$('#pjFlowsWrap').classList.toggle('hide',!f);$('#pjOther').classList.toggle('hide',f);$('#pjEmpty').classList.add('hide');$('#pjOtherTxt').textContent={creds:'Las 4 credenciales de este proyecto (misma tabla que la pantalla 9, filtrada).',execs:'Ejecuciones de este proyecto (misma vista que la pantalla 8, filtrada).',settings:'Nombre, descripción, color, personas del proyecto y sus roles.'}[pj.dataset.pjtab]||'';return;}
+ const sgt=t.closest('[data-segtabs] button');if(sgt){const g=sgt.parentElement,p=g.dataset.segtabs;$$('button',g).forEach(b=>b.setAttribute('aria-pressed',b===sgt));$$(`[data-pane^="${p}-"]`).forEach(x=>x.classList.toggle('hide',x.dataset.pane!==p+'-'+sgt.dataset.t));return;}
+ const seg=t.closest('.seg button');if(seg&&!seg.closest('[data-segtabs]')&&!seg.closest('.ed-mid')){$$('button',seg.parentElement).forEach(b=>b.setAttribute('aria-pressed',b===seg));return;}
+ const ex=t.closest('.ex-it');if(ex){$$('.ex-it').forEach(x=>x.classList.toggle('on',x===ex));return;}
+ const fc=t.closest('.ex-filters .fchip');if(fc){$$('.ex-filters .fchip').forEach(x=>x.classList.toggle('on',x===fc));return;}
+ if(t.closest('#aiBtn')){$('#aiPop').classList.toggle('hide');return;}
+ if(t.closest('#aiClose')){$('#aiPop').classList.add('hide');return;}
+ if(t.closest('#pwEye')){const p=$('#lgPw');p.type=p.type==='password'?'text':'password';return;}
+ const eye=t.closest('.pw-eye');if(eye){const inp=eye.parentElement.querySelector('input');if(inp)inp.type=inp.type==='password'?'text':'password';return;}
+ if(t.closest('#sendReset')){$('#resetOk').classList.remove('hide');return;}
+ if(t.closest('#sbCollapse')){$('#sidebar').classList.toggle('collapsed');requestAnimationFrame(placeAnn);return;}
+ const mb={orgBtn:'#orgMenu',userBtn:'#userMenu',helpBtn:'#helpMenu'};for(const k in mb){if(t.closest('#'+k)){const m=$(mb[k]);const was=m.classList.contains('hide');$$('.menu').forEach(x=>x.classList.add('hide'));m.classList.toggle('hide',!was);return;}}
+ if(!t.closest('.menu'))$$('.menu').forEach(x=>x.classList.add('hide'));
+});
+$('#palSearch').addEventListener('input',e=>renderPalette(e.target.value));
+$('#dzNotesBtn').addEventListener('click',function(){const on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',on);document.body.classList.toggle('no-notes',!on);});
+$('#dzMin').addEventListener('click',()=>$('#dzNotes').classList.toggle('min'));
+/* drag-and-drop mapping */
+let dragExpr=null;
+document.addEventListener('dragstart',e=>{const f=e.target.closest&&e.target.closest('[data-expr]');if(!f)return;dragExpr=f.dataset.expr;e.dataTransfer.setData('text/plain',dragExpr);e.dataTransfer.effectAllowed='copy';});
+$$('.dz-target').forEach(z=>{z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drop-on');});z.addEventListener('dragleave',()=>z.classList.remove('drop-on'));
+ z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('drop-on');const x=e.dataTransfer.getData('text/plain')||dragExpr;if(!x)return;const ph=z.querySelector('.ph');const p=document.createElement('span');p.className='pill exp';p.textContent=x;ph?z.insertBefore(p,ph):z.appendChild(p);});});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#ndv').classList.contains('on')&&cur.id!=='ndv'){$('#ndv').classList.remove('on');}else closeAll();}
+ if(e.target.matches('input,textarea'))return;
+ const n=parseInt(e.key,10);if(n>=1&&n<=9&&!e.metaKey&&!e.ctrlKey&&!e.altKey){show(SCREENS[n-1].id);}if(e.key==='0'&&!e.metaKey&&!e.ctrlKey)show(SCREENS[9].id);});
+addEventListener('resize',()=>{fit();placeAnn();});
+$$('.view').forEach(v=>v.addEventListener('scroll',()=>placeAnn(),{passive:true}));
+const h=(location.hash||'').slice(1).split(':');show(SCREENS.some(s=>s.id===h[0])?h[0]:'login',h[1]||undefined);
+addEventListener('hashchange',()=>{const q=(location.hash||'').slice(1).split(':');if(SCREENS.some(s=>s.id===q[0])&&(!cur||q[0]!==cur.id||(q[1]||null)!==curVar))show(q[0],q[1]||undefined);});
+document.fonts&&document.fonts.ready.then(()=>placeAnn());
+})();
+</script>
+</body>
+</html>

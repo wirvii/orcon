@@ -6,8 +6,10 @@ import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 
 import { renderInApp } from '../../../../../test/screen-harness';
+import { writeStored } from '../../../../app/boundary/storage';
 import { createQueryClient } from '../../../../app/query-client';
 import type { RouterContext } from '../../../../app/router-context';
+import { createLocalCredentialStore } from '../../../../app/credential-store/store';
 import { createLocalCredentialSource } from '../../api/local-credential-source';
 import { createLocalFlowTargetSource } from '../../api/local-flow-target-source';
 import { credentialSource, flowTargetSource } from '../../api/queries';
@@ -27,8 +29,10 @@ export interface Harness {
  * channel, a query client and a router (the sub-flow widget links to flows). Credentials and flows
  * come from fresh in-memory sources, so no test sees what another created.
  */
-export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument()): Harness & ReturnType<typeof renderInApp> {
-  const fresh = createLocalCredentialSource();
+export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument(), expressionView: 'chips' | 'raw' = 'raw'): Harness & ReturnType<typeof renderInApp> {
+  // The tests of the form type into formulas as text; the ones about chips ask for them.
+  writeStored('orcon.editor.expression-view', expressionView);
+  const fresh = createLocalCredentialSource(createLocalCredentialStore());
   vi.spyOn(credentialSource, 'list').mockImplementation(fresh.list);
   vi.spyOn(credentialSource, 'create').mockImplementation(fresh.create);
   const flows = createLocalFlowTargetSource();
@@ -40,15 +44,16 @@ export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleF
   const root = createRootRouteWithContext<RouterContext>()({ component: Outlet });
   const page = createRoute({
     getParentRoute: () => root,
-    path: '/',
+    // The editor sits under its project, so the sub-flow widget finds the organization and project of the address.
+    path: '/orgs/$orgSlug/projects/$projectHandle',
     component: () => (
       <NoticeContext.Provider value={channel}>
         <EditorStoreProvider store={store}>{ui}</EditorStoreProvider>
       </NoticeContext.Provider>
     ),
   });
-  const flow = createRoute({ getParentRoute: () => root, path: '/flows/$flowId', component: () => null });
-  const router = createRouter({ routeTree: root.addChildren([page, flow]), history: createMemoryHistory({ initialEntries: ['/'] }), context: { queryClient } });
+  const flow = createRoute({ getParentRoute: () => root, path: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId', component: () => null });
+  const router = createRouter({ routeTree: root.addChildren([page, flow]), history: createMemoryHistory({ initialEntries: ['/orgs/acme/projects/ventas'] }), context: { queryClient } });
   const view = renderInApp(<RouterProvider router={router} />, { queryClient });
   return { ...view, store, channel };
 }

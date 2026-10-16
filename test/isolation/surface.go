@@ -41,10 +41,31 @@ func (StoreSurface) StoreMethods() []string {
 var UncoveredStoreMethods = []string{
 	"Atomic", "ClaimOutbox", "ClaimTokens", "FindGrant", "FireDueTimers",
 	"GetExecution", "GetExternalOperation", "GetJoinInstance", "GetPackage", "GetPackageByID", "GetTimer",
-	"GetToken", "InTx", "InsertGrant", "InsertPackage", "ListAttentionRequests",
+	"GetToken", "InsertGrant", "InsertPackage", "ListAttentionRequests",
 	"ListDraftConnectorReferences", "ListExecutionEvents", "ListExecutions", "ListExternalOperations",
 	"ListPackageVersions", "ListPackages", "ListVersionConnectorReferences", "Read", "ReleaseExpiredLeases",
 	"ReleaseWorkerLeases", "RenewLeases", "ResolveWaitSecret",
+	// Added by the durable engine (SPEC-001 C4a: payloads, snapshots, lost leases, token
+	// attempts and nondeterminism reads), by its last-chance tokens, and by the outbox
+	// routing. They take the organization as well (ScopeOf, the scope itself); their cases
+	// are owed by BL-100 like the rest of this list.
+	"ClaimLastChanceToken", "GetPayload", "LastChanceWaiting", "ListAttempts", "ListTokenNondeterminism",
+	"LoadSnapshot", "ReleaseLostLeases", "ReleaseTokenLease", "RouteEvents", "ScopeOf",
+	// Added by the shared rate buckets of the connector dispatch (SPEC-003 CN3-dispatch, ADR-0014
+	// section 2.4). They take the organization; their cases are owed by BL-100 as well.
+	"BlockBucket", "TakeBucketPermits",
+	// RunnableCounts is the instance-wide count the fair claim planner reads (SPEC-001 C11): it
+	// takes no organization, so it is not an isolation subject, and the list keeps the surface exact.
+	"RunnableCounts",
+	// ResolveRoute maps an unauthenticated webhook path to the organization that owns it (SPEC-002
+	// T2): it runs before any organization is known, so it has no organization parameter. Its
+	// cases are owed by BL-100 with the rest of this list.
+	"ResolveRoute",
+	// Added by the read side of the executions API (the node runs and stored outputs of an execution,
+	// and the audit entry of a read of data). They take the scope of the organization like the other
+	// execution reads; storetest checks that another organization lists nothing (NodeReads,
+	// OrgAuditAppend), and their cases here are owed by BL-100 with the rest of this list.
+	"AppendOrgEntry", "ListNodeExecutions", "ListNodeOutputs",
 }
 
 // NoSurface is the surface of a tree without routes or store methods that handle

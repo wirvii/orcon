@@ -4,8 +4,16 @@
     "sm": {
       "$value": "4px"
     },
+    "base": {
+      "$value": "6px",
+      "$description": "Small buttons, menu items and segmented-control items."
+    },
     "md": {
       "$value": "8px"
+    },
+    "panel": {
+      "$value": "10px",
+      "$description": "Floating panels: menus and popovers."
     },
     "lg": {
       "$value": "12px"

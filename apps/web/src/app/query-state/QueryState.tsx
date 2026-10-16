@@ -34,7 +34,18 @@ export interface QueryStateProps<TData> {
   /** True when the data holds nothing to show. Defaults to an empty array. */
   isEmpty?: ((data: TData) => boolean) | undefined;
   /** What an empty result says and, usually, the next step to take. */
-  empty: { title: string; description?: string | undefined; action?: ReactNode };
+  empty: {
+    title: string;
+    description?: string | undefined;
+    action?: ReactNode;
+    /** A decorative picture shown above the text on a first-run empty state (the mascot, SPEC-018). */
+    illustration?: ReactNode | undefined;
+  };
+  /**
+   * What to say when the server answers that the operation is not available yet (503 `service-unavailable`).
+   * The text replaces the error banner, so the person sees a calm state, not a server title or a request id.
+   */
+  unavailable?: { title: string; description?: string | undefined } | undefined;
   /** Placeholder rows shown while loading. */
   skeletonRows?: number | undefined;
   /** The screen's content for loaded data. */
@@ -46,7 +57,7 @@ export interface QueryStateProps<TData> {
  * empty state with a next step, an error with a retry, a permission message without a
  * retry, or the data. Every screen looks and behaves the same in each state.
  */
-export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, skeletonRows = 3, children }: QueryStateProps<TData>) {
+export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, unavailable, skeletonRows = 3, children }: QueryStateProps<TData>) {
   const intl = useIntl();
 
   if (query.status === 'pending') {
@@ -62,6 +73,9 @@ export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, skel
   if (query.status === 'error') {
     const problem = toProblemDetails(query.error);
     if (problem.status === 403) return <Forbidden />;
+    if (unavailable !== undefined && problem.code === 'service-unavailable') {
+      return <EmptyState title={unavailable.title} description={unavailable.description} />;
+    }
     return (
       <div className="flex flex-col items-start gap-3">
         <ProblemAlert problem={problem} />
@@ -79,7 +93,14 @@ export function QueryState<TData>({ query, isEmpty = defaultIsEmpty, empty, skel
 
   const { data } = query;
   if (data === undefined || isEmpty(data)) {
-    return <EmptyState title={empty.title} description={empty.description} action={empty.action} />;
+    const state = <EmptyState title={empty.title} description={empty.description} action={empty.action} />;
+    if (empty.illustration === undefined) return state;
+    return (
+      <div className="flex flex-col items-center gap-2">
+        {empty.illustration}
+        {state}
+      </div>
+    );
   }
   return <>{children(data)}</>;
 }

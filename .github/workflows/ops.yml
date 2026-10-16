@@ -11,8 +11,33 @@ on:
     types: [checks_requested]
 permissions:
   contents: read
+# A newer push to a pull request supersedes the run in flight; the merge queue is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  # changes computes the areas the change touches (scripts/ci-changes.sh). Jobs below use
+  # job-level `if:` on its outputs and never a workflow-level paths filter: a skipped job
+  # counts as passed for a required check. Any doubt runs everything.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.areas.outputs.go }}
+      web: ${{ steps.areas.outputs.web }}
+      api: ${{ steps.areas.outputs.api }}
+      skills: ${{ steps.areas.outputs.skills }}
+      docs: ${{ steps.areas.outputs.docs }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: areas
+        uses: ./.github/actions/changes
+
   ops:
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -49,6 +49,12 @@ paths:
     $ref: ./paths/orgs.yaml
   /orgs/{orgId}/projects:
     $ref: ./paths/org-projects.yaml
+  /orgs/{orgId}/flows:
+    $ref: ./paths/org-flows.yaml
+  /orgs/{orgId}/activity-summary:
+    $ref: ./paths/org-activity-summary.yaml
+  /orgs/{orgId}/executions:
+    $ref: ./paths/org-executions.yaml
   /projects/{projectId}:
     $ref: ./paths/project.yaml
   /projects/{projectId}/flows:
@@ -314,6 +320,14 @@ components:
       $ref: ./schemas/session.yaml#/Session
     CurrentUser:
       $ref: ./schemas/session.yaml#/CurrentUser
+    OrgRole:
+      $ref: ./schemas/session.yaml#/OrgRole
+    ActivitySummary:
+      $ref: ./schemas/activity.yaml#/ActivitySummary
+    ActivityExecutionCounts:
+      $ref: ./schemas/activity.yaml#/ActivityExecutionCounts
+    ActivityTimeSaved:
+      $ref: ./schemas/activity.yaml#/ActivityTimeSaved
     Organization:
       $ref: ./schemas/session.yaml#/Organization
     OrganizationList:
@@ -332,6 +346,8 @@ components:
       $ref: ./schemas/flow.yaml#/Flow
     FlowList:
       $ref: ./schemas/flow.yaml#/FlowList
+    FlowLastExecution:
+      $ref: ./schemas/flow.yaml#/FlowLastExecution
     CreateFlowRequest:
       $ref: ./schemas/flow.yaml#/CreateFlowRequest
     UpdateFlowRequest:
@@ -396,6 +412,8 @@ components:
       $ref: ./schemas/node-type.yaml#/NodeTypeOperation
     NodeType:
       $ref: ./schemas/node-type.yaml#/NodeType
+    NodeTypeIcon:
+      $ref: ./schemas/node-type.yaml#/NodeTypeIcon
     NodeTypeList:
       $ref: ./schemas/node-type.yaml#/NodeTypeList
   responses:

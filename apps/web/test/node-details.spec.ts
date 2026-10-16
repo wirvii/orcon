@@ -4,14 +4,17 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { goInApp, isFlowDataRequest, isFrameRequest, mockDraftApi } from './draft-api';
+
 // The node details view in a real browser, against the production build: the dialog and the docked
 // panel are laid out by the browser, and the lists of the Select fields open in a layer above the
-// dialog, which jsdom cannot show. The preview opens a sample flow kept in memory.
+// dialog, which jsdom cannot show. The draft of the sample flow comes from a page-level API answer.
 
-const FLOW = '/flows/01930000-0000-7000-8000-00000000ed5a';
+const FLOW = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-00000000ed5a';
 const wcag = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 async function openEditor(page: Page, options: { theme?: 'light' | 'dark'; density?: 'comfortable' | 'compact' } = {}) {
+  await mockDraftApi(page);
   await page.addInitScript(
     ({ theme, density }) => {
       window.localStorage.setItem('orcon.locale', 'en');
@@ -54,7 +57,11 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Settings' }).click();
+      await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeVisible();
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Retries and safety' }).click();
       await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeVisible();
+      await expect(page.getByText('A retry can send this twice')).toBeVisible();
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Docs' }).click();
       await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible();
@@ -97,6 +104,7 @@ for (const locale of ['en', 'es'] as const) {
     await page.addInitScript((value) => {
       window.localStorage.setItem('orcon.locale', value);
     }, locale);
+    await mockDraftApi(page);
     await page.goto(FLOW);
     await page.waitForSelector('[data-fitted="true"]');
     await openDetails(page, 'slack', 'dialog');
@@ -236,7 +244,8 @@ test.describe('on a computer', () => {
     await form.getByLabel(/Header value/).fill('x');
     await form.getByRole('button', { name: 'Create credential' }).click();
     await expect(form).toHaveCount(0);
-    expect(requests).toEqual([]);
+    // The only data the editor asks for is its flow and draft; a credential is created in the page, without a request.
+    expect(requests.filter((url) => !isFlowDataRequest(url) && !isFrameRequest(url))).toEqual([]);
   });
 
   test('says test runs come later when a pane or the header offers the run', async ({ page }) => {
@@ -252,9 +261,9 @@ test.describe('on a computer', () => {
     await openDetails(page, 'slack', 'dialog');
     await page.getByRole('dialog', { name: 'Slack details' }).getByRole('textbox', { name: /URL/ }).fill('https://kept.example.test/hook');
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByRole('status').filter({ hasText: /^Save state: Saved/ })).toBeVisible({ timeout: 6_000 });
     await page.getByRole('link', { name: 'Settings' }).first().click();
-    await page.getByRole('link', { name: 'Flow editor' }).first().click();
+    await goInApp(page, FLOW);
     await page.waitForSelector('[data-fitted="true"]');
     await expect(page.getByRole('group', { name: /^Slack, POST kept\.example\.test/ })).toBeVisible();
   });
@@ -344,6 +353,9 @@ test.describe('on a phone the node details are read-only', () => {
       await expect(page.getByRole('tab', { name: 'Parameters' })).toHaveAttribute('aria-selected', 'true');
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Settings' }).click();
+      await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeDisabled();
+      await expectNoViolations(page);
+      await page.getByRole('tab', { name: 'Retries and safety' }).click();
       await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
       await expectNoViolations(page);
       await page.getByRole('tab', { name: 'Docs' }).click();
@@ -364,6 +376,9 @@ test.describe('on a phone the node details are read-only', () => {
     await expect(view.getByRole('textbox').first()).toBeDisabled();
     expect(await enabledControls(page)).toEqual([]);
     await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('textbox', { name: /Limit for one attempt/ })).toBeDisabled();
+    expect(await enabledControls(page)).toEqual([]);
+    await page.getByRole('tab', { name: 'Retries and safety' }).click();
     await expect(page.getByRole('textbox', { name: /Attempts in total/ })).toBeDisabled();
     expect(await enabledControls(page)).toEqual([]);
     await page.getByRole('tab', { name: 'Docs' }).click();

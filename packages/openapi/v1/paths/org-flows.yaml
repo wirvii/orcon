@@ -1,0 +1,141 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+x-orcon-resource: collection
+parameters:
+  - $ref: ../openapi.yaml#/components/parameters/OrgId
+get:
+  operationId: listOrgFlows
+  summary: List the flows of an organization
+  description: >-
+    Returns the flows of every project of one organization that the caller can read, one page at a time,
+    each with its latest execution and the number of executions of the last 24 hours. Use the filters to
+    narrow the list; flows of projects the caller cannot read are left out.
+  tags:
+    - flows
+  x-orcon-permission: flow:read
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - forbidden
+    - not-found
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    command: org-flows list
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: firstPageOfOrgFlows
+      scenario: project-with-flows
+      request:
+        pathParams:
+          orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+        query:
+          sort: -lastExecutionAt
+      response:
+        status: 200
+        body: firstPageOfOrgFlows
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+    - name: projectId
+      in: query
+      required: false
+      description: Return only flows of this project; a project the caller cannot read gives an empty page.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+    - name: sort
+      in: query
+      required: false
+      description: Sort expression; a leading minus sorts in descending order.
+      x-orcon-sort-default: -updatedAt
+      schema:
+        type: string
+        enum:
+          - -updatedAt
+          - -lastExecutionAt
+        x-orcon-enum-kind: identifier
+        default: -updatedAt
+    - name: activationState
+      in: query
+      required: false
+      description: Return only flows in this activation state.
+      schema:
+        type: string
+        enum:
+          - ACTIVE
+          - INACTIVE
+    - name: q
+      in: query
+      required: false
+      description: Return only flows whose name starts with this text (case-insensitive).
+      schema:
+        type: string
+        maxLength: 200
+        examples:
+          - Welcome
+  responses:
+    '200':
+      description: One page of flows of the organization.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/FlowList
+          examples:
+            firstPageOfOrgFlows:
+              summary: Two flows, one of them ran today
+              value:
+                items:
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    name: Welcome email
+                    activationState: ACTIVE
+                    hasUnpublishedChanges: false
+                    draftRevision: 2
+                    lastExecution:
+                      id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                      status: SUCCEEDED
+                      hasUncertainOperation: false
+                      createdAt: '2026-10-12T15:04:05Z'
+                      finishedAt: '2026-10-12T15:04:09Z'
+                    executionCountLast24h: 12
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:04:05Z'
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    name: Weekly report
+                    activationState: INACTIVE
+                    hasUnpublishedChanges: true
+                    draftRevision: 0
+                    executionCountLast24h: 0
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:04:05Z'
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '403':
+      $ref: ../openapi.yaml#/components/responses/Forbidden
+    '404':
+      $ref: ../openapi.yaml#/components/responses/NotFound
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable

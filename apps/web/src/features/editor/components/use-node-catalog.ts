@@ -5,6 +5,7 @@ import type { CatalogItem } from '@orcon/ui';
 import { useCallback, useMemo } from 'react';
 import { useIntl, type MessageDescriptor } from 'react-intl';
 
+import { brandIconFor } from '../model/brand-marks';
 import { ADDED_ID_PREFIX, NODE_TYPES, typeDefOf, type NodeGroup } from '../model/node-types';
 import type { FlowNode } from '../model/flow-document';
 
@@ -38,8 +39,10 @@ const descriptions: Record<string, MessageDescriptor> = {
 
 const groups: Record<NodeGroup, MessageDescriptor> = {
   triggers: editorMessages.catalogTriggers,
-  flow: editorMessages.catalogFlow,
+  apps: editorMessages.catalogApps,
   data: editorMessages.catalogData,
+  flow: editorMessages.catalogFlow,
+  subflows: editorMessages.catalogSubflows,
 };
 
 /**
@@ -61,6 +64,7 @@ export function useNodeCatalog(): CatalogItem[] {
         subtitle: text ? intl.formatMessage(text) : undefined,
         group: intl.formatMessage(groups[def.group]),
         icon: def.icon,
+        connector: brandIconFor(def.type),
         keywords: def.aliases,
         inputs: def.kind === 'trigger' ? [] : [{ id: 'main' }],
         outputs: def.outputs.map((port) => ({ id: port.id, label: port.label })),

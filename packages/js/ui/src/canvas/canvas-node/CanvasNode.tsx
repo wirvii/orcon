@@ -129,6 +129,8 @@ export function CanvasNode({
   else if (node.status && node.status !== 'SUCCEEDED') chips.push({ status: node.status, code: node.statusCode });
   if ((node.uncertainCount ?? 0) > 0 && node.status !== 'UNCERTAIN') chips.push({ kind: 'uncertain-items', count: node.uncertainCount });
   if (node.pinned) chips.push({ kind: 'pinned' });
+  // The protection against a repeat comes after the states: a state that needs attention is never pushed out by it.
+  if (node.neverTwice && !placeholder) chips.push({ kind: 'never-twice' });
   const shownChips = chips.slice(0, 2);
 
   const ringRadius = trigger

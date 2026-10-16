@@ -593,3 +593,9 @@ carries (the link map of the build lists the objects):
 
 emmalloc (MIT) and musl-fts (BSD-3-Clause), which wasi-libc also carries, are not
 linked into quickjs.wasm.
+
+--------------------------------------------------------------------------------
+Trademarks
+
+Third-party names and logos are trademarks of their owners and are used only to
+identify the service (nominative use).

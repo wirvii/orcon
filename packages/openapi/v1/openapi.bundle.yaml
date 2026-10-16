@@ -584,6 +584,412 @@ paths:
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /orgs/{orgId}/flows:
+    x-orcon-resource: collection
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: listOrgFlows
+      summary: List the flows of an organization
+      description: Returns the flows of every project of one organization that the caller can read, one page at a time, each with its latest execution and the number of executions of the last 24 hours. Use the filters to narrow the list; flows of projects the caller cannot read are left out.
+      tags:
+        - flows
+      x-orcon-permission: flow:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: org-flows list
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: firstPageOfOrgFlows
+          scenario: project-with-flows
+          request:
+            pathParams:
+              orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+            query:
+              sort: -lastExecutionAt
+          response:
+            status: 200
+            body: firstPageOfOrgFlows
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+        - name: projectId
+          in: query
+          required: false
+          description: Return only flows of this project; a project the caller cannot read gives an empty page.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        - name: sort
+          in: query
+          required: false
+          description: Sort expression; a leading minus sorts in descending order.
+          x-orcon-sort-default: -updatedAt
+          schema:
+            type: string
+            enum:
+              - -updatedAt
+              - -lastExecutionAt
+            x-orcon-enum-kind: identifier
+            default: -updatedAt
+        - name: activationState
+          in: query
+          required: false
+          description: Return only flows in this activation state.
+          schema:
+            type: string
+            enum:
+              - ACTIVE
+              - INACTIVE
+        - name: q
+          in: query
+          required: false
+          description: Return only flows whose name starts with this text (case-insensitive).
+          schema:
+            type: string
+            maxLength: 200
+            examples:
+              - Welcome
+      responses:
+        '200':
+          description: One page of flows of the organization.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlowList'
+              examples:
+                firstPageOfOrgFlows:
+                  summary: Two flows, one of them ran today
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                        name: Welcome email
+                        activationState: ACTIVE
+                        hasUnpublishedChanges: false
+                        draftRevision: 2
+                        lastExecution:
+                          id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                          status: SUCCEEDED
+                          hasUncertainOperation: false
+                          createdAt: '2026-10-12T15:04:05Z'
+                          finishedAt: '2026-10-12T15:04:09Z'
+                        executionCountLast24h: 12
+                        createdAt: '2026-10-12T15:04:05Z'
+                        updatedAt: '2026-10-12T15:04:05Z'
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a63
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                        name: Weekly report
+                        activationState: INACTIVE
+                        hasUnpublishedChanges: true
+                        draftRevision: 0
+                        executionCountLast24h: 0
+                        createdAt: '2026-10-12T15:04:05Z'
+                        updatedAt: '2026-10-12T15:04:05Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /orgs/{orgId}/activity-summary:
+    x-orcon-resource: singleton
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: getOrgActivitySummary
+      summary: Get the activity summary of an organization
+      description: 'Returns the figures the home screen of an organization shows: the active flows, the flows and projects, the executions of the last 24 hours by hour, status and uncertain outcome, and the time saved by the automated executions of the last 7 days. The figures count only the projects the caller can read.'
+      tags:
+        - organizations
+      x-orcon-permission: execution:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: orgs activity
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: activitySummaryOfOrganization
+          scenario: project-with-flows
+          request:
+            pathParams:
+              orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+          response:
+            status: 200
+            body: activitySummaryOfOrganization
+      responses:
+        '200':
+          description: The activity summary of the organization.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivitySummary'
+              examples:
+                activitySummaryOfOrganization:
+                  summary: Two projects with a day of activity
+                  value:
+                    activeFlowCount: 1
+                    flowCount: 2
+                    projectCount: 2
+                    executionsLast24h:
+                      total: 6
+                      failed: 1
+                      succeeded: 4
+                      uncertain: 1
+                      byHour:
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 0
+                        - 1
+                        - 2
+                        - 2
+                        - 1
+                    timeSaved:
+                      windowDays: 7
+                      succeededExecutions: 4
+                      minutesPerExecution: 3
+                      minutes: 12
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /orgs/{orgId}/executions:
+    x-orcon-resource: collection
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: listOrgExecutions
+      summary: List the executions of an organization
+      description: Returns the executions of every project of one organization that the caller can read, newest first by default, one page at a time. Filter by project, flow, status, time, identity or uncertain outcome; the list holds metadata only and never execution data. Executions of projects the caller cannot read are left out.
+      tags:
+        - executions
+      x-orcon-permission: execution:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: org-executions list
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: uncertainExecutionsOfOrganization
+          scenario: execution-with-uncertain-operation
+          request:
+            pathParams:
+              orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+            query:
+              uncertain: true
+          response:
+            status: 200
+            body: uncertainExecutionsOfOrganization
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+        - name: projectId
+          in: query
+          required: false
+          description: Return only executions of this project; a project the caller cannot read gives an empty page.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        - name: flowId
+          in: query
+          required: false
+          description: Return only executions of this flow.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        - name: id
+          in: query
+          required: false
+          description: Return only the execution with this identifier.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+        - name: status
+          in: query
+          required: false
+          description: Return only executions in this status.
+          schema:
+            type: string
+            enum:
+              - QUEUED
+              - RUNNING
+              - WAITING
+              - SUSPENDED
+              - CANCELING
+              - COMPENSATING
+              - SUCCEEDED
+              - FAILED
+              - CANCELED
+        - name: uncertain
+          in: query
+          required: false
+          description: Pass true to return only the executions that have an operation whose outcome is unknown and need a review.
+          schema:
+            type: boolean
+        - name: createdAfter
+          in: query
+          required: false
+          description: Return only executions accepted at or after this instant.
+          schema:
+            type: string
+            format: date-time
+            examples:
+              - '2026-10-12T15:04:05Z'
+        - name: createdBefore
+          in: query
+          required: false
+          description: Return only executions accepted before this instant.
+          schema:
+            type: string
+            format: date-time
+            examples:
+              - '2026-10-12T15:10:00Z'
+        - name: sort
+          in: query
+          required: false
+          description: Sort expression; a leading minus sorts in descending order.
+          x-orcon-sort-default: -createdAt
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - -createdAt
+            x-orcon-enum-kind: identifier
+            default: -createdAt
+      responses:
+        '200':
+          description: One page of executions of the organization.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionList'
+              examples:
+                uncertainExecutionsOfOrganization:
+                  summary: One execution that needs a review
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                        flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                        flowVersion: 1
+                        mode: TRIGGER
+                        status: FAILED
+                        hasUncertainOperation: true
+                        createdAt: '2026-10-12T15:04:05Z'
+                        startedAt: '2026-10-12T15:04:05Z'
+                        finishedAt: '2026-10-12T15:04:09Z'
+                        dataHidden: false
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /projects/{projectId}:
     x-orcon-resource: item
     parameters:
@@ -1157,6 +1563,12 @@ paths:
             format: date-time
             examples:
               - '2026-10-12T15:10:00Z'
+        - name: uncertain
+          in: query
+          required: false
+          description: Pass true to return only the executions that have an operation whose outcome is unknown and need a review.
+          schema:
+            type: boolean
       responses:
         '200':
           description: One page of executions.
@@ -1185,6 +1597,7 @@ paths:
                         createdAt: '2026-10-12T15:04:05Z'
                         startedAt: '2026-10-12T15:04:05Z'
                         finishedAt: '2026-10-12T15:04:09Z'
+                        hasUncertainOperation: false
                         dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -2838,6 +3251,7 @@ paths:
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
                     finishedAt: '2026-10-12T15:04:09Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '202':
           description: The execution is still running; read it later from the Location address.
@@ -2865,6 +3279,7 @@ paths:
                     mode: MANUAL
                     status: QUEUED
                     createdAt: '2026-10-12T15:04:05Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3225,6 +3640,7 @@ paths:
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
                     finishedAt: '2026-10-12T15:04:09Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3544,6 +3960,7 @@ paths:
                     status: CANCELING
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3633,6 +4050,7 @@ paths:
                     status: QUEUED
                     createdAt: '2026-10-12T15:04:05Z'
                     retryOfExecutionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -4260,6 +4678,176 @@ components:
         currentSession:
           description: The session the request carries.
           $ref: '#/components/schemas/Session'
+        orgRoles:
+          type: array
+          description: The organization role the user holds in each organization it belongs to, for the organization menu. An organization in which the user holds no organization-level role is left out.
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/OrgRole'
+    OrgRole:
+      type: object
+      description: The organization-level role a user holds in one organization.
+      required:
+        - orgId
+        - role
+      properties:
+        orgId:
+          type: string
+          format: uuid
+          description: Id of the organization.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+        role:
+          type: string
+          description: Name of the predefined role, one of Owner, Admin, Member, Project Admin, Editor, Operator or Viewer.
+          examples:
+            - Owner
+          maxLength: 100
+    ActivitySummary:
+      type: object
+      description: The activity of an organization that its home screen shows. Every count covers only the projects the caller can read.
+      required:
+        - activeFlowCount
+        - flowCount
+        - projectCount
+        - executionsLast24h
+        - timeSaved
+      properties:
+        activeFlowCount:
+          type: integer
+          description: Number of flows that are active, in the projects the caller reads.
+          examples:
+            - 4
+          minimum: 0
+          readOnly: true
+        flowCount:
+          type: integer
+          description: Number of flows that are not deleted, in the projects the caller reads.
+          examples:
+            - 9
+          minimum: 0
+          readOnly: true
+        projectCount:
+          type: integer
+          description: Number of projects the caller reads.
+          examples:
+            - 2
+          minimum: 0
+          readOnly: true
+        executionsLast24h:
+          $ref: '#/components/schemas/ActivityExecutionCounts'
+        timeSaved:
+          $ref: '#/components/schemas/ActivityTimeSaved'
+    ActivityExecutionCounts:
+      type: object
+      description: The executions accepted in the last 24 hours, in the projects the caller reads.
+      required:
+        - total
+        - failed
+        - succeeded
+        - uncertain
+        - byHour
+      properties:
+        total:
+          type: integer
+          description: Number of executions accepted in the last 24 hours.
+          examples:
+            - 128
+          minimum: 0
+          readOnly: true
+        failed:
+          type: integer
+          description: Number of those executions that failed.
+          examples:
+            - 3
+          minimum: 0
+          readOnly: true
+        succeeded:
+          type: integer
+          description: Number of those executions that succeeded.
+          examples:
+            - 120
+          minimum: 0
+          readOnly: true
+        uncertain:
+          type: integer
+          description: Number of those executions that have an external operation whose outcome is unknown, so a person must review them.
+          examples:
+            - 2
+          minimum: 0
+          readOnly: true
+        byHour:
+          type: array
+          description: Executions accepted in each hour of the last 24 hours, the oldest hour first; the last item is the current hour.
+          readOnly: true
+          minItems: 24
+          maxItems: 24
+          items:
+            type: integer
+            minimum: 0
+          examples:
+            - - 0
+              - 0
+              - 1
+              - 4
+              - 9
+              - 12
+              - 8
+              - 6
+              - 5
+              - 7
+              - 11
+              - 13
+              - 9
+              - 8
+              - 6
+              - 5
+              - 4
+              - 3
+              - 2
+              - 1
+              - 0
+              - 0
+              - 0
+              - 0
+    ActivityTimeSaved:
+      type: object
+      description: The time the organization saves by its successful automated executions in the last 7 days, estimated as the minutes per execution the organization sets. Test runs are not counted.
+      required:
+        - windowDays
+        - succeededExecutions
+        - minutesPerExecution
+        - minutes
+      properties:
+        windowDays:
+          type: integer
+          description: Length of the window in days.
+          examples:
+            - 7
+          minimum: 1
+          readOnly: true
+        succeededExecutions:
+          type: integer
+          description: Number of automated executions that succeeded in the window.
+          examples:
+            - 96
+          minimum: 0
+          readOnly: true
+        minutesPerExecution:
+          type: integer
+          description: Minutes the organization saves per automated execution that succeeded.
+          examples:
+            - 3
+          minimum: 0
+          maximum: 600
+          readOnly: true
+        minutes:
+          type: integer
+          description: Estimated minutes saved in the window (succeededExecutions times minutesPerExecution).
+          examples:
+            - 288
+          minimum: 0
+          readOnly: true
     Organization:
       type: object
       description: An organization the user belongs to.
@@ -4519,6 +5107,13 @@ components:
         protected:
           type: boolean
           description: Whether the project is protected. Protected projects require confirmation for actions that change production behavior. New projects are protected.
+        flowCount:
+          type: integer
+          description: Number of flows of the project that are not deleted. Present in lists of projects; absent in the answers that return one project.
+          readOnly: true
+          examples:
+            - 4
+          minimum: 0
         createdAt:
           type: string
           format: date-time
@@ -4655,6 +5250,17 @@ components:
           examples:
             - 7
           minimum: 0
+        lastExecution:
+          description: The most recent execution of the flow. Present only in lists of flows, where it is read with the flow; absent in the answers that return one flow, and when the flow never ran.
+          readOnly: true
+          $ref: '#/components/schemas/FlowLastExecution'
+        executionCountLast24h:
+          type: integer
+          description: Number of executions of the flow accepted in the last 24 hours. Present only in lists of flows.
+          readOnly: true
+          examples:
+            - 12
+          minimum: 0
         createdAt:
           type: string
           format: date-time
@@ -4684,6 +5290,52 @@ components:
           examples:
             - example-page-token-2
           maxLength: 1024
+    FlowLastExecution:
+      type: object
+      description: 'The most recent execution of a flow: enough to show its status in a list without reading the execution.'
+      required:
+        - id
+        - status
+        - hasUncertainOperation
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the execution.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+          readOnly: true
+        status:
+          type: string
+          description: Progress of the execution, the same values as the execution status.
+          enum:
+            - QUEUED
+            - RUNNING
+            - WAITING
+            - SUSPENDED
+            - CANCELING
+            - COMPENSATING
+            - SUCCEEDED
+            - FAILED
+            - CANCELED
+          examples:
+            - SUCCEEDED
+        hasUncertainOperation:
+          type: boolean
+          description: True when the execution has an external operation whose outcome is unknown and a person must review it.
+        createdAt:
+          type: string
+          format: date-time
+          description: When the execution was accepted, in UTC.
+          examples:
+            - '2026-10-12T15:04:05Z'
+        finishedAt:
+          type: string
+          format: date-time
+          description: When the execution reached a final status, in UTC; absent before that.
+          examples:
+            - '2026-10-12T15:04:09Z'
     CreateFlowRequest:
       type: object
       description: Fields of a new flow.
@@ -5048,10 +5700,10 @@ components:
         - id
         - flowId
         - projectId
-        - flowVersion
         - mode
         - status
         - createdAt
+        - hasUncertainOperation
         - dataHidden
       properties:
         id:
@@ -5075,10 +5727,14 @@ components:
             - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
         flowVersion:
           type: integer
-          description: Number of the flow version the execution runs; it never changes.
+          description: Number of the flow version the execution runs; it never changes. Absent for an execution that runs a snapshot of a draft (a test run), which has no version number.
           examples:
             - 3
           minimum: 1
+        hasUncertainOperation:
+          type: boolean
+          description: True when an external operation of the execution has an outcome that is unknown, so a person must review it (the "Needs review" state).
+          readOnly: true
         mode:
           type: string
           description: How the execution started.
@@ -5764,6 +6420,8 @@ components:
           description: Id of the installed connector that provides the type; absent for built-in types.
           examples:
             - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a6a
+        icon:
+          $ref: '#/components/schemas/NodeTypeIcon'
         operations:
           type: array
           description: The operations of the type with their purity and safety level.
@@ -5778,6 +6436,31 @@ components:
             examples:
               - n8n-nodes-base.httpRequest
             maxLength: 255
+    NodeTypeIcon:
+      type: object
+      description: 'The brand icon of a node type, inline. The markup is sanitized when the connector is loaded: no scripts, no event attributes, no external references. The client shows it through an img element only.'
+      required:
+        - svg
+        - source
+      properties:
+        svg:
+          type: string
+          description: The icon of the service in its official colour, as an SVG document of at most 8 KiB.
+          maxLength: 8192
+          examples:
+            - <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20z"/></svg>
+        darkSvg:
+          type: string
+          description: The variant the brand itself publishes for dark backgrounds, same limits as svg. Absent unless the brand publishes one.
+          examples:
+            - <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#FFFFFF" d="M1 1h22v22H1z"/></svg>
+          maxLength: 8192
+        source:
+          type: string
+          description: Where the icon came from, one line such as simple-icons@16.35.0:whatsapp, brand-kit:<url> or orcon-fallback.
+          examples:
+            - simple-icons@16.35.0:whatsapp
+          maxLength: 300
     NodeTypeList:
       type: object
       description: One page of node types.

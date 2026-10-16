@@ -4,7 +4,7 @@ description: Builds and reviews Orcon web UI (apps/web, packages/js) with the Or
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with pnpm 9 and Node 22.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   pinned: true
   owner: wirvii
 ---

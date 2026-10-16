@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -65,7 +66,7 @@ func (m *Memory) GetSystemPrincipal(context.Context) (identity.PrincipalRecord, 
 }
 
 // CreateProject implements [identity.ProjectStore].
-func (m *Memory) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord) error {
+func (m *Memory) CreateProject(_ context.Context, org orgscope.Org, p identity.ProjectRecord, _ audit.Entry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !p.OrgID.Matches(org) {
@@ -109,6 +110,23 @@ func (m *Memory) ListProjects(_ context.Context, org orgscope.Org, after identit
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+// CreateProjectWithGrant implements [identity.ProjectStore]. The fake keeps no role bindings.
+func (m *Memory) CreateProjectWithGrant(ctx context.Context, org orgscope.Org, p identity.ProjectRecord, _ identity.RoleBindingRecord, entries []audit.Entry) error {
+	return m.CreateProject(ctx, org, p, entries[0])
+}
+
+// CreateOrganizationWithAdmin implements [identity.OrgStore]. The fake keeps no memberships,
+// role bindings or audit entries.
+func (m *Memory) CreateOrganizationWithAdmin(ctx context.Context, o identity.OrgRecord, _ identity.OrgKeyRecord, _ identity.MembershipRecord, _ identity.RoleBindingRecord, _ []audit.Entry) error {
+	return m.CreateOrganization(ctx, o)
+}
+
+// CreateFlowWithEntry implements [flow.Store]. The in-memory fake keeps no audit chain, so
+// the entry is accepted and dropped; the storage adapters write it.
+func (m *Memory) CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f flow.Record, _ audit.Entry) error {
+	return m.CreateFlow(ctx, org, f)
 }
 
 // CreateFlow implements [flow.Store].
@@ -160,6 +178,33 @@ func (m *Memory) GetFlowByName(_ context.Context, org orgscope.Org, project iden
 	return flow.Record{}, fmt.Errorf("flow %q: %w", name, flow.ErrNotFound)
 }
 
+// ListFlowActivity implements [flow.Store]. The fake keeps no executions, so every flow has no
+// latest execution and no executions in the last day.
+func (m *Memory) ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, _ time.Time, after flow.FlowID, limit int) ([]flow.Activity, error) {
+	rows, err := m.ListFlows(ctx, org, project, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]flow.Activity, 0, len(rows))
+	for i := range rows {
+		out = append(out, flow.Activity{Flow: rows[i]})
+	}
+	return out, nil
+}
+
+// CountFlows implements [flow.Store].
+func (m *Memory) CountFlows(_ context.Context, org orgscope.Org, project identity.ProjectID) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for _, f := range m.s.flows {
+		if f.OrgID.Matches(org) && f.ProjectID == project && !f.IsDeleted() {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // ListFlows implements [flow.Store].
 func (m *Memory) ListFlows(_ context.Context, org orgscope.Org, project identity.ProjectID, after flow.FlowID, limit int) ([]flow.Record, error) {
 	m.mu.Lock()
@@ -191,6 +236,12 @@ func (m *Memory) UpdateFlowDraft(_ context.Context, org orgscope.Org, id flow.Fl
 	}
 	f.Draft, f.DraftRevision, f.UpdatedAt = bytes.Clone(draft), expected+1, now
 	return f.DraftRevision, nil
+}
+
+// UpdateFlowDraftWithEntry implements [flow.Store]. The fake keeps no audit chain, so the entry is
+// dropped.
+func (m *Memory) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, id flow.FlowID, draft []byte, expected int64, refs []flow.ConnectorReference, now time.Time, _ audit.Entry) (int64, error) {
+	return m.UpdateFlowDraft(ctx, org, id, draft, expected, refs, now)
 }
 
 // PublishVersion implements [flow.VersionStore].

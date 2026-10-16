@@ -650,6 +650,44 @@ func (q *Queries) PurgeFlow(ctx context.Context, orgID []byte, iD []byte) (int64
 	return result.RowsAffected()
 }
 
+const resolveTriggerRoute = `-- name: ResolveTriggerRoute :one
+SELECT a.org_id, f.project_id, t.flow_id, t.node_id, a.flow_trigger_id, a.id AS trigger_address_id
+FROM trigger_address_method m
+JOIN trigger_address a ON a.org_id = m.org_id AND a.id = m.trigger_address_id
+JOIN flow_trigger t ON t.org_id = a.org_id AND t.id = a.flow_trigger_id
+JOIN flow f ON f.org_id = t.org_id AND f.id = t.flow_id
+WHERE a.scope = 'PRODUCTION' AND a.status = 'ACTIVE' AND a.pattern = ?1
+  AND m.method = ?2 AND f.deleted_at IS NULL
+ORDER BY a.id
+LIMIT 1
+`
+
+type ResolveTriggerRouteRow struct {
+	OrgID            []byte
+	ProjectID        []byte
+	FlowID           []byte
+	NodeID           string
+	FlowTriggerID    []byte
+	TriggerAddressID []byte
+}
+
+// orcon:scope engine
+// Reads across organizations on purpose: a public request does not know its organization yet (SPEC-002 R-ADDR-08).
+// It returns the organization and the flow the address starts; nothing else of another organization leaves the statement.
+func (q *Queries) ResolveTriggerRoute(ctx context.Context, pattern string, method string) (ResolveTriggerRouteRow, error) {
+	row := q.db.QueryRowContext(ctx, resolveTriggerRoute, pattern, method)
+	var i ResolveTriggerRouteRow
+	err := row.Scan(
+		&i.OrgID,
+		&i.ProjectID,
+		&i.FlowID,
+		&i.NodeID,
+		&i.FlowTriggerID,
+		&i.TriggerAddressID,
+	)
+	return i, err
+}
+
 const restoreFlow = `-- name: RestoreFlow :execrows
 UPDATE flow
 SET deleted_at = NULL,

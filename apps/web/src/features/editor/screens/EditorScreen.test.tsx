@@ -6,7 +6,9 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderInApp } from '../../../../test/screen-harness';
+import { http, HttpResponse } from 'msw';
+
+import { renderInApp, server } from '../../../../test/screen-harness';
 import { FIRST_USEFUL_MARK } from '../../../app/perf/marks';
 import { createQueryClient } from '../../../app/query-client';
 import type { RouterContext } from '../../../app/router-context';
@@ -17,12 +19,16 @@ import type { FlowDocument } from '../model/flow-document';
 
 import { EditorScreen } from './EditorScreen';
 
-/** The editor opens where the app opens it: `/flows/<id>`. The route here has no loader, so the screen itself shows every state. */
-function renderEditor(path = `/flows/${EXAMPLE_FLOW_ID}`) {
+/**
+ * The editor opens where the app opens it: under the signed-in layout and the project, at
+ * `/orgs/<slug>/projects/<handle>/flows/<id>`. The route here has no loader, so the screen itself shows every state.
+ */
+function renderEditor(path = `/orgs/acme/projects/main/flows/${EXAMPLE_FLOW_ID}`) {
   const queryClient = createQueryClient();
   const root = createRootRouteWithContext<RouterContext>()({ component: Outlet });
-  const flow = createRoute({ getParentRoute: () => root, path: '/flows/$flowId', component: EditorScreen });
-  const router = createRouter({ routeTree: root.addChildren([flow]), history: createMemoryHistory({ initialEntries: [path] }), context: { queryClient } });
+  const session = createRoute({ getParentRoute: () => root, id: '_session', component: Outlet });
+  const flow = createRoute({ getParentRoute: () => session, path: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId', component: EditorScreen });
+  const router = createRouter({ routeTree: root.addChildren([session.addChildren([flow])]), history: createMemoryHistory({ initialEntries: [path] }), context: { queryClient } });
   return renderInApp(<RouterProvider router={router} />, { queryClient });
 }
 
@@ -72,6 +78,8 @@ const status = () => screen.getAllByRole('status').map((element) => element.text
 
 describe('the editor screen', () => {
   beforeEach(() => {
+    // These tests type into formulas as text; the chips have their own tests.
+    window.localStorage.setItem('orcon.editor.expression-view', JSON.stringify('raw'));
     editing();
     // Every test starts from the sample flow at revision 1: the app's source keeps what an earlier test saved.
     const fresh = createLocalDraftSource();
@@ -114,17 +122,18 @@ describe('the editor screen', () => {
       expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     });
 
-    it('shows the flow: its name, the sample notice, the tools and the canvas with every node', async () => {
+    it('shows the flow: its name, the tools and the canvas with every node, and no sample notice', async () => {
       const mark = vi.spyOn(performance, 'mark');
       renderEditor();
       await opened();
       expect(screen.getByRole('heading', { level: 1, name: 'Order notifications' })).toBeVisible();
-      expect(screen.getByText('Preview with a sample flow')).toBeVisible();
+      // The draft comes from the server, so the page does not call it a sample.
+      expect(screen.queryByText('Preview with a sample flow')).toBeNull();
       expect(screen.getByRole('toolbar', { name: 'Flow editor tools' })).toBeVisible();
       expect(screen.getByRole('region', { name: 'Flow canvas: 6 nodes' })).toBeVisible();
       for (const name of [/^Webhook,/, /^Validate order,/, /^HTTP Request,/, /^Slack,/, /^Ignore invalid order,/, /^Done,/]) expect(canvasNode(name)).toBeInTheDocument();
       expect(status()).toContain('Saved');
-      expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/flows/$flowId' } });
+      expect(mark).toHaveBeenCalledWith(FIRST_USEFUL_MARK, { detail: { route: '/orgs/$orgSlug/projects/$projectHandle/flows/$flowId' } });
     });
   });
 
@@ -505,7 +514,7 @@ describe('the editor screen', () => {
       await waitFor(() => {
         expect(screen.queryByText('This flow changed somewhere else')).toBeNull();
       });
-      expect(screen.getByText('Saved')).toBeVisible();
+      expect(screen.getByText(/^Saved/)).toBeVisible();
     });
   });
 
@@ -526,6 +535,16 @@ describe('the editor screen', () => {
 
 describe('the node details view', () => {
   beforeEach(() => {
+    // The panes read the last run of the flow: this flow never ran, so they show their empty state.
+    server.use(
+      http.get(`/api/v1/flows/${EXAMPLE_FLOW_ID}`, () =>
+        HttpResponse.json(
+          { id: EXAMPLE_FLOW_ID, projectId: '0195f1a0-0000-7000-8000-0000000000d1', activationState: 'INACTIVE', activeVersion: null, hasUnpublishedChanges: true, draftRevision: 1 },
+          { headers: { ETag: '"1"' } },
+        ),
+      ),
+      http.get('/api/v1/projects/:projectId/executions', () => HttpResponse.json({ items: [] })),
+    );
     const fresh = createLocalDraftSource();
     vi.spyOn(draftSource, 'load').mockImplementation(fresh.load);
     vi.spyOn(draftSource, 'save').mockImplementation(fresh.save);
@@ -547,11 +566,11 @@ describe('the node details view', () => {
       await userEvent.keyboard('{Enter}');
       const dialog = await screen.findByRole('dialog', { name: 'Slack details' });
       for (const pane of ['input', 'parameters', 'output']) expect(dialog.querySelector(`[data-pane="${pane}"]`)).not.toBeNull();
-      expect(within(dialog).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Parameters', 'Settings', 'Docs']);
+      expect(within(dialog).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Parameters', 'Settings', 'Retries and safety', 'Docs']);
       expect(within(dialog).getByRole('textbox', { name: /URL/ })).toHaveValue('https://hooks.slack.example.test/services/orders');
       // Nothing has run in this editor: both panes say so and offer the run.
-      expect(within(dialog).getByText('No input data yet')).toBeVisible();
-      expect(within(dialog).getByText('Execute this step to see output')).toBeVisible();
+      expect(await within(dialog).findByText('No input data yet')).toBeVisible();
+      expect(await within(dialog).findByText('Execute this step to see output')).toBeVisible();
     });
 
     it('has no input pane for a trigger', async () => {
@@ -615,7 +634,8 @@ describe('the node details view', () => {
       });
       // The canvas was told about the new line and port; that is not an edit of its own, so nothing was renamed.
       expect(status()).not.toMatch(/Renamed/);
-    });
+      // Types a long address key by key and walks three controls: slower than the 5 s default on CI runners (BL-107).
+    }, 15_000);
 
     it('takes the canvas back with the draft when the edits are undone', async () => {
       renderEditor();
@@ -709,9 +729,9 @@ describe('the node details view', () => {
       // The canvas stays on screen beside it.
       expect(canvasNode(/^Slack,/)).toBeInTheDocument();
       const data = await screen.findByRole('region', { name: 'Data of Slack' });
-      expect(within(data).getByText('Execute this step to see output')).toBeVisible();
+      expect(await within(data).findByText('Execute this step to see output')).toBeVisible();
       await userEvent.click(within(data).getByRole('button', { name: 'Input' }));
-      expect(within(data).getByText('No input data yet')).toBeVisible();
+      expect(await within(data).findByText('No input data yet')).toBeVisible();
       expect(within(data).getByRole('button', { name: 'Input' })).toHaveAttribute('aria-pressed', 'true');
     });
 
@@ -722,7 +742,7 @@ describe('the node details view', () => {
       await userEvent.keyboard('{Enter}');
       const data = await screen.findByRole('region', { name: 'Data of Webhook' });
       expect(within(data).queryByRole('button', { name: 'Input' })).toBeNull();
-      expect(within(data).getByText('Execute this step to see output')).toBeVisible();
+      expect(await within(data).findByText('Execute this step to see output')).toBeVisible();
     });
 
     it('closes with Escape from inside the panel and gives focus back to the node', async () => {

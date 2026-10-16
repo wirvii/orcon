@@ -11,8 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/wirvii/orcon/internal/adapter/postgres/sqlcgen"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/id"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
 )
 
@@ -36,6 +38,24 @@ func (s *Store) CreateFlow(ctx context.Context, org orgscope.Org, f flow.Record)
 			Name: f.Name, DraftDocument: f.Draft,
 			CreatedAt: timestamp(f.CreatedAt), UpdatedAt: timestamp(f.UpdatedAt),
 		})
+	})
+}
+
+// CreateFlowWithEntry implements [flow.Store]: the flow, the creation entry and the
+// idempotency claim of the context, when there is one, in one transaction.
+func (s *Store) CreateFlowWithEntry(ctx context.Context, org orgscope.Org, f flow.Record, entry audit.Entry) error {
+	return s.inScopeRecord(ctx, "create flow", org, f.OrgID, func(ctx context.Context, q *sqlcgen.Queries) error {
+		if err := claimIdempotency(ctx, q, org, "flow:"+id.UUID(f.ID).String(), f.CreatedAt); err != nil {
+			return err
+		}
+		if err := q.InsertFlow(ctx, sqlcgen.InsertFlowParams{
+			ID: pgUUID(f.ID), OrgID: pgUUID(f.OrgID), ProjectID: pgUUID(f.ProjectID),
+			Name: f.Name, DraftDocument: f.Draft,
+			CreatedAt: timestamp(f.CreatedAt), UpdatedAt: timestamp(f.UpdatedAt),
+		}); err != nil {
+			return err
+		}
+		return insertPendingOrg(ctx, q, org, entry)
 	})
 }
 
@@ -87,8 +107,70 @@ func (s *Store) ListFlows(ctx context.Context, org orgscope.Org, project identit
 	return out, err
 }
 
+// ListFlowActivity implements [flow.Store] (SPEC-019 R-UX-BE-01): the flows of the page with their
+// latest execution and the executions of the last day, in one query.
+func (s *Store) ListFlowActivity(ctx context.Context, org orgscope.Org, project identity.ProjectID, since time.Time, after flow.FlowID, limit int) ([]flow.Activity, error) {
+	var out []flow.Activity
+	err := s.inScope(ctx, "list flow activity", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListFlowActivity(ctx, sqlcgen.ListFlowActivityParams{
+			SinceAt: timestamp(since), OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(project), AfterID: pgUUID(after), PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			out = append(out, activityFrom(&rows[i]))
+		}
+		return nil
+	})
+	return out, err
+}
+
+// activityFrom converts a row of ListFlowActivity: the flow, and its latest execution when it ran.
+func activityFrom(row *sqlcgen.ListFlowActivityRow) flow.Activity {
+	out := flow.Activity{
+		Flow: flowFrom(&sqlcgen.GetFlowRow{
+			ID: row.ID, OrgID: row.OrgID, ProjectID: row.ProjectID, Name: row.Name, DraftRevision: row.DraftRevision,
+			ActiveFlowVersionID: row.ActiveFlowVersionID, ActivationState: row.ActivationState,
+			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		}),
+		ExecutionCountLast24h: row.ExecutionCountLast24h,
+	}
+	if !row.LastExecutionID.Valid {
+		return out
+	}
+	out.LastExecution = &flow.LastExecution{
+		ID: fromPGUUID[id.UUID](row.LastExecutionID), Status: row.LastExecutionStatus.String,
+		HasUncertainOperation: row.LastExecutionHasUncertainOperation,
+		CreatedAt:             instant(row.LastExecutionCreatedAt),
+		FinishedAt:            instant(row.LastExecutionFinishedAt),
+	}
+	return out
+}
+
+// CountFlows implements [flow.Store].
+func (s *Store) CountFlows(ctx context.Context, org orgscope.Org, project identity.ProjectID) (int64, error) {
+	var n int64
+	err := s.inScope(ctx, "count flows", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		var err error
+		n, err = q.CountFlows(ctx, pgUUID(org.UUID()), pgUUID(project))
+		return err
+	})
+	return n, err
+}
+
 // UpdateFlowDraft implements [flow.Store].
 func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time) (int64, error) {
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, nil)
+}
+
+// UpdateFlowDraftWithEntry implements [flow.Store]: the new draft, its connector references and
+// the audit entry of the change in one transaction.
+func (s *Store) UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry audit.Entry) (int64, error) {
+	return s.updateFlowDraft(ctx, org, flowID, draft, expectedRevision, references, now, &entry)
+}
+
+func (s *Store) updateFlowDraft(ctx context.Context, org orgscope.Org, flowID flow.FlowID, draft []byte, expectedRevision int64, references []flow.ConnectorReference, now time.Time, entry *audit.Entry) (int64, error) {
 	var revision int64
 	err := s.inScope(ctx, "update flow draft", org, false, func(ctx context.Context, q *sqlcgen.Queries) error {
 		n, err := q.UpdateFlowDraft(ctx, sqlcgen.UpdateFlowDraftParams{
@@ -99,7 +181,13 @@ func (s *Store) UpdateFlowDraft(ctx context.Context, org orgscope.Org, flowID fl
 		}
 		if n == 1 {
 			revision = expectedRevision + 1
-			return replaceDraftReferences(ctx, q, org, flowID, references, now)
+			if err := replaceDraftReferences(ctx, q, org, flowID, references, now); err != nil {
+				return err
+			}
+			if entry != nil {
+				return insertPendingOrg(ctx, q, org, *entry)
+			}
+			return nil
 		}
 		// Either the flow does not exist or its revision moved; tell them apart.
 		if _, err := q.GetFlow(ctx, pgUUID(org.UUID()), pgUUID(flowID)); err != nil {

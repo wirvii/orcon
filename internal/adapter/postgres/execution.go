@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	_ store.Reader       = (*Store)(nil)
-	_ store.Inbox        = (*Store)(nil)
-	_ store.Transactor   = (*Store)(nil)
-	_ store.WorkQueue    = (*Store)(nil)
-	_ store.Deliveries   = (*Store)(nil)
-	_ store.WaitResolver = (*Store)(nil)
+	_ store.Reader        = (*Store)(nil)
+	_ store.Inbox         = (*Store)(nil)
+	_ store.Transactor    = (*Store)(nil)
+	_ store.WorkQueue     = (*Store)(nil)
+	_ store.LeaseRecovery = (*Store)(nil)
+	_ store.Deliveries    = (*Store)(nil)
+	_ store.WaitResolver  = (*Store)(nil)
 )
 
 // beforeCursor is the position of a newest-first list; the zero cursor is after everything.
@@ -38,6 +39,22 @@ func beforeCursor(c store.Cursor) (pgtype.Timestamptz, pgtype.UUID) {
 		return pgtype.Timestamptz{InfinityModifier: pgtype.Infinity, Valid: true}, pgtype.UUID{Bytes: ceiling, Valid: true}
 	}
 	return timestamp(c.CreatedAt), pgUUID(c.ID)
+}
+
+// afterBound and beforeBound are the exclusive creation-time bounds of a list; the zero time opens
+// the bound.
+func afterBound(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{InfinityModifier: pgtype.NegativeInfinity, Valid: true}
+	}
+	return timestamp(t)
+}
+
+func beforeBound(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{InfinityModifier: pgtype.Infinity, Valid: true}
+	}
+	return timestamp(t)
 }
 
 // afterCursor is the position of an oldest-first list; the zero cursor is before everything.
@@ -62,6 +79,7 @@ func executionFrom(row *sqlcgen.GetExecutionRow) store.Execution {
 		RunnableCount:     row.RunnableCount, LeasedCount: row.LeasedCount, WaitingCount: row.WaitingCount, SuspendedCount: row.SuspendedCount,
 		StartedAt: instant(row.StartedAt), FinishedAt: instant(row.FinishedAt),
 		CreatedAt: instant(row.CreatedAt), UpdatedAt: instant(row.UpdatedAt),
+		FlowVersionNumber: row.FlowVersionNumber, HasUncertainOperation: row.HasUncertainOperation,
 	}
 }
 
@@ -81,48 +99,17 @@ func (s *Store) GetExecution(ctx context.Context, org orgscope.Org, execID store
 
 // ListExecutions implements [store.Reader].
 func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
-	set := 0
-	if !filter.ProjectID.IsZero() {
-		set++
+	if filter.Uncertain {
+		return s.listUncertainExecutions(ctx, org, filter, after, limit)
 	}
-	if !filter.FlowID.IsZero() {
-		set++
+	if !filter.Valid() {
+		return nil, fmt.Errorf("list executions: the filter must name a project, or exactly one of flow and status: %w", flow.ErrInvalidRecord)
 	}
-	if filter.Status != "" {
-		set++
-	}
-	if set != 1 {
-		return nil, fmt.Errorf("list executions: exactly one filter field must be set, got %d: %w", set, flow.ErrInvalidRecord)
-	}
-	beforeAt, beforeID := beforeCursor(after)
 	var out []store.Execution
 	err := s.inScope(ctx, "list executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		var rows []sqlcgen.GetExecutionRow
-		switch {
-		case !filter.ProjectID.IsZero():
-			r, err := q.ListExecutions(ctx, sqlcgen.ListExecutionsParams{OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		case !filter.FlowID.IsZero():
-			r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org.UUID()), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
-		default:
-			r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
-			if err != nil {
-				return err
-			}
-			for i := range r {
-				rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
-			}
+		rows, err := listExecutionRows(ctx, q, org, filter, after, limit)
+		if err != nil {
+			return err
 		}
 		for i := range rows {
 			out = append(out, executionFrom(&rows[i]))
@@ -130,6 +117,60 @@ func (s *Store) ListExecutions(ctx context.Context, org orgscope.Org, filter sto
 		return nil
 	})
 	return out, err
+}
+
+// listExecutionRows runs the list query the filter selects.
+func listExecutionRows(ctx context.Context, q *sqlcgen.Queries, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]sqlcgen.GetExecutionRow, error) {
+	beforeAt, beforeID := beforeCursor(after)
+	var rows []sqlcgen.GetExecutionRow
+	switch {
+	case filter.Oldest:
+		afterAt, afterID := afterCursor(after)
+		r, err := q.ListProjectExecutionsAsc(ctx, sqlcgen.ListProjectExecutionsAscParams{
+			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID),
+			AnyFlow: filter.FlowID.IsZero(), FlowID: pgUUID(filter.FlowID),
+			AnyStatus: filter.Status == "", Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case filter.Refined() || !filter.ProjectID.IsZero():
+		r, err := q.ListProjectExecutions(ctx, sqlcgen.ListProjectExecutionsParams{
+			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(filter.ProjectID),
+			AnyFlow: filter.FlowID.IsZero(), FlowID: pgUUID(filter.FlowID),
+			AnyStatus: filter.Status == "", Status: filter.Status,
+			CreatedAfter: afterBound(filter.CreatedAfter), CreatedBefore: beforeBound(filter.CreatedBefore),
+			BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	case !filter.FlowID.IsZero():
+		r, err := q.ListFlowExecutions(ctx, sqlcgen.ListFlowExecutionsParams{OrgID: pgUUID(org.UUID()), FlowID: pgUUID(filter.FlowID), BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	default:
+		r, err := q.ListExecutionsByStatus(ctx, sqlcgen.ListExecutionsByStatusParams{OrgID: pgUUID(org.UUID()), Status: filter.Status, BeforeCreatedAt: beforeAt, BeforeID: beforeID, PageSize: clampPage(limit)})
+		if err != nil {
+			return nil, err
+		}
+		for i := range r {
+			rows = append(rows, sqlcgen.GetExecutionRow(r[i]))
+		}
+	}
+	return rows, nil
 }
 
 // GetToken implements [store.Reader].
@@ -187,6 +228,55 @@ func operationFrom(row *sqlcgen.GetExternalOperationRow) store.ExternalOperation
 	}
 }
 
+// ListNodeExecutions implements [store.Reader].
+func (s *Store) ListNodeExecutions(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeExecution, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeExecution
+	err := s.inScope(ctx, "list node executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeExecutionsByExecution(ctx, sqlcgen.ListNodeExecutionsByExecutionParams{
+			OrgID: pgUUID(org.UUID()), ExecutionID: pgUUID(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			out = append(out, store.NodeExecution{
+				ID: fromPGUUID[store.NodeExecutionID](r.ID), OrgID: fromPGUUID[identity.OrgID](r.OrgID),
+				ExecutionID: fromPGUUID[store.ExecutionID](r.ExecutionID), TokenID: fromPGUUID[store.TokenID](r.TokenID),
+				NodeID: r.NodeID, ScopePath: r.ScopePath, Status: r.Status, AttemptCount: r.AttemptCount,
+				StartedAt: instant(r.StartedAt), FinishedAt: instant(r.FinishedAt),
+				CreatedAt: instant(r.CreatedAt), UpdatedAt: instant(r.UpdatedAt),
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ListNodeOutputs implements [store.Reader].
+func (s *Store) ListNodeOutputs(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeOutputRecord, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeOutputRecord
+	err := s.inScope(ctx, "list node outputs", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeOutputsByExecution(ctx, sqlcgen.ListNodeOutputsByExecutionParams{
+			OrgID: pgUUID(org.UUID()), ExecutionID: pgUUID(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			out = append(out, store.NodeOutputRecord{
+				ID: fromPGUUID[store.PayloadID](r.ID), NodeExecutionID: fromPGUUID[store.NodeExecutionID](r.NodeExecutionID),
+				NodeID: r.NodeID, Port: r.Port, ItemCount: r.ItemCount, Document: r.InlineDocument, CreatedAt: instant(r.CreatedAt),
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
 // GetExternalOperation implements [store.Reader].
 func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, operation store.ExternalOperationID) (store.ExternalOperation, error) {
 	var out store.ExternalOperation
@@ -202,10 +292,10 @@ func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, oper
 }
 
 // ListExternalOperations implements [store.Reader].
-func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, limit int) ([]store.ExternalOperation, error) {
+func (s *Store) ListExternalOperations(ctx context.Context, org orgscope.Org, node store.NodeExecutionID, fromItem int64, fromID store.ExternalOperationID, limit int) ([]store.ExternalOperation, error) {
 	var out []store.ExternalOperation
 	err := s.inScope(ctx, "list external operations", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
-		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, PageSize: clampPage(limit)})
+		rows, err := q.ListExternalOperations(ctx, sqlcgen.ListExternalOperationsParams{OrgID: pgUUID(org.UUID()), NodeExecutionID: pgUUID(node), FromItemIndex: fromItem, FromID: pgUUID(fromID), PageSize: clampPage(limit)})
 		if err != nil {
 			return err
 		}
@@ -340,13 +430,16 @@ func (t *pgTx) InsertExecution(ctx context.Context, e *store.Execution) error {
 	if root.IsZero() {
 		root = e.ID
 	}
-	return t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
+	if err := t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
 		ID: pgUUID(e.ID), OrgID: pgUUID(e.OrgID), ProjectID: pgUUID(e.ProjectID), FlowID: pgUUID(e.FlowID),
 		FlowVersionID: nullPGUUID(e.FlowVersionID), FlowSnapshotID: nullPGUUID(e.FlowSnapshotID),
 		Status: e.Status, Mode: e.Mode, Priority: e.Priority, ParentExecutionID: nullPGUUID(e.ParentExecutionID),
 		RootExecutionID: pgUUID(root), CallDepth: e.CallDepth, RunnableCount: e.RunnableCount,
 		CreatedAt: timestamp(e.CreatedAt), UpdatedAt: timestamp(e.UpdatedAt),
-	})
+	}); err != nil {
+		return err
+	}
+	return countAcceptance(ctx, t.q, e)
 }
 
 func (t *pgTx) InsertToken(ctx context.Context, tok *store.Token) error {
@@ -357,8 +450,9 @@ func (t *pgTx) InsertToken(ctx context.Context, tok *store.Token) error {
 		ID: pgUUID(tok.ID), OrgID: pgUUID(tok.OrgID), ExecutionID: pgUUID(tok.ExecutionID), Status: tok.Status,
 		NodeID: tok.NodeID, EdgeID: nullText(tok.EdgeID), ScopePath: tok.ScopePath, ForkLineageDocument: tok.ForkLineage,
 		PayloadReference: nullText(tok.PayloadReference), FairnessKey: tok.FairnessKey, EffectivePriority: tok.EffectivePriority,
-		AvailableAt: timestamp(tok.AvailableAt), LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
-		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
+		AvailableAt: nullTimestamp(tok.AvailableAt), QueueOrder: tok.QueueOrder, LeaseOwner: nullPGUUID(tok.LeaseOwner), LeaseEpoch: tok.LeaseEpoch,
+		LeaseExpiresAt: nullTimestamp(tok.LeaseExpiresAt), LeaseMilliseconds: tok.LeaseTTL.Milliseconds(),
+		CreatedAt: timestamp(tok.CreatedAt), UpdatedAt: timestamp(tok.UpdatedAt),
 	})
 }
 
@@ -368,7 +462,7 @@ func (t *pgTx) InsertNodeExecution(ctx context.Context, n store.NodeExecution) e
 	}
 	return t.q.InsertNodeExecution(ctx, sqlcgen.InsertNodeExecutionParams{
 		ID: pgUUID(n.ID), OrgID: pgUUID(n.OrgID), ExecutionID: pgUUID(n.ExecutionID), TokenID: pgUUID(n.TokenID),
-		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt), FinishedAt: nullTimestamp(n.FinishedAt),
 		CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
 	})
 }
@@ -413,11 +507,45 @@ func (t *pgTx) AppendJournal(ctx context.Context, operations []store.ExternalOpe
 	return nil
 }
 
-func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, deadline, now time.Time) (int64, error) {
+func (t *pgTx) UpsertNodeExecution(ctx context.Context, n store.NodeExecution) error {
+	if err := t.own(n.OrgID); err != nil {
+		return err
+	}
+	return t.q.UpsertNodeExecution(ctx, sqlcgen.UpsertNodeExecutionParams{
+		ID: pgUUID(n.ID), OrgID: pgUUID(n.OrgID), ExecutionID: pgUUID(n.ExecutionID), TokenID: pgUUID(n.TokenID),
+		NodeID: n.NodeID, ScopePath: n.ScopePath, Status: n.Status, StartedAt: nullTimestamp(n.StartedAt), FinishedAt: nullTimestamp(n.FinishedAt),
+		CreatedAt: timestamp(n.CreatedAt), UpdatedAt: timestamp(n.UpdatedAt),
+	})
+}
+
+func (t *pgTx) InsertJournalIfAbsent(ctx context.Context, operations []store.ExternalOperation) error {
+	for i := range operations {
+		o := &operations[i]
+		if err := t.own(o.OrgID); err != nil {
+			return err
+		}
+		if _, err := t.q.InsertExternalOperationIfAbsent(ctx, sqlcgen.InsertExternalOperationIfAbsentParams{
+			ID: pgUUID(o.ID), OrgID: pgUUID(o.OrgID), ExecutionID: pgUUID(o.ExecutionID), NodeExecutionID: pgUUID(o.NodeExecutionID),
+			ItemIndex: o.ItemIndex, CorrelationKey: o.CorrelationKey, ContractReference: o.ContractReference, BatchKey: nullText(o.BatchKey),
+			CreatedAt: timestamp(o.CreatedAt), UpdatedAt: timestamp(o.CreatedAt),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalOperationID, attemptTimeout time.Duration) (int64, error) {
+	// The deadline is the database clock of this transaction plus the attempt timeout (ADR-0012 section 5).
+	now, err := t.DatabaseNow(ctx)
+	if err != nil {
+		return 0, err
+	}
+	deadline := now.Add(attemptTimeout)
 	var moved int64
 	for _, op := range operations {
 		n, err := t.q.MarkExternalOperationDispatching(ctx, sqlcgen.MarkExternalOperationDispatchingParams{
-			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: nullTimestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
+			DispatchDeadlineAt: nullTimestamp(deadline), DispatchedAt: timestamp(now), UpdatedAt: timestamp(now), OrgID: pgUUID(t.org), ID: pgUUID(op),
 		})
 		if err != nil {
 			return moved, err
@@ -425,6 +553,16 @@ func (t *pgTx) MarkDispatching(ctx context.Context, operations []store.ExternalO
 		moved += n
 	}
 	return moved, nil
+}
+
+// DatabaseNow implements [store.Tx] with the PostgreSQL clock_timestamp(), so
+// that every process decides recovery windows with one clock (ADR-0013 section 4).
+func (t *pgTx) DatabaseNow(ctx context.Context) (time.Time, error) {
+	ts, err := t.q.GetDatabaseTime(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.Time.UTC(), nil
 }
 
 func (t *pgTx) ResolveOperation(ctx context.Context, operation store.ExternalOperationID, from, to, responseReference string, now time.Time) (bool, error) {
@@ -541,4 +679,13 @@ func defaultText(v, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+// listUncertainExecutions lists the executions of a project that need a review (SPEC-019 R-UX-BE-03).
+// The uncertain filter narrows a project listing and takes no other field.
+func (s *Store) listUncertainExecutions(ctx context.Context, org orgscope.Org, filter store.ExecutionFilter, after store.Cursor, limit int) ([]store.Execution, error) {
+	if filter.ProjectID.IsZero() || !filter.FlowID.IsZero() || filter.Status != "" {
+		return nil, fmt.Errorf("list executions: the uncertain filter takes the project and no other field: %w", flow.ErrInvalidRecord)
+	}
+	return s.ListProjectExecutions(ctx, org, filter.ProjectID, store.ExecutionQuery{UncertainOnly: true}, after, limit)
 }

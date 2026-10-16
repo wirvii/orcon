@@ -21,6 +21,8 @@ docs/reference/n8n-ai-coverage.md  # n8n AI node coverage table (SPEC-006 21.3)
 docs/reference/ai-prices*  # model price tables by provider (SPEC-006 21.3)
 docs/reference/connectors/ai/**  # reference pages of AI connectors
 test/mockllm/**  # mock model provider used by tests (SPEC-006 21.3)
+docs/design-system/mockups/ux-2026-10/index.html  # approved UX mockup: the model-provider credential and AI step of the product (SPEC-006, SPEC-019)
+docs/design-system/mockups/ux-2026-10/DECISIONS.md  # design decisions of the same mockup: the model-provider credential example (SPEC-019)
 
 # Not a product AI feature: the only non-product entry. This file holds the
 # line-ending block that mneme writes for the tool configuration directories,

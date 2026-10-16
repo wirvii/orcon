@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/identity"
+	"github.com/wirvii/orcon/internal/platform/clock"
 )
 
 // Deps are the ports an [Interpreter] consumes. Each is needed only by the
@@ -27,6 +29,9 @@ type Deps struct {
 	// Events receives the execution events in order. When nil the events are
 	// only returned in [Result].
 	Events EventSink
+	// Clock gives each activation its start instant (ADR-0013 section 7). When
+	// nil, activations carry a zero Time.
+	Clock clock.Clock
 }
 
 // Interpreter runs compiled flows as token interpreters: tokens move through
@@ -56,6 +61,9 @@ type Request struct {
 	// Execution identifies the execution. Every id the run derives (tokens,
 	// node executions, payloads) is a function of it, so it must be unique.
 	Execution ID
+	// Org is the organization the execution belongs to; nodes that act on
+	// external systems use it for their journal and their rate buckets.
+	Org identity.OrgID
 	// Start is the start event to begin at. It may be empty when the flow has
 	// exactly one start event.
 	Start flow.NodeID

@@ -59,6 +59,15 @@ Project:
       description: >-
         Whether the project is protected. Protected projects require confirmation for actions that change
         production behavior. New projects are protected.
+    flowCount:
+      type: integer
+      description: >-
+        Number of flows of the project that are not deleted. Present in lists of projects; absent in the
+        answers that return one project.
+      readOnly: true
+      examples:
+        - 4
+      minimum: 0
     createdAt:
       type: string
       format: date-time

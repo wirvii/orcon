@@ -21,7 +21,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/audit/audittest"
+	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/connector"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -33,12 +37,25 @@ import (
 
 // Store is every port the storage adapters implement, and Close.
 type Store interface { //nolint:interfacebloat // the suite exercises every port of the adapters through one value
+	store.Scopes
 	identity.OrgStore
 	identity.PrincipalStore
 	identity.UserStore
+	identity.SessionStore
+	identity.AuditLog
+	audit.Store
+	identity.LoginThrottleStore
+	identity.OrganizationResolver
+	envelope.KeyStore
+	identity.OrgKeyGapStore
+	authz.Store
 	identity.MembershipStore
 	identity.ProjectStore
+	identity.IdempotencyStore
 	flow.Store
+	flow.DraftStore
+	flow.ActivityStore
+	store.ProjectExecutionReader
 	flow.VersionStore
 	flow.SnapshotStore
 	flow.ReferenceStore
@@ -46,11 +63,15 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	connector.GrantStore
 	execution.WorkerStore
 	store.Reader
+	store.NodeReader
+	store.EngineReader
 	store.Inbox
 	store.Transactor
 	store.WorkQueue
+	store.LeaseRecovery
 	store.Deliveries
 	store.WaitResolver
+	store.LimitBuckets
 	io.Closer
 }
 
@@ -97,10 +118,16 @@ func (f *fixture) org(name string) identity.OrgID {
 	return o.ID
 }
 
+// projectCreated is the audit entry that a project creation carries in these tests.
+func projectCreated(tb testing.TB, org identity.OrgID) audit.Entry {
+	tb.Helper()
+	return audittest.Org(tb, id.UUID(org), "project.created")
+}
+
 func (f *fixture) project(org identity.OrgID, slug string) identity.ProjectID {
 	f.t.Helper()
 	p := identity.ProjectRecord{ID: next[identity.ProjectID](f.ids), OrgID: org, Name: "Project " + slug, Slug: slug, Handle: slug + "-" + org.String(), Environment: "development", IsProtected: true, CreatedAt: base, UpdatedAt: base}
-	if err := f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p); err != nil {
+	if err := f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p, projectCreated(f.t, p.OrgID)); err != nil {
 		f.t.Fatalf("create project %s: %v", slug, err)
 	}
 	return p.ID
@@ -171,6 +198,7 @@ func Conformance(t *testing.T, newStore Factory) {
 		{"CloseWhileOperationsRun", closeCase},
 	}
 	cases = append(cases, executionCases()...)
+	cases = append(cases, engineCases()...)
 	for i := range cases {
 		c := &cases[i]
 		t.Run(c.name, func(t *testing.T) { c.run(t, newStore) })
@@ -276,20 +304,20 @@ func projectsCase(t *testing.T, newStore Factory) {
 		t.Fatalf("project = %+v, %v", got, err)
 	}
 	p := identity.ProjectRecord{ID: next[identity.ProjectID](f.ids), OrgID: f.orgA, Name: "Again", Slug: "one", Environment: "production", IsProtected: true, CreatedAt: base, UpdatedAt: base}
-	wantErr(t, "a duplicate slug", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p), flow.ErrConflict)
+	wantErr(t, "a duplicate slug", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p, projectCreated(t, p.OrgID)), flow.ErrConflict)
 	p.Slug, p.OrgID = "fresh", next[identity.OrgID](f.ids)
-	wantErr(t, "an unknown organization", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p), flow.ErrReference)
+	wantErr(t, "an unknown organization", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p, projectCreated(t, p.OrgID)), flow.ErrReference)
 	_, err = f.s.GetProject(f.ctx(), scopeOf(f.orgA), next[identity.ProjectID](f.ids))
 	wantErr(t, "an unknown project", err, flow.ErrNotFound)
 	p.OrgID, p.Slug, p.Environment = f.orgA, "no-label", ""
-	if err := f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p); err != nil {
+	if err := f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p, projectCreated(t, p.OrgID)); err != nil {
 		t.Fatalf("a project without an environment label: %v", err)
 	}
 	if got, err := f.s.GetProject(f.ctx(), scopeOf(f.orgA), p.ID); err != nil || got.Environment != "" {
 		t.Fatalf("environment of a project without a label = %q, %v", got.Environment, err)
 	}
 	p.ID, p.Slug, p.Environment = next[identity.ProjectID](f.ids), "too-long", strings.Repeat("x", 101)
-	wantErr(t, "an environment label over 100 characters", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p), flow.ErrInvalidRecord)
+	wantErr(t, "an environment label over 100 characters", f.s.CreateProject(f.ctx(), scopeOf(p.OrgID), p, projectCreated(t, p.OrgID)), flow.ErrInvalidRecord)
 
 	// Keyset pages in identity order: alpha (fixture), one, two, three and the unlabeled one.
 	var all []identity.ProjectID

@@ -76,7 +76,7 @@ func (r *run) stepNode(ctx context.Context, t *token, n *planNode) (*token, erro
 	if err != nil {
 		return nil, err
 	}
-	ems, err := r.activate(ctx, t, n, ne)
+	ems, err := r.activateNode(ctx, t, n, ne)
 	if err != nil {
 		return nil, r.activationError(t, ne, n, err)
 	}
@@ -89,9 +89,55 @@ func (r *run) stepNode(ctx context.Context, t *token, n *planNode) (*token, erro
 	return r.route(t, n, ne.id, t.scope, arrival, true, ems)
 }
 
+// holdOf reads a delay or a suspension out of the error of a node runner. Only a
+// session that persists can park a token, so an in-memory run fails the node.
+func (r *run) holdOf(err error) (hold, bool) {
+	if r.rec == nil {
+		return hold{}, false
+	}
+	var de *DelayError
+	if errors.As(err, &de) {
+		return hold{until: de.Until, reason: de.Reason}, true
+	}
+	var se *SuspendError
+	if errors.As(err, &se) {
+		return hold{reason: se.Reason}, true
+	}
+	return hold{}, false
+}
+
+// parkToken applies a hold to the token that raised it. A delay returns the
+// token to RUNNABLE, claimable from the instant on, at the node it stopped at;
+// the node execution stays RUNNING because the same activation runs again. A
+// suspension parks the node execution, the token and the execution for a
+// person.
+func (r *run) parkToken(t *token, ne *nodeExec, h hold) error {
+	if !h.until.IsZero() {
+		t.availableAt = h.until
+		return r.setToken(t, TokenRunnable)
+	}
+	next, err := ne.state.Transition(NodeSuspended)
+	if err != nil {
+		return err
+	}
+	ne.state = next
+	if err := r.setToken(t, TokenSuspended); err != nil {
+		return err
+	}
+	if r.state == ExecRunning {
+		return r.setExec(ExecSuspended)
+	}
+	return nil
+}
+
 // activationError turns the failure of an activation into a failed execution,
-// and lets every other error abort the run.
+// parks the token of a delay or a suspension, and lets every other error abort
+// the run.
 func (r *run) activationError(t *token, ne *nodeExec, n *planNode, err error) error {
+	var he *holdError
+	if errors.As(err, &he) {
+		return r.parkToken(t, ne, he.hold)
+	}
 	var fe *failureError
 	if !errors.As(err, &fe) {
 		return err
@@ -120,7 +166,7 @@ func (r *run) activate(ctx context.Context, t *token, n *planNode, ne *nodeExec)
 	case kindParallel:
 		return r.emitEdges(n.out, t.payload), nil
 	case kindExclusive, kindInclusive:
-		return r.emitGateway(ctx, n, t, input)
+		return r.emitGateway(ctx, n, t, ne, input)
 	case kindRouting:
 		return r.emitRouting(ctx, t, n, ne, input)
 	case kindLoop:
@@ -153,7 +199,7 @@ func (r *run) emitPorts(ctx context.Context, n *planNode, ne *nodeExec, ports []
 			return nil, fmt.Errorf("%w: node %q emitted port %q twice", ErrPort, n.node.ID, pb.Port)
 		}
 		ref := outputRef(ne.id, pb.Port)
-		if err := r.payloads.Put(ctx, ref, pb.Batch); err != nil {
+		if err := r.put(ctx, PayloadWrite{Ref: ref, Kind: PayloadOutput, NodeExecution: ne.id, Port: pb.Port, Batch: pb.Batch}); err != nil {
 			return nil, fmt.Errorf("store output of node %q port %q: %w", n.node.ID, pb.Port, err)
 		}
 		if pb.Batch.Len() > 0 {
@@ -172,15 +218,26 @@ func (r *run) emitPorts(ctx context.Context, n *planNode, ne *nodeExec, ports []
 // emitActivity runs the node through the NodeRunner port.
 func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeExec, input Batch) ([]emission, error) {
 	call := NodeCall{
+		Org:           r.req.Org,
 		Execution:     r.req.Execution,
 		Token:         t.id,
 		NodeExecution: ne.id,
 		Node:          n.node,
 		Scope:         t.scope,
 		Input:         input,
+		Env:           r.envOf(ne.id),
+	}
+	if cp := r.checkpoint; cp != nil {
+		at := call
+		call.Checkpoint = func(ctx context.Context, fn func(ctx context.Context, tx any) error) error {
+			return cp(ctx, at, fn)
+		}
 	}
 	out, err := guard(func() (NodeOutput, error) { return r.in.deps.Runner.Execute(ctx, call) })
 	if err != nil {
+		if h, ok := r.holdOf(err); ok {
+			return nil, &holdError{hold: h}
+		}
 		return nil, r.portFailure(ctx, "", n, "node failed", err)
 	}
 	return r.emitPorts(ctx, n, ne, out.Ports)
@@ -192,7 +249,7 @@ func (r *run) emitActivity(ctx context.Context, t *token, n *planNode, ne *nodeE
 // one every true edge; none true takes the default edge, or raises NoPathTaken.
 // An edge without a condition is always true, and the default edge is not
 // evaluated, whatever condition it carries.
-func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, input Batch) ([]emission, error) {
+func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, ne *nodeExec, input Batch) ([]emission, error) {
 	var chosen []int
 	for _, ei := range n.out {
 		if ei == n.defaultEdge {
@@ -201,7 +258,7 @@ func (r *run) emitGateway(ctx context.Context, n *planNode, t *token, input Batc
 		e := &r.plan.edges[ei]
 		ok := true
 		if cond := e.edge.Condition; cond != "" {
-			env := EvalEnv{Node: n.node.ID, Edge: e.edge.ID, Scope: t.scope, Items: input}
+			env := EvalEnv{Node: n.node.ID, Edge: e.edge.ID, Scope: t.scope, Items: input, Env: r.envOf(ne.id)}
 			verdict, err := guard(func() (bool, error) { return r.in.deps.Conditions.EvalCondition(ctx, cond, env) })
 			if err != nil {
 				return nil, r.portFailure(ctx, CodeExpressionError, n, fmt.Sprintf("condition of edge %q failed", e.edge.ID), err)
@@ -253,7 +310,7 @@ func (r *run) portFailure(ctx context.Context, code string, n *planNode, what st
 // no edge drops the items it receives: the node matched them, they lead
 // nowhere.
 func (r *run) emitRouting(ctx context.Context, t *token, n *planNode, ne *nodeExec, input Batch) ([]emission, error) {
-	call := RouteCall{Execution: r.req.Execution, NodeExecution: ne.id, Node: n.node, Scope: t.scope, Items: input}
+	call := RouteCall{Execution: r.req.Execution, NodeExecution: ne.id, Node: n.node, Scope: t.scope, Items: input, Env: r.envOf(ne.id)}
 	matches, err := guard(func() ([][]string, error) { return r.in.deps.Router.RouteItems(ctx, call) })
 	if err != nil {
 		return nil, r.portFailure(ctx, "", n, "routing failed", err)

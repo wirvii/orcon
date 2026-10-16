@@ -1,0 +1,133 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
+import { Button, Link, Mascot, PageHeader, RelativeTime } from '@orcon/ui';
+import { useQuery } from '@tanstack/react-query';
+import { getRouteApi, Link as RouterLink, useNavigate } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
+import { defineMessages, useIntl } from 'react-intl';
+
+import { markFirstUsefulScreen } from '../../../app/perf/marks';
+import { QueryState } from '../../../app/query-state/QueryState';
+import { flowsQueryOptions } from '../api/queries';
+import { CreateFlowChooser } from '../forms/CreateFlowChooser';
+import type { CreateMode } from '../model/params';
+
+const messages = defineMessages({
+  title: { id: 'flows.list.title', defaultMessage: 'Flows', description: 'Main heading of the list of flows of a project.' },
+  description: {
+    id: 'flows.list.description',
+    defaultMessage: 'A flow is a process made of steps. New flows start inactive.',
+    description: 'One line under the heading of the flows list: what a flow is and its starting state.',
+  },
+  newFlow: { id: 'flows.list.new', defaultMessage: 'Create flow', description: 'Button that opens the dialog where a person chooses how to start a flow.' },
+  emptyTitle: { id: 'flows.list.empty.title', defaultMessage: 'No flows yet', description: 'Title of the flows list when the project has none.' },
+  emptyDescription: {
+    id: 'flows.list.empty.description',
+    defaultMessage: 'Create the first flow to open it in the editor.',
+    description: 'Explains the empty flows list and the next step.',
+  },
+  columnState: { id: 'flows.list.column.state', defaultMessage: 'State', description: 'Column heading of whether the flow is active.' },
+  columnUpdated: { id: 'flows.list.column.updated', defaultMessage: 'Last change', description: 'Column heading of when the flow last changed.' },
+  active: { id: 'flows.list.state.active', defaultMessage: 'Active', description: 'State of a flow that runs when its triggers fire, shown as text.' },
+  inactive: { id: 'flows.list.state.inactive', defaultMessage: 'Inactive', description: 'State of a flow that does not run, shown as text.' },
+  runs: { id: 'flows.list.runs', defaultMessage: 'Runs', description: 'Link from a flow to the runs of that flow.' },
+});
+
+const route = getRouteApi('/_session/orgs/$orgSlug/projects/$projectHandle/flows');
+
+/** The flows of the project. The name opens the editor; the state is text, never color alone. */
+export function FlowListScreen() {
+  const intl = useIntl();
+  const { organization, project } = route.useRouteContext();
+  const { orgSlug, projectHandle } = route.useParams();
+  const flows = useQuery(flowsQueryOptions(organization.id, project.id));
+  const navigate = useNavigate();
+  const { create } = route.useSearch();
+  // `?create` opens the dialog on arrival; closing it drops the parameter so a reload does not open it again.
+  const requested: CreateMode | undefined = create === undefined || create === false ? undefined : create === true ? 'blank' : create;
+  const [creating, setCreating] = useState<CreateMode | undefined>(requested);
+  useEffect(() => {
+    // The address can ask for the chooser while the page is already open (the key N, the sidebar).
+    if (requested !== undefined) setCreating(requested);
+  }, [requested]);
+
+  useEffect(() => {
+    markFirstUsefulScreen('/orgs/$orgSlug/projects/$projectHandle/flows');
+  }, []);
+
+  const newFlow = (
+    <Button
+      onClick={() => {
+        setCreating('blank');
+      }}
+    >
+      {intl.formatMessage(messages.newFlow)}
+    </Button>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader title={intl.formatMessage(messages.title)} description={intl.formatMessage(messages.description)} actions={newFlow} />
+      <QueryState
+        query={flows}
+        empty={{
+          title: intl.formatMessage(messages.emptyTitle),
+          description: intl.formatMessage(messages.emptyDescription),
+          action: newFlow,
+          illustration: <Mascot pose="happy" />,
+        }}
+      >
+        {(items) => (
+          // A row on a computer, a card on a phone: the same markup, laid out by the width. The labels of the
+          // columns show only on a phone, where the card has no column heads.
+          <ul className="border-border flex flex-col rounded-lg border">
+            {items.map((flow) => (
+              <li key={flow.id} className="border-border flex flex-col gap-1 border-b p-4 last:border-b-0 md:grid md:grid-cols-4 md:items-center md:gap-4">
+                <span className="font-medium wrap-anywhere">
+                  <Link asChild>
+                    <RouterLink to="/orgs/$orgSlug/projects/$projectHandle/flows/$flowId" params={{ orgSlug, projectHandle, flowId: flow.id }}>
+                      {flow.name}
+                    </RouterLink>
+                  </Link>
+                </span>
+                <span>
+                  <span className="text-fg-muted md:hidden">{intl.formatMessage(messages.columnState)}: </span>
+                  {intl.formatMessage(flow.activationState === 'ACTIVE' ? messages.active : messages.inactive)}
+                </span>
+                <span className="text-fg-muted">
+                  <span className="md:hidden">{intl.formatMessage(messages.columnUpdated)}: </span>
+                  <RelativeTime value={flow.updatedAt} />
+                </span>
+                <span>
+                  <Link asChild>
+                    <RouterLink
+                      to="/orgs/$orgSlug/projects/$projectHandle/executions"
+                      params={{ orgSlug, projectHandle }}
+                      search={{ flowId: flow.id }}
+                    >
+                      {intl.formatMessage(messages.runs)}
+                    </RouterLink>
+                  </Link>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </QueryState>
+      <CreateFlowChooser
+        open={creating !== undefined}
+        initialMode={creating}
+        onOpenChange={(open) => {
+          if (open) return;
+          setCreating(undefined);
+          if (requested !== undefined) void navigate({ to: '/orgs/$orgSlug/projects/$projectHandle/flows', params: { orgSlug, projectHandle }, search: {}, replace: true });
+        }}
+        orgId={organization.id}
+        orgSlug={orgSlug}
+        projectHandle={projectHandle}
+        replaceHistory={requested !== undefined}
+      />
+    </div>
+  );
+}
