@@ -7,7 +7,7 @@ import { createFlow } from './operations';
 import { flowKeys } from './queries';
 
 /**
- * Creates a flow in the project. It is never retried; on success the list of the project is stale.
+ * Creates a flow in the project. It is never retried; on success every list of flows and the flow counts are stale.
  * The new flow is read again by the editor, so nothing else is written here.
  */
 export function useCreateFlow(orgId: string, projectId: string) {
@@ -16,6 +16,9 @@ export function useCreateFlow(orgId: string, projectId: string) {
     mutationKey: [...flowKeys.all(orgId), 'create', projectId],
     mutationFn: (name: string) => createFlow({ projectId, name }),
     retry: false,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: flowKeys.list(orgId, projectId) }),
+    onSuccess: async () => {
+      // Every list of flows of the organization (the project's, the home page's) and the flow counts of the projects.
+      await Promise.all([queryClient.invalidateQueries({ queryKey: flowKeys.all(orgId) }), queryClient.invalidateQueries({ queryKey: [orgId, 'projects'] })]);
+    },
   });
 }
