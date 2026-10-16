@@ -188,6 +188,55 @@ func operationFrom(row *sqlcgen.GetExternalOperationRow) store.ExternalOperation
 	}
 }
 
+// ListNodeExecutions implements [store.Reader].
+func (s *Store) ListNodeExecutions(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeExecution, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeExecution
+	err := s.inScope(ctx, "list node executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeExecutionsByExecution(ctx, sqlcgen.ListNodeExecutionsByExecutionParams{
+			OrgID: pgUUID(org.UUID()), ExecutionID: pgUUID(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			out = append(out, store.NodeExecution{
+				ID: fromPGUUID[store.NodeExecutionID](r.ID), OrgID: fromPGUUID[identity.OrgID](r.OrgID),
+				ExecutionID: fromPGUUID[store.ExecutionID](r.ExecutionID), TokenID: fromPGUUID[store.TokenID](r.TokenID),
+				NodeID: r.NodeID, ScopePath: r.ScopePath, Status: r.Status, AttemptCount: r.AttemptCount,
+				StartedAt: instant(r.StartedAt), FinishedAt: instant(r.FinishedAt),
+				CreatedAt: instant(r.CreatedAt), UpdatedAt: instant(r.UpdatedAt),
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ListNodeOutputs implements [store.Reader].
+func (s *Store) ListNodeOutputs(ctx context.Context, org orgscope.Org, execID store.ExecutionID, after store.Cursor, limit int) ([]store.NodeOutputRecord, error) {
+	afterAt, afterID := afterCursor(after)
+	var out []store.NodeOutputRecord
+	err := s.inScope(ctx, "list node outputs", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListNodeOutputsByExecution(ctx, sqlcgen.ListNodeOutputsByExecutionParams{
+			OrgID: pgUUID(org.UUID()), ExecutionID: pgUUID(execID), AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
+		})
+		if err != nil {
+			return err
+		}
+		for i := range rows {
+			r := &rows[i]
+			out = append(out, store.NodeOutputRecord{
+				ID: fromPGUUID[store.PayloadID](r.ID), NodeExecutionID: fromPGUUID[store.NodeExecutionID](r.NodeExecutionID),
+				NodeID: r.NodeID, Port: r.Port, ItemCount: r.ItemCount, Document: r.InlineDocument, CreatedAt: instant(r.CreatedAt),
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
 // GetExternalOperation implements [store.Reader].
 func (s *Store) GetExternalOperation(ctx context.Context, org orgscope.Org, operation store.ExternalOperationID) (store.ExternalOperation, error) {
 	var out store.ExternalOperation

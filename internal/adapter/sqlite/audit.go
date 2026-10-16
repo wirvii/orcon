@@ -80,6 +80,15 @@ func (s *Store) AppendInstanceEntry(ctx context.Context, entry audit.Entry) erro
 	})
 }
 
+// AppendOrgEntry stores one pending entry of an organization chain in its own transaction. The
+// entry must belong to the organization of the scope. It audits an action that changes nothing,
+// such as a read of execution data (ADR-0049 section 3).
+func (s *Store) AppendOrgEntry(ctx context.Context, org orgscope.Org, entry audit.Entry) error {
+	return s.write(ctx, "append organization audit entry", func(ctx context.Context, q *sqlcgen.Queries) error {
+		return insertPendingOrg(ctx, q, org, entry)
+	})
+}
+
 // PendingChains implements [audit.Store].
 func (s *Store) PendingChains(ctx context.Context, limit int) ([]audit.Chain, error) {
 	var chains []audit.Chain

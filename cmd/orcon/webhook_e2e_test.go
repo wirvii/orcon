@@ -95,6 +95,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 	// The true branch: the amount is above the threshold, the provider is called.
 	exec := postEvent(t, handler, "/hooks/engine/orders", `{"amount": 42}`, http.StatusAccepted)
 	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	checkExecutionReads(t, env, st, exec)
 	if n := len(provider.Requests()); n != 1 {
 		t.Fatalf("the provider received %d requests, want 1", n)
 	}
@@ -131,7 +132,7 @@ func publishWebhookFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, pro
 	t.Helper()
 	ctx := t.Context()
 	extra := []string{
-		`{"id":"check","name":"Check","element":"exclusiveGateway","type":"orcon.if@1","routing":"EXCLUSIVE","parameters":{"condition":"={{ $json.amount > 10 }}"}}`,
+		`{"id":"check","name":"Check","element":"exclusiveGateway","type":"orcon.if@1","routing":"EXCLUSIVE","sensitivePaths":["/amount"],"parameters":{"condition":"={{ $json.amount > 10 }}"}}`,
 		fmt.Sprintf(`{"id":"call","name":"Call","element":"serviceTask","type":"orcon.http@1","parameters":{"method":"GET","url":%q,"credential":"mock"}}`,
 			providerURL+"/v1/items?offset=0&limit=2"),
 	}
