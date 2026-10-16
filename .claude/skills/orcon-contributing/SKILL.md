@@ -4,7 +4,7 @@ description: Applies the Orcon contribution workflow - branch names, scoped Conv
 license: Apache-2.0
 compatibility: Rules in references/ are self-contained; scripts/ require an Orcon repository checkout with git, Go, GNU make, pnpm 9 and Node 22, and an authenticated GitHub CLI for the settings check.
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   pinned: true
   owner: wirvii
 ---

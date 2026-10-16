@@ -16,3 +16,4 @@ This document defines how branches are named, based, updated and removed. It is 
 - **BR-6** Branches are deleted automatically after merge; never reuse a merged branch name.
 - **BR-7** `release-please--branches--main` belongs to the release automation; nobody else pushes to it.
 - **BR-8** Outside contributors may use any branch name in their fork; the advisory check only warns.
+- **BR-9** When resolving rebase or merge conflicts, run `git diff origin/main...HEAD --diff-filter=D` before pushing; it must list no deletion outside the pull request's own scope. A conflict resolved in favor of the old side can silently revert merged work. Incident: #132 silently reverted merged work.
