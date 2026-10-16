@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/wirvii/orcon/internal/adapter/connectors/whatsapp"
 	"github.com/wirvii/orcon/internal/adapter/httpapi"
 )
 
@@ -19,7 +20,9 @@ type officialPackage struct {
 
 // officialPackages are the official connector packages of this build. A package joins the list with
 // the change that embeds it; its icon and catalogs then reach the node type catalog.
-var officialPackages []officialPackage
+var officialPackages = []officialPackage{
+	{id: "orcon.whatsapp", files: whatsapp.Files},
+}
 
 // officialConnectorAssets loads the icons and message catalogs of the official packages. An icon
 // that is not safe to show inline fails the start, so it never reaches the API.

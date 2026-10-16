@@ -115,7 +115,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind, stored bool) {
 
 	// The true branch: the amount is above the threshold, the provider is called.
 	exec := postEvent(t, handler, "/hooks/engine/orders", `{"amount": 42}`, http.StatusAccepted)
-	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	waitExecution(t, env, st, exec)
 	checkExecutionReads(t, env, st, exec)
 	if n := len(provider.Requests()); n != 1 {
 		t.Fatalf("the provider received %d requests, want 1", n)
@@ -126,7 +126,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind, stored bool) {
 
 	// The false branch: the amount is below the threshold, nothing is called.
 	exec = postEvent(t, handler, "/hooks/engine/orders", `{"amount": 1}`, http.StatusAccepted)
-	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	waitExecution(t, env, st, exec)
 	if n := len(provider.Requests()); n != 1 {
 		t.Fatalf("the false branch called the provider: %d requests", n)
 	}
@@ -214,8 +214,8 @@ func postEvent(t *testing.T, h http.Handler, path, body string, want int) store.
 	return store.ExecutionID(u)
 }
 
-// waitExecution polls the store until the execution reaches the state.
-func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec store.ExecutionID, want execution.State) {
+// waitExecution polls the store until the execution has succeeded; a failed one ends the wait.
+func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec store.ExecutionID) {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	var last string
@@ -223,8 +223,11 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 		ex, err := st.GetExecution(t.Context(), storetest.ScopeOf(env.Org), exec)
 		if err == nil {
 			last = ex.Status
-			if last == string(want) {
+			if last == string(execution.ExecSucceeded) {
 				return
+			}
+			if last == string(execution.ExecFailed) {
+				break
 			}
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -233,7 +236,7 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 	for i := range events {
 		t.Logf("event %s", events[i].Type)
 	}
-	t.Fatalf("execution %s stayed in %q, want %s", exec, last, want)
+	t.Fatalf("execution %s stayed in %q, want %s", exec, last, execution.ExecSucceeded)
 }
 
 // storedCredential keeps the mock provider's bearer token in the credential store of env, bound to the host of
@@ -246,11 +249,19 @@ func storedCredential(t *testing.T, env *storetest.EngineEnv, providerURL string
 // storedCredentialWith is storedCredential for the secret fields the caller chooses.
 func storedCredentialWith(t *testing.T, env *storetest.EngineEnv, providerURL string, secret map[string]string) (*credential.Service, string) {
 	t.Helper()
-	ctx := t.Context()
 	u, err := url.Parse(providerURL)
 	if err != nil {
 		t.Fatal(err)
 	}
+	svc, owner := credentialServiceOf(t, env)
+	return svc, storeCredential(t, svc, env, owner, "Mock provider", "http", u.Hostname(), secret)
+}
+
+// credentialServiceOf builds the credential service of the environment over its store, with the keys of its
+// organization, and returns it with the principal that owns the credentials a test stores.
+func credentialServiceOf(t *testing.T, env *storetest.EngineEnv) (*credential.Service, audit.Actor) {
+	t.Helper()
+	ctx := t.Context()
 	keys, ok := env.Store.(interface {
 		credential.Store
 		envelope.KeyStore
@@ -275,14 +286,20 @@ func storedCredentialWith(t *testing.T, env *storetest.EngineEnv, providerURL st
 	if err := keys.CreatePrincipal(ctx, identity.PrincipalRecord{ID: owner, Kind: identity.PrincipalUser, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("credential owner: %v", err)
 	}
-	created, err := svc.Create(ctx, storetest.ScopeOf(env.Org), env.Project, credential.Input{
-		Name: "Mock provider", ConnectorReference: "http", AllowedHosts: []string{u.Hostname()},
-		Secret: secret,
-	}, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser})
+	return svc, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser}
+}
+
+// storeCredential keeps one credential in the project of the environment, bound to one host, and returns the
+// identifier a flow names it by.
+func storeCredential(t *testing.T, svc *credential.Service, env *storetest.EngineEnv, owner audit.Actor, name, connector, host string, secret map[string]string) string {
+	t.Helper()
+	created, err := svc.Create(t.Context(), storetest.ScopeOf(env.Org), env.Project, credential.Input{
+		Name: name, ConnectorReference: connector, AllowedHosts: []string{host}, Secret: secret,
+	}, owner)
 	if err != nil {
-		t.Fatalf("create the credential: %v", err)
+		t.Fatalf("create the credential %q: %v", name, err)
 	}
-	return svc, created.ID.String()
+	return created.ID.String()
 }
 
 // mustMasterKey returns a fresh master key for the test keyring.

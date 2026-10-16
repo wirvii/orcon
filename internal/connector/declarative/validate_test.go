@@ -6,6 +6,8 @@ package declarative
 import (
 	"strings"
 	"testing"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 // opDef wraps one operation named item.list in a valid connector.
@@ -79,7 +81,7 @@ func TestValidateRefusesBrokenDefinitions(t *testing.T) {
 		}), "/code"},
 		{"error rule without a status", readWith(func(o *Operation) {
 			o.Response.Errors = []ErrorRule{{Class: "PERMANENT"}}
-		}), "/status"},
+		}), "needs a status code"},
 		{"error rule with an impossible status", readWith(func(o *Operation) {
 			o.Response.Errors = []ErrorRule{{Status: []int{42}, Class: "PERMANENT"}}
 		}), "/status"},
@@ -103,7 +105,7 @@ func TestValidateRefusesBrokenDefinitions(t *testing.T) {
 		}), "$credentials is visible only to the authentication step"},
 		{"credential in a body field", func() Definition {
 			o := writeOp(SafetyUnsafe)
-			o.Request.Body = &Body{Type: "JSON", Fields: map[string]string{"t": "{{$credentials.token}}"}}
+			o.Request.Body = &Body{Type: "JSON", Fields: map[string]Node{"t": {Value: jsonvalue.String("{{$credentials.token}}")}}}
 			return opDef(o)
 		}, "$credentials is visible only to the authentication step"},
 		{"credential in the idempotency key", func() Definition {

@@ -27,14 +27,19 @@ const WebhookBodyLimit = 1 << 20
 // service implements it.
 type WebhookIngress interface {
 	Ingest(ctx context.Context, req trigger.IngressRequest) (trigger.Accepted, error)
+	Handshake(ctx context.Context, req trigger.IngressRequest) (string, error)
 }
 
-// webhookHandler serves the public addresses: it reads the body, hands the
-// request to the ingress and answers 202 Accepted with the execution started.
-// Problems are answered as the rest of the API does; nothing of another
+// webhookHandler serves the public addresses: a GET to a route that declares a
+// subscription handshake is answered with the challenge; every other request,
+// including a GET to a native webhook, reads the body, hands the request to the
+// ingress and answers 202 Accepted with the execution started. Problems are answered as the rest of the API does; nothing of another
 // organization reaches the response.
 func webhookHandler(in WebhookIngress, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && serveHandshake(w, r, in, logger) {
+			return
+		}
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, WebhookBodyLimit))
 		if err != nil {
 			var tooLarge *http.MaxBytesError
@@ -45,9 +50,23 @@ func webhookHandler(in WebhookIngress, logger *slog.Logger) http.Handler {
 			problem.Write(w, r, problem.ValidationFailed, problem.Detail("the body could not be read"))
 			return
 		}
-		acc, err := in.Ingest(r.Context(), trigger.IngressRequest{Method: r.Method, Path: r.URL.Path, Body: body})
+		if r.Method == http.MethodGet && len(body) == 0 {
+			// A GET carries no body; its event is an empty object, as the engine takes JSON only.
+			body = []byte("{}")
+		}
+		acc, err := in.Ingest(r.Context(), trigger.IngressRequest{
+			Method: r.Method, Path: r.URL.Path, Headers: r.Header, Query: firstQuery(r), Body: body,
+		})
 		if err != nil {
 			writeIngressProblem(w, r, logger, err)
+			return
+		}
+		if acc.Ignored {
+			// Authentic but without events to run (for example a status update):
+			// acknowledged so the provider does not resend it.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ignored"})
 			return
 		}
 		w.Header().Set("Orcon-Execution-Id", acc.ExecutionID)
@@ -57,6 +76,43 @@ func webhookHandler(in WebhookIngress, logger *slog.Logger) http.Handler {
 	})
 }
 
+// serveHandshake answers a subscription GET with the challenge as plain text and
+// reports whether it answered. A refused handshake is 403, as Meta expects, and
+// reveals nothing about the address beyond that. It does not answer, and the
+// request goes on as an ordinary event, when the route declares no handshake or
+// no route matches (the ingress then answers 404).
+func serveHandshake(w http.ResponseWriter, r *http.Request, in WebhookIngress, logger *slog.Logger) bool {
+	challenge, err := in.Handshake(r.Context(), trigger.IngressRequest{
+		Method: r.Method, Path: r.URL.Path, Headers: r.Header, Query: firstQuery(r),
+	})
+	switch {
+	case err == nil:
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(challenge))
+	case errors.Is(err, trigger.ErrNoHandshake), errors.Is(err, trigger.ErrNoRoute):
+		return false
+	case errors.Is(err, trigger.ErrUnauthorized):
+		problem.Write(w, r, problem.Forbidden, problem.Detail("the subscription handshake was refused"))
+	default:
+		logger.ErrorContext(r.Context(), "webhook handshake failed", "error", err)
+		problem.Write(w, r, problem.InternalError)
+	}
+	return true
+}
+
+// firstQuery keeps the first value of each query parameter of a request.
+func firstQuery(r *http.Request) map[string]string {
+	q := r.URL.Query()
+	out := make(map[string]string, len(q))
+	for k, values := range q {
+		if len(values) > 0 {
+			out[k] = values[0]
+		}
+	}
+	return out
+}
+
 // writeIngressProblem maps the errors of the ingress to the problem catalog.
 func writeIngressProblem(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
 	switch {
@@ -64,6 +120,8 @@ func writeIngressProblem(w http.ResponseWriter, r *http.Request, logger *slog.Lo
 		problem.Write(w, r, problem.NotFound, problem.Detail("no active address answers this request"))
 	case errors.Is(err, trigger.ErrInactive):
 		problem.Write(w, r, problem.Conflict, problem.Detail("the flow does not accept events right now"))
+	case errors.Is(err, trigger.ErrUnauthorized):
+		problem.Write(w, r, problem.Unauthenticated, problem.Detail("the request signature is missing or wrong"))
 	case errors.Is(err, trigger.ErrBadBody):
 		problem.Write(w, r, problem.ValidationFailed, problem.Detail("the body must be JSON"))
 	case errors.Is(err, trigger.ErrNoStarter):

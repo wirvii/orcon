@@ -14,6 +14,9 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/exprflow"
+	"github.com/wirvii/orcon/internal/ai/agent"
+	"github.com/wirvii/orcon/internal/ai/chain"
+	"github.com/wirvii/orcon/internal/ai/cost"
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/connector/limit"
@@ -74,6 +77,13 @@ type engineOptions struct {
 	// credentials replaces the resolver in tests; nil uses the resolver, or the
 	// refusing function when there is none either.
 	credentials func(ctx context.Context, req httpdispatch.CredentialRequest) (httpdispatch.Credential, error)
+	// models resolves the model of the AI nodes; nil uses the production
+	// resolver, which reaches each provider through the egress client with the
+	// API key of the stored credential the model names.
+	models chain.Models
+	// modelEndpoint points every model provider at a scripted server in tests;
+	// nil in production. It does not change how the credential is resolved.
+	modelEndpoint *modelEndpoint
 }
 
 // engine is the execution engine of a process: the durable engine that runs the
@@ -108,6 +118,10 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	default:
 		credentials = refuseCredentials
 	}
+	inbound := refuseInbound
+	if opts.resolver != nil {
+		inbound = resolveInbound(opts.resolver, st)
+	}
 	policy := opts.senderPolicy
 	if policy == nil {
 		policy = publicHTTPSPolicy
@@ -127,7 +141,37 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("wire orcon.http@1: %w", err)
 	}
-	runner := logFailures{next: httpdispatch.NewRouter(map[string]execution.NodeRunner{httpdispatch.HTTPNodeType: httpNode}), logger: opts.logger}
+	models := opts.models
+	if models == nil {
+		models = modelResolver{client: client, credentials: credentials, endpoint: opts.modelEndpoint}
+	}
+	llmNode, err := chain.NewLLM(chain.Config{Models: models})
+	if err != nil {
+		return nil, fmt.Errorf("wire orcon.ai.llm@1: %w", err)
+	}
+	agentStore, ok := st.(agent.Store)
+	if !ok {
+		return nil, errors.New("wire orcon.ai.agent@1: the store keeps no agent runs")
+	}
+	// The agent runs its tools through the same runners as the flow: a tool is
+	// a node type the agent may call, here the HTTP node.
+	budgets, ok := st.(cost.Store)
+	if !ok {
+		return nil, errors.New("wire orcon.ai.agent@1: the store keeps no AI budgets")
+	}
+	agentNode, err := agent.New(agent.Config{
+		Models: models, Store: agentStore, Orgs: st, Clock: clk,
+		Prices: newModelPrices(), Budgets: budgets,
+		Runners: map[string]execution.NodeRunner{httpdispatch.HTTPNodeType: httpNode},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("wire orcon.ai.agent@1: %w", err)
+	}
+	runner := logFailures{next: httpdispatch.NewRouter(map[string]execution.NodeRunner{
+		httpdispatch.HTTPNodeType: httpNode,
+		chain.LLMNodeType:         llmNode,
+		agent.NodeType:            agentNode,
+	}), logger: opts.logger}
 
 	workers := opts.role == config.RoleStandalone
 	cfg := durable.Config{
@@ -141,10 +185,14 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 		return nil, fmt.Errorf("wire the durable engine: %w", err)
 	}
 
+	verifier, err := newWhatsAppVerifier(st, inbound)
+	if err != nil {
+		return nil, fmt.Errorf("wire the WhatsApp trigger: %w", err)
+	}
 	starter := triggerStarter{engine: eng}
 	svc, err := trigger.New(trigger.Config{
-		Store: st, Flows: st, Catalog: webhookCatalog{}, Credentials: noTriggerCredentials{},
-		Settings: trigger.Settings{}, Starter: starter, Clock: clk, IDs: ids,
+		Store: st, Flows: st, Catalog: triggerCatalog{}, Credentials: noTriggerCredentials{},
+		Settings: trigger.Settings{}, Starter: starter, Clock: clk, IDs: ids, Verifier: verifier,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("wire the trigger service: %w", err)
@@ -226,20 +274,6 @@ func bodyItems(body []byte) ([]execution.Item, error) {
 		out = append(out, execution.Item{JSON: it})
 	}
 	return out, nil
-}
-
-// webhookCatalog declares the trigger node types of this build: the native
-// webhook. It answers for no other type.
-type webhookCatalog struct{}
-
-// LookupTrigger implements [trigger.Catalog].
-func (webhookCatalog) LookupTrigger(_ context.Context, nodeType string) (trigger.Declaration, bool) {
-	if nodeType != WebhookNodeType {
-		return trigger.Declaration{}, false
-	}
-	return trigger.Declaration{
-		Family: flow.TriggerWebhook, Delivery: trigger.DeliveryAtLeastOnce, MaxPayloadBytes: webhookBodyCap,
-	}, true
 }
 
 // noTriggerCredentials reports that no trigger needs a credential this build cannot use.

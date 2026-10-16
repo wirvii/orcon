@@ -1,0 +1,21 @@
+{
+  "connector.displayName": "WhatsApp Cloud API",
+  "connector.description": "Envía mensajes de WhatsApp y los marca como leídos a través de la WhatsApp Cloud API de Meta.",
+  "node.whatsapp.displayName": "WhatsApp Cloud API",
+  "node.whatsappTrigger.displayName": "Mensaje de WhatsApp recibido",
+  "parameter.whatsapp.phoneNumberId.description": "El ID del número de teléfono de WhatsApp Business que envía o trabaja con el mensaje.",
+  "parameter.whatsapp.to.description": "Número de teléfono del destinatario en formato internacional, solo dígitos, por ejemplo 573001234567.",
+  "parameter.whatsapp.text.description": "El objeto de texto de Meta, por ejemplo {\"body\": \"Hola\"}. Campo opcional: preview_url.",
+  "parameter.whatsapp.template.description": "El objeto de plantilla de Meta: name, language.code y components, tal como está aprobada en la cuenta de WhatsApp Business.",
+  "parameter.whatsapp.image.description": "El objeto de imagen de Meta: link (URL https de un archivo JPEG o PNG) y caption opcional.",
+  "parameter.whatsapp.document.description": "El objeto de documento de Meta: link (URL https), filename y caption opcional.",
+  "parameter.whatsapp.messageId.description": "El ID del mensaje de WhatsApp (wamid) que se marca como leído.",
+  "operation.message.send.displayName": "Enviar un mensaje de texto",
+  "operation.templateMessage.send.displayName": "Enviar un mensaje de plantilla",
+  "operation.imageMessage.send.displayName": "Enviar una imagen",
+  "operation.documentMessage.send.displayName": "Enviar un documento",
+  "operation.message.update.displayName": "Marcar un mensaje como leído",
+  "operation.phoneNumber.get.displayName": "Consultar un número de teléfono",
+  "credential.systemUser.displayName": "Token de acceso del usuario del sistema",
+  "changelog.1.0.0.first": "Primera versión: mensajes de texto, plantilla, imagen y documento, marcar como leído, y la prueba del número de teléfono."
+}

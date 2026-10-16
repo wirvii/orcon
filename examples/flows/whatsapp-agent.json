@@ -1,0 +1,66 @@
+{
+  "format": "orcon/flow@1",
+  "id": "0193a000-0000-7000-8000-0000000000a1",
+  "name": "WhatsApp agent reply",
+  "settings": {},
+  "variables": [],
+  "nodes": [
+    {
+      "id": "inbound",
+      "name": "WhatsApp inbound message",
+      "element": "startEvent",
+      "type": "orcon.whatsapp.whatsappTrigger@1",
+      "parameters": { "credential": "REPLACE-WITH-THE-WHATSAPP-CREDENTIAL-ID" },
+      "trigger": {
+        "family": "WEBHOOK",
+        "addresses": [{ "family": "NATIVE", "path": "whatsapp", "methods": ["GET", "POST"] }]
+      }
+    },
+    {
+      "id": "agent",
+      "name": "Support agent",
+      "element": "serviceTask",
+      "type": "orcon.ai.agent@1",
+      "parameters": {
+        "model": { "provider": "openai", "name": "gpt-4o-mini", "credential": "REPLACE-WITH-THE-MODEL-CREDENTIAL-ID" },
+        "system": "You are the customer support agent of a small shop. Answer briefly, in the language of the customer.",
+        "inputField": "text",
+        "conversationField": "from",
+        "memoryWindow": 20,
+        "maxSteps": 4,
+        "maxOutputTokens": 512
+      }
+    },
+    {
+      "id": "reply",
+      "name": "Send the WhatsApp reply",
+      "element": "serviceTask",
+      "type": "orcon.http@1",
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/106540352242922/messages",
+        "credential": "REPLACE-WITH-THE-WHATSAPP-CREDENTIAL-ID",
+        "body": {
+          "messaging_product": "whatsapp",
+          "recipient_type": "individual",
+          "to": "{{ $json.from }}",
+          "type": "text",
+          "text": { "body": "{{ $json.text }}" }
+        }
+      }
+    },
+    {
+      "id": "end",
+      "name": "End",
+      "element": "endEvent",
+      "type": "orcon.end@1",
+      "parameters": {}
+    }
+  ],
+  "edges": [
+    { "id": "e-inbound-agent", "from": { "node": "inbound", "port": "main" }, "to": { "node": "agent" }, "kind": "SEQUENCE" },
+    { "id": "e-agent-reply", "from": { "node": "agent", "port": "main" }, "to": { "node": "reply" }, "kind": "SEQUENCE" },
+    { "id": "e-reply-end", "from": { "node": "reply", "port": "main" }, "to": { "node": "end" }, "kind": "SEQUENCE" }
+  ],
+  "editor": {}
+}

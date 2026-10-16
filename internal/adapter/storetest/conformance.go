@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/ai/agent"
+	"github.com/wirvii/orcon/internal/ai/cost"
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/authz"
@@ -68,6 +70,8 @@ type Store interface { //nolint:interfacebloat // the suite exercises every port
 	connector.PackageStore
 	connector.GrantStore
 	execution.WorkerStore
+	cost.Store
+	agent.Store
 	store.Reader
 	store.NodeReader
 	store.EngineReader

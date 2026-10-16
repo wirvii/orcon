@@ -11,6 +11,132 @@ import (
 	"database/sql"
 )
 
+type AiAgentMessage struct {
+	ID             []byte
+	OrgID          []byte
+	AiAgentRunID   []byte
+	SequenceNumber int64
+	Role           string
+	PartKind       string
+	CallKey        string
+	ToolName       string
+	IsError        int64
+	ContentText    string
+	CreatedAt      int64
+	UpdatedAt      int64
+}
+
+type AiAgentRun struct {
+	ID                []byte
+	OrgID             []byte
+	Status            string
+	StepCount         int64
+	ToolCallCount     int64
+	SpendMicrodollars int64
+	FinalText         sql.NullString
+	ErrorCode         sql.NullString
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+type AiAgentStep struct {
+	ID                 []byte
+	OrgID              []byte
+	AiAgentRunID       []byte
+	StepNumber         int64
+	Kind               string
+	ToolCallKey        string
+	ToolName           string
+	OutputText         string
+	IsError            int64
+	IsArgumentsInvalid int64
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
+type AiBudget struct {
+	ID                    []byte
+	OrgID                 []byte
+	ScopeKey              []byte
+	ScopeKind             string
+	ExecutionID           []byte
+	FlowID                []byte
+	ProjectID             []byte
+	Period                string
+	LimitMicrodollars     int64
+	AlertThresholdPercent int64
+	ExceededAction        string
+	UnknownPriceAction    string
+	CreatedAt             int64
+	UpdatedAt             int64
+}
+
+type AiBudgetAlert struct {
+	ID                []byte
+	OrgID             []byte
+	AiBudgetID        []byte
+	PeriodStartedAt   int64
+	Kind              string
+	ThresholdPercent  int64
+	SpentMicrodollars int64
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+type AiConversationMessage struct {
+	ID              []byte
+	OrgID           []byte
+	ThreadKey       []byte
+	ConversationKey string
+	SequenceNumber  int64
+	Role            string
+	ContentText     string
+	CreatedAt       int64
+	UpdatedAt       int64
+}
+
+type AiModelCall struct {
+	ID                   []byte
+	OrgID                []byte
+	AiAgentStepID        []byte
+	Provider             string
+	Model                string
+	InputTokenCount      int64
+	OutputTokenCount     int64
+	CacheReadTokenCount  int64
+	CacheWriteTokenCount int64
+	ReasoningTokenCount  int64
+	CostMicrodollars     int64
+	CostStatus           string
+	PriceVersion         string
+	FinishReason         string
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
+type AiUsageRollup struct {
+	ID                   []byte
+	OrgID                []byte
+	ScopeKey             []byte
+	ScopeKind            string
+	ExecutionID          []byte
+	FlowID               []byte
+	ProjectID            []byte
+	Grain                string
+	PeriodStartedAt      int64
+	Purpose              string
+	InputTokenCount      int64
+	OutputTokenCount     int64
+	CacheReadTokenCount  int64
+	CacheWriteTokenCount int64
+	ReasoningTokenCount  int64
+	CostMicrodollars     int64
+	UnpricedCallCount    int64
+	CallCount            int64
+	CreatedAt            int64
+	UpdatedAt            int64
+}
+
 type ApplicationUser struct {
 	ID              []byte
 	PrincipalID     []byte

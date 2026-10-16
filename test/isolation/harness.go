@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/ai/agent"
+	"github.com/wirvii/orcon/internal/ai/cost"
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
 	"github.com/wirvii/orcon/internal/credential"
@@ -99,6 +101,8 @@ type Stores interface { //nolint:interfacebloat // the battery exercises every p
 	flow.SnapshotStore
 	editor.Store
 	execution.WorkerStore
+	cost.Store
+	agent.Store
 }
 
 // Org is one of the two organizations of a run.

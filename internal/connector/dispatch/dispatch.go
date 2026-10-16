@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -128,10 +129,14 @@ func New(cfg Config) (*HTTPNode, error) {
 
 // request is one parsed orcon.http@1 node: what to send, for every item.
 type request struct {
-	method     string
-	target     *url.URL
-	headers    map[string]string
-	body       string
+	method  string
+	target  *url.URL
+	headers map[string]string
+	// body is the template of the JSON body; hasBody is false when the node
+	// sends none. Its strings may hold {{ $json.<field> }} markers that read the
+	// item being sent (see renderBody).
+	body       jsonvalue.Value
+	hasBody    bool
 	credential string
 	idempotent bool
 	// org and bucket locate the rate bucket the send draws from; they are set
@@ -172,11 +177,11 @@ func parse(node *flow.Node) (request, error) {
 		}
 	}
 	if b, ok := p.Get("body"); ok {
-		text, err := jsonvalue.Marshal(b)
-		if err != nil {
-			return r, errors.New("orcon.http@1 body is not encodable")
+		if err := checkMarkers(b); err != nil {
+			return r, err
 		}
-		r.body = string(text)
+		r.body = b
+		r.hasBody = true
 	}
 	r.credential, _ = stringParam(p, "credential")
 	if v, ok := p.Get("idempotent"); ok {
@@ -193,6 +198,124 @@ func stringParam(p jsonvalue.Value, name string) (string, bool) {
 		return "", false
 	}
 	return v.Str()
+}
+
+// markerPattern is one {{ $json.<field> }} marker: a dotted path into the item.
+var markerPattern = regexp.MustCompile(`\{\{\s*\$json\.([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\s*\}\}`)
+
+// checkMarkers refuses a body string that holds a "{{" which is not a complete
+// marker, so a typo fails the node at activation instead of being sent.
+func checkMarkers(v jsonvalue.Value) error {
+	switch v.Kind() {
+	case jsonvalue.KindString:
+		s, _ := v.Str()
+		if strings.Count(s, "{{") != len(markerPattern.FindAllString(s, -1)) {
+			return errors.New("orcon.http@1 body holds a template marker that is not {{ $json.<field> }}")
+		}
+	case jsonvalue.KindObject:
+		for _, m := range v.Members() {
+			if err := checkMarkers(m.Value); err != nil {
+				return err
+			}
+		}
+	case jsonvalue.KindArray:
+		for _, it := range v.Items() {
+			if err := checkMarkers(it); err != nil {
+				return err
+			}
+		}
+	case jsonvalue.KindInvalid, jsonvalue.KindNull, jsonvalue.KindBool, jsonvalue.KindNumber:
+		return nil
+	}
+	return nil
+}
+
+// renderBody returns the body text of one item: every marker reads its field
+// of the item. A string that is exactly one marker takes the field's value as
+// it is; a marker inside a longer string is written as text. A missing field
+// fails the item, so nothing is sent with an empty value.
+func renderBody(body jsonvalue.Value, item jsonvalue.Value) (string, error) {
+	v, err := renderValue(body, item)
+	if err != nil {
+		return "", err
+	}
+	text, err := jsonvalue.Marshal(v)
+	if err != nil {
+		return "", errors.New("orcon.http@1 body is not encodable")
+	}
+	return string(text), nil
+}
+
+func renderValue(v jsonvalue.Value, item jsonvalue.Value) (jsonvalue.Value, error) {
+	switch v.Kind() {
+	case jsonvalue.KindString:
+		s, _ := v.Str()
+		if !strings.Contains(s, "{{") {
+			return v, nil
+		}
+		if m := markerPattern.FindStringSubmatch(s); m != nil && markerPattern.FindString(s) == s {
+			return fieldOf(item, m[1])
+		}
+		var failed error
+		out := markerPattern.ReplaceAllStringFunc(s, func(marker string) string {
+			m := markerPattern.FindStringSubmatch(marker)
+			f, err := fieldOf(item, m[1])
+			if err != nil {
+				failed = err
+				return ""
+			}
+			if t, ok := f.Str(); ok {
+				return t
+			}
+			raw, _ := jsonvalue.Marshal(f)
+			return string(raw)
+		})
+		if failed != nil {
+			return jsonvalue.Value{}, failed
+		}
+		return jsonvalue.String(out), nil
+	case jsonvalue.KindObject:
+		members := v.Members()
+		out := make([]jsonvalue.Member, 0, len(members))
+		for _, m := range members {
+			x, err := renderValue(m.Value, item)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, jsonvalue.Member{Key: m.Key, Value: x})
+		}
+		return jsonvalue.Object(out...)
+	case jsonvalue.KindArray:
+		items := v.Items()
+		out := make([]jsonvalue.Value, 0, len(items))
+		for _, it := range items {
+			x, err := renderValue(it, item)
+			if err != nil {
+				return jsonvalue.Value{}, err
+			}
+			out = append(out, x)
+		}
+		return jsonvalue.Array(out...), nil
+	case jsonvalue.KindInvalid, jsonvalue.KindNull, jsonvalue.KindBool, jsonvalue.KindNumber:
+		return v, nil
+	}
+	return v, nil
+}
+
+// fieldOf reads a dotted path of object members from the item.
+func fieldOf(item jsonvalue.Value, path string) (jsonvalue.Value, error) {
+	cur := item
+	for _, key := range strings.Split(path, ".") {
+		if cur.Kind() != jsonvalue.KindObject {
+			return jsonvalue.Value{}, fmt.Errorf("orcon.http@1 body reads $json.%s, which is not an object path", path)
+		}
+		next, ok := cur.Get(key)
+		if !ok {
+			return jsonvalue.Value{}, fmt.Errorf("orcon.http@1 body reads $json.%s, which the item does not have", path)
+		}
+		cur = next
+	}
+	return cur, nil
 }
 
 // isRead reports whether the method only reads (GET and HEAD).
@@ -213,7 +336,7 @@ func (r request) operation() declarative.Operation {
 			op.IdempotencyKey = "{{$parameter.key}}"
 		}
 	}
-	if r.body != "" {
+	if r.hasBody {
 		op.Request.Body = &declarative.Body{Type: "RAW", Raw: "{{$parameter.body}}"}
 		op.Request.Headers = withContentType(op.Request.Headers)
 	}
@@ -280,7 +403,7 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 		if err := n.takeReadPermits(ctx, call.Org, bucketKey, int64(count)); err != nil {
 			return execution.NodeOutput{}, err
 		}
-		results, err = n.reads(ctx, req, cred, count)
+		results, err = n.reads(ctx, req, cred, call.Input)
 	} else {
 		results, err = n.effects(ctx, req, cred, call)
 	}
@@ -372,11 +495,16 @@ func (n *HTTPNode) waitUntil(ctx context.Context, at time.Time) error {
 }
 
 // reads sends the request once per input item. A read repeats freely, so it
-// needs no journal. The parameters are the same for every item in this version.
-func (n *HTTPNode) reads(ctx context.Context, req request, cred Credential, count int) ([]jsonvalue.Value, error) {
-	out := make([]jsonvalue.Value, 0, count)
-	for range count {
-		v, err := n.sendOnce(ctx, req, cred, "")
+// needs no journal. The URL and headers are the same for every item; the body,
+// when it has markers, is rendered from each item.
+func (n *HTTPNode) reads(ctx context.Context, req request, cred Credential, input execution.Batch) ([]jsonvalue.Value, error) {
+	out := make([]jsonvalue.Value, 0, input.Len())
+	for i := range input.Len() {
+		body, err := bodyOf(req, input.Item(i).JSON)
+		if err != nil {
+			return nil, err
+		}
+		v, err := n.sendOnce(ctx, req, cred, "", body)
 		if err != nil {
 			return nil, err
 		}
@@ -385,14 +513,22 @@ func (n *HTTPNode) reads(ctx context.Context, req request, cred Credential, coun
 	return out, nil
 }
 
+// bodyOf is the body text an item sends; empty when the node sends no body.
+func bodyOf(req request, item jsonvalue.Value) (string, error) {
+	if !req.hasBody {
+		return "", nil
+	}
+	return renderBody(req.body, item)
+}
+
 // sendOnce runs the one-operation connector and returns its items.
-func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, key string) ([]jsonvalue.Value, error) {
+func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, key, body string) ([]jsonvalue.Value, error) {
 	def := req.definition(cred.Auth)
 	in, err := declarative.New(def, declarative.Options{Sender: n.cfg.SenderFor(req.target), Now: n.cfg.Clock.Now})
 	if err != nil {
 		return nil, fmt.Errorf("dispatch: %w", err)
 	}
-	res, err := in.Execute(ctx, n.call(req, cred, key), nil)
+	res, err := in.Execute(ctx, n.call(req, cred, key, body), nil)
 	if err != nil {
 		n.honorRetryAfter(ctx, req, err)
 		return nil, describe(err)
@@ -412,13 +548,13 @@ func (n *HTTPNode) honorRetryAfter(ctx context.Context, req request, err error) 
 	_ = n.cfg.Buckets.BlockBucket(ctx, req.org, req.bucket, now.Add(f.RetryAfter), now)
 }
 
-func (n *HTTPNode) call(req request, cred Credential, key string) declarative.Call {
+func (n *HTTPNode) call(req request, cred Credential, key, body string) declarative.Call {
 	params := map[string]jsonvalue.Value{}
 	if key != "" {
 		params["key"] = jsonvalue.String(key)
 	}
-	if req.body != "" {
-		params["body"] = jsonvalue.String(req.body)
+	if req.hasBody {
+		params["body"] = jsonvalue.String(body)
 	}
 	return declarative.Call{Operation: "http.call", Parameters: params, Credentials: cred.Fields}
 }
@@ -474,7 +610,7 @@ func (n *HTTPNode) effects(ctx context.Context, req request, cred Credential, ca
 	if req.idempotent {
 		contract = journal.Contract{Idempotency: journal.IdempotencyProviderKey, KeyTTL: n.cfg.KeyTTL}
 	}
-	p := &effectProvider{n: n, req: req, cred: cred, results: make([]*jsonvalue.Value, count)}
+	p := &effectProvider{n: n, req: req, cred: cred, input: call.Input, results: make([]*jsonvalue.Value, count)}
 	fenced := journalStore{base: n.cfg.Journal, checkpoint: call.Checkpoint}
 	j, err := journal.New(fenced, p, n.cfg.Clock, n.cfg.JournalCfg)
 	if err != nil {
@@ -680,18 +816,25 @@ func (s journalStore) ListExternalOperations(ctx context.Context, org orgscope.O
 // effectProvider performs the sends of a journal. Results are kept per item; a
 // send whose outcome is unknown returns its error, which the journal classifies.
 type effectProvider struct {
-	n    *HTTPNode
-	req  request
-	cred Credential
+	n     *HTTPNode
+	req   request
+	cred  Credential
+	input execution.Batch
 
 	mu      sync.Mutex
 	results []*jsonvalue.Value
 }
 
-// Send performs one item. The journal calls it outside every transaction.
+// Send performs one item. The journal calls it outside every transaction. The
+// body is rendered from the item it sends, so a recovery sends the same text.
 func (p *effectProvider) Send(ctx context.Context, a *journal.Attempt) (journal.Reply, error) {
 	i := int(a.Operation.ItemIndex)
-	items, err := p.n.sendOnce(ctx, p.req, p.cred, a.Operation.CorrelationKey)
+	body, err := bodyOf(p.req, p.input.Item(i).JSON)
+	if err != nil {
+		// Nothing was sent, so the item is counted as failed without a send.
+		return journal.Reply{Outcome: journal.StateFailed}, nil //nolint:nilerr // a render failure is a failed item, not a journal error
+	}
+	items, err := p.n.sendOnce(ctx, p.req, p.cred, a.Operation.CorrelationKey, body)
 	if err != nil {
 		if errors.Is(err, ErrUnknownOutcome) {
 			return journal.Reply{}, err

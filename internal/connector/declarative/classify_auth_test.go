@@ -163,7 +163,7 @@ func TestSigV4SignatureCoversTheBody(t *testing.T) {
 	sign := func(value string) string {
 		op := Operation{
 			Purity: PurityEffect, Safety: SafetyUnsafe,
-			Request: Request{Method: "PUT", Path: "/objects", Body: &Body{Type: "JSON", Fields: map[string]string{"v": "{{$parameter.v}}"}}},
+			Request: Request{Method: "PUT", Path: "/objects", Body: &Body{Type: "JSON", Fields: map[string]Node{"v": {Value: jsonvalue.String("{{$parameter.v}}")}}}},
 		}
 		s := okSender(`{}`)
 		in := newInterp(t, baseDef(auth, map[string]Operation{"object.put": op}), s, nil)

@@ -6,10 +6,13 @@ package declarative
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 const (
@@ -52,6 +55,9 @@ func Validate(def Definition) error {
 	slices.Sort(names)
 	for _, name := range names {
 		v.operation(name, def.Operations[name])
+	}
+	for _, name := range slices.Sorted(maps.Keys(def.Triggers)) {
+		v.trigger("triggers/"+name, def.Triggers[name])
 	}
 	return v.err()
 }
@@ -158,8 +164,16 @@ func (v *validator) request(base string, op Operation) {
 		if r.Body.Type == "RAW" && r.Body.Raw == "" {
 			v.addf(base+"/body/raw", "a RAW body needs its text")
 		}
-		for _, val := range r.Body.Fields {
-			templates = append(templates, val)
+		templates = append(templates, r.Body.Raw)
+		for _, k := range slices.Sorted(maps.Keys(r.Body.Fields)) {
+			n := r.Body.Fields[k].Value
+			if r.Body.Type == "FORM" {
+				if n.Kind() != jsonvalue.KindString {
+					v.addf(base+"/body/fields/"+k, "a FORM field must be a string template")
+					continue
+				}
+			}
+			templates = append(templates, templateStrings(n)...)
 		}
 	}
 	for _, tpl := range templates {
@@ -178,30 +192,77 @@ func (v *validator) response(base string, op Operation) {
 	if referencesCredentials(rs.Select) {
 		v.addf(base+"/select", "$credentials is not visible in response mapping")
 	}
-	if _, err := parsePath(rs.Select); rs.Select != "" && err != nil {
+	if err := checkPlainPath(rs.Select); rs.Select != "" && err != nil {
 		v.addf(base+"/select", "unsupported path: %v", err)
 	}
 	if !slices.Contains(validEmpty, rs.Empty) {
 		v.addf(base+"/empty", "must be NO_ITEMS or ONE_EMPTY_ITEM")
 	}
 	for i, rule := range rs.Errors {
-		p := fmt.Sprintf("%s/errors/%d", base, i)
-		if !slices.Contains(Classes(), Class(rule.Class)) {
-			v.addf(p+"/class", "must be TRANSIENT, PERMANENT or UNCERTAIN")
+		v.errorRule(fmt.Sprintf("%s/errors/%d", base, i), op, rule)
+	}
+	v.responseMap(base+"/map", rs.Map)
+}
+
+func (v *validator) errorRule(p string, op Operation, rule ErrorRule) {
+	if !slices.Contains(Classes(), Class(rule.Class)) {
+		v.addf(p+"/class", "must be TRANSIENT, PERMANENT or UNCERTAIN")
+	}
+	if Class(rule.Class) == ClassUncertain && op.Purity != PurityEffect {
+		v.addf(p+"/class", "UNCERTAIN is allowed only on EFFECT operations (ADR-0079 §4)")
+	}
+	if rule.Code != "" && !IsCode(rule.Code) {
+		v.addf(p+"/code", "%q is not one of the fourteen codes of ADR-0079 §5", rule.Code)
+	}
+	if len(rule.Status) == 0 && rule.Body == nil {
+		v.addf(p, "needs a status code, a body match or both")
+	}
+	for _, s := range rule.Status {
+		if s < 100 || s > 599 {
+			v.addf(p+"/status", "%d is not an HTTP status", s)
 		}
-		if Class(rule.Class) == ClassUncertain && op.Purity != PurityEffect {
-			v.addf(p+"/class", "UNCERTAIN is allowed only on EFFECT operations (ADR-0079 §4)")
+	}
+	if rule.Body != nil {
+		v.bodyMatch(p+"/body", *rule.Body)
+	}
+}
+
+// responseMap checks the keys and paths of a response map: each output key is
+// named and each alternative of each path starts with $ and is supported.
+func (v *validator) responseMap(base string, mapping map[string]string) {
+	for _, k := range slices.Sorted(maps.Keys(mapping)) {
+		if k == "" {
+			v.addf(base, "output keys must not be empty")
 		}
-		if rule.Code != "" && !IsCode(rule.Code) {
-			v.addf(p+"/code", "%q is not one of the fourteen codes of ADR-0079 §5", rule.Code)
-		}
-		if len(rule.Status) == 0 {
-			v.addf(p+"/status", "needs at least one status code")
-		}
-		for _, s := range rule.Status {
-			if s < 100 || s > 599 {
-				v.addf(p+"/status", "%d is not an HTTP status", s)
+		p := base + "/" + k
+		for _, alt := range alternatives(mapping[k]) {
+			if !strings.HasPrefix(alt, "$") {
+				v.addf(p, "must be a path starting with $")
+			} else if err := checkPlainPath(alt); err != nil {
+				v.addf(p, "unsupported path: %v", err)
 			}
+		}
+	}
+}
+
+// bodyMatch checks the path and the scalars of a body condition of an error
+// rule. Objects and arrays cannot be compared, so they are refused.
+func (v *validator) bodyMatch(base string, m BodyMatch) {
+	if err := checkPlainPath(m.Path); err != nil {
+		v.addf(base+"/path", "unsupported path: %v", err)
+	}
+	if len(m.In) == 0 {
+		v.addf(base+"/in", "needs at least one scalar to compare with")
+	}
+	for i, n := range m.In {
+		if _, isText := n.Value.Str(); isText {
+			continue
+		}
+		if _, isNumber := n.Value.NumberText(); isNumber {
+			continue
+		}
+		if _, isBool := n.Value.Bool(); !isBool {
+			v.addf(fmt.Sprintf("%s/in/%d", base, i), "must be a string, a number or a boolean")
 		}
 	}
 }
@@ -236,7 +297,7 @@ func (v *validator) pagination(base string, op Operation) {
 			v.addf(base+"/path", "NEXT_URL needs the path to the next URL")
 		}
 	}
-	if _, err := parsePath(pg.Path); pg.Path != "" && err != nil {
+	if err := checkPlainPath(pg.Path); pg.Path != "" && err != nil {
 		v.addf(base+"/path", "unsupported path: %v", err)
 	}
 	if pg.MaxPages < 0 {

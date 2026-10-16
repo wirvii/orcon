@@ -3,6 +3,8 @@
 
 package declarative
 
+import "github.com/wirvii/orcon/internal/platform/jsonvalue"
+
 // Format is the value of the "format" member of a declarative connector.
 const Format = "orcon/declarative@1"
 
@@ -12,6 +14,8 @@ type Definition struct {
 	Format     string               `json:"format"`
 	HTTP       HTTP                 `json:"http"`
 	Operations map[string]Operation `json:"operations"`
+	// Triggers are the declared triggers, keyed by name (ADR-0030 §8).
+	Triggers map[string]Trigger `json:"triggers,omitempty"`
 }
 
 // HTTP holds the defaults of every request (ADR-0030 §2) and the
@@ -87,13 +91,32 @@ type Request struct {
 	Body    *Body             `json:"body,omitempty"`
 }
 
-// Body is a JSON object or a form whose field values are templates. A value
-// that is exactly one placeholder keeps the parameter's JSON type.
+// Body is a JSON object or a form whose field values are templates. A JSON
+// field may be a nested object or array of templates; a value that is exactly
+// one placeholder keeps the parameter's JSON type. A FORM field must be a
+// string template.
 type Body struct {
 	// Type is JSON, FORM or RAW. A RAW body is the text of Raw, a template.
-	Type   string            `json:"type"`
-	Fields map[string]string `json:"fields,omitempty"`
-	Raw    string            `json:"raw,omitempty"`
+	Type   string          `json:"type"`
+	Fields map[string]Node `json:"fields,omitempty"`
+	Raw    string          `json:"raw,omitempty"`
+}
+
+// Node is one value of a body template: any JSON value whose strings may hold
+// placeholders. The value is read through jsonvalue, so this package never
+// imports encoding/json.
+type Node struct {
+	Value jsonvalue.Value
+}
+
+// UnmarshalJSON keeps the JSON value exactly as the document writes it.
+func (n *Node) UnmarshalJSON(data []byte) error {
+	v, err := jsonvalue.Parse(data)
+	if err != nil {
+		return err
+	}
+	n.Value = v
+	return nil
 }
 
 // ResponseSpec maps a response to items (ADR-0030 §5).
@@ -101,16 +124,34 @@ type ResponseSpec struct {
 	// Select is a path such as "$.data.items" to the array or object to emit.
 	// Empty means the whole body.
 	Select string `json:"select,omitempty"`
+	// Map adds members to every emitted item: each key names a JSON path read
+	// from the item (such as "$.messages[0].id"), and the provider's record is
+	// kept as it is. A key the record already has is replaced. A path that finds
+	// nothing adds nothing.
+	Map map[string]string `json:"map,omitempty"`
 	// Empty is NO_ITEMS (default) or ONE_EMPTY_ITEM, for an empty result.
 	Empty  string      `json:"empty,omitempty"`
 	Errors []ErrorRule `json:"errors,omitempty"`
 }
 
-// ErrorRule maps a response status to a class and a code (ADR-0030 §5).
+// ErrorRule maps a failed response to a class and a code (ADR-0030 §5). A rule
+// matches when every condition it names holds: the HTTP status is one of Status
+// (when Status is given) and the body member at Body.Path has one of Body.In
+// (when Body is given). Rules are tried in order and the first match wins.
 type ErrorRule struct {
-	Status []int  `json:"status"`
-	Class  string `json:"class"`
-	Code   string `json:"code,omitempty"`
+	Status []int `json:"status,omitempty"`
+	// Body matches a provider error code carried in the response body, such as
+	// the "error.code" member of the Graph API error envelope.
+	Body  *BodyMatch `json:"body,omitempty"`
+	Class string     `json:"class"`
+	Code  string     `json:"code,omitempty"`
+}
+
+// BodyMatch compares one member of a JSON response body with a list of
+// scalars. Numbers and strings match by their text, so 4 and "4" are the same.
+type BodyMatch struct {
+	Path string `json:"path"`
+	In   []Node `json:"in"`
 }
 
 // Pagination describes how read operations walk pages (ADR-0030 §6).

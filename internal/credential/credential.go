@@ -6,6 +6,7 @@ package credential
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/wirvii/orcon/internal/identity"
@@ -152,6 +153,17 @@ type Resolved struct {
 func (r Resolved) Secret(field string) (string, bool) {
 	v, ok := r.secret[field]
 	return v, ok
+}
+
+// SecretNames returns the names of the secret fields, sorted. A caller that needs every field of the credential reads
+// each one through [Resolved.Secret]; the values are never listed with their names.
+func (r Resolved) SecretNames() []string {
+	out := make([]string, 0, len(r.secret))
+	for name := range r.secret {
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // SecretValues returns every secret value, for the masking set of an execution. The caller must not store them.

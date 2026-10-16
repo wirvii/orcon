@@ -21,7 +21,6 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
 	"github.com/wirvii/orcon/internal/authz"
-	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
@@ -106,7 +105,7 @@ func runEchoFlow(t *testing.T, kind storetest.Kind, secret map[string]string, me
 		t.Fatalf("build the router: %v", err)
 	}
 	exec := postEvent(t, handler, "/hooks/engine/orders", `{"amount": 42}`, http.StatusAccepted)
-	waitExecution(t, env, st, exec, execution.ExecSucceeded)
+	waitExecution(t, env, st, exec)
 
 	scope := storetest.ScopeOf(env.Org)
 	var stored strings.Builder

@@ -36,7 +36,7 @@ func TestRawFormAndJSONBodies(t *testing.T) {
 		t.Fatalf("RAW body = %q, %v", req.Body, err)
 	}
 
-	form := Operation{Request: Request{Body: &Body{Type: "FORM", Fields: map[string]string{"who": "{{$parameter.name}}"}}}}
+	form := Operation{Request: Request{Body: &Body{Type: "FORM", Fields: map[string]Node{"who": {Value: jsonvalue.String("{{$parameter.name}}")}}}}}
 	req = HTTPRequest{Header: map[string][]string{}}
 	if err := in.addBody(form, params, &req); err != nil || string(req.Body) != "who=bob" {
 		t.Fatalf("FORM body = %q, %v", req.Body, err)
@@ -45,9 +45,9 @@ func TestRawFormAndJSONBodies(t *testing.T) {
 		t.Fatalf("FORM content type = %v", got)
 	}
 
-	obj := Operation{Request: Request{Body: &Body{Type: "JSON", Fields: map[string]string{
-		"count": "{{$parameter.n}}",
-		"label": "x {{$parameter.name}}",
+	obj := Operation{Request: Request{Body: &Body{Type: "JSON", Fields: map[string]Node{
+		"count": {Value: jsonvalue.String("{{$parameter.n}}")},
+		"label": {Value: jsonvalue.String("x {{$parameter.name}}")},
 	}}}}
 	req = HTTPRequest{Header: map[string][]string{}}
 	if err := in.addBody(obj, params, &req); err != nil {

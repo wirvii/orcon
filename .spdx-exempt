@@ -28,6 +28,7 @@ packages/js/ui/scripts/inventory.json  # generated component inventory; JSON has
 packages/js/ui/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/src/i18n/*.json  # translation catalogs; JSON has no comment syntax
 apps/web/perf/fixtures/*.json  # the reference flow of the editor performance test; JSON has no comment syntax
+internal/adapter/llm/*/testdata/*.json  # recorded provider answers replayed by the adapter tests; JSON has no comment syntax
 internal/adapter/codec/flowjson/schema/*.json  # JSON Schema; the licence is stated in its $comment member
 docs/reference/configuration.schema.json  # generated JSON Schema; the licence is stated in its $comment member
 internal/connector/schema/*.json  # JSON Schema; the licence is stated in its $comment member
@@ -78,3 +79,9 @@ internal/n8nimport/testdata/workflows/**/*.json  # n8n workflow exports: JSON ha
 # Brand icon rule fixtures (SPEC-019).
 internal/connector/authoring/testdata/placeholder-icons.txt  # digest list read by the icon rules; the format is not a source file
 internal/connector/authoring/testdata/whatsapp-simple-icons-16.35.0.svg  # third-party mark kept byte-faithful so its digest stays stable (CC0)
+internal/adapter/connectors/**/*.json  # connector package JSON (manifest, body, catalogs, authoring record); JSON has no comment syntax
+internal/adapter/connectors/**/LICENSE  # canonical license text of a connector package, must stay byte-identical
+internal/adapter/connectors/**/NOTICE  # attribution notice of a connector package, shipped verbatim
+examples/flows/*.json  # example flow documents for import; JSON has no comment syntax
+internal/adapter/connectors/whatsapp/icons/icon.svg  # WhatsApp mark from simple-icons 16.35.0 (CC0), kept byte-faithful as its source records
+internal/adapter/connectors/**/icons/SOURCE  # one-line record of where an icon comes from (orcon-connector IC-6); the format admits no header
