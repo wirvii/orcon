@@ -62,6 +62,17 @@ type Credential struct {
 	Fields map[string]string
 }
 
+// CredentialRequest asks for the credential one activation names.
+type CredentialRequest struct {
+	Org     identity.OrgID
+	Project identity.ProjectID
+	// ID is the credential the node names.
+	ID string
+	// Host is the host the request goes to; the resolver refuses a credential
+	// that is not allowed for it.
+	Host string
+}
+
 // Config are the ports and bounds of a dispatcher.
 type Config struct {
 	Journal journal.Store
@@ -72,9 +83,10 @@ type Config struct {
 	// SenderFor returns the network port of one destination: the egress
 	// adapter, bound to the policy that grants that host.
 	SenderFor func(u *url.URL) declarative.Sender
-	// Credential resolves the credential a node names. A nil function means no
-	// node can name a credential.
-	Credential func(ctx context.Context, org identity.OrgID, credentialID string) (Credential, error)
+	// Credential resolves the credential a node names, for the project of its
+	// execution and the host the request is sent to, on every activation (ADR-0043
+	// sections 3 and 4). A nil function means no node can name a credential.
+	Credential func(ctx context.Context, req CredentialRequest) (Credential, error)
 	// Bucket is the rate bucket of each credential and host.
 	Bucket     limit.Spec
 	IDs        id.Generator
@@ -243,7 +255,7 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 	if err != nil {
 		return execution.NodeOutput{}, err
 	}
-	cred, err := n.credential(ctx, call.Org, req.credential)
+	cred, err := n.credential(ctx, call, req)
 	if err != nil {
 		return execution.NodeOutput{}, err
 	}
@@ -273,14 +285,17 @@ func (n *HTTPNode) Execute(ctx context.Context, call execution.NodeCall) (execut
 	return execution.NodeOutput{Ports: []execution.PortBatch{{Port: flow.PortMain, Batch: execution.NewBatch(items...)}}}, nil
 }
 
-func (n *HTTPNode) credential(ctx context.Context, org identity.OrgID, name string) (Credential, error) {
+func (n *HTTPNode) credential(ctx context.Context, call execution.NodeCall, req request) (Credential, error) {
+	name := req.credential
 	if name == "" {
 		return Credential{Auth: declarative.Auth{Type: declarative.AuthNone}}, nil
 	}
 	if n.cfg.Credential == nil {
 		return Credential{}, errors.New("dispatch: no credential resolver is configured")
 	}
-	return n.cfg.Credential(ctx, org, name)
+	return n.cfg.Credential(ctx, CredentialRequest{
+		Org: call.Org, Project: call.Project, ID: name, Host: req.target.Hostname(),
+	})
 }
 
 func bucketKeyOf(credential, host string) string {

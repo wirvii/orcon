@@ -109,7 +109,7 @@ func (e *Engine) Start(ctx context.Context, r StartRequest) (store.ExecutionID, 
 	if err != nil {
 		return store.ExecutionID{}, fmt.Errorf("start execution: %w", err)
 	}
-	sess, err := e.interp.NewSession(ctx, plan, execution.Request{Org: r.OrgID, Execution: executionText(execID), Start: r.Start, Input: r.Input})
+	sess, err := e.interp.NewSession(ctx, plan, execution.Request{Org: r.OrgID, Project: r.ProjectID, Execution: executionText(execID), Start: r.Start, Input: r.Input})
 	if err != nil {
 		return store.ExecutionID{}, fmt.Errorf("start execution: %w", err)
 	}

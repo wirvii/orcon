@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,8 +18,11 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/connector/declarative"
 	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
+	"github.com/wirvii/orcon/internal/credential"
+	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -38,7 +42,18 @@ import (
 func TestWebhookRunsIfThenHTTPToSucceeded(t *testing.T) {
 	for _, kind := range e2eKinds() {
 		t.Run(string(kind), func(t *testing.T) {
-			runWebhookFlow(t, kind)
+			runWebhookFlow(t, kind, false)
+		})
+	}
+}
+
+// TestWebhookCallsWithAStoredCredential runs the same flow with the credential in the credential store: the
+// HTTP node resolves it through the credential service for the project of the execution, and the request
+// carries its secret.
+func TestWebhookCallsWithAStoredCredential(t *testing.T) {
+	for _, kind := range e2eKinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			runWebhookFlow(t, kind, true)
 		})
 	}
 }
@@ -52,7 +67,7 @@ func e2eKinds() []storetest.Kind {
 	return []storetest.Kind{storetest.SQLite}
 }
 
-func runWebhookFlow(t *testing.T, kind storetest.Kind) {
+func runWebhookFlow(t *testing.T, kind storetest.Kind, stored bool) {
 	t.Helper()
 	ctx := t.Context()
 	env := storetest.NewEngineEnv(t, kind, storetest.EngineOptions{})
@@ -65,13 +80,19 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 	srv := httptest.NewServer(provider)
 	t.Cleanup(srv.Close)
 
-	eng, err := newEngine(st, engineOptions{
+	opts := engineOptions{
 		role: config.RoleStandalone, logger: slog.New(slog.DiscardHandler), version: "test",
 		senderPolicy: func(u *url.URL) egress.Policy {
 			return egress.Policy{Domains: []string{u.Hostname()}, Schemes: []string{"http"}, AllowPrivateNetworks: true}
 		},
 		credentials: testCredentials,
-	})
+	}
+	credentialRef := "mock"
+	if stored {
+		svc, ref := storedCredential(t, env, srv.URL)
+		opts.credentials, opts.resolver, credentialRef = nil, svc, ref
+	}
+	eng, err := newEngine(st, opts)
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
@@ -85,7 +106,7 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 		}
 	})
 
-	publishWebhookFlow(t, env, eng, srv.URL)
+	publishWebhookFlow(t, env, eng, srv.URL, credentialRef)
 
 	handler, err := newAPIRouterWith(config.RoleStandalone, slog.New(slog.DiscardHandler), nil, eng.ingress())
 	if err != nil {
@@ -116,8 +137,8 @@ func runWebhookFlow(t *testing.T, kind storetest.Kind) {
 
 // testCredentials resolves the one credential the test flow names: a bearer
 // token the mock provider accepts.
-func testCredentials(_ context.Context, _ identity.OrgID, credentialID string) (httpdispatch.Credential, error) {
-	if credentialID != "mock" {
+func testCredentials(_ context.Context, req httpdispatch.CredentialRequest) (httpdispatch.Credential, error) {
+	if req.ID != "mock" {
 		return httpdispatch.Credential{}, errors.New("unknown test credential")
 	}
 	return httpdispatch.Credential{
@@ -128,13 +149,13 @@ func testCredentials(_ context.Context, _ identity.OrgID, credentialID string) (
 
 // publishWebhookFlow stores a draft, publishes it and activates it, through the
 // trigger service the process runs.
-func publishWebhookFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, providerURL string) {
+func publishWebhookFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, providerURL, credentialRef string) {
 	t.Helper()
 	ctx := t.Context()
 	extra := []string{
 		`{"id":"check","name":"Check","element":"exclusiveGateway","type":"orcon.if@1","routing":"EXCLUSIVE","sensitivePaths":["/amount"],"parameters":{"condition":"={{ $json.amount > 10 }}"}}`,
-		fmt.Sprintf(`{"id":"call","name":"Call","element":"serviceTask","type":"orcon.http@1","parameters":{"method":"GET","url":%q,"credential":"mock"}}`,
-			providerURL+"/v1/items?offset=0&limit=2"),
+		fmt.Sprintf(`{"id":"call","name":"Call","element":"serviceTask","type":"orcon.http@1","parameters":{"method":"GET","url":%q,"credential":%q}}`,
+			providerURL+"/v1/items?offset=0&limit=2", credentialRef),
 	}
 	extraEdges := []string{
 		`{"id":"e-true","from":{"node":"check","port":"true"},"to":{"node":"call"},"kind":"SEQUENCE"}`,
@@ -210,4 +231,89 @@ func waitExecution(t *testing.T, env *storetest.EngineEnv, st engineStore, exec 
 		t.Logf("event %s", events[i].Type)
 	}
 	t.Fatalf("execution %s stayed in %q, want %s", exec, last, want)
+}
+
+// storedCredential keeps the mock provider's bearer token in the credential store of env, bound to the host of
+// the provider, and returns the service and the identifier the flow names.
+func storedCredential(t *testing.T, env *storetest.EngineEnv, providerURL string) (*credential.Service, string) {
+	t.Helper()
+	ctx := t.Context()
+	u, err := url.Parse(providerURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, ok := env.Store.(interface {
+		credential.Store
+		envelope.KeyStore
+		CreatePrincipal(context.Context, identity.PrincipalRecord) error
+	})
+	if !ok {
+		t.Fatalf("the %s store does not implement the credential store", env.Kind)
+	}
+	kr := envelope.NewKeyring(envelope.NewLocalMasterKey("file", "e2e-master", mustMasterKey(t)), keys)
+	if err := kr.InitMasterCanary(ctx); err != nil {
+		t.Fatalf("master canary: %v", err)
+	}
+	if _, err := kr.CreateKey(ctx, envelope.OrgScope(env.Org)); err != nil {
+		t.Fatalf("organization key: %v", err)
+	}
+	svc, err := credential.New(credential.Config{Store: keys, Keys: kr, Clock: env.Clock, IDs: env.IDs})
+	if err != nil {
+		t.Fatalf("credential service: %v", err)
+	}
+	now := env.Clock.Now()
+	owner := identity.PrincipalID(env.IDs.New())
+	if err := keys.CreatePrincipal(ctx, identity.PrincipalRecord{ID: owner, Kind: identity.PrincipalUser, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("credential owner: %v", err)
+	}
+	created, err := svc.Create(ctx, storetest.ScopeOf(env.Org), env.Project, credential.Input{
+		Name: "Mock provider", ConnectorReference: "http", AllowedHosts: []string{u.Hostname()},
+		Secret: map[string]string{"token": mockprovider.Token},
+	}, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser})
+	if err != nil {
+		t.Fatalf("create the credential: %v", err)
+	}
+	return svc, created.ID.String()
+}
+
+// mustMasterKey returns a fresh master key for the test keyring.
+func mustMasterKey(t *testing.T) envelope.Key {
+	t.Helper()
+	key, err := envelope.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("master key: %v", err)
+	}
+	return key
+}
+
+// TestResolveCredentialsBindsTheHost: the credential resolves for the host it is bound to and for no other.
+func TestResolveCredentialsBindsTheHost(t *testing.T) {
+	for _, kind := range e2eKinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			env := storetest.NewEngineEnv(t, kind, storetest.EngineOptions{})
+			svc, ref := storedCredential(t, env, "http://provider.example.com")
+			st, ok := env.Store.(engineStore)
+			if !ok {
+				t.Fatalf("the %s store does not implement the engine store", kind)
+			}
+			resolve := resolveCredentials(svc, st)
+			req := httpdispatch.CredentialRequest{Org: env.Org, Project: env.Project, ID: ref, Host: "provider.example.com"}
+			got, err := resolve(t.Context(), req)
+			if err != nil || got.Auth.Type != declarative.AuthBearer || got.Fields["token"] != mockprovider.Token {
+				t.Fatalf("bound host: %+v, %v; want a bearer credential", got.Auth, err)
+			}
+			req.Host = "evil.example.net"
+			if _, err := resolve(t.Context(), req); !errors.Is(err, credential.ErrHostNotAllowed) {
+				t.Fatalf("other host: %v; want ErrHostNotAllowed", err)
+			}
+			req.Host, req.Project = "provider.example.com", identity.ProjectID(env.IDs.New())
+			if _, err := resolve(t.Context(), req); !errors.Is(err, credential.ErrNotUsable) {
+				t.Fatalf("project without a share: %v; want ErrNotUsable", err)
+			}
+			req.Project, req.ID = env.Project, "not-an-id"
+			if _, err := resolve(t.Context(), req); !errors.Is(err, credential.ErrNotFound) {
+				t.Fatalf("malformed id: %v; want ErrNotFound", err)
+			}
+		})
+	}
 }

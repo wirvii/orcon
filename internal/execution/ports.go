@@ -72,6 +72,7 @@ type ItemRouter interface {
 // NodeCall is what a [NodeRunner] receives for one activation.
 type NodeCall struct {
 	Org           identity.OrgID
+	Project       identity.ProjectID
 	Execution     ID
 	Token         TokenID
 	NodeExecution NodeExecutionID

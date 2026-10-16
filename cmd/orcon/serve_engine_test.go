@@ -20,6 +20,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/sqlite"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/expr"
@@ -133,7 +134,7 @@ func publishOnDisk(t *testing.T, dbPath, providerURL string) (identity.OrgID, id
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
 	}
-	publishWebhookFlow(t, env, eng, providerURL)
+	publishWebhookFlow(t, env, eng, providerURL, "mock")
 	if err := st.Close(); err != nil {
 		t.Fatalf("close the database: %v", err)
 	}
@@ -142,7 +143,7 @@ func publishOnDisk(t *testing.T, dbPath, providerURL string) (identity.OrgID, id
 
 // loopbackEngine is the engine opener of the test: the production opener with a
 // network policy that admits the loopback provider and the test credentials.
-func loopbackEngine(st engineStore, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
+func loopbackEngine(st engineStore, _ credential.Resolver, cfg *config.Config, sandbox expr.Sandbox, logger *slog.Logger) (*engine, error) {
 	return newEngine(st, engineOptions{
 		role: cfg.Role(), logger: logger, version: "test", sandbox: sandbox,
 		senderPolicy: loopbackPolicy, credentials: testCredentials,
