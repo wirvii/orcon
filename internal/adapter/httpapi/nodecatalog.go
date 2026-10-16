@@ -252,7 +252,7 @@ type builtinOperation struct {
 }
 
 // builtins are the node types of the flow engine: the format's control nodes, the data nodes and
-// the HTTP node (SPEC-003 Annex B). The HTTP node reads with GET and HEAD and writes with every
+// the HTTP node (SPEC-003 Annex B) and the AI model and agent nodes (SPEC-006). The HTTP node reads with GET and HEAD and writes with every
 // other method, which stays UNSAFE without an idempotency key.
 var builtins = []builtin{
 	{
@@ -266,6 +266,24 @@ var builtins = []builtin{
 			{"request.read", map[string]string{LocaleEnglish: "Read (GET, HEAD)", LocaleSpanish: "Leer (GET, HEAD)"}, flow.PurityRead, apigen.NONE},
 			{"request.write", map[string]string{LocaleEnglish: "Write (other methods)", LocaleSpanish: "Escribir (otros métodos)"}, flow.PurityEffect, apigen.UNSAFE},
 		},
+	},
+	{
+		typ: "orcon.ai.llm@1", group: groupApps,
+		name: map[string]string{LocaleEnglish: "AI model", LocaleSpanish: "Modelo de IA"},
+		desc: map[string]string{
+			LocaleEnglish: "Sends each item to an AI model and returns its text or a checked JSON answer.",
+			LocaleSpanish: "Envía cada elemento a un modelo de IA y devuelve su texto o una respuesta JSON validada.",
+		},
+		operations: []builtinOperation{{"model.generate", map[string]string{LocaleEnglish: "Generate an answer", LocaleSpanish: "Generar una respuesta"}, flow.PurityRead, apigen.NONE}},
+	},
+	{
+		typ: "orcon.ai.agent@1", group: groupApps,
+		name: map[string]string{LocaleEnglish: "AI agent", LocaleSpanish: "Agente de IA"},
+		desc: map[string]string{
+			LocaleEnglish: "Lets an AI model decide steps and call tools, with memory and a spending limit, until it has an answer.",
+			LocaleSpanish: "Deja que un modelo de IA decida pasos y llame herramientas, con memoria y un límite de gasto, hasta tener una respuesta.",
+		},
+		operations: []builtinOperation{{"agent.run", map[string]string{LocaleEnglish: "Run the agent", LocaleSpanish: "Ejecutar el agente"}, flow.PurityAgentic, apigen.NONE}},
 	},
 	{
 		typ: "orcon.if@1", group: groupFlow,

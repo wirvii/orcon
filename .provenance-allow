@@ -23,6 +23,9 @@ docs/reference/connectors/ai/**  # reference pages of AI connectors
 test/mockllm/**  # mock model provider used by tests (SPEC-006 21.3)
 docs/design-system/mockups/ux-2026-10/index.html  # approved UX mockup: the model-provider credential and AI step of the product (SPEC-006, SPEC-019)
 docs/design-system/mockups/ux-2026-10/DECISIONS.md  # design decisions of the same mockup: the model-provider credential example (SPEC-019)
+cmd/orcon/wire_agent.go  # wiring of the model provider adapters of the agent node (SPEC-006)
+cmd/orcon/whatsapp_agent_e2e_test.go  # end-to-end test of the agent flow with a scripted model (SPEC-006)
+examples/flows/whatsapp-agent.json  # example flow whose model node names its provider (SPEC-006)
 
 # Not a product AI feature: the only non-product entry. This file holds the
 # line-ending block that mneme writes for the tool configuration directories,
