@@ -20,12 +20,12 @@ import (
 func (s *Store) ListProjectExecutions(ctx context.Context, org orgscope.Org, project identity.ProjectID, query store.ExecutionQuery, cursor store.Cursor, limit int) ([]store.Execution, error) {
 	var out []store.Execution
 	err := s.readOf(ctx, "list project executions", org, func(ctx context.Context, q *sqlcgen.Queries) error {
-		var rows []sqlcgen.ListProjectExecutionsRow
+		var rows []sqlcgen.ListOrgProjectExecutionsRow
 		var err error
 		if query.OldestFirst {
 			afterAt, afterID := afterCursor(cursor)
-			var oldest []sqlcgen.ListProjectExecutionsOldestRow
-			oldest, err = q.ListProjectExecutionsOldest(ctx, sqlcgen.ListProjectExecutionsOldestParams{
+			var oldest []sqlcgen.ListOrgProjectExecutionsOldestRow
+			oldest, err = q.ListOrgProjectExecutionsOldest(ctx, sqlcgen.ListOrgProjectExecutionsOldestParams{
 				OrgID: uuidBytes(org.UUID()), ProjectID: uuidBytes(project),
 				FlowID: nullUUIDBytes(query.FlowID), Status: sql.NullString{String: query.Status, Valid: query.Status != ""},
 				ExecutionID:    nullUUIDBytes(query.ID),
@@ -35,11 +35,11 @@ func (s *Store) ListProjectExecutions(ctx context.Context, org orgscope.Org, pro
 				AfterCreatedAt: afterAt, AfterID: afterID, PageSize: clampPage(limit),
 			})
 			for i := range oldest {
-				rows = append(rows, sqlcgen.ListProjectExecutionsRow(oldest[i]))
+				rows = append(rows, sqlcgen.ListOrgProjectExecutionsRow(oldest[i]))
 			}
 		} else {
 			beforeAt, beforeID := beforeCursor(cursor)
-			rows, err = q.ListProjectExecutions(ctx, sqlcgen.ListProjectExecutionsParams{
+			rows, err = q.ListOrgProjectExecutions(ctx, sqlcgen.ListOrgProjectExecutionsParams{
 				OrgID: uuidBytes(org.UUID()), ProjectID: uuidBytes(project),
 				FlowID: nullUUIDBytes(query.FlowID), Status: sql.NullString{String: query.Status, Valid: query.Status != ""},
 				ExecutionID:     nullUUIDBytes(query.ID),

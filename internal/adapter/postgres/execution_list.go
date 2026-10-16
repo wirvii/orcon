@@ -21,7 +21,7 @@ func (s *Store) ListProjectExecutions(ctx context.Context, org orgscope.Org, pro
 	err := s.inScope(ctx, "list project executions", org, true, func(ctx context.Context, q *sqlcgen.Queries) error {
 		if query.OldestFirst {
 			afterAt, afterID := afterCursor(cursor)
-			rows, err := q.ListProjectExecutionsOldest(ctx, sqlcgen.ListProjectExecutionsOldestParams{
+			rows, err := q.ListOrgProjectExecutionsOldest(ctx, sqlcgen.ListOrgProjectExecutionsOldestParams{
 				OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(project),
 				FlowID: nullPGUUID(query.FlowID), Status: nullText(query.Status),
 				ExecutionID:    nullPGUUID(query.ID),
@@ -40,7 +40,7 @@ func (s *Store) ListProjectExecutions(ctx context.Context, org orgscope.Org, pro
 			return nil
 		}
 		beforeAt, beforeID := beforeCursor(cursor)
-		rows, err := q.ListProjectExecutions(ctx, sqlcgen.ListProjectExecutionsParams{
+		rows, err := q.ListOrgProjectExecutions(ctx, sqlcgen.ListOrgProjectExecutionsParams{
 			OrgID: pgUUID(org.UUID()), ProjectID: pgUUID(project),
 			FlowID: nullPGUUID(query.FlowID), Status: nullText(query.Status),
 			ExecutionID:     nullPGUUID(query.ID),

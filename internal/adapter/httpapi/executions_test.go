@@ -4,6 +4,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/httpapi/page"
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/authz"
+	"github.com/wirvii/orcon/internal/connector"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
@@ -39,6 +41,7 @@ type fakeExecutionStore struct {
 	nodes      []store.NodeExecution
 	outputs    []store.NodeOutputRecord
 	events     []store.Event
+	listCalls  int
 }
 
 func (f *fakeExecutionStore) mine(org orgscope.Org) bool { return f.org == identity.OrgIDOf(org) }
@@ -59,15 +62,31 @@ func (f *fakeExecutionStore) ListExecutions(_ context.Context, org orgscope.Org,
 	if !f.mine(org) {
 		return out, nil
 	}
+	f.listCalls++
 	rows := slices.Clone(f.executions)
-	slices.SortFunc(rows, func(a, b store.Execution) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	slices.SortFunc(rows, func(a, b store.Execution) int {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		return bytes.Compare(b.ID[:], a.ID[:])
+	})
+	if filter.Oldest {
+		slices.Reverse(rows)
+	}
 	for i := range rows {
 		e := rows[i]
-		if e.ProjectID != filter.ProjectID {
+		switch {
+		case e.ProjectID != filter.ProjectID,
+			!filter.FlowID.IsZero() && e.FlowID != filter.FlowID,
+			filter.Status != "" && e.Status != filter.Status,
+			!filter.CreatedAfter.IsZero() && !e.CreatedAt.After(filter.CreatedAfter),
+			!filter.CreatedBefore.IsZero() && !e.CreatedAt.Before(filter.CreatedBefore):
 			continue
 		}
-		if !after.IsZero() && !e.CreatedAt.Before(after.CreatedAt) {
-			continue
+		if !after.IsZero() {
+			if filter.Oldest && !e.CreatedAt.After(after.CreatedAt) || !filter.Oldest && !e.CreatedAt.Before(after.CreatedAt) {
+				continue
+			}
 		}
 		out = append(out, e)
 		if len(out) == limit {
@@ -131,6 +150,8 @@ func (f fakeRevisions) GetSnapshot(context.Context, orgscope.Org, flow.FlowSnaps
 // fakeDocs reads the marks the test wants, whatever the bytes.
 type fakeDocs struct {
 	marks map[string][]string
+	// nodes are nodes the document holds besides the marked ones, such as nodes of a connector.
+	nodes []flow.Node
 	err   error
 }
 
@@ -142,7 +163,25 @@ func (f fakeDocs) Read([]byte) (*flow.Document, error) {
 	for node, paths := range f.marks {
 		doc.Nodes = append(doc.Nodes, flow.Node{ID: flow.NodeID(node), SensitivePaths: paths})
 	}
+	doc.Nodes = append(doc.Nodes, f.nodes...)
 	return &doc, nil
+}
+
+// fakePackages holds the installed connector packages of a test.
+type fakePackages struct {
+	records map[string]connector.PackageRecord
+	err     error
+}
+
+func (f *fakePackages) GetPackage(_ context.Context, connectorID, version string) (connector.PackageRecord, error) {
+	if f.err != nil {
+		return connector.PackageRecord{}, f.err
+	}
+	rec, ok := f.records[connectorID+"@"+version]
+	if !ok {
+		return connector.PackageRecord{}, connector.ErrNotFound
+	}
+	return rec, nil
 }
 
 // readDecider allows or denies the read-data permission of the test.
@@ -172,6 +211,7 @@ type executionsRig struct {
 	t      *testing.T
 	h      *Executions
 	st     *fakeExecutionStore
+	pkgs   *fakePackages
 	log    *auditRecorder
 	ctx    context.Context //nolint:containedctx // the rig carries the request context of every call it makes
 	other  context.Context //nolint:containedctx // the context of a request authorized in another organization
@@ -202,11 +242,11 @@ func newExecutionsRig(t *testing.T, docs fakeDocs, allowData bool) *executionsRi
 		return authz.WithOrgScope(middleware.WithPrincipal(t.Context(), principal), s)
 	}
 	r := &executionsRig{
-		t: t, st: &fakeExecutionStore{org: org}, log: &auditRecorder{}, ctx: scope(org), other: scope(otherOrg),
+		t: t, st: &fakeExecutionStore{org: org}, pkgs: &fakePackages{records: map[string]connector.PackageRecord{}}, log: &auditRecorder{}, ctx: scope(org), other: scope(otherOrg),
 		org: org, flowID: flow.FlowID(ids.New()), proj: identity.ProjectID(ids.New()), ids: ids,
 	}
 	r.exec = store.ExecutionID(ids.New())
-	r.h = NewExecutions(r.st, fakeRevisions{doc: []byte("{}")}, docs, readDecider{allowData: allowData}, r.log, clock.NewFake(executionsBase), ids, codec)
+	r.h = NewExecutions(r.st, fakeRevisions{doc: []byte("{}")}, docs, r.pkgs, readDecider{allowData: allowData}, r.log, clock.NewFake(executionsBase), ids, codec)
 	return r
 }
 
@@ -290,6 +330,67 @@ func TestListExecutionsFiltersSortsAndPages(t *testing.T) {
 	}
 	if first := answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body.Items[0]; !first.CreatedAt.Equal(executionsBase) {
 		t.Fatalf("oldest first: %v", first.CreatedAt)
+	}
+}
+
+// TestListExecutionsReachesTheOldestMatchingExecutions: the filters and the page position are applied
+// by the store, so an execution older than the newest thousand of the project is reachable, a page is
+// read with one store call, and the token of the last row continues the list.
+func TestListExecutionsReachesTheOldestMatchingExecutions(t *testing.T) {
+	r := newExecutionsRig(t, fakeDocs{}, true)
+	otherFlow := flow.FlowID(r.ids.New())
+	var oldFailed store.Execution
+	for i := range 1205 {
+		r.addExecution(i, "SUCCEEDED")
+		if i == 3 {
+			e := r.addExecution(i, "FAILED")
+			e.FlowID = otherFlow
+			r.st.executions[len(r.st.executions)-1] = e
+			oldFailed = e
+		}
+	}
+	failed := apigen.ListExecutionsParamsStatus("FAILED")
+	resp, err := r.h.ListExecutions(r.ctx, apigen.ListExecutionsRequestObject{ProjectId: types.UUID(r.proj), Params: apigen.ListExecutionsParams{Status: &failed}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body
+	if len(body.Items) != 1 || *body.Items[0].Id != types.UUID(oldFailed.ID) || body.NextPageToken != nil {
+		t.Fatalf("failed executions = %+v", body)
+	}
+
+	// Filters combine: the flow and a creation window.
+	flowID := types.UUID(otherFlow)
+	after := executionsBase.Add(2 * time.Minute)
+	before := executionsBase.Add(4 * time.Minute)
+	resp, err = r.h.ListExecutions(r.ctx, apigen.ListExecutionsRequestObject{ProjectId: types.UUID(r.proj), Params: apigen.ListExecutionsParams{FlowId: &flowID, CreatedAfter: &after, CreatedBefore: &before}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body.Items); n != 1 {
+		t.Fatalf("flow and window matched %d executions, want 1", n)
+	}
+
+	// A page costs one read of limit+1 rows and its token continues after the last row shown.
+	limit := 100
+	req := apigen.ListExecutionsRequestObject{ProjectId: types.UUID(r.proj), Params: apigen.ListExecutionsParams{Limit: &limit}}
+	r.st.listCalls = 0
+	resp, err = r.h.ListExecutions(r.ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body
+	if r.st.listCalls != 1 || len(first.Items) != limit || first.NextPageToken == nil {
+		t.Fatalf("calls = %d, items = %d, token = %v", r.st.listCalls, len(first.Items), first.NextPageToken)
+	}
+	req.Params.PageToken = first.NextPageToken
+	resp, err = r.h.ListExecutions(r.ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := answerOf[apigen.ListExecutions200JSONResponse](t, resp).Body
+	if len(second.Items) != limit || !second.Items[0].CreatedAt.Before(first.Items[limit-1].CreatedAt) {
+		t.Fatalf("second page starts at %v after %v", second.Items[0].CreatedAt, first.Items[limit-1].CreatedAt)
 	}
 }
 
@@ -514,6 +615,112 @@ func TestListExecutionDataMasksAuditsAndFailsClosed(t *testing.T) {
 	broken.st.outputs = r.st.outputs
 	if resp, err := broken.h.ListExecutionData(broken.ctx, apigen.ListExecutionDataRequestObject{ExecutionId: types.UUID(be.ID)}); err == nil {
 		t.Fatalf("data served without its marks: %+v", resp)
+	}
+}
+
+// shopManifest is an installed connector whose node declares /customer/email and /card/*/number as
+// sensitive.
+const shopManifest = `{
+  "format": "orcon/connector@1", "id": "acme.shop", "version": "1.2.0", "kind": "DECLARATIVE",
+  "displayName": "Acme Shop", "description": "Orders of the Acme Shop service.",
+  "publisher": { "name": "Acme", "url": "https://acme.example.com", "contact": "support@acme.example.com" },
+  "license": "Apache-2.0",
+  "source": { "repository": "https://github.com/acme/orcon-shop", "commit": "0123456789abcdef0123456789abcdef01234567" },
+  "compat": { "engineApi": ">=1.0.0 <2.0.0" },
+  "nodes": [{
+    "name": "order", "type": "acme.shop.order@1", "displayName": "Order", "group": "ACTION",
+    "operations": [{ "name": "order.get", "displayName": "Get an order", "purity": "READ", "itemMode": "PER_ITEM", "rateLimit": "api" }],
+    "parameters": { "orderId": { "type": "STRING", "required": true } },
+    "outputs": ["main"],
+    "sensitiveFields": ["/customer/email", "/card/*/number"]
+  }],
+  "permissions": {
+    "network": { "domains": ["api.shop.example.com"], "schemes": ["https"] },
+    "resources": { "memoryMiB": 64, "timeout": "PT30S", "maxConcurrent": 4 }
+  },
+  "rateLimits": [{ "name": "api", "key": "CREDENTIAL", "requestsPerSecond": 10, "burst": 20 }],
+  "changelog": [{ "version": "1.2.0", "date": "2026-10-01", "notes": ["changelog.1_2_0.orders"] }]
+}`
+
+const shopDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+
+// shopNode is a node of the shop connector that also marks /token as sensitive itself.
+func shopNode(digest string) flow.Node {
+	return flow.Node{
+		ID: "shop", Type: "acme.shop.order@1", SensitivePaths: []string{"/token"},
+		Connector: &flow.ConnectorPin{Version: "1.2.0", Digest: digest},
+	}
+}
+
+// TestListExecutionDataMasksFieldsTheConnectorDeclares: the sensitive fields of the manifest of the
+// pinned connector version are masked together with the ones the node marks, and when that
+// manifest cannot be trusted the data is not served.
+func TestListExecutionDataMasksFieldsTheConnectorDeclares(t *testing.T) {
+	read := func(t *testing.T, r *executionsRig) (string, error) {
+		t.Helper()
+		e := r.addExecution(1, "SUCCEEDED")
+		r.st.outputs = append(r.st.outputs, store.NodeOutputRecord{
+			ID: store.PayloadID{1}, NodeExecutionID: store.NodeExecutionID{1}, NodeID: "shop", Port: "main", ItemCount: 1,
+			Document:  batchDoc(t, `{"token":"tok-1","customer":{"email":"ana@example.com","name":"Ana"},"card":[{"number":"4111"}]}`),
+			CreatedAt: executionsBase,
+		})
+		resp, err := r.h.ListExecutionData(r.ctx, apigen.ListExecutionDataRequestObject{ExecutionId: types.UUID(e.ID)})
+		if err != nil {
+			return "", err
+		}
+		raw, err := json.Marshal(answerOf[apigen.ListExecutionData200JSONResponse](t, resp).Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw), nil
+	}
+	installed := func(r *executionsRig, manifest string) {
+		r.pkgs.records["acme.shop@1.2.0"] = connector.PackageRecord{ConnectorID: "acme.shop", Version: "1.2.0", Digest: shopDigest, Manifest: []byte(manifest)}
+	}
+
+	t.Run("declared and node fields are masked", func(t *testing.T) {
+		r := newExecutionsRig(t, fakeDocs{nodes: []flow.Node{shopNode(shopDigest)}}, true)
+		installed(r, shopManifest)
+		text, err := read(t, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, leaked := range []string{"tok-1", "ana@example.com", "4111"} {
+			if strings.Contains(text, leaked) {
+				t.Fatalf("%q leaked: %s", leaked, text)
+			}
+		}
+		if !strings.Contains(text, `"name":"Ana"`) || strings.Count(text, execution.Redacted) != 3 {
+			t.Fatalf("data = %s", text)
+		}
+	})
+
+	failures := map[string]func(*executionsRig){
+		"package not installed": func(*executionsRig) {},
+		"package unreadable":    func(r *executionsRig) { r.pkgs.err = errors.New("store down") },
+		"manifest invalid":      func(r *executionsRig) { installed(r, `{"format":"orcon/connector@1"}`) },
+		"not the pinned digest": func(r *executionsRig) {
+			installed(r, shopManifest)
+			rec := r.pkgs.records["acme.shop@1.2.0"]
+			rec.Digest = "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+			r.pkgs.records["acme.shop@1.2.0"] = rec
+		},
+		"node type not declared": func(r *executionsRig) {
+			installed(r, strings.Replace(shopManifest, `"type": "acme.shop.order@1"`, `"type": "acme.shop.invoice@1"`, 1))
+		},
+	}
+	for name, setup := range failures {
+		t.Run(name, func(t *testing.T) {
+			r := newExecutionsRig(t, fakeDocs{nodes: []flow.Node{shopNode(shopDigest)}}, true)
+			setup(r)
+			text, err := read(t, r)
+			if err == nil {
+				t.Fatalf("data served without the declared marks: %s", text)
+			}
+			if len(r.log.entries) != 0 {
+				t.Fatalf("a refused read was audited: %d entries", len(r.log.entries))
+			}
+		})
 	}
 }
 

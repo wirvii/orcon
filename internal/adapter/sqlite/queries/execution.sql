@@ -26,20 +26,6 @@ SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, statu
 FROM execution AS e
 WHERE e.org_id = sqlc.arg(org_id) AND e.id = sqlc.arg(id);
 
--- name: ListExecutions :many
--- orcon:scope org
--- orcon:hot
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at,
-       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
-       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
-FROM execution AS e
-WHERE e.org_id = sqlc.arg(org_id) AND e.project_id = sqlc.arg(project_id)
-  AND (e.created_at, e.id) < (sqlc.arg(before_created_at), CAST(sqlc.arg(before_id) AS BLOB))
-ORDER BY e.created_at DESC, e.id DESC
-LIMIT sqlc.arg(page_size);
-
 -- name: ListFlowExecutions :many
 -- orcon:scope org
 -- orcon:hot
@@ -68,7 +54,7 @@ WHERE e.org_id = sqlc.arg(org_id) AND e.status = sqlc.arg(status)
 ORDER BY e.created_at DESC, e.id DESC
 LIMIT sqlc.arg(page_size);
 
--- name: ListProjectExecutions :many
+-- name: ListOrgProjectExecutions :many
 -- orcon:scope org
 -- orcon:hot
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
@@ -89,7 +75,7 @@ ORDER BY e.created_at DESC, e.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- The same list oldest first, after the cursor.
--- name: ListProjectExecutionsOldest :many
+-- name: ListOrgProjectExecutionsOldest :many
 -- orcon:scope org
 -- orcon:hot
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
@@ -105,6 +91,40 @@ WHERE e.org_id = sqlc.arg(org_id) AND e.project_id = sqlc.arg(project_id)
   AND (CAST(sqlc.narg(created_after) AS INTEGER) IS NULL OR e.created_at >= CAST(sqlc.narg(created_after) AS INTEGER))
   AND (CAST(sqlc.narg(created_before) AS INTEGER) IS NULL OR e.created_at < CAST(sqlc.narg(created_before) AS INTEGER))
   AND (CAST(sqlc.arg(uncertain_only) AS INTEGER) = 0 OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) > (sqlc.arg(after_created_at), CAST(sqlc.arg(after_id) AS BLOB))
+ORDER BY e.created_at ASC, e.id ASC
+LIMIT sqlc.arg(page_size);
+
+-- name: ListProjectExecutions :many
+-- orcon:scope org
+-- orcon:hot
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
+       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = sqlc.arg(org_id) AND e.project_id = sqlc.arg(project_id)
+  AND (sqlc.arg(any_flow) = 1 OR e.flow_id = sqlc.arg(flow_id))
+  AND (sqlc.arg(any_status) = 1 OR e.status = sqlc.arg(status))
+  AND e.created_at > sqlc.arg(created_after) AND e.created_at < sqlc.arg(created_before)
+  AND (e.created_at, e.id) < (sqlc.arg(before_created_at), CAST(sqlc.arg(before_id) AS BLOB))
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT sqlc.arg(page_size);
+
+-- name: ListProjectExecutionsAsc :many
+-- orcon:scope org
+-- orcon:hot
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
+       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = sqlc.arg(org_id) AND e.project_id = sqlc.arg(project_id)
+  AND (sqlc.arg(any_flow) = 1 OR e.flow_id = sqlc.arg(flow_id))
+  AND (sqlc.arg(any_status) = 1 OR e.status = sqlc.arg(status))
+  AND e.created_at > sqlc.arg(created_after) AND e.created_at < sqlc.arg(created_before)
   AND (e.created_at, e.id) > (sqlc.arg(after_created_at), CAST(sqlc.arg(after_id) AS BLOB))
 ORDER BY e.created_at ASC, e.id ASC
 LIMIT sqlc.arg(page_size);

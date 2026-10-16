@@ -190,3 +190,13 @@ type SnapshotStore interface {
 	// GetSnapshot returns a snapshot by identity, or [ErrSnapshotNotFound].
 	GetSnapshot(ctx context.Context, org orgscope.Org, snapshot FlowSnapshotID) (SnapshotRecord, error)
 }
+
+// DraftStore is what the draft service needs of the storage: the flow and the atomic save of a
+// draft with its audit entry.
+type DraftStore interface {
+	// GetFlow returns a non-deleted flow, or [ErrNotFound].
+	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
+	// UpdateFlowDraftWithEntry is [Store.UpdateFlowDraft] with the audit entry of the change in the
+	// same transaction (SPEC-004 R-AUD-02): a conflict or a missing flow writes neither.
+	UpdateFlowDraftWithEntry(ctx context.Context, org orgscope.Org, flow FlowID, draft []byte, expectedRevision int64, references []ConnectorReference, now time.Time, entry audit.Entry) (int64, error)
+}

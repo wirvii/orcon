@@ -1163,110 +1163,6 @@ func (q *Queries) ListExecutionEvents(ctx context.Context, arg ListExecutionEven
 	return items, nil
 }
 
-const listExecutions = `-- name: ListExecutions :many
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at,
-       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
-       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
-FROM execution AS e
-WHERE e.org_id = ?1 AND e.project_id = ?2
-  AND (e.created_at, e.id) < (?3, CAST(?4 AS BLOB))
-ORDER BY e.created_at DESC, e.id DESC
-LIMIT ?5
-`
-
-type ListExecutionsParams struct {
-	OrgID           []byte
-	ProjectID       []byte
-	BeforeCreatedAt int64
-	BeforeID        []byte
-	PageSize        int64
-}
-
-type ListExecutionsRow struct {
-	ID                    []byte
-	OrgID                 []byte
-	ProjectID             []byte
-	FlowID                []byte
-	FlowVersionID         []byte
-	FlowSnapshotID        []byte
-	Status                string
-	Mode                  string
-	Priority              int64
-	ParentExecutionID     []byte
-	RootExecutionID       []byte
-	CallDepth             int64
-	RunGeneration         int64
-	CancelRequestedAt     sql.NullInt64
-	RunnableCount         int64
-	LeasedCount           int64
-	WaitingCount          int64
-	SuspendedCount        int64
-	StartedAt             sql.NullInt64
-	FinishedAt            sql.NullInt64
-	CreatedAt             int64
-	UpdatedAt             int64
-	FlowVersionNumber     int64
-	HasUncertainOperation int64
-}
-
-// orcon:scope org
-// orcon:hot
-func (q *Queries) ListExecutions(ctx context.Context, arg ListExecutionsParams) ([]ListExecutionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listExecutions,
-		arg.OrgID,
-		arg.ProjectID,
-		arg.BeforeCreatedAt,
-		arg.BeforeID,
-		arg.PageSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListExecutionsRow{}
-	for rows.Next() {
-		var i ListExecutionsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.ProjectID,
-			&i.FlowID,
-			&i.FlowVersionID,
-			&i.FlowSnapshotID,
-			&i.Status,
-			&i.Mode,
-			&i.Priority,
-			&i.ParentExecutionID,
-			&i.RootExecutionID,
-			&i.CallDepth,
-			&i.RunGeneration,
-			&i.CancelRequestedAt,
-			&i.RunnableCount,
-			&i.LeasedCount,
-			&i.WaitingCount,
-			&i.SuspendedCount,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.FlowVersionNumber,
-			&i.HasUncertainOperation,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listExecutionsByStatus = `-- name: ListExecutionsByStatus :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
@@ -1789,7 +1685,7 @@ func (q *Queries) ListNodeOutputsByExecution(ctx context.Context, arg ListNodeOu
 	return items, nil
 }
 
-const listProjectExecutions = `-- name: ListProjectExecutions :many
+const listOrgProjectExecutions = `-- name: ListOrgProjectExecutions :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
        suspended_count, started_at, finished_at, created_at, updated_at,
@@ -1808,7 +1704,7 @@ ORDER BY e.created_at DESC, e.id DESC
 LIMIT ?11
 `
 
-type ListProjectExecutionsParams struct {
+type ListOrgProjectExecutionsParams struct {
 	OrgID           []byte
 	ProjectID       []byte
 	FlowID          []byte
@@ -1817,6 +1713,248 @@ type ListProjectExecutionsParams struct {
 	CreatedAfter    sql.NullInt64
 	CreatedBefore   sql.NullInt64
 	UncertainOnly   int64
+	BeforeCreatedAt int64
+	BeforeID        []byte
+	PageSize        int64
+}
+
+type ListOrgProjectExecutionsRow struct {
+	ID                    []byte
+	OrgID                 []byte
+	ProjectID             []byte
+	FlowID                []byte
+	FlowVersionID         []byte
+	FlowSnapshotID        []byte
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     []byte
+	RootExecutionID       []byte
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     sql.NullInt64
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             sql.NullInt64
+	FinishedAt            sql.NullInt64
+	CreatedAt             int64
+	UpdatedAt             int64
+	FlowVersionNumber     int64
+	HasUncertainOperation int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutions(ctx context.Context, arg ListOrgProjectExecutionsParams) ([]ListOrgProjectExecutionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOrgProjectExecutions,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgProjectExecutionsOldest = `-- name: ListOrgProjectExecutionsOldest :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
+       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = ?1 AND e.project_id = ?2
+  AND (CAST(?3 AS BLOB) IS NULL OR e.flow_id = CAST(?3 AS BLOB))
+  AND (CAST(?4 AS TEXT) IS NULL OR e.status = CAST(?4 AS TEXT))
+  AND (CAST(?5 AS BLOB) IS NULL OR e.id = CAST(?5 AS BLOB))
+  AND (CAST(?6 AS INTEGER) IS NULL OR e.created_at >= CAST(?6 AS INTEGER))
+  AND (CAST(?7 AS INTEGER) IS NULL OR e.created_at < CAST(?7 AS INTEGER))
+  AND (CAST(?8 AS INTEGER) = 0 OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (e.created_at, e.id) > (?9, CAST(?10 AS BLOB))
+ORDER BY e.created_at ASC, e.id ASC
+LIMIT ?11
+`
+
+type ListOrgProjectExecutionsOldestParams struct {
+	OrgID          []byte
+	ProjectID      []byte
+	FlowID         []byte
+	Status         sql.NullString
+	ExecutionID    []byte
+	CreatedAfter   sql.NullInt64
+	CreatedBefore  sql.NullInt64
+	UncertainOnly  int64
+	AfterCreatedAt int64
+	AfterID        []byte
+	PageSize       int64
+}
+
+type ListOrgProjectExecutionsOldestRow struct {
+	ID                    []byte
+	OrgID                 []byte
+	ProjectID             []byte
+	FlowID                []byte
+	FlowVersionID         []byte
+	FlowSnapshotID        []byte
+	Status                string
+	Mode                  string
+	Priority              int64
+	ParentExecutionID     []byte
+	RootExecutionID       []byte
+	CallDepth             int64
+	RunGeneration         int64
+	CancelRequestedAt     sql.NullInt64
+	RunnableCount         int64
+	LeasedCount           int64
+	WaitingCount          int64
+	SuspendedCount        int64
+	StartedAt             sql.NullInt64
+	FinishedAt            sql.NullInt64
+	CreatedAt             int64
+	UpdatedAt             int64
+	FlowVersionNumber     int64
+	HasUncertainOperation int64
+}
+
+// The same list oldest first, after the cursor.
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListOrgProjectExecutionsOldest(ctx context.Context, arg ListOrgProjectExecutionsOldestParams) ([]ListOrgProjectExecutionsOldestRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOrgProjectExecutionsOldest,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FlowID,
+		arg.Status,
+		arg.ExecutionID,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.UncertainOnly,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgProjectExecutionsOldestRow{}
+	for rows.Next() {
+		var i ListOrgProjectExecutionsOldestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FlowVersionNumber,
+			&i.HasUncertainOperation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectExecutions = `-- name: ListProjectExecutions :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at,
+       CAST(COALESCE((SELECT v.version_number FROM flow_version AS v WHERE v.org_id = e.org_id AND v.id = e.flow_version_id), 0) AS INTEGER) AS flow_version_number,
+       CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
+FROM execution AS e
+WHERE e.org_id = ?1 AND e.project_id = ?2
+  AND (?3 = 1 OR e.flow_id = ?4)
+  AND (?5 = 1 OR e.status = ?6)
+  AND e.created_at > ?7 AND e.created_at < ?8
+  AND (e.created_at, e.id) < (?9, CAST(?10 AS BLOB))
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT ?11
+`
+
+type ListProjectExecutionsParams struct {
+	OrgID           []byte
+	ProjectID       []byte
+	AnyFlow         interface{}
+	FlowID          []byte
+	AnyStatus       interface{}
+	Status          string
+	CreatedAfter    int64
+	CreatedBefore   int64
 	BeforeCreatedAt int64
 	BeforeID        []byte
 	PageSize        int64
@@ -1855,12 +1993,12 @@ func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExec
 	rows, err := q.db.QueryContext(ctx, listProjectExecutions,
 		arg.OrgID,
 		arg.ProjectID,
+		arg.AnyFlow,
 		arg.FlowID,
+		arg.AnyStatus,
 		arg.Status,
-		arg.ExecutionID,
 		arg.CreatedAfter,
 		arg.CreatedBefore,
-		arg.UncertainOnly,
 		arg.BeforeCreatedAt,
 		arg.BeforeID,
 		arg.PageSize,
@@ -1911,7 +2049,7 @@ func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExec
 	return items, nil
 }
 
-const listProjectExecutionsOldest = `-- name: ListProjectExecutionsOldest :many
+const listProjectExecutionsAsc = `-- name: ListProjectExecutionsAsc :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
        suspended_count, started_at, finished_at, created_at, updated_at,
@@ -1919,32 +2057,29 @@ SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, statu
        CAST(EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN') AS INTEGER) AS has_uncertain_operation
 FROM execution AS e
 WHERE e.org_id = ?1 AND e.project_id = ?2
-  AND (CAST(?3 AS BLOB) IS NULL OR e.flow_id = CAST(?3 AS BLOB))
-  AND (CAST(?4 AS TEXT) IS NULL OR e.status = CAST(?4 AS TEXT))
-  AND (CAST(?5 AS BLOB) IS NULL OR e.id = CAST(?5 AS BLOB))
-  AND (CAST(?6 AS INTEGER) IS NULL OR e.created_at >= CAST(?6 AS INTEGER))
-  AND (CAST(?7 AS INTEGER) IS NULL OR e.created_at < CAST(?7 AS INTEGER))
-  AND (CAST(?8 AS INTEGER) = 0 OR EXISTS (SELECT 1 FROM external_operation AS o WHERE o.org_id = e.org_id AND o.execution_id = e.id AND o.state = 'UNCERTAIN'))
+  AND (?3 = 1 OR e.flow_id = ?4)
+  AND (?5 = 1 OR e.status = ?6)
+  AND e.created_at > ?7 AND e.created_at < ?8
   AND (e.created_at, e.id) > (?9, CAST(?10 AS BLOB))
 ORDER BY e.created_at ASC, e.id ASC
 LIMIT ?11
 `
 
-type ListProjectExecutionsOldestParams struct {
+type ListProjectExecutionsAscParams struct {
 	OrgID          []byte
 	ProjectID      []byte
+	AnyFlow        interface{}
 	FlowID         []byte
-	Status         sql.NullString
-	ExecutionID    []byte
-	CreatedAfter   sql.NullInt64
-	CreatedBefore  sql.NullInt64
-	UncertainOnly  int64
+	AnyStatus      interface{}
+	Status         string
+	CreatedAfter   int64
+	CreatedBefore  int64
 	AfterCreatedAt int64
 	AfterID        []byte
 	PageSize       int64
 }
 
-type ListProjectExecutionsOldestRow struct {
+type ListProjectExecutionsAscRow struct {
 	ID                    []byte
 	OrgID                 []byte
 	ProjectID             []byte
@@ -1971,19 +2106,18 @@ type ListProjectExecutionsOldestRow struct {
 	HasUncertainOperation int64
 }
 
-// The same list oldest first, after the cursor.
 // orcon:scope org
 // orcon:hot
-func (q *Queries) ListProjectExecutionsOldest(ctx context.Context, arg ListProjectExecutionsOldestParams) ([]ListProjectExecutionsOldestRow, error) {
-	rows, err := q.db.QueryContext(ctx, listProjectExecutionsOldest,
+func (q *Queries) ListProjectExecutionsAsc(ctx context.Context, arg ListProjectExecutionsAscParams) ([]ListProjectExecutionsAscRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProjectExecutionsAsc,
 		arg.OrgID,
 		arg.ProjectID,
+		arg.AnyFlow,
 		arg.FlowID,
+		arg.AnyStatus,
 		arg.Status,
-		arg.ExecutionID,
 		arg.CreatedAfter,
 		arg.CreatedBefore,
-		arg.UncertainOnly,
 		arg.AfterCreatedAt,
 		arg.AfterID,
 		arg.PageSize,
@@ -1992,9 +2126,9 @@ func (q *Queries) ListProjectExecutionsOldest(ctx context.Context, arg ListProje
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListProjectExecutionsOldestRow{}
+	items := []ListProjectExecutionsAscRow{}
 	for rows.Next() {
-		var i ListProjectExecutionsOldestRow
+		var i ListProjectExecutionsAscRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrgID,

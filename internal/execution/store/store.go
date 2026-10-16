@@ -510,14 +510,40 @@ type Cursor struct {
 // IsZero reports whether c starts the first page.
 func (c Cursor) IsZero() bool { return c.CreatedAt.IsZero() && c.ID.IsZero() }
 
-// ExecutionFilter selects executions by exactly one of its fields.
+// ExecutionFilter selects executions: by exactly one of ProjectID, FlowID and
+// Status, or by ProjectID refined with any of FlowID, Status, CreatedAfter and
+// CreatedBefore. The refinements are applied by the store, so a page is never
+// short of rows that match.
 type ExecutionFilter struct {
 	ProjectID identity.ProjectID
 	FlowID    flow.FlowID
 	Status    string
+	// CreatedAfter and CreatedBefore bound the creation time exclusively; the
+	// zero time leaves the bound open. They need ProjectID.
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	// Oldest lists the oldest execution first, and the cursor is the last row of the previous
+	// page; it needs ProjectID.
+	Oldest bool
 	// Uncertain narrows a project listing to the executions that need a review (SPEC-019 R-UX-BE-03).
 	// It is not a filter field of its own: it needs ProjectID and no other field.
 	Uncertain bool
+}
+
+// Refined reports whether the filter narrows a project by more than the project.
+func (f ExecutionFilter) Refined() bool {
+	return !f.ProjectID.IsZero() && (!f.FlowID.IsZero() || f.Status != "" || !f.CreatedAfter.IsZero() || !f.CreatedBefore.IsZero() || f.Oldest)
+}
+
+// Valid reports whether the filter is one of the two accepted shapes.
+func (f ExecutionFilter) Valid() bool {
+	if !f.ProjectID.IsZero() {
+		return true
+	}
+	if !f.CreatedAfter.IsZero() || !f.CreatedBefore.IsZero() || f.Oldest {
+		return false
+	}
+	return !f.FlowID.IsZero() != (f.Status != "")
 }
 
 // ExecutionQuery narrows the executions of one project for the organization-wide listing (SPEC-019
@@ -550,7 +576,7 @@ type Reader interface {
 	// GetExecution returns an execution, or flow.ErrNotFound.
 	GetExecution(ctx context.Context, org orgscope.Org, execution ExecutionID) (Execution, error)
 	// ListExecutions returns at most limit executions matching the filter,
-	// newest first, after the cursor. Exactly one filter field must be set.
+	// newest first (oldest first with Oldest), after the cursor. The filter must satisfy [ExecutionFilter.Valid].
 	ListExecutions(ctx context.Context, org orgscope.Org, filter ExecutionFilter, after Cursor, limit int) ([]Execution, error)
 	// GetToken returns a token, or flow.ErrNotFound.
 	GetToken(ctx context.Context, org orgscope.Org, token TokenID) (Token, error)
