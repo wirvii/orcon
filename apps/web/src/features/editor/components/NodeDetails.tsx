@@ -2,15 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { DataPane, NodeDetailsView, type DetailsTab, type GraphNode } from '@orcon/ui';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import { useIntl } from 'react-intl';
 
+import { useNodeData } from '../forms/use-node-data';
 import { ConnectorUpdate } from '../forms/node-config/ConnectorUpdate';
+import { DuplicateProtectionBox } from '../forms/node-config/DuplicateProtectionBox';
+import { FieldInsertProvider, type FieldInsertController, type InputSource } from '../forms/node-config/field-insert';
 import { NodeConfigForm } from '../forms/node-config/NodeConfigForm';
 import { NodeDocs } from '../forms/node-config/NodeDocs';
 import { NodeSettingsForm } from '../forms/node-config/NodeSettingsForm';
+import { RetrySafetyTab } from '../forms/node-config/RetrySafetyTab';
+import { pathLabel } from '../model/expression-chips';
 import { canvasNodeView } from '../model/canvas-graph';
-import { manifestOf } from '../model/node-manifests';
+import { catalogText, localeOf, manifestOf, safetyOf } from '../model/node-manifests';
 import { useEditorStore, useEditorStoreApi } from '../store/editor-context';
 
 import { editorMessages } from './messages';
@@ -29,6 +34,10 @@ export interface NodeDetailsProps {
   onClose: () => void;
   /** Moves keyboard focus back to the node on the canvas. */
   onReturnFocus: () => void;
+  /** The flow, to read what its last run recorded for this node. Absent for a flow that is not stored on the server. */
+  flowId?: string | undefined;
+  /** How a field chosen in the input pane reaches the parameter that had the focus. Shared with the docked data panel. */
+  insertController: RefObject<FieldInsertController | undefined>;
 }
 
 /** The node as the design system's view draws it: the same name, line and ports as its tile on the canvas. */
@@ -39,18 +48,50 @@ function useViewNode(nodeId: string): GraphNode | undefined {
   return useMemo(() => (node ? canvasNodeView(node, edges, describe) : undefined), [node, edges, describe]);
 }
 
-/** The two data panes of a node. Nothing has run in this editor yet, so both show their empty state and offer the run. */
-function usePanes(node: GraphNode | undefined, className: string): { input: ReactNode; output: ReactNode; run: () => void } {
+/**
+ * The two data panes of a node: what the last run of the flow recorded for it, or their empty state when there is none
+ * (a flow that never ran, a server that does not answer, a person who may not read execution data). The fields of the
+ * input can be dragged to a parameter or chosen with Enter; `source` says where they come from.
+ */
+function usePanes(nodeId: string, node: GraphNode | undefined, flowId: string | undefined, controller: RefObject<FieldInsertController | undefined>, className: string): { input: ReactNode; output: ReactNode; run: () => void; source: InputSource | undefined } {
   const intl = useIntl();
   const notices = useNoticeChannel();
+  const edges = useEditorStore((state) => state.document.edges);
+  const incoming = useMemo(() => edges.filter((edge) => edge.to.node === nodeId), [edges, nodeId]);
+  const names = useEditorStore((state) => state.document.nodes);
+  const sourceName = incoming[0] ? names.find((candidate) => candidate.id === incoming[0]?.from.node)?.name : undefined;
+  const source = useMemo<InputSource | undefined>(() => (sourceName === undefined ? undefined : { node: sourceName, direct: incoming.length === 1 }), [incoming.length, sourceName]);
+  const data = useNodeData(flowId, nodeId, sourceName);
+  const [activePort, setActivePort] = useState<string | undefined>(undefined);
   const run = () => {
     notices.notify('warning', intl.formatMessage(editorMessages.noticeLaterRun));
   };
+  const insertField = (path: readonly (string | number)[]) => {
+    const target = controller.current?.insert(path);
+    notices.notify(target === undefined ? 'warning' : 'info', target === undefined ? intl.formatMessage(editorMessages.noticeNoFieldTarget) : intl.formatMessage(editorMessages.noticeFieldAdded, { name: pathLabel(path), field: target }));
+  };
   const trigger = node?.kind === 'trigger';
+  const shown = data.outputs.find((entry) => entry.port === activePort) ?? data.outputs[0];
+  const loading = data.status === 'loading';
   return {
     run,
-    input: trigger ? undefined : <DataPane mode="input" onExecute={run} className={className} />,
-    output: <DataPane mode="output" onExecute={run} onPinChange={() => { notices.notify('warning', intl.formatMessage(editorMessages.noticeLaterPin)); }} className={className} />,
+    source,
+    input: trigger ? undefined : <DataPane mode="input" data={data.input} status={loading ? 'loading' : 'data'} onExecute={run} onInsertField={insertField} className={className} />,
+    output: (
+      <DataPane
+        mode="output"
+        data={shown?.data}
+        status={loading ? 'loading' : 'data'}
+        ports={data.outputs.length > 1 ? data.outputs.map((entry) => ({ id: entry.port, label: entry.port, count: entry.data.items.length })) : undefined}
+        activePort={shown?.port}
+        onPortChange={setActivePort}
+        onExecute={run}
+        onPinChange={() => {
+          notices.notify('warning', intl.formatMessage(editorMessages.noticeLaterPin));
+        }}
+        className={className}
+      />
+    ),
   };
 }
 
@@ -61,13 +102,13 @@ function usePanes(node: GraphNode | undefined, className: string): { input: Reac
  * right of the canvas, and `DockedDataPanel` shows the data at the bottom. The tabs are Parameters,
  * Settings and Docs; every edit is a store action, so it is one step of the undo history.
  */
-export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onReturnFocus }: NodeDetailsProps) {
+export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onReturnFocus, flowId, insertController }: NodeDetailsProps) {
   const intl = useIntl();
   const api = useEditorStoreApi();
   const notices = useNoticeChannel();
   const view = useViewNode(nodeId);
   const node = useEditorStore((state) => state.document.nodes.find((candidate) => candidate.id === nodeId));
-  const panes = usePanes(view, 'flex-1');
+  const panes = usePanes(nodeId, view, flowId, insertController, 'flex-1');
   // On a phone the view only shows: no data panes, no rename, no run.
   const readOnly = layout === 'fullscreen';
 
@@ -86,7 +127,11 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
     notices.notify('info', intl.formatMessage(editorMessages.noticeRenamed, { name, count: result.references }));
   };
 
+  const safety = safetyOf(node);
+  const service = manifest ? catalogText(manifest, localeOf(intl.locale), 'name') : node.name;
+
   return (
+    <FieldInsertProvider source={panes.source} controller={insertController}>
     <NodeDetailsView
       node={view}
       open
@@ -104,15 +149,18 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
           <>
             <ConnectorUpdate node={node} />
             <NodeConfigForm nodeId={nodeId} />
+            <DuplicateProtectionBox safety={safety} service={service} />
           </>
         ),
-        settings: <NodeSettingsForm node={node} manifest={manifest} />,
+        settings: <NodeSettingsForm node={node} manifest={manifest} section="rest" />,
+        retry: <RetrySafetyTab node={node} manifest={manifest} />,
         docs: <NodeDocs node={node} manifest={manifest} />,
       }}
       onExecute={readOnly ? undefined : panes.run}
       onRename={readOnly ? undefined : rename}
       onReturnFocus={onReturnFocus}
     />
+    </FieldInsertProvider>
   );
 }
 
@@ -120,10 +168,10 @@ export function NodeDetails({ nodeId, layout, tab, onTabChange, onClose, onRetur
  * Between md and lg the data of the open node shows in a panel at the bottom of the editor, one side
  * at a time (SPEC-014 R-ED-DATA-01). A trigger has no input, so it shows only its output.
  */
-export function DockedDataPanel({ nodeId }: { nodeId: string }) {
+export function DockedDataPanel({ nodeId, flowId, insertController }: { nodeId: string; flowId?: string | undefined; insertController: RefObject<FieldInsertController | undefined> }) {
   const intl = useIntl();
   const view = useViewNode(nodeId);
-  const panes = usePanes(view, 'flex-1');
+  const panes = usePanes(nodeId, view, flowId, insertController, 'flex-1');
   const [side, setSide] = useState<'input' | 'output'>('output');
   if (!view) return null;
   const sides = view.kind === 'trigger' ? (['output'] as const) : (['input', 'output'] as const);

@@ -148,6 +148,32 @@ func (q *Queries) GetExecution(ctx context.Context, orgID []byte, iD []byte) (Ge
 	return i, err
 }
 
+const getExecutionCountKey = `-- name: GetExecutionCountKey :one
+SELECT project_id, status, mode, created_at
+FROM execution
+WHERE org_id = ?1 AND id = ?2
+`
+
+type GetExecutionCountKeyRow struct {
+	ProjectID []byte
+	Status    string
+	Mode      string
+	CreatedAt int64
+}
+
+// orcon:scope org
+func (q *Queries) GetExecutionCountKey(ctx context.Context, orgID []byte, iD []byte) (GetExecutionCountKeyRow, error) {
+	row := q.db.QueryRowContext(ctx, getExecutionCountKey, orgID, iD)
+	var i GetExecutionCountKeyRow
+	err := row.Scan(
+		&i.ProjectID,
+		&i.Status,
+		&i.Mode,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getExternalOperation = `-- name: GetExternalOperation :one
 SELECT id, org_id, execution_id, node_execution_id, item_index, correlation_key, contract_reference, state, batch_key,
        dispatch_deadline_at, first_dispatched_at, retry_epoch, response_reference
@@ -2147,6 +2173,38 @@ func (q *Queries) UpdateExecutionCounters(ctx context.Context, updatedAt int64, 
 	return err
 }
 
+const updateExecutionHourCountDown = `-- name: UpdateExecutionHourCountDown :execrows
+UPDATE execution_hour_count
+SET execution_count = execution_count - 1, updated_at = ?1
+WHERE org_id = ?2 AND project_id = ?3 AND hour_started_at = ?4
+  AND mode = ?5 AND status = ?6 AND execution_count > 0
+`
+
+type UpdateExecutionHourCountDownParams struct {
+	Now           int64
+	OrgID         []byte
+	ProjectID     []byte
+	HourStartedAt int64
+	Mode          string
+	Status        string
+}
+
+// orcon:scope org
+func (q *Queries) UpdateExecutionHourCountDown(ctx context.Context, arg UpdateExecutionHourCountDownParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateExecutionHourCountDown,
+		arg.Now,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.HourStartedAt,
+		arg.Mode,
+		arg.Status,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const updateMovedToken = `-- name: UpdateMovedToken :execrows
 UPDATE token
 SET status = ?1, node_id = ?2, edge_id = ?3, scope_path = ?4,
@@ -2229,6 +2287,37 @@ func (q *Queries) UpdateTokenFenced(ctx context.Context, arg UpdateTokenFencedPa
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const upsertExecutionHourCount = `-- name: UpsertExecutionHourCount :exec
+INSERT INTO execution_hour_count (id, org_id, project_id, hour_started_at, mode, status, execution_count, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?7)
+ON CONFLICT (org_id, project_id, hour_started_at, mode, status) DO UPDATE
+SET execution_count = execution_hour_count.execution_count + 1, updated_at = excluded.updated_at
+`
+
+type UpsertExecutionHourCountParams struct {
+	ID            []byte
+	OrgID         []byte
+	ProjectID     []byte
+	HourStartedAt int64
+	Mode          string
+	Status        string
+	Now           int64
+}
+
+// orcon:scope org
+func (q *Queries) UpsertExecutionHourCount(ctx context.Context, arg UpsertExecutionHourCountParams) error {
+	_, err := q.db.ExecContext(ctx, upsertExecutionHourCount,
+		arg.ID,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.HourStartedAt,
+		arg.Mode,
+		arg.Status,
+		arg.Now,
+	)
+	return err
 }
 
 const upsertNodeExecution = `-- name: UpsertNodeExecution :exec

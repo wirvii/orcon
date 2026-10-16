@@ -1,15 +1,21 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { FormField, Switch } from '@orcon/ui';
-import { useState } from 'react';
+import { FIELD_DRAG_TYPE, FormField, Switch } from '@orcon/ui';
+import { Braces } from 'lucide-react';
+import { useRef, useState, type DragEvent } from 'react';
 import { useIntl } from 'react-intl';
 
+import { carriesField, readDraggedField } from '../../../../app/boundary/drag';
 import { isJsonText } from '../../../../app/boundary/parse';
+import { useNoticeChannel } from '../../components/notice-channel';
+import { appendField, pathLabel } from '../../model/expression-chips';
 import { expressionCapable, modeOf, normalize, problemOf, switchMode, valueOf, type ParamMode, type Parameters, type ProblemCode } from '../../model/node-config';
 import type { ParamDef } from '../../model/node-manifests';
 
 import { CollectionField } from './CollectionField';
+import { ExpressionChipsField } from './ExpressionChipsField';
+import { blockFor, useFieldInsert } from './field-insert';
 import {
   BinaryField,
   DateTimeField,
@@ -23,6 +29,7 @@ import {
   type FieldProps,
 } from './fields';
 import { configMessages } from './messages';
+import { useExpressionView } from './use-expression-view';
 import { useFieldGroup } from './use-node-config';
 
 const problemMessages = {
@@ -92,6 +99,9 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
   const intl = useIntl();
   const [touched, setTouched] = useState(false);
   const fieldGroup = useFieldGroup(def.name);
+  const insert = useFieldInsert();
+  const notices = useNoticeChannel();
+  const [view, setView] = useExpressionView();
   const label = t(`param.${def.name}.label`);
   const description = optionalText(t, `param.${def.name}.description`);
   const mode = modeOf(def, parameters);
@@ -99,6 +109,32 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
   const problem = touched ? problemOf(def, parameters, isJsonText) : undefined;
   const write = (next: unknown) => {
     onChange(def.name, normalize(def, next), fieldGroup.group());
+  };
+  // A field from the input becomes part of the formula, whatever the field showed before: a fixed text turns into a
+  // formula that keeps its text. The latest closure is read when it is used, long after the focus that registered it.
+  const add = useRef<(block: string) => void>(() => undefined);
+  add.current = (block) => {
+    const current = parameters[def.name];
+    onChange(def.name, appendField(typeof current === 'string' ? current : '', block), fieldGroup.group());
+  };
+  const register = () => {
+    insert.setTarget({ label, apply: (block) => {
+        add.current(block);
+      } });
+  };
+  const canTake = expressionCapable(def);
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!canTake || !carriesField(event.dataTransfer, FIELD_DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!canTake || !carriesField(event.dataTransfer, FIELD_DRAG_TYPE)) return;
+    event.preventDefault();
+    const path = readDraggedField(event.dataTransfer, FIELD_DRAG_TYPE);
+    if (!path) return;
+    add.current(blockFor(path, insert.source));
+    notices.notify('info', intl.formatMessage(configMessages.chipsDropped, { name: pathLabel(path), field: label }));
   };
 
   if (def.type === 'BOOLEAN') {
@@ -130,7 +166,20 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
   const group = def.type === 'FIXED_COLLECTION' || def.type === 'COLLECTION' || def.type === 'MULTI_OPTIONS';
   const modeSwitch = expressionCapable(def) ? (
     // The switch sits at the right end of the label row, over the space the label leaves free.
-    <div className="absolute -top-1 end-0">
+    <div className="absolute -top-1 end-0 flex items-center gap-1">
+      {mode === 'expression' ? (
+        <button
+          type="button"
+          aria-label={intl.formatMessage(view === 'chips' ? configMessages.viewAsText : configMessages.viewAsChips)}
+          aria-pressed={view === 'raw'}
+          onClick={() => {
+            setView(view === 'chips' ? 'raw' : 'chips');
+          }}
+          className="text-fg hover:bg-surface-sunken aria-pressed:bg-surface-sunken border-control inline-flex min-h-target min-w-target items-center justify-center rounded-md border"
+        >
+          <Braces aria-hidden className="size-icon-16" />
+        </button>
+      ) : null}
       <ModeSwitch
         label={label}
         mode={mode}
@@ -141,7 +190,7 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
     </div>
   ) : null;
   return (
-    <div className="relative">
+    <div className="relative" onFocusCapture={canTake ? register : undefined} onDragOver={onDragOver} onDrop={onDrop}>
       {modeSwitch}
       <FormField
       label={label}
@@ -151,7 +200,25 @@ export function ParameterField({ def, parameters, t, onChange }: ParameterFieldP
       name={`/parameters/${def.name}`}
       error={problem ? intl.formatMessage(problemMessages[problem]) : undefined}
     >
-      {mode === 'expression' && expressionCapable(def) ? <ExpressionControl {...props} value={parameters[def.name]} /> : <Widget {...props} />}
+      {mode === 'expression' && expressionCapable(def) ? (
+        view === 'chips' ? (
+          <ExpressionChipsField
+            value={parameters[def.name]}
+            label={label}
+            onFocus={fieldGroup.renew}
+            onBlur={() => {
+              setTouched(true);
+            }}
+            onChange={(stored) => {
+              onChange(def.name, stored, fieldGroup.group());
+            }}
+          />
+        ) : (
+          <ExpressionControl {...props} value={parameters[def.name]} />
+        )
+      ) : (
+        <Widget {...props} />
+      )}
       </FormField>
     </div>
   );

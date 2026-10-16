@@ -390,13 +390,16 @@ func (t *pgTx) InsertExecution(ctx context.Context, e *store.Execution) error {
 	if root.IsZero() {
 		root = e.ID
 	}
-	return t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
+	if err := t.q.InsertExecution(ctx, sqlcgen.InsertExecutionParams{
 		ID: pgUUID(e.ID), OrgID: pgUUID(e.OrgID), ProjectID: pgUUID(e.ProjectID), FlowID: pgUUID(e.FlowID),
 		FlowVersionID: nullPGUUID(e.FlowVersionID), FlowSnapshotID: nullPGUUID(e.FlowSnapshotID),
 		Status: e.Status, Mode: e.Mode, Priority: e.Priority, ParentExecutionID: nullPGUUID(e.ParentExecutionID),
 		RootExecutionID: pgUUID(root), CallDepth: e.CallDepth, RunnableCount: e.RunnableCount,
 		CreatedAt: timestamp(e.CreatedAt), UpdatedAt: timestamp(e.UpdatedAt),
-	})
+	}); err != nil {
+		return err
+	}
+	return countAcceptance(ctx, t.q, e)
 }
 
 func (t *pgTx) InsertToken(ctx context.Context, tok *store.Token) error {

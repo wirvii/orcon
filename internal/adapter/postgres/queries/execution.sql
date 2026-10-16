@@ -60,6 +60,26 @@ WHERE org_id = sqlc.arg(org_id) AND status = sqlc.arg(status)
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
 
+-- name: UpsertExecutionHourCount :exec
+-- orcon:scope org
+INSERT INTO execution_hour_count (id, org_id, project_id, hour_started_at, mode, status, execution_count, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(project_id), sqlc.arg(hour_started_at), sqlc.arg(mode), sqlc.arg(status), 1, sqlc.arg(now), sqlc.arg(now))
+ON CONFLICT (org_id, project_id, hour_started_at, mode, status) DO UPDATE
+SET execution_count = execution_hour_count.execution_count + 1, updated_at = excluded.updated_at;
+
+-- name: UpdateExecutionHourCountDown :execrows
+-- orcon:scope org
+UPDATE execution_hour_count
+SET execution_count = execution_count - 1, updated_at = sqlc.arg(now)
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND hour_started_at = sqlc.arg(hour_started_at)
+  AND mode = sqlc.arg(mode) AND status = sqlc.arg(status) AND execution_count > 0;
+
+-- name: GetExecutionCountKey :one
+-- orcon:scope org
+SELECT project_id, status, mode, created_at
+FROM execution
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id);
+
 -- name: InsertToken :exec
 -- orcon:scope org
 INSERT INTO token (id, org_id, execution_id, status, node_id, edge_id, scope_path, fork_lineage_document, fork_lineage_document_format,

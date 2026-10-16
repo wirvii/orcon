@@ -45,6 +45,12 @@ export interface PaneData {
 
 export type DataView = 'table' | 'json' | 'schema';
 
+/** The steps into an item that lead to a field: names, and positions for lists. */
+export type FieldPath = readonly (string | number)[];
+
+/** The drag data type a schema field carries: the JSON of its path. The editor reads it when the field is dropped on a parameter. */
+export const FIELD_DRAG_TYPE = 'application/x-orcon-field';
+
 /** A JSON-like value of an item, with protected values and files recognised. */
 export type JsonLike = unknown;
 

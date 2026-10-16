@@ -14,6 +14,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveFlows = `-- name: CountActiveFlows :one
+SELECT COUNT(*)
+FROM flow
+WHERE org_id = $1 AND project_id = $2 AND activation_state = 'ACTIVE' AND deleted_at IS NULL
+`
+
+// orcon:scope org
+func (q *Queries) CountActiveFlows(ctx context.Context, orgID pgtype.UUID, projectID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveFlows, orgID, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countFlows = `-- name: CountFlows :one
 SELECT COUNT(*)
 FROM flow
@@ -23,6 +37,37 @@ WHERE org_id = $1 AND project_id = $2 AND deleted_at IS NULL
 // orcon:scope org
 func (q *Queries) CountFlows(ctx context.Context, orgID pgtype.UUID, projectID pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countFlows, orgID, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSucceededTriggerExecutions = `-- name: CountSucceededTriggerExecutions :one
+SELECT CAST(COALESCE(SUM(execution_count), 0) AS bigint) AS succeeded
+FROM execution_hour_count
+WHERE org_id = $1 AND project_id = $2 AND status = 'SUCCEEDED' AND mode = 'TRIGGER' AND hour_started_at >= $3
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) CountSucceededTriggerExecutions(ctx context.Context, orgID pgtype.UUID, projectID pgtype.UUID, sinceAt pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, countSucceededTriggerExecutions, orgID, projectID, sinceAt)
+	var succeeded int64
+	err := row.Scan(&succeeded)
+	return succeeded, err
+}
+
+const countUncertainExecutions = `-- name: CountUncertainExecutions :one
+SELECT COUNT(*)
+FROM (SELECT DISTINCT o.execution_id FROM external_operation AS o WHERE o.org_id = $1 AND o.state = 'UNCERTAIN') AS u
+JOIN execution AS e ON e.org_id = $1 AND e.id = u.execution_id
+WHERE e.project_id = $2 AND e.created_at >= $3
+`
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) CountUncertainExecutions(ctx context.Context, orgID pgtype.UUID, projectID pgtype.UUID, sinceAt pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, countUncertainExecutions, orgID, projectID, sinceAt)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -352,6 +397,47 @@ func (q *Queries) InsertFlowVersion(ctx context.Context, arg InsertFlowVersionPa
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const listExecutionHourCounts = `-- name: ListExecutionHourCounts :many
+SELECT hour_started_at, mode, status, execution_count
+FROM execution_hour_count
+WHERE org_id = $1 AND project_id = $2 AND hour_started_at >= $3
+LIMIT 1000
+`
+
+type ListExecutionHourCountsRow struct {
+	HourStartedAt  pgtype.Timestamptz
+	Mode           string
+	Status         string
+	ExecutionCount int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListExecutionHourCounts(ctx context.Context, orgID pgtype.UUID, projectID pgtype.UUID, sinceAt pgtype.Timestamptz) ([]ListExecutionHourCountsRow, error) {
+	rows, err := q.db.Query(ctx, listExecutionHourCounts, orgID, projectID, sinceAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExecutionHourCountsRow{}
+	for rows.Next() {
+		var i ListExecutionHourCountsRow
+		if err := rows.Scan(
+			&i.HourStartedAt,
+			&i.Mode,
+			&i.Status,
+			&i.ExecutionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listFlowActivity = `-- name: ListFlowActivity :many

@@ -1059,6 +1059,148 @@
         }
       }
     },
+    "/orgs/{orgId}/activity-summary": {
+      "x-orcon-resource": "singleton",
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrgId"
+        }
+      ],
+      "get": {
+        "operationId": "getOrgActivitySummary",
+        "summary": "Get the activity summary of an organization",
+        "description": "Returns the figures the home screen of an organization shows: the active flows, the flows and projects, the executions of the last 24 hours by hour, status and uncertain outcome, and the time saved by the automated executions of the last 7 days. The figures count only the projects the caller can read.",
+        "tags": [
+          "organizations"
+        ],
+        "x-orcon-permission": "execution:read",
+        "x-orcon-rate-class": "read",
+        "x-orcon-stability": "stable",
+        "x-orcon-audit": "none",
+        "x-orcon-problems": [
+          "validation-failed",
+          "unauthenticated",
+          "forbidden",
+          "not-found",
+          "rate-limited",
+          "internal-error",
+          "service-unavailable"
+        ],
+        "x-orcon-cli": {
+          "command": "orgs activity"
+        },
+        "x-orcon-mcp": {
+          "level": "none"
+        },
+        "x-orcon-examples": [
+          {
+            "name": "activitySummaryOfOrganization",
+            "scenario": "project-with-flows",
+            "request": {
+              "pathParams": {
+                "orgId": "0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71"
+              }
+            },
+            "response": {
+              "status": 200,
+              "body": "activitySummaryOfOrganization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The activity summary of the organization.",
+            "headers": {
+              "Orcon-Request-Id": {
+                "$ref": "#/components/headers/OrconRequestId"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimitPolicy"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivitySummary"
+                },
+                "examples": {
+                  "activitySummaryOfOrganization": {
+                    "summary": "Two projects with a day of activity",
+                    "value": {
+                      "activeFlowCount": 1,
+                      "flowCount": 2,
+                      "projectCount": 2,
+                      "executionsLast24h": {
+                        "total": 6,
+                        "failed": 1,
+                        "succeeded": 4,
+                        "uncertain": 1,
+                        "byHour": [
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          1,
+                          2,
+                          2,
+                          1
+                        ]
+                      },
+                      "timeSaved": {
+                        "windowDays": 7,
+                        "succeededExecutions": 4,
+                        "minutesPerExecution": 3,
+                        "minutes": 12
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/projects/{projectId}": {
       "x-orcon-resource": "item",
       "parameters": [
@@ -6432,6 +6574,189 @@
               "Owner"
             ],
             "maxLength": 100
+          }
+        }
+      },
+      "ActivitySummary": {
+        "type": "object",
+        "description": "The activity of an organization that its home screen shows. Every count covers only the projects the caller can read.",
+        "required": [
+          "activeFlowCount",
+          "flowCount",
+          "projectCount",
+          "executionsLast24h",
+          "timeSaved"
+        ],
+        "properties": {
+          "activeFlowCount": {
+            "type": "integer",
+            "description": "Number of flows that are active, in the projects the caller reads.",
+            "examples": [
+              4
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "flowCount": {
+            "type": "integer",
+            "description": "Number of flows that are not deleted, in the projects the caller reads.",
+            "examples": [
+              9
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "projectCount": {
+            "type": "integer",
+            "description": "Number of projects the caller reads.",
+            "examples": [
+              2
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "executionsLast24h": {
+            "$ref": "#/components/schemas/ActivityExecutionCounts"
+          },
+          "timeSaved": {
+            "$ref": "#/components/schemas/ActivityTimeSaved"
+          }
+        }
+      },
+      "ActivityExecutionCounts": {
+        "type": "object",
+        "description": "The executions accepted in the last 24 hours, in the projects the caller reads.",
+        "required": [
+          "total",
+          "failed",
+          "succeeded",
+          "uncertain",
+          "byHour"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Number of executions accepted in the last 24 hours.",
+            "examples": [
+              128
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "failed": {
+            "type": "integer",
+            "description": "Number of those executions that failed.",
+            "examples": [
+              3
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "succeeded": {
+            "type": "integer",
+            "description": "Number of those executions that succeeded.",
+            "examples": [
+              120
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "uncertain": {
+            "type": "integer",
+            "description": "Number of those executions that have an external operation whose outcome is unknown, so a person must review them.",
+            "examples": [
+              2
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "byHour": {
+            "type": "array",
+            "description": "Executions accepted in each hour of the last 24 hours, the oldest hour first; the last item is the current hour.",
+            "readOnly": true,
+            "minItems": 24,
+            "maxItems": 24,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "examples": [
+              [
+                0,
+                0,
+                1,
+                4,
+                9,
+                12,
+                8,
+                6,
+                5,
+                7,
+                11,
+                13,
+                9,
+                8,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1,
+                0,
+                0,
+                0,
+                0
+              ]
+            ]
+          }
+        }
+      },
+      "ActivityTimeSaved": {
+        "type": "object",
+        "description": "The time the organization saves by its successful automated executions in the last 7 days, estimated as the minutes per execution the organization sets. Test runs are not counted.",
+        "required": [
+          "windowDays",
+          "succeededExecutions",
+          "minutesPerExecution",
+          "minutes"
+        ],
+        "properties": {
+          "windowDays": {
+            "type": "integer",
+            "description": "Length of the window in days.",
+            "examples": [
+              7
+            ],
+            "minimum": 1,
+            "readOnly": true
+          },
+          "succeededExecutions": {
+            "type": "integer",
+            "description": "Number of automated executions that succeeded in the window.",
+            "examples": [
+              96
+            ],
+            "minimum": 0,
+            "readOnly": true
+          },
+          "minutesPerExecution": {
+            "type": "integer",
+            "description": "Minutes the organization saves per automated execution that succeeded.",
+            "examples": [
+              3
+            ],
+            "minimum": 0,
+            "maximum": 600,
+            "readOnly": true
+          },
+          "minutes": {
+            "type": "integer",
+            "description": "Estimated minutes saved in the window (succeededExecutions times minutesPerExecution).",
+            "examples": [
+              288
+            ],
+            "minimum": 0,
+            "readOnly": true
           }
         }
       },

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 
 import { renderInApp } from '../../../../../test/screen-harness';
+import { writeStored } from '../../../../app/boundary/storage';
 import { createQueryClient } from '../../../../app/query-client';
 import type { RouterContext } from '../../../../app/router-context';
 import { createLocalCredentialStore } from '../../../../app/credential-store/store';
@@ -28,7 +29,9 @@ export interface Harness {
  * channel, a query client and a router (the sub-flow widget links to flows). Credentials and flows
  * come from fresh in-memory sources, so no test sees what another created.
  */
-export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument()): Harness & ReturnType<typeof renderInApp> {
+export function renderWithStore(ui: ReactNode, document: FlowDocument = exampleFlowDocument(), expressionView: 'chips' | 'raw' = 'raw'): Harness & ReturnType<typeof renderInApp> {
+  // The tests of the form type into formulas as text; the ones about chips ask for them.
+  writeStored('orcon.editor.expression-view', expressionView);
   const fresh = createLocalCredentialSource(createLocalCredentialStore());
   vi.spyOn(credentialSource, 'list').mockImplementation(fresh.list);
   vi.spyOn(credentialSource, 'create').mockImplementation(fresh.create);

@@ -97,7 +97,7 @@ const WAITS: ReadonlySet<string> = new Set(['receiveTask', 'userTask', 'intermed
  * kind of step (ADR-0011 §2). Notes on a step and marks for sensitive values have no place in the
  * flow format yet, so they are not offered.
  */
-export function NodeSettingsForm({ node, manifest }: { node: FlowNode; manifest: NodeManifest | undefined }) {
+export function NodeSettingsForm({ node, manifest, section = 'all' }: { node: FlowNode; manifest: NodeManifest | undefined; section?: 'all' | 'retry' | 'rest' }) {
   const intl = useIntl();
   const actions = useNodeActions(node.id);
   const effect = manifest ? effectOf(manifest, node.parameters) : 'pure';
@@ -121,129 +121,136 @@ export function NodeSettingsForm({ node, manifest }: { node: FlowNode; manifest:
 
   const retryDefault = effect === 'write' ? configMessages.retryDefaultWrite : effect === 'read' ? configMessages.retryDefaultRead : configMessages.retryDefaultPure;
 
+  const showRetry = section !== 'rest';
+  const showRest = section !== 'retry';
+
   return (
     <div className="flex flex-col gap-5">
-      <Section title={intl.formatMessage(configMessages.settingsRetry)}>
-        <p className="text-fg-muted text-sm">{intl.formatMessage(retryDefault)}</p>
-        <NumberSetting
-          name="retry/maxAttempts"
-          label={intl.formatMessage(configMessages.retryAttempts)}
-          hint={intl.formatMessage(configMessages.retryAttemptsHint)}
-          value={attempts}
-          min={1}
-          integer
-          onChange={(value, group) => {
-            writeRetry({ maxAttempts: value }, group);
-          }}
-        />
-        {attempts !== undefined && attempts > 1 ? (
-          <>
-            <NumberSetting
-              name="retry/initialInterval"
-              label={intl.formatMessage(configMessages.retryInitial)}
-              value={seconds(retry['initialInterval'])}
-              min={1}
-              integer
-              onChange={(value, group) => {
-                writeRetry({ initialInterval: value === undefined ? undefined : formatDuration(value) }, group);
-              }}
-            />
-            <NumberSetting
-              name="retry/factor"
-              label={intl.formatMessage(configMessages.retryFactor)}
-              value={typeof retry['factor'] === 'number' ? retry['factor'] : undefined}
-              min={1}
-              integer={false}
-              onChange={(value, group) => {
-                writeRetry({ factor: value }, group);
-              }}
-            />
-            <NumberSetting
-              name="retry/maxInterval"
-              label={intl.formatMessage(configMessages.retryMax)}
-              value={seconds(retry['maxInterval'])}
-              min={1}
-              integer
-              onChange={(value, group) => {
-                writeRetry({ maxInterval: value === undefined ? undefined : formatDuration(value) }, group);
-              }}
-            />
-            <Switch
-              label={intl.formatMessage(configMessages.retryAfter)}
-              checked={retry['respectRetryAfter'] === true}
-              onCheckedChange={(checked) => {
-                writeRetry({ respectRetryAfter: checked ? true : undefined }, 'retry-after');
-              }}
-            />
-          </>
+      {showRetry ? (
+        <Section title={intl.formatMessage(configMessages.settingsRetry)}>
+          <p className="text-fg-muted text-sm">{intl.formatMessage(retryDefault)}</p>
+          <NumberSetting
+            name="retry/maxAttempts"
+            label={intl.formatMessage(configMessages.retryAttempts)}
+            hint={intl.formatMessage(configMessages.retryAttemptsHint)}
+            value={attempts}
+            min={1}
+            integer
+            onChange={(value, group) => {
+              writeRetry({ maxAttempts: value }, group);
+            }}
+          />
+          {attempts !== undefined && attempts > 1 ? (
+            <>
+              <NumberSetting
+                name="retry/initialInterval"
+                label={intl.formatMessage(configMessages.retryInitial)}
+                value={seconds(retry['initialInterval'])}
+                min={1}
+                integer
+                onChange={(value, group) => {
+                  writeRetry({ initialInterval: value === undefined ? undefined : formatDuration(value) }, group);
+                }}
+              />
+              <NumberSetting
+                name="retry/factor"
+                label={intl.formatMessage(configMessages.retryFactor)}
+                value={typeof retry['factor'] === 'number' ? retry['factor'] : undefined}
+                min={1}
+                integer={false}
+                onChange={(value, group) => {
+                  writeRetry({ factor: value }, group);
+                }}
+              />
+              <NumberSetting
+                name="retry/maxInterval"
+                label={intl.formatMessage(configMessages.retryMax)}
+                value={seconds(retry['maxInterval'])}
+                min={1}
+                integer
+                onChange={(value, group) => {
+                  writeRetry({ maxInterval: value === undefined ? undefined : formatDuration(value) }, group);
+                }}
+              />
+              <Switch
+                label={intl.formatMessage(configMessages.retryAfter)}
+                checked={retry['respectRetryAfter'] === true}
+                onCheckedChange={(checked) => {
+                  writeRetry({ respectRetryAfter: checked ? true : undefined }, 'retry-after');
+                }}
+              />
+            </>
         ) : null}
       </Section>
+      ) : null}
 
-      <Section title={intl.formatMessage(configMessages.settingsTimeouts)}>
-        <NumberSetting
-          name="timeouts/attempt"
-          label={intl.formatMessage(configMessages.timeoutAttempt)}
-          hint={intl.formatMessage(configMessages.timeoutHint)}
-          value={seconds(timeouts['attempt'])}
-          min={1}
-          integer
-          onChange={(value, group) => {
-            writeTimeout('attempt', value, group);
-          }}
-        />
-        <NumberSetting
-          name="timeouts/node"
-          label={intl.formatMessage(configMessages.timeoutNode)}
-          hint={intl.formatMessage(configMessages.timeoutHint)}
-          value={seconds(timeouts['node'])}
-          min={1}
-          integer
-          onChange={(value, group) => {
-            writeTimeout('node', value, group);
-          }}
-        />
-      </Section>
-
-      <Section title={intl.formatMessage(configMessages.settingsErrors)}>
-        <FormField label={intl.formatMessage(configMessages.onError)} name="/onError">
-          <Select
-            value={onError}
-            onValueChange={(next) => {
-              actions.setBlock('onError', next === 'STOP_EXECUTION' ? undefined : next);
+      {showRest ? (
+      <>
+        <Section title={intl.formatMessage(configMessages.settingsTimeouts)}>
+          <NumberSetting
+            name="timeouts/attempt"
+            label={intl.formatMessage(configMessages.timeoutAttempt)}
+            hint={intl.formatMessage(configMessages.timeoutHint)}
+            value={seconds(timeouts['attempt'])}
+            min={1}
+            integer
+            onChange={(value, group) => {
+              writeTimeout('attempt', value, group);
             }}
-            options={[
-              { value: 'STOP_EXECUTION', label: intl.formatMessage(configMessages.onErrorStop) },
-              { value: 'CONTINUE_WITH_ERROR', label: intl.formatMessage(configMessages.onErrorContinue) },
-              { value: 'ERROR_OUTPUT', label: intl.formatMessage(configMessages.onErrorOutput) },
-            ]}
           />
-        </FormField>
-        {onError === 'ERROR_OUTPUT' ? <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.onErrorOutputHint)}</p> : null}
-      </Section>
+          <NumberSetting
+            name="timeouts/node"
+            label={intl.formatMessage(configMessages.timeoutNode)}
+            hint={intl.formatMessage(configMessages.timeoutHint)}
+            value={seconds(timeouts['node'])}
+            min={1}
+            integer
+            onChange={(value, group) => {
+              writeTimeout('node', value, group);
+            }}
+          />
+        </Section>
 
-      <Section title={intl.formatMessage(configMessages.settingsConcurrency)}>
-        <FormField label={intl.formatMessage(configMessages.concurrency)} description={intl.formatMessage(configMessages.concurrencyHint)} name="/concurrency">
-          <ConcurrencyInput value={concurrency} onChange={(value, group) => { actions.setBlock('concurrency', value, group); }} />
-        </FormField>
-      </Section>
-
-      {notifyApplies ? (
-        <Section title={intl.formatMessage(configMessages.settingsAttention)}>
-          <FormField label={intl.formatMessage(configMessages.attention)} name="/attention/notify">
+        <Section title={intl.formatMessage(configMessages.settingsErrors)}>
+          <FormField label={intl.formatMessage(configMessages.onError)} name="/onError">
             <Select
-              value={canSilence || notify !== 'OFF' ? notify : 'DEFAULT'}
+              value={onError}
               onValueChange={(next) => {
-                actions.setBlock('attention', next === 'DEFAULT' ? undefined : { ...block(node['attention']), notify: next });
+                actions.setBlock('onError', next === 'STOP_EXECUTION' ? undefined : next);
               }}
               options={[
-                { value: 'DEFAULT', label: intl.formatMessage(configMessages.attentionDefault) },
-                { value: 'ON', label: intl.formatMessage(configMessages.attentionOn) },
-                ...(canSilence ? [{ value: 'OFF', label: intl.formatMessage(configMessages.attentionOff) }] : []),
+                { value: 'STOP_EXECUTION', label: intl.formatMessage(configMessages.onErrorStop) },
+                { value: 'CONTINUE_WITH_ERROR', label: intl.formatMessage(configMessages.onErrorContinue) },
+                { value: 'ERROR_OUTPUT', label: intl.formatMessage(configMessages.onErrorOutput) },
               ]}
             />
           </FormField>
-          {!canSilence ? <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.attentionOffRefused)}</p> : null}
+          {onError === 'ERROR_OUTPUT' ? <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.onErrorOutputHint)}</p> : null}
         </Section>
+
+        <Section title={intl.formatMessage(configMessages.settingsConcurrency)}>
+          <FormField label={intl.formatMessage(configMessages.concurrency)} description={intl.formatMessage(configMessages.concurrencyHint)} name="/concurrency">
+            <ConcurrencyInput value={concurrency} onChange={(value, group) => { actions.setBlock('concurrency', value, group); }} />
+          </FormField>
+        </Section>
+
+        {notifyApplies ? (
+          <Section title={intl.formatMessage(configMessages.settingsAttention)}>
+            <FormField label={intl.formatMessage(configMessages.attention)} name="/attention/notify">
+              <Select
+                value={canSilence || notify !== 'OFF' ? notify : 'DEFAULT'}
+                onValueChange={(next) => {
+                  actions.setBlock('attention', next === 'DEFAULT' ? undefined : { ...block(node['attention']), notify: next });
+                }}
+                options={[
+                  { value: 'DEFAULT', label: intl.formatMessage(configMessages.attentionDefault) },
+                  { value: 'ON', label: intl.formatMessage(configMessages.attentionOn) },
+                  ...(canSilence ? [{ value: 'OFF', label: intl.formatMessage(configMessages.attentionOff) }] : []),
+                ]}
+              />
+            </FormField>
+            {!canSilence ? <p className="text-fg-muted text-sm">{intl.formatMessage(configMessages.attentionOffRefused)}</p> : null}
+          </Section>
       ) : null}
 
       <Section title={intl.formatMessage(configMessages.settingsNotes)}>
@@ -251,6 +258,8 @@ export function NodeSettingsForm({ node, manifest }: { node: FlowNode; manifest:
       </Section>
 
       <Banner tone="info" title={intl.formatMessage(configMessages.settingsLater)} />
+      </>
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,132 @@
+# SPDX-FileCopyrightText: The Orcon Authors
+# SPDX-License-Identifier: Apache-2.0
+ActivitySummary:
+  type: object
+  description: >-
+    The activity of an organization that its home screen shows. Every count covers only the projects the
+    caller can read.
+  required:
+    - activeFlowCount
+    - flowCount
+    - projectCount
+    - executionsLast24h
+    - timeSaved
+  properties:
+    activeFlowCount:
+      type: integer
+      description: Number of flows that are active, in the projects the caller reads.
+      examples:
+        - 4
+      minimum: 0
+      readOnly: true
+    flowCount:
+      type: integer
+      description: Number of flows that are not deleted, in the projects the caller reads.
+      examples:
+        - 9
+      minimum: 0
+      readOnly: true
+    projectCount:
+      type: integer
+      description: Number of projects the caller reads.
+      examples:
+        - 2
+      minimum: 0
+      readOnly: true
+    executionsLast24h:
+      $ref: ../openapi.yaml#/components/schemas/ActivityExecutionCounts
+    timeSaved:
+      $ref: ../openapi.yaml#/components/schemas/ActivityTimeSaved
+ActivityExecutionCounts:
+  type: object
+  description: The executions accepted in the last 24 hours, in the projects the caller reads.
+  required:
+    - total
+    - failed
+    - succeeded
+    - uncertain
+    - byHour
+  properties:
+    total:
+      type: integer
+      description: Number of executions accepted in the last 24 hours.
+      examples:
+        - 128
+      minimum: 0
+      readOnly: true
+    failed:
+      type: integer
+      description: Number of those executions that failed.
+      examples:
+        - 3
+      minimum: 0
+      readOnly: true
+    succeeded:
+      type: integer
+      description: Number of those executions that succeeded.
+      examples:
+        - 120
+      minimum: 0
+      readOnly: true
+    uncertain:
+      type: integer
+      description: >-
+        Number of those executions that have an external operation whose outcome is unknown, so a person must
+        review them.
+      examples:
+        - 2
+      minimum: 0
+      readOnly: true
+    byHour:
+      type: array
+      description: >-
+        Executions accepted in each hour of the last 24 hours, the oldest hour first; the last item is the
+        current hour.
+      readOnly: true
+      minItems: 24
+      maxItems: 24
+      items:
+        type: integer
+        minimum: 0
+      examples:
+        - [0, 0, 1, 4, 9, 12, 8, 6, 5, 7, 11, 13, 9, 8, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0]
+ActivityTimeSaved:
+  type: object
+  description: >-
+    The time the organization saves by its successful automated executions in the last 7 days, estimated as
+    the minutes per execution the organization sets. Test runs are not counted.
+  required:
+    - windowDays
+    - succeededExecutions
+    - minutesPerExecution
+    - minutes
+  properties:
+    windowDays:
+      type: integer
+      description: Length of the window in days.
+      examples:
+        - 7
+      minimum: 1
+      readOnly: true
+    succeededExecutions:
+      type: integer
+      description: Number of automated executions that succeeded in the window.
+      examples:
+        - 96
+      minimum: 0
+      readOnly: true
+    minutesPerExecution:
+      type: integer
+      description: Minutes the organization saves per automated execution that succeeded.
+      examples:
+        - 3
+      minimum: 0
+      maximum: 600
+      readOnly: true
+    minutes:
+      type: integer
+      description: Estimated minutes saved in the window (succeededExecutions times minutesPerExecution).
+      examples:
+        - 288
+      minimum: 0
+      readOnly: true
