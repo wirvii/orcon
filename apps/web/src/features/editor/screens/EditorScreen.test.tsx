@@ -533,6 +533,40 @@ describe('the editor screen', () => {
   });
 });
 
+describe('the logs bar', () => {
+  const flowAnswer = () =>
+    http.get(`/api/v1/flows/${EXAMPLE_FLOW_ID}`, () =>
+      HttpResponse.json(
+        { id: EXAMPLE_FLOW_ID, projectId: '0195f1a0-0000-7000-8000-0000000000d1', activationState: 'INACTIVE', activeVersion: null, hasUnpublishedChanges: true, draftRevision: 1 },
+        { headers: { ETag: '"1"' } },
+      ),
+    );
+  beforeEach(() => {
+    editing();
+    const fresh = createLocalDraftSource();
+    vi.spyOn(draftSource, 'load').mockImplementation(fresh.load);
+    vi.spyOn(draftSource, 'save').mockImplementation(fresh.save);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('says the flow has not run when the server answers with no runs, and shows no error', async () => {
+    server.use(flowAnswer(), http.get('/api/v1/projects/:projectId/executions', () => HttpResponse.json({ items: [] })));
+    renderEditor();
+    await opened();
+    expect(await screen.findByText('This flow has not run yet. Its runs show here.')).toBeVisible();
+    expect(screen.queryByText('The last run could not be read.')).toBeNull();
+  });
+
+  it('still shows a read failure as an error', async () => {
+    server.use(flowAnswer(), http.get('/api/v1/projects/:projectId/executions', () => HttpResponse.json({ title: 'broken', status: 500 }, { status: 500 })));
+    renderEditor();
+    await opened();
+    expect(await screen.findByText('The last run could not be read.')).toBeVisible();
+  });
+});
+
 describe('the node details view', () => {
   beforeEach(() => {
     // The panes read the last run of the flow: this flow never ran, so they show their empty state.

@@ -28,3 +28,11 @@ export function durationOf(startedAt: string | undefined, finishedAt: string | u
 export function shortId(id: string): string {
   return id.slice(0, 8);
 }
+
+/**
+ * The end of a run identifier. Identifiers are time-ordered, so their first characters are the same for runs
+ * that started close together; the end is the random part and tells those runs apart.
+ */
+export function tailId(id: string): string {
+  return id.slice(-8);
+}

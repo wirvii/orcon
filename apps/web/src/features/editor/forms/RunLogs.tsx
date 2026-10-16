@@ -70,11 +70,11 @@ export function RunLogs({ flowId, open, onOpenChange, chatOpen, previousRuns }: 
     const failure = last.error ?? flow.error;
     // A server without the runs yet answers 503: that is a calm "not available", not a failure of the page.
     state = failure instanceof ApiProblem && failure.status === 503 ? 'unavailable' : 'error';
-  } else if (last.data === undefined) state = 'empty';
+  } else if (last.data === null || last.data === undefined) state = 'empty';
   else if (nodes.isPending) state = 'loading';
   else state = 'ready';
 
-  const run = last.data;
+  const run = last.data ?? undefined;
   const finished = run?.finishedAt ?? run?.startedAt ?? run?.createdAt;
   return (
     <LogsPanel
