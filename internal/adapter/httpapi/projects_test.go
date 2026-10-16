@@ -274,8 +274,8 @@ func TestCreateFlowStartsInactiveWithAnEmptyDraft(t *testing.T) {
 	if !ok {
 		t.Fatalf("response = %T, want 201", resp)
 	}
-	if out.Body.ActivationState != apigen.FlowActivationState("INACTIVE") || out.Body.DraftRevision != 0 || out.Body.HasUnpublishedChanges {
-		t.Errorf("flow = %+v, want an inactive flow at draft revision 0", out.Body)
+	if out.Body.ActivationState != apigen.FlowActivationState("INACTIVE") || out.Body.DraftRevision != 0 || !out.Body.HasUnpublishedChanges {
+		t.Errorf("flow = %+v, want an inactive flow at draft revision 0 that was never published", out.Body)
 	}
 	if out.Headers.ETag == nil || *out.Headers.ETag != `"0"` {
 		t.Errorf("etag = %v, want \"0\"", out.Headers.ETag)

@@ -77,6 +77,9 @@ type Record struct {
 	// ActiveVersion is the number of the active version, or 0 while nothing is published. Only the
 	// reads fill it; the writes ignore it.
 	ActiveVersion int64
+	// HasUnpublishedChanges says whether the draft differs from the active version. Only
+	// [Manager.Get] fills it, from the content hashes; the stores leave it false.
+	HasUnpublishedChanges bool
 	// ActivationState is [ActivationInactive] until the flow is activated.
 	// CreateFlow ignores it: a new flow is always inactive.
 	ActivationState ActivationState
@@ -218,6 +221,8 @@ type DraftStore interface {
 type ManageStore interface {
 	// GetFlow returns a non-deleted flow, or [ErrNotFound].
 	GetFlow(ctx context.Context, org orgscope.Org, flow FlowID) (Record, error)
+	// GetVersion returns a version by identity, or [ErrVersionNotFound].
+	GetVersion(ctx context.Context, org orgscope.Org, version FlowVersionID) (VersionRecord, error)
 	// UpdateFlowNameWithEntry renames the flow when its revision still equals expectedRevision,
 	// increments the revision and writes the audit entry in the same transaction. A different
 	// revision fails with [ErrRevisionConflict], a missing flow with [ErrNotFound] and a name the

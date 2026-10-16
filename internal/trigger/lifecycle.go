@@ -253,7 +253,7 @@ func (s *Service) Status(ctx context.Context, org orgscope.Org, flowID flow.Flow
 			return FlowStatus{}, fmt.Errorf("status of flow %s: read the live version: %w", flowID, err)
 		}
 		out.ActiveVersion = v.Number
-		out.HasUnpublishedChanges = draftDiffers(rec.Draft, v.ContentHash)
+		out.HasUnpublishedChanges = flow.DraftDiffers(rec.Draft, v.ContentHash)
 	}
 	err = s.store.Read(ctx, org, func(ctx context.Context, tx Tx) error {
 		var rerr error
@@ -264,25 +264,6 @@ func (s *Service) Status(ctx context.Context, org orgscope.Org, flowID flow.Flow
 		return FlowStatus{}, fmt.Errorf("status of flow %s: %w", flowID, err)
 	}
 	return out, nil
-}
-
-// draftDiffers reports whether the draft, normalized the way publication
-// normalizes it, has a different content hash than the live version. A draft
-// that does not read as a document differs by definition.
-func draftDiffers(draft []byte, liveHash string) bool {
-	value, err := jsonvalue.Parse(draft)
-	if err != nil {
-		return true
-	}
-	doc, err := flow.Read(value)
-	if err != nil {
-		return true
-	}
-	h, err := flow.ContentHash(&doc)
-	if err != nil {
-		return true
-	}
-	return h.String() != liveHash
 }
 
 // Accept reads what an ingress acceptance needs about the trigger of a node:
