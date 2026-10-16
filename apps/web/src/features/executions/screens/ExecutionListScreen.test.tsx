@@ -14,7 +14,7 @@ import { acme, problem, signedIn } from '../../../../test/session-fixtures';
 const address = '/orgs/acme/projects/ventas/executions';
 
 /** Everything the runs page reads before its own list: the person, the organization and the project. */
-const beforeRuns = () => [signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([project])];
+const beforeRuns = (flows: readonly object[] = [flow]) => [signedIn.currentUser, signedIn.organizations([acme]), productApi.projects([project]), productApi.orgFlows(flows)];
 
 describe('ExecutionListScreen', () => {
   it('loading', async () => {
@@ -58,15 +58,33 @@ describe('ExecutionListScreen', () => {
   it('data, with the next page on request and the flow filter from the address', async () => {
     server.use(...beforeRuns(), executionApi.list([[run], [otherRun]]));
     renderRoute(address);
-    const first = await screen.findByRole('link', { name: 'Run 0195f1a0' });
+    const first = await screen.findByRole('link', { name: 'Order notifications' });
     expect(first).toHaveAttribute('href', `${address}/0195f1a0-0000-7000-8000-0000000000f1`);
     await userEvent.click(screen.getByRole('button', { name: 'Load more runs' }));
-    // Both runs of the example start with the same short identifier, so the links are counted, not named.
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: 'Run 0195f1a0' })).toHaveLength(2);
+      expect(screen.getAllByRole('link', { name: 'Order notifications' })).toHaveLength(2);
     });
-    expect(screen.getAllByRole('link', { name: 'Run 0195f1a0' })[1]).toHaveAttribute('href', `${address}/0195f1a0-0000-7000-8000-0000000000f2`);
+    expect(screen.getAllByRole('link', { name: 'Order notifications' })[1]).toHaveAttribute('href', `${address}/0195f1a0-0000-7000-8000-0000000000f2`);
     expect(screen.queryByRole('button', { name: 'Load more runs' })).toBeNull();
+  });
+
+  it('tells runs that started together apart: the flow name, the start time and the random end of the identifier', async () => {
+    server.use(...beforeRuns(), executionApi.list([[run, otherRun]]));
+    renderRoute(address);
+    await screen.findAllByRole('link', { name: 'Order notifications' });
+    // The two runs share the first characters of their identifiers (time-ordered), so the end is what differs.
+    expect(screen.getByText(/Run .000000f1/)).toBeVisible();
+    expect(screen.getByText(/Run .000000f2/)).toBeVisible();
+    const times = Array.from(document.querySelectorAll('time')).map((element) => element.getAttribute('datetime'));
+    expect(times).toEqual(expect.arrayContaining(['2026-10-14T09:00:01.000Z', '2026-10-14T08:00:00.000Z']));
+  });
+
+  it('names a run of a deleted flow instead of hiding it', async () => {
+    const gone = { ...run, flowId: '0195f1a0-0000-7000-8000-0000000000e9' };
+    server.use(...beforeRuns(), executionApi.list([[gone, otherRun]]));
+    renderRoute(address);
+    expect(await screen.findByRole('link', { name: 'Deleted flow' })).toHaveAttribute('href', `${address}/${gone.id}`);
+    expect(screen.getByRole('link', { name: 'Order notifications' })).toBeVisible();
   });
 
   it('shows the runs of one flow only when the address names it', async () => {
@@ -79,7 +97,7 @@ describe('ExecutionListScreen', () => {
       }),
     );
     renderRoute(`${address}?flowId=${flow.id}`);
-    expect(await screen.findByRole('link', { name: 'Run 0195f1a0' })).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'Order notifications' })).toBeVisible();
     expect(requested).toBe(flow.id);
     expect(screen.getByRole('link', { name: 'Show every run' })).toBeVisible();
   });

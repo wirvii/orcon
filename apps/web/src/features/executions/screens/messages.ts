@@ -17,6 +17,12 @@ export const runMessages = defineMessages({
   duration: { id: 'runs.column.duration', defaultMessage: 'Duration', description: 'Column heading: how long the run took.' },
   trigger: { id: 'runs.column.trigger', defaultMessage: 'Started by', description: 'Column heading: how the run started.' },
   run: { id: 'runs.column.run', defaultMessage: 'Run', description: 'Column heading: the short identifier of the run, which opens it.' },
+  deletedFlow: {
+    id: 'runs.list.deletedFlow',
+    defaultMessage: 'Deleted flow',
+    description: 'Names the flow of a run when that flow is no longer in the project: it was deleted, and its runs stay in the history until they are purged.',
+  },
+  unknownFlow: { id: 'runs.list.unknownFlow', defaultMessage: 'Flow', description: 'Names the flow of a run while its name is not known.' },
   notStarted: { id: 'runs.notStarted', defaultMessage: 'Not started', description: 'Shown instead of a start time while the run is still queued.' },
   stillRunning: { id: 'runs.stillRunning', defaultMessage: 'Still running', description: 'Shown instead of a duration while the run has not finished.' },
   dataHidden: {

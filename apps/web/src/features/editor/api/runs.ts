@@ -54,8 +54,11 @@ export type RunData = z.infer<typeof runDataSchema>;
 
 const page = <T extends z.ZodType>(item: T) => z.object({ items: z.array(item), nextPageToken: z.string().optional() });
 
-/** The newest run of one flow, or none. */
-async function lastRun(projectId: string, flowId: string): Promise<Run | undefined> {
+/**
+ * The newest run of one flow, or `null` when it never ran. It is `null` and not `undefined` because a query function
+ * that returns `undefined` is a failed read for the query cache, and a flow with no runs is a normal answer.
+ */
+async function lastRun(projectId: string, flowId: string): Promise<Run | null> {
   const answer = await apiRequest({
     method: 'GET',
     path: `/projects/${encodeURIComponent(projectId)}/executions`,
@@ -63,7 +66,7 @@ async function lastRun(projectId: string, flowId: string): Promise<Run | undefin
     schema: page(runSchema),
     source: 'response of GET /projects/{projectId}/executions',
   });
-  return answer.items[0];
+  return answer.items[0] ?? null;
 }
 
 async function runNodes(executionId: string): Promise<NodeRun[]> {
