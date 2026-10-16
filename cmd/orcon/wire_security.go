@@ -209,6 +209,9 @@ func wireSecurity(ctx context.Context, cfg *config.Config, logger *slog.Logger, 
 	if err != nil {
 		return nil, fmt.Errorf("credentials: %w", err)
 	}
+	if err := registerOfficialPackages(ctx, store, clk, ids); err != nil {
+		return nil, err
+	}
 	return &security{
 		store: store, keyring: kr, sessions: sessions,
 		// A request that names a credential is decided with the grant of the project that owns it.

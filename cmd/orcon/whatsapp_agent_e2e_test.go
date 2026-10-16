@@ -19,11 +19,14 @@ import (
 
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
 	"github.com/wirvii/orcon/internal/platform/id"
+	"github.com/wirvii/orcon/internal/platform/orgscope"
 	"github.com/wirvii/orcon/internal/trigger"
 	"github.com/wirvii/orcon/test/mockllm"
 	"github.com/wirvii/orcon/test/mockprovider"
@@ -176,11 +179,37 @@ type flowCredentials struct {
 	openAI   string
 }
 
+// storeModelCredential stores the credential of the model of the example flow and returns its identifier.
+// It, with [fillOf], lets tests outside the allowed paths build the flow without naming a model provider.
+func storeModelCredential(t *testing.T, svc *credential.Service, env *storetest.EngineEnv, owner audit.Actor) string {
+	t.Helper()
+	return storeCredential(t, svc, env, owner, "Model key", "model", openAIHost, map[string]string{"apiKey": "k"})
+}
+
+// fillOf names the two stored credentials the example flow needs, with the real Graph address.
+func fillOf(whatsapp, model string) flowCredentials {
+	return flowCredentials{graphURL: graphHost, whatsapp: whatsapp, openAI: model}
+}
+
 // publishWhatsAppFlow stores the example flow, points its Graph address at the
 // mock provider and its credential placeholders at the stored credentials,
 // publishes it and activates it, through the trigger service the process runs.
 // The example itself is what an owner imports; only those values change.
 func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, fill flowCredentials) {
+	t.Helper()
+	ctx := t.Context()
+	org, flowID, by := storeWhatsAppFlow(t, env, fill)
+	if _, err := eng.trigger.Publish(ctx, trigger.PublishCommand{Org: org, Flow: flowID, By: by}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if err := eng.trigger.Activate(ctx, org, flowID); err != nil {
+		t.Fatalf("activate: %v", err)
+	}
+}
+
+// storeWhatsAppFlow stores the example flow as a draft, filled in as [publishWhatsAppFlow] describes,
+// and a principal to publish it as. It publishes nothing.
+func storeWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, fill flowCredentials) (orgscope.Org, flow.FlowID, identity.PrincipalID) {
 	t.Helper()
 	ctx := t.Context()
 	raw, err := os.ReadFile(whatsappFlowFile)
@@ -198,7 +227,7 @@ func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, fi
 	}
 	now := env.Clock.Now()
 	rec := flow.Record{
-		ID: flow.FlowID(env.IDs.New()), OrgID: env.Org, ProjectID: env.Project, Name: "whatsapp-agent",
+		ID: flow.FlowID(env.IDs.New()), OrgID: env.Org, ProjectID: env.Project, Name: "whatsapp-agent-" + env.IDs.New().String(),
 		Draft: []byte(draft), CreatedAt: now, UpdatedAt: now,
 	}
 	org := storetest.ScopeOf(env.Org)
@@ -209,12 +238,7 @@ func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, fi
 	if err := env.Store.CreatePrincipal(ctx, identity.PrincipalRecord{ID: by, Kind: identity.PrincipalUser, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create the publishing principal: %v", err)
 	}
-	if _, err := eng.trigger.Publish(ctx, trigger.PublishCommand{Org: org, Flow: rec.ID, By: by}); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
-	if err := eng.trigger.Activate(ctx, org, rec.ID); err != nil {
-		t.Fatalf("activate: %v", err)
-	}
+	return org, rec.ID, by
 }
 
 // handshake sends the subscription GET of the provider and checks the status and the echo.

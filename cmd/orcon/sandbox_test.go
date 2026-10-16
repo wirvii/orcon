@@ -138,8 +138,8 @@ func testDeps(t *testing.T, factory sandboxFactory) serveDeps {
 
 // provisionMasterKey writes the master key file the tests run with into dataDir and sets
 // the backup acknowledgement of its fingerprint, as an operator does before the first start
-// (the serving roles refuse to start without a verified master key).
-func provisionMasterKey(t *testing.T, dataDir string) {
+// (the serving roles refuse to start without a verified master key). It returns that acknowledgement.
+func provisionMasterKey(t *testing.T, dataDir string) string {
 	t.Helper()
 	raw := bytes.Repeat([]byte{0x42}, envelope.KeySize)
 	material, err := envelope.NewKey(raw)
@@ -153,5 +153,7 @@ func provisionMasterKey(t *testing.T, dataDir string) {
 	if err := os.WriteFile(filepath.Join(dataDir, "keys", "master.key"), []byte(encoded), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("ORCON_MASTER_KEY_BACKUP_ACK", envelope.Fingerprint(material))
+	ack := envelope.Fingerprint(material)
+	t.Setenv("ORCON_MASTER_KEY_BACKUP_ACK", ack)
+	return ack
 }

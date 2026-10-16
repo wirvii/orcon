@@ -29,6 +29,7 @@ func TriggerValidation(t *testing.T, f Factory) {
 		{"T-V1 a path of another organization is a generic problem", collisionAcrossOrganizations},
 		{"T-V1 overlapping patterns only warn", overlapWarns},
 		{"T-V3 a trigger that needs a missing credential", missingCredential},
+		{"T-V3 a webhook trigger that needs a missing credential, at publication and at activation", missingWebhookCredential},
 		{"T-V4 an imported n8n address stays unless the author confirms", importedAddress},
 		{"T-V4 deleting a trigger node that owns an imported address needs the confirmation", importedAddressNodeRemoved},
 		{"T-V4 dropping the trigger block of a node with an imported address needs the confirmation", importedAddressBlockRemoved},
@@ -209,6 +210,25 @@ func missingCredential(t *testing.T, f Factory) {
 	}
 	e.creds.SetMissing()
 	e.publish(e.scopeA, id)
+}
+
+func missingWebhookCredential(t *testing.T, f Factory) {
+	t.Helper()
+	e := newEnv(t, f, trigger.Settings{})
+	id := e.newFlow(e.scopeA, e.projA, "hook", Build(single(TypeWebhook, WebhookBlock("a"))))
+	e.creds.SetMissing("whatsapp credential")
+	_, err := e.svc.Publish(e.ctx(), trigger.PublishCommand{Org: e.scopeA, Flow: id, By: e.user})
+	issue := validationIssue(t, "publish a webhook without the credential", err, trigger.CodeTV3)
+	if !contains(issue.Message, "whatsapp credential") {
+		t.Fatalf("message %q does not name the credential", issue.Message)
+	}
+	e.creds.SetMissing()
+	e.publish(e.scopeA, id)
+	// The credential goes away after publication: the flow cannot be switched on until it is back.
+	e.creds.SetMissing("whatsapp credential")
+	validationIssue(t, "activate without the credential", e.svc.Activate(e.ctx(), e.scopeA, id), trigger.CodeTV3)
+	e.creds.SetMissing()
+	must(t, "activate with the credential", e.svc.Activate(e.ctx(), e.scopeA, id))
 }
 
 func importedAddress(t *testing.T, f Factory) {

@@ -70,6 +70,11 @@ func checkRevision(cmd *ChangeCommand, state *FlowState) error {
 
 func (s *Service) setActivation(ctx context.Context, cmd *ChangeCommand, target flow.ActivationState) error {
 	flowID, org := cmd.Flow, cmd.Org
+	if target == flow.ActivationActive {
+		if err := s.liveCredentialsIssues(ctx, org, flowID); err != nil {
+			return fmt.Errorf("set activation of flow %s to %s: %w", flowID, target, err)
+		}
+	}
 	err := s.store.Atomic(ctx, org, func(ctx context.Context, tx Tx) error {
 		state, err := tx.LockFlowState(ctx, flowID)
 		if err != nil {
@@ -112,6 +117,42 @@ func (s *Service) setActivation(ctx context.Context, cmd *ChangeCommand, target 
 		return fmt.Errorf("set activation of flow %s to %s: %w", flowID, target, err)
 	}
 	return nil
+}
+
+// liveCredentialsIssues is rule T-V3 on activation: a credential that was usable at publication may
+// have been removed, disabled or unshared since, so the live version is checked again before its
+// triggers go on. A flow that is already active, deleted or unpublished is left to the checks that
+// follow in the activation itself.
+func (s *Service) liveCredentialsIssues(ctx context.Context, org orgscope.Org, flowID flow.FlowID) error {
+	rec, err := s.flows.GetFlow(ctx, org, flowID)
+	if err != nil {
+		return err
+	}
+	if rec.ActivationState == flow.ActivationActive || rec.ActiveVersionID.IsZero() {
+		return nil
+	}
+	rc, err := s.ruleContext(ctx, org, rec, false)
+	if err != nil {
+		return err
+	}
+	if rc.previous == nil {
+		return nil
+	}
+	var issues []flow.Issue
+	for i := range rc.previous.Nodes {
+		n := &rc.previous.Nodes[i]
+		if n.Trigger == nil {
+			continue
+		}
+		base := fmt.Sprintf("/nodes/%d/trigger", i)
+		add := func(sev flow.Severity, code, at, format string, args ...any) {
+			issues = append(issues, flow.Issue{Severity: sev, Code: code, Path: base + at, Message: fmt.Sprintf(format, args...)})
+		}
+		if err := s.credentialIssues(ctx, rc, n, add); err != nil {
+			return err
+		}
+	}
+	return flow.Report{Issues: issues}.Err()
 }
 
 // Delete soft-deletes the flow. In the same transaction its automatic
