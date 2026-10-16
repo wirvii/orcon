@@ -30,7 +30,7 @@ type AccountStore interface {
 	PrincipalStore
 }
 
-// Accounts creates user accounts and changes their passwords for the operator's command line
+// Accounts creates user accounts and changes their passwords and display names for the operator's command line
 // (SPEC-016 SH5). Each change is stored with its audit entry in the same transaction, and the
 // installation acts as the actor (SYSTEM principal).
 type Accounts struct {
@@ -128,6 +128,37 @@ func (a *Accounts) SetPassword(ctx context.Context, email, password string) erro
 	}
 	if err := a.store.ChangePassword(ctx, user.ID, hash, now, entry); err != nil {
 		return fmt.Errorf("set password: %w", err)
+	}
+	return nil
+}
+
+// SetDisplayName changes the display name of the account with the given address, with the
+// account.renamed entry in the same transaction. An unknown address fails with [ErrNotFound]; a
+// change by someone else between the read and the write with [ErrConflict].
+func (a *Accounts) SetDisplayName(ctx context.Context, email, displayName string) error {
+	name, err := ValidateDisplayName(displayName)
+	if err != nil {
+		return err
+	}
+	user, err := a.store.GetUserByEmail(ctx, NormalizeEmail(email))
+	if err != nil {
+		return fmt.Errorf("set name: %w", err)
+	}
+	actor, err := a.systemActor(ctx)
+	if err != nil {
+		return err
+	}
+	now := clock.Micros(a.clock.Now())
+	details, err := jsonvalue.Object(jsonvalue.Member{Key: "userId", Value: jsonvalue.String(user.ID.String())})
+	if err != nil {
+		return fmt.Errorf("set name: %w", err)
+	}
+	entry, err := a.entry(actor, "account.renamed", details, now)
+	if err != nil {
+		return err
+	}
+	if err := a.store.ChangeDisplayName(ctx, user.ID, name, user.UpdatedAt, now, entry); err != nil {
+		return fmt.Errorf("set name: %w", err)
 	}
 	return nil
 }

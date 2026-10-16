@@ -79,6 +79,8 @@ var storeCases = map[string]func(ctx context.Context, tb testing.TB, env *Env){
 	"GetSessionByTokenHash":  caseGetSessionByTokenHash,
 	"UpdateSessionActivity":  caseUpdateSessionActivity,
 	"MarkSessionRevoked":     caseMarkSessionRevoked,
+	"ListLiveSessions":       caseListLiveSessions,
+	"ChangeDisplayName":      caseChangeDisplayName,
 	"GetLoginThrottle":       caseGetLoginThrottle,
 	"PutLoginThrottle":       casePutLoginThrottle,
 	"ClearLoginThrottle":     caseClearLoginThrottle,

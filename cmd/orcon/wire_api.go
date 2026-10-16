@@ -108,6 +108,14 @@ type productServer struct {
 	credentials *httpapi.Credentials
 }
 
+func (s productServer) ListSessions(ctx context.Context, req apigen.ListSessionsRequestObject) (apigen.ListSessionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.sessions.ListSessions(ctx, req)
+}
+
+func (s productServer) UpdateCurrentUser(ctx context.Context, req apigen.UpdateCurrentUserRequestObject) (apigen.UpdateCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.sessions.UpdateCurrentUser(ctx, req)
+}
+
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.ListProjects(ctx, req)
 }

@@ -6,6 +6,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -52,6 +53,44 @@ func (s *Store) ChangePassword(ctx context.Context, user identity.UserID, hash s
 		}
 		return insertPendingInstance(ctx, q, entry)
 	})
+}
+
+// ChangeDisplayName implements [identity.UserStore]: the new name and the audit entry are written
+// in one transaction, and only when the row still has the update instant the caller read.
+func (s *Store) ChangeDisplayName(ctx context.Context, user identity.UserID, displayName string, expected, now time.Time, entry audit.Entry) error {
+	return s.instanceTx(ctx, "change display name", func(ctx context.Context, q *sqlcgen.Queries) error {
+		n, err := q.UpdateApplicationUserDisplayName(ctx, sqlcgen.UpdateApplicationUserDisplayNameParams{
+			DisplayName: displayName, UpdatedAt: timestamp(now), ID: pgUUID(user), ExpectedUpdatedAt: timestamp(expected),
+		})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := q.GetApplicationUser(ctx, pgUUID(user)); err != nil {
+				return err
+			}
+			return fmt.Errorf("user %s changed since it was read: %w", user, identity.ErrConflict)
+		}
+		return insertPendingInstance(ctx, q, entry)
+	})
+}
+
+// ListLiveSessions implements [identity.SessionStore].
+func (s *Store) ListLiveSessions(ctx context.Context, user identity.UserID, now time.Time, limit int) ([]identity.SessionRecord, error) {
+	var out []identity.SessionRecord
+	err := s.instance(ctx, "list live sessions", func(ctx context.Context, q *sqlcgen.Queries) error {
+		rows, err := q.ListLiveSessionsOfUser(ctx, pgUUID(user), timestamp(now), int32(min(limit, math.MaxInt32))) //nolint:gosec // bounded by min above
+		if err != nil {
+			return err
+		}
+		out = make([]identity.SessionRecord, 0, len(rows))
+		for i := range rows {
+			r := &rows[i]
+			out = append(out, sessionRecord(r.ID, r.ApplicationUserID, r.AssuranceLevel, r.CreatedAt, r.ExpiresAt, r.IdleExpiresAt, r.LastSeenAt, r.RevokedAt))
+		}
+		return nil
+	})
+	return out, err
 }
 
 // SetPasswordHash implements [identity.UserStore].

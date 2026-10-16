@@ -41,7 +41,7 @@ paths:
     get:
       operationId: getCurrentUser
       summary: Get the signed-in user
-      description: Returns the user of the session the request carries, with that session. It never returns the password hash or the session token.
+      description: Returns the user of the session the request carries, with that session. The ETag is the one updateCurrentUser expects in If-Match. It never returns the password hash or the session token.
       tags:
         - session
       x-orcon-permission: authenticated
@@ -68,6 +68,8 @@ paths:
         '200':
           description: The signed-in user and the current session.
           headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
             Orcon-Request-Id:
               $ref: '#/components/headers/OrconRequestId'
             RateLimit:
@@ -99,8 +101,179 @@ paths:
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+    patch:
+      operationId: updateCurrentUser
+      summary: Update my profile
+      description: 'Changes the fields you send and leaves the others as they are (JSON Merge Patch). Today the only field is the display name. Send the ETag you read from getCurrentUser in If-Match; a stale ETag is refused so concurrent edits are never lost. The change is recorded as account.renamed. The password and the email are not changed here. Request body limit: 1 MiB.'
+      tags:
+        - session
+      x-orcon-permission: authenticated
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-audit: account.renamed
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - precondition-failed
+        - payload-too-large
+        - unsupported-media-type
+        - precondition-required
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: users update
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: renameMyAccount
+          scenario: signed-in-user
+          request:
+            headers:
+              If-Match: '"1760454245000000"'
+            body: renameMyAccount
+          response:
+            status: 200
+            body: renamedUser
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateCurrentUserRequest'
+            examples:
+              renameMyAccount:
+                summary: Change the display name
+                value:
+                  displayName: Ana Torres
+      responses:
+        '200':
+          description: The updated user and the session the request carries.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+              examples:
+                renamedUser:
+                  summary: The user with the new name
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a81
+                    email: ana@example.com
+                    displayName: Ana Torres
+                    currentSession:
+                      id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                      createdAt: '2026-10-14T15:04:05Z'
+                      expiresAt: '2026-11-13T15:04:05Z'
+                      idleExpiresAt: '2026-10-14T23:04:05Z'
+                      assuranceLevel: AAL1
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfCheckFailed'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /users/me/sessions:
     x-orcon-resource: collection
+    get:
+      operationId: listSessions
+      summary: List my sessions
+      description: Returns the live browser sessions of the signed-in user, the one the request carries included, newest first, one page at a time. A session that was revoked or has expired is not listed. Each item has the id that revokeSession names; the session of the request is the one whose id equals currentSession.id in getCurrentUser. The response never carries a session token. At most 1000 live sessions are read per user.
+      tags:
+        - session
+      x-orcon-permission: authenticated
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        none:
+          category: interactive-session-only
+          reason: Lists browser sessions; the command line signs in with device authorization (ADR-0058).
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: listMySessions
+          scenario: signed-in-user
+          request:
+            query:
+              limit: 50
+          response:
+            status: 200
+            body: mySessions
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: One page of the live sessions of the signed-in user.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+              examples:
+                mySessions:
+                  summary: Two live sessions, newest first
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                        createdAt: '2026-10-14T15:04:05Z'
+                        expiresAt: '2026-11-13T15:04:05Z'
+                        idleExpiresAt: '2026-10-14T23:04:05Z'
+                        assuranceLevel: AAL1
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a7f
+                        createdAt: '2026-10-12T09:30:00Z'
+                        expiresAt: '2026-11-11T09:30:00Z'
+                        idleExpiresAt: '2026-10-12T17:30:00Z'
+                        assuranceLevel: AAL1
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     post:
       operationId: createSession
       summary: Sign in with an email and a password
@@ -203,8 +376,8 @@ paths:
       - $ref: '#/components/parameters/SessionId'
     post:
       operationId: revokeSession
-      summary: Sign out of the current browser session
-      description: Revokes the session the request carries and clears its cookies. Only the current session can be revoked here; any other session id is not found, so the response never reveals another session. A later request with the same token gets 401 unauthenticated. API keys are revoked with the API key operations instead.
+      summary: Revoke one of my browser sessions
+      description: 'Revokes one live session of the signed-in user. Revoking the session the request carries signs out: the response clears both cookies and a later request with the same token gets 401 unauthenticated; that is audited as logout. Revoking another session of the same user ends it at once, leaves the cookies of this request alone and is audited as session.revoked. The id of a session that belongs to another user, that is already revoked or that does not exist is not found, so the response never reveals another user''s session. API keys are revoked with the API key operations instead.'
       tags:
         - session
       x-orcon-permission: authenticated
@@ -240,7 +413,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '204':
-          description: The session was revoked; the cookies are cleared.
+          description: The session was revoked. When it was the session of the request the cookies are cleared.
           headers:
             Orcon-Request-Id:
               $ref: '#/components/headers/OrconRequestId'
@@ -5420,6 +5593,23 @@ components:
             - AAL2
           examples:
             - AAL1
+    SessionList:
+      type: object
+      description: One page of sessions.
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: The items of this page.
+          items:
+            $ref: '#/components/schemas/Session'
+        nextPageToken:
+          type: string
+          description: Token for the next page; absent on the last page.
+          examples:
+            - example-page-token-2
+          maxLength: 1024
     CurrentUser:
       type: object
       description: The signed-in user and the session the request carries.
@@ -5458,6 +5648,19 @@ components:
           readOnly: true
           items:
             $ref: '#/components/schemas/OrgRole'
+    UpdateCurrentUserRequest:
+      type: object
+      description: Fields of the signed-in user to change (JSON Merge Patch).
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName:
+          type: string
+          description: New display name; it cannot be empty.
+          examples:
+            - Ana Torres
+          minLength: 1
+          maxLength: 200
     OrgRole:
       type: object
       description: The organization-level role a user holds in one organization.

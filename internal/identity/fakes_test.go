@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -255,6 +256,23 @@ func (f *fakeStore) ChangePassword(_ context.Context, user UserID, hash string, 
 	return nil
 }
 
+func (f *fakeStore) ChangeDisplayName(_ context.Context, user UserID, displayName string, expected, now time.Time, entry audit.Entry) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	u, ok := f.users[user]
+	if !ok {
+		return ErrNotFound
+	}
+	if !u.UpdatedAt.Equal(expected) {
+		return ErrConflict
+	}
+	u.DisplayName = displayName
+	u.UpdatedAt = now
+	f.users[user] = u
+	f.entries = append(f.entries, entry)
+	return nil
+}
+
 // PrincipalStore.
 
 func (f *fakeStore) CreatePrincipal(_ context.Context, p PrincipalRecord) error {
@@ -355,6 +373,28 @@ func (f *fakeStore) GetSession(_ context.Context, user UserID, session SessionID
 		return SessionRecord{}, ErrNotFound
 	}
 	return s, nil
+}
+
+func (f *fakeStore) ListLiveSessions(_ context.Context, user UserID, now time.Time, limit int) ([]SessionRecord, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []SessionRecord
+	for sid := range f.sessions {
+		s := f.sessions[sid]
+		if s.UserID == user && s.RevokedAt.IsZero() && now.Before(s.ExpiresAt) && now.Before(s.IdleExpiresAt) {
+			out = append(out, s)
+		}
+	}
+	slices.SortFunc(out, func(a, b SessionRecord) int {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		return bytes.Compare(b.ID[:], a.ID[:])
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (f *fakeStore) UpdateSessionActivity(_ context.Context, session SessionID, lastSeen, idleExpiresAt time.Time) error {

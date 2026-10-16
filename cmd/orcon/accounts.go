@@ -26,16 +26,18 @@ import (
 const accountsUsage = `usage:
   orcon accounts create --email <address> [--name <display name>]
   orcon accounts set-password --email <address>
+  orcon accounts set-name --email <address> --name <display name>
 
 The password is read from standard input, the first line, and is never a
-command-line argument. It must have at least 12 characters. When the server
-runs on SQLite it holds the database file, so stop it first.`
+command-line argument. It must have at least 12 characters. set-name reads
+nothing from standard input. When the server runs on SQLite it holds the
+database file, so stop it first.`
 
-// accountsCommand creates accounts and changes their passwords (SPEC-016 SH5).
+// accountsCommand creates accounts and changes their passwords and display names (SPEC-016 SH5, BL-132).
 func accountsCommand() command {
 	return command{
 		name:    "accounts",
-		summary: "create accounts and change their passwords",
+		summary: "create accounts and change their passwords and names",
 		run: func(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return runAccounts(ctx, args, os.Stdin, stdout, stderr)
 		},
@@ -56,7 +58,7 @@ func runAccounts(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
-	case "create", "set-password":
+	case "create", "set-password", "set-name":
 		return runAccountChange(ctx, sub, rest, stdin, stdout, stderr)
 	default:
 		_, _ = fmt.Fprintf(stderr, "orcon: unknown accounts subcommand %q\n%s\n", sub, accountsUsage)
@@ -64,12 +66,12 @@ func runAccounts(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 }
 
-// runAccountChange parses one subcommand, reads the password and applies the change.
+// runAccountChange parses one subcommand, reads the password when it needs one and applies the change.
 func runAccountChange(ctx context.Context, sub string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("orcon accounts "+sub, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	email := fs.String("email", "", "the address of the account")
-	name := fs.String("name", "", "the display name (create only)")
+	name := fs.String("name", "", "the display name (create and set-name only)")
 	if err := fs.Parse(args); err != nil {
 		_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
 		return exitUsage
@@ -83,13 +85,21 @@ func runAccountChange(ctx context.Context, sub string, args []string, stdin io.R
 		return exitUsage
 	}
 	if sub == "set-password" && *name != "" {
-		_, _ = fmt.Fprintln(stderr, "orcon: --name applies to create only")
+		_, _ = fmt.Fprintln(stderr, "orcon: --name applies to create and set-name only")
 		return exitUsage
 	}
-	secret, err := readPassword(stdin)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
+	if sub == "set-name" && strings.TrimSpace(*name) == "" {
+		_, _ = fmt.Fprintln(stderr, "orcon: --name is required")
 		return exitUsage
+	}
+	secret := ""
+	if sub != "set-name" {
+		var err error
+		secret, err = readPassword(stdin)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "orcon: %v\n", err)
+			return exitUsage
+		}
 	}
 
 	store, err := openAccountsStore(ctx)
@@ -112,6 +122,11 @@ func runAccountChange(ctx context.Context, sub string, args []string, stdin io.R
 			return accountFailure(stderr, err)
 		}
 		_, _ = fmt.Fprintln(stdout, "password changed; the account's live sessions ended")
+	case "set-name":
+		if err := accounts.SetDisplayName(ctx, *email, *name); err != nil {
+			return accountFailure(stderr, err)
+		}
+		_, _ = fmt.Fprintln(stdout, "display name changed")
 	}
 	return exitOK
 }

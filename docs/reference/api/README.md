@@ -4,7 +4,7 @@
 
 # API operation index
 
-Generated from the API contract: 49 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
+Generated from the API contract: 51 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
 
 ## Operations
 
@@ -57,8 +57,10 @@ Generated from the API contract: 49 operations and 0 event types. The reference 
 | POST | `/api/v1/projects/{projectId}/flows` | `createFlow` | Create a flow in a project | stable | `flow:create` | `orcon flows create` | `create_flow` (write) |
 | GET | `/api/v1/projects/{projectId}/node-types` | `listNodeTypes` | List the node types a project can use | stable | `project:read` | `orcon node-types list` | `list_node_types` (read) |
 | GET | `/api/v1/users/me` | `getCurrentUser` | Get the signed-in user | stable | `authenticated` | `orcon users whoami` | none |
+| PATCH | `/api/v1/users/me` | `updateCurrentUser` | Update my profile | stable | `authenticated` | `orcon users update` | none |
+| GET | `/api/v1/users/me/sessions` | `listSessions` | List my sessions | stable | `authenticated` | none (interactive-session-only) | none |
 | POST | `/api/v1/users/me/sessions` | `createSession` | Sign in with an email and a password | stable | `anonymous` | none (interactive-session-only) | none |
-| POST | `/api/v1/users/me/sessions/{sessionId}/revoke` | `revokeSession` | Sign out of the current browser session | stable | `authenticated` | none (interactive-session-only) | none |
+| POST | `/api/v1/users/me/sessions/{sessionId}/revoke` | `revokeSession` | Revoke one of my browser sessions | stable | `authenticated` | none (interactive-session-only) | none |
 
 ## Events
 

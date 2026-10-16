@@ -229,6 +229,24 @@ UPDATE application_user
 SET password_hash = sqlc.arg(password_hash), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
 
+-- name: UpdateApplicationUserDisplayName :execrows
+-- orcon:scope instance
+UPDATE application_user
+SET display_name = sqlc.arg(display_name), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND updated_at = sqlc.arg(expected_updated_at);
+
+-- The live sessions of one user, newest first: not revoked, not past the maximum age, not idle past the deadline.
+-- name: ListLiveSessionsOfUser :many
+-- orcon:scope instance
+SELECT id, application_user_id, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at
+FROM session
+WHERE application_user_id = sqlc.arg(application_user_id)
+  AND revoked_at IS NULL
+  AND expires_at > sqlc.arg(now)
+  AND idle_expires_at > sqlc.arg(now)
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(row_limit);
+
 -- name: InsertSession :exec
 -- orcon:scope instance
 INSERT INTO session (id, application_user_id, token_hash, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at, updated_at)

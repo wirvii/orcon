@@ -564,6 +564,62 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 	return err
 }
 
+const listLiveSessionsOfUser = `-- name: ListLiveSessionsOfUser :many
+SELECT id, application_user_id, assurance_level, created_at, expires_at, idle_expires_at, last_seen_at, revoked_at
+FROM session
+WHERE application_user_id = ?1
+  AND revoked_at IS NULL
+  AND expires_at > ?2
+  AND idle_expires_at > ?2
+ORDER BY created_at DESC, id DESC
+LIMIT ?3
+`
+
+type ListLiveSessionsOfUserRow struct {
+	ID                []byte
+	ApplicationUserID []byte
+	AssuranceLevel    string
+	CreatedAt         int64
+	ExpiresAt         int64
+	IdleExpiresAt     int64
+	LastSeenAt        int64
+	RevokedAt         sql.NullInt64
+}
+
+// The live sessions of one user, newest first: not revoked, not past the maximum age, not idle past the deadline.
+// orcon:scope instance
+func (q *Queries) ListLiveSessionsOfUser(ctx context.Context, applicationUserID []byte, now int64, rowLimit int64) ([]ListLiveSessionsOfUserRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLiveSessionsOfUser, applicationUserID, now, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveSessionsOfUserRow{}
+	for rows.Next() {
+		var i ListLiveSessionsOfUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationUserID,
+			&i.AssuranceLevel,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.IdleExpiresAt,
+			&i.LastSeenAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMemberships = `-- name: ListMemberships :many
 SELECT id, org_id, application_user_id, status, invited_by_principal_id, created_at, updated_at
 FROM membership
@@ -741,6 +797,33 @@ func (q *Queries) ResolveUserOrganizations(ctx context.Context, applicationUserI
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateApplicationUserDisplayName = `-- name: UpdateApplicationUserDisplayName :execrows
+UPDATE application_user
+SET display_name = ?1, updated_at = ?2
+WHERE id = ?3 AND updated_at = ?4
+`
+
+type UpdateApplicationUserDisplayNameParams struct {
+	DisplayName       string
+	UpdatedAt         int64
+	ID                []byte
+	ExpectedUpdatedAt int64
+}
+
+// orcon:scope instance
+func (q *Queries) UpdateApplicationUserDisplayName(ctx context.Context, arg UpdateApplicationUserDisplayNameParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateApplicationUserDisplayName,
+		arg.DisplayName,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.ExpectedUpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateApplicationUserPasswordHash = `-- name: UpdateApplicationUserPasswordHash :execrows
