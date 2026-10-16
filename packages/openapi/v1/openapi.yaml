@@ -340,8 +340,12 @@ components:
       $ref: ./schemas/session.yaml#/SessionCredentials
     Session:
       $ref: ./schemas/session.yaml#/Session
+    SessionList:
+      $ref: ./schemas/session.yaml#/SessionList
     CurrentUser:
       $ref: ./schemas/session.yaml#/CurrentUser
+    UpdateCurrentUserRequest:
+      $ref: ./schemas/session.yaml#/UpdateCurrentUserRequest
     OrgRole:
       $ref: ./schemas/session.yaml#/OrgRole
     ActivitySummary:

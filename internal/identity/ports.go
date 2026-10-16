@@ -124,6 +124,13 @@ type UserStore interface { //nolint:interfacebloat // the account and sign-in pa
 	//
 	//orcon:scope instance application_user is an instance table
 	ChangePassword(ctx context.Context, user UserID, hash string, now time.Time, entry audit.Entry) error
+	// ChangeDisplayName stores a new display name and the audit entry of the change in one
+	// transaction, only when the user's update instant is still expected (the one the caller
+	// read). An unknown user fails with [ErrNotFound]; a user changed since it was read with
+	// [ErrConflict].
+	//
+	//orcon:scope instance application_user is an instance table
+	ChangeDisplayName(ctx context.Context, user UserID, displayName string, expected, now time.Time, entry audit.Entry) error
 }
 
 // AuditLog appends the audit entries of actions that have no transaction of their own
@@ -157,6 +164,11 @@ type SessionStore interface {
 	//
 	//orcon:scope instance session is an instance table
 	UpdateSessionActivity(ctx context.Context, session SessionID, lastSeen, idleExpiresAt time.Time) error
+	// ListLiveSessions returns at most limit sessions of the user that are neither revoked nor
+	// past their maximum age or idle deadline at now, newest first (by start, then identity).
+	//
+	//orcon:scope instance session is an instance table
+	ListLiveSessions(ctx context.Context, user UserID, now time.Time, limit int) ([]SessionRecord, error)
 	// MarkSessionRevoked sets the revocation instant of a live session of the user and
 	// stores the audit entry of the revocation in the same transaction, or fails with [ErrNotFound].
 	//

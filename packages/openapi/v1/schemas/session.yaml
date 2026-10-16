@@ -68,6 +68,36 @@ Session:
         - AAL2
       examples:
         - AAL1
+SessionList:
+  type: object
+  description: One page of sessions.
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      description: The items of this page.
+      items:
+        $ref: ../openapi.yaml#/components/schemas/Session
+    nextPageToken:
+      type: string
+      description: Token for the next page; absent on the last page.
+      examples:
+        - example-page-token-2
+      maxLength: 1024
+UpdateCurrentUserRequest:
+  type: object
+  description: Fields of the signed-in user to change (JSON Merge Patch).
+  additionalProperties: false
+  minProperties: 1
+  properties:
+    displayName:
+      type: string
+      description: New display name; it cannot be empty.
+      examples:
+        - Ana Torres
+      minLength: 1
+      maxLength: 200
 CurrentUser:
   type: object
   description: The signed-in user and the session the request carries.

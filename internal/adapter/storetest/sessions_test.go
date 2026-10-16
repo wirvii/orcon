@@ -288,3 +288,85 @@ func TestParallelFailedAttemptsAreAllCounted(t *testing.T) {
 		}
 	})
 }
+
+// TestListAndRevokeOwnSessions (SPEC-004 R-ID-08): a user lists its live sessions, ends another
+// one with session.revoked and keeps the current one; the ended session no longer authenticates
+// and no longer appears; another user never sees or ends it.
+func TestListAndRevokeOwnSessions(t *testing.T) {
+	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
+		t.Helper()
+		f := newFixture(t, newStore)
+		clk := clock.NewFake(base)
+		svc := sessionsOf(t, f, clk)
+		ada := userWithPassword(t, f, "ada@example.test")
+		bob := userWithPassword(t, f, "bob@example.test")
+		laptop, err := svc.SignIn(f.ctx(), identity.SignIn{Email: "ada@example.test", Password: testPassword})
+		if err != nil {
+			t.Fatalf("sign in: %v", err)
+		}
+		clk.Advance(time.Minute)
+		phone, err := svc.SignIn(f.ctx(), identity.SignIn{Email: "ada@example.test", Password: testPassword})
+		if err != nil {
+			t.Fatalf("second sign in: %v", err)
+		}
+		if _, err := svc.SignIn(f.ctx(), identity.SignIn{Email: "bob@example.test", Password: testPassword}); err != nil {
+			t.Fatalf("bob signs in: %v", err)
+		}
+		me := identity.Principal{ID: ada.PrincipalID, Kind: identity.PrincipalUser, UserID: ada.ID, CredentialID: laptop.Session.ID.String()}
+		bobMe := identity.Principal{ID: bob.PrincipalID, Kind: identity.PrincipalUser, UserID: bob.ID}
+
+		got, err := svc.ListMine(f.ctx(), me)
+		if err != nil || len(got) != 2 || got[0].ID != phone.Session.ID || got[1].ID != laptop.Session.ID {
+			t.Fatalf("listed %+v, %v; want the phone then the laptop", got, err)
+		}
+		if err := svc.Revoke(f.ctx(), bobMe, phone.Session.ID); !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("bob ends the phone of ada: %v, want not found", err)
+		}
+		if err := svc.Revoke(f.ctx(), me, phone.Session.ID); err != nil {
+			t.Fatalf("ada ends her phone: %v", err)
+		}
+		if _, err := svc.Authenticate(f.ctx(), identity.Credentials{Session: phone.Token}); !errors.Is(err, identity.ErrUnauthenticated) {
+			t.Errorf("the ended session still authenticates: %v", err)
+		}
+		if _, err := svc.Authenticate(f.ctx(), identity.Credentials{Session: laptop.Token}); err != nil {
+			t.Errorf("the current session stopped authenticating: %v", err)
+		}
+		if got, err = svc.ListMine(f.ctx(), me); err != nil || len(got) != 1 || got[0].ID != laptop.Session.ID {
+			t.Errorf("listed after the revocation: %+v, %v; want only the laptop", got, err)
+		}
+		r := rawOf(t, f.s)
+		mustCount(t, r, identity.OrgID{}, 1, "SELECT count(*) FROM instance_audit_pending WHERE action_name = ?", "session.revoked")
+	})
+}
+
+// TestRenameOwnAccount (SPEC-019 F-04): the name changes under the revision the user read, the
+// next write with the old revision is refused, and the change is audited as account.renamed.
+func TestRenameOwnAccount(t *testing.T) {
+	forEachStore(t, func(t *testing.T, newStore storetest.Factory) {
+		t.Helper()
+		f := newFixture(t, newStore)
+		clk := clock.NewFake(base)
+		svc := sessionsOf(t, f, clk)
+		ada := userWithPassword(t, f, "ada@example.test")
+		read, err := f.s.GetUser(f.ctx(), ada.ID)
+		if err != nil {
+			t.Fatalf("read the user: %v", err)
+		}
+		me := identity.Principal{ID: ada.PrincipalID, Kind: identity.PrincipalUser, UserID: ada.ID}
+
+		clk.Advance(time.Minute)
+		renamed, err := svc.Rename(f.ctx(), me, "Ada Lovelace", read.UpdatedAt)
+		if err != nil {
+			t.Fatalf("rename: %v", err)
+		}
+		if renamed.DisplayName != "Ada Lovelace" || !renamed.UpdatedAt.After(read.UpdatedAt) {
+			t.Errorf("renamed = %+v, want the new name at a later instant", renamed)
+		}
+		if _, err := svc.Rename(f.ctx(), me, "Stale", read.UpdatedAt); !errors.Is(err, identity.ErrConflict) {
+			t.Errorf("rename with the old revision: %v, want conflict", err)
+		}
+		r := rawOf(t, f.s)
+		mustCount(t, r, identity.OrgID{}, 1, "SELECT count(*) FROM application_user WHERE id = ? AND display_name = ?", ada.ID[:], "Ada Lovelace")
+		mustCount(t, r, identity.OrgID{}, 1, "SELECT count(*) FROM instance_audit_pending WHERE action_name = ?", "account.renamed")
+	})
+}

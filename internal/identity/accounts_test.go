@@ -231,3 +231,36 @@ func TestSetPasswordReportsStorageFailures(t *testing.T) {
 		t.Fatal("a failing change was reported as success")
 	}
 }
+
+// TestSetDisplayNameRenamesAnAccountUnderTheSystemPrincipal (BL-132): the operator renames an
+// account by address; the account.renamed entry belongs to the installation, the name is
+// trimmed, an unknown address is not found and a blank name changes nothing.
+func TestSetDisplayNameRenamesAnAccountUnderTheSystemPrincipal(t *testing.T) {
+	f := newFixture(t)
+	user := f.account("owner@example.test", "correct horse battery")
+
+	if err := f.accounts.SetDisplayName(t.Context(), " Owner@Example.test ", "  Juan Tamayo "); err != nil {
+		t.Fatalf("set name: %v", err)
+	}
+	if got := f.store.users[user.ID].DisplayName; got != "Juan Tamayo" {
+		t.Errorf("display name = %q, want the trimmed name", got)
+	}
+	system, err := f.store.GetSystemPrincipal(t.Context())
+	if err != nil {
+		t.Fatalf("system principal: %v", err)
+	}
+	entries := f.store.entriesWith("account.renamed")
+	if len(entries) != 1 || entries[0].Actor.PrincipalID != id.UUID(system.ID) || entries[0].Actor.Kind != audit.ActorSystem {
+		t.Fatalf("account.renamed entries = %+v, want one under the system principal", entries)
+	}
+
+	if err := f.accounts.SetDisplayName(t.Context(), "nobody@example.test", "Nobody"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown address: %v, want ErrNotFound", err)
+	}
+	if err := f.accounts.SetDisplayName(t.Context(), "owner@example.test", "   "); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("blank name: %v, want ErrInvalidInput", err)
+	}
+	if got := f.store.users[user.ID].DisplayName; got != "Juan Tamayo" {
+		t.Errorf("a refused rename changed the name to %q", got)
+	}
+}

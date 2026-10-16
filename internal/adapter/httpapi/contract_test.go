@@ -212,6 +212,9 @@ var coreOperations = []struct {
 	{"createSession", "POST", "/users/me/sessions", "anonymous", "write", "optional", ""},
 	{"revokeSession", "POST", "/users/me/sessions/{sessionId}/revoke", "authenticated", "write", "optional", ""},
 	{"getCurrentUser", "GET", "/users/me", "authenticated", "read", "", ""},
+	// Settings (SPEC-019 F-03, F-04; SPEC-004 R-ID-08).
+	{"updateCurrentUser", "PATCH", "/users/me", "authenticated", "write", "", ""},
+	{"listSessions", "GET", "/users/me/sessions", "authenticated", "read", "", ""},
 	{"listOrgs", "GET", "/orgs", "authenticated", "read", "", ""},
 	// The credential operations of SPEC-004 SE7-store (SPEC-005 section 3, credentials and shares).
 	{"listCredentials", "GET", "/projects/{projectId}/credentials", "credential:read", "read", "", "list_credentials"},

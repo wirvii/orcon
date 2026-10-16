@@ -5,13 +5,16 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/oapi-codegen/runtime/types"
 
 	"github.com/wirvii/orcon/internal/adapter/httpapi/apigen"
+	"github.com/wirvii/orcon/internal/adapter/httpapi/conditional"
 	"github.com/wirvii/orcon/internal/adapter/httpapi/middleware"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/orgscope"
@@ -23,12 +26,12 @@ type SessionService interface {
 	SignIn(ctx context.Context, in identity.SignIn) (identity.SignedIn, error)
 	Current(ctx context.Context, principal identity.Principal) (identity.CurrentUser, error)
 	Revoke(ctx context.Context, actor identity.Principal, session identity.SessionID) error
+	ListMine(ctx context.Context, actor identity.Principal) ([]identity.SessionRecord, error)
+	Rename(ctx context.Context, actor identity.Principal, displayName string, expected time.Time) (identity.UserRecord, error)
 }
 
-// Sessions serves createSession, revokeSession and getCurrentUser (SPEC-016
-// section 3.2). It is not routed yet. Until SPEC-004 SE8 (the audit of sign-in and
-// sign-out) is on main, the two state-changing operations keep answering 503 from
-// Unavailable (SPEC-016 rule C-6). The getCurrentUser operation joins the routes with them.
+// Sessions serves createSession, revokeSession, getCurrentUser (SPEC-016 section 3.2),
+// listSessions and updateCurrentUser (SPEC-004 R-ID-08, SPEC-019 F-03 and F-04).
 type Sessions struct {
 	svc    SessionService
 	cookie middleware.AuthConfig
@@ -77,22 +80,115 @@ func (s *Sessions) CreateSession(ctx context.Context, req apigen.CreateSessionRe
 	}, nil
 }
 
-// RevokeSession ends the session the request carries (SPEC-016 R-SH-SES-04). Any
-// other session id is not found, so the answer never reveals another session.
+// RevokeSession ends one live session of the signed-in user (SPEC-016 R-SH-SES-04, SPEC-004
+// R-ID-08). Ending the session the request carries clears the cookies; ending another one of the
+// same user leaves them. The session of another user is not found, so the answer never reveals it.
 func (s *Sessions) RevokeSession(ctx context.Context, req apigen.RevokeSessionRequestObject) (apigen.RevokeSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	principal, ok := middleware.PrincipalFrom(ctx)
 	if !ok {
 		return nil, identity.ErrUnauthenticated
 	}
 	session := identity.SessionID(req.SessionId)
-	if session.String() != principal.CredentialID {
-		return nil, identity.ErrNotFound
-	}
 	if err := s.svc.Revoke(ctx, principal, session); err != nil {
 		return nil, err
 	}
+	if session.String() != principal.CredentialID {
+		return apigen.RevokeSession204Response{}, nil
+	}
 	return clearedSession{cookies: s.cookie}, nil
 }
+
+// ListSessions lists the live sessions of the signed-in user, newest first, one page at a time
+// (SPEC-004 R-ID-08). It reads at most identity.MaxListedSessions sessions.
+func (s *Sessions) ListSessions(ctx context.Context, req apigen.ListSessionsRequestObject) (apigen.ListSessionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	principal, ok := middleware.PrincipalFrom(ctx)
+	if !ok || principal.UserID.IsZero() {
+		return nil, identity.ErrUnauthenticated
+	}
+	limit := defaultPageSize
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	if limit < 1 || limit > maxPageSize {
+		return nil, identity.ErrInvalidInput
+	}
+	query := sessionQuery{Limit: limit}
+	var after *sessionCursor
+	if req.Params.PageToken != nil {
+		c, err := decodeSessionCursor(*req.Params.PageToken, query)
+		if err != nil {
+			return nil, err
+		}
+		after = &c
+	}
+	all, err := s.svc.ListMine(ctx, principal)
+	if err != nil {
+		return nil, err
+	}
+	var page []identity.SessionRecord
+	for i := range all {
+		if after != nil && !after.before(all[i]) {
+			continue
+		}
+		page = append(page, all[i])
+		if len(page) > limit {
+			break
+		}
+	}
+	body := apigen.SessionList{Items: []apigen.Session{}}
+	more := len(page) > limit
+	if more {
+		page = page[:limit]
+	}
+	for i := range page {
+		body.Items = append(body.Items, sessionBody(page[i]))
+	}
+	if more {
+		token, err := encodeSessionCursor(page[len(page)-1], query)
+		if err != nil {
+			return nil, err
+		}
+		body.NextPageToken = &token
+	}
+	return apigen.ListSessions200JSONResponse{Body: body}, nil
+}
+
+// UpdateCurrentUser changes the display name of the signed-in user (SPEC-019 F-04). The If-Match
+// ETag must be the one getCurrentUser returned; a stale one answers 412 with the current ETag.
+func (s *Sessions) UpdateCurrentUser(ctx context.Context, req apigen.UpdateCurrentUserRequestObject) (apigen.UpdateCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	principal, ok := middleware.PrincipalFrom(ctx)
+	if !ok {
+		return nil, identity.ErrUnauthenticated
+	}
+	cur, err := s.svc.Current(ctx, principal)
+	if err != nil {
+		return nil, err
+	}
+	rev, parseErr := conditional.Parse(req.Params.IfMatch)
+	if parseErr != nil || rev != userRevision(cur.User) {
+		return nil, staleRevisionError{etag: conditional.ETag(userRevision(cur.User))}
+	}
+	if req.Body == nil || req.Body.DisplayName == nil {
+		return nil, identity.ErrInvalidInput
+	}
+	if _, err := s.svc.Rename(ctx, principal, *req.Body.DisplayName, cur.User.UpdatedAt); err != nil {
+		if errors.Is(err, identity.ErrConflict) {
+			if fresh, getErr := s.svc.Current(ctx, principal); getErr == nil {
+				return nil, staleRevisionError{etag: conditional.ETag(userRevision(fresh.User))}
+			}
+		}
+		return nil, err
+	}
+	body, etag, err := s.currentUserBody(ctx, principal)
+	if err != nil {
+		return nil, err
+	}
+	return apigen.UpdateCurrentUser200JSONResponse{Body: body, Headers: apigen.UpdateCurrentUser200ResponseHeaders{ETag: &etag}}, nil
+}
+
+// userRevision is the revision of a user for optimistic concurrency: its last change, in
+// microseconds (the precision the stores keep). Renaming and changing the password move it.
+func userRevision(u identity.UserRecord) int64 { return u.UpdatedAt.UnixMicro() }
 
 // GetCurrentUser returns the user of the session the request carries (SPEC-016
 // R-SH-SES-05). It never returns the password hash or the token.
@@ -101,22 +197,32 @@ func (s *Sessions) GetCurrentUser(ctx context.Context, _ apigen.GetCurrentUserRe
 	if !ok {
 		return nil, identity.ErrUnauthenticated
 	}
-	current, err := s.svc.Current(ctx, principal)
+	body, etag, err := s.currentUserBody(ctx, principal)
 	if err != nil {
 		return nil, err
+	}
+	return apigen.GetCurrentUser200JSONResponse{Body: body, Headers: apigen.GetCurrentUser200ResponseHeaders{ETag: &etag}}, nil
+}
+
+// currentUserBody reads the user and the session of the principal and returns the CurrentUser
+// body with the ETag of the user.
+func (s *Sessions) currentUserBody(ctx context.Context, principal identity.Principal) (apigen.CurrentUser, string, error) {
+	current, err := s.svc.Current(ctx, principal)
+	if err != nil {
+		return apigen.CurrentUser{}, "", err
 	}
 	uid := types.UUID(current.User.ID)
 	roles, err := s.orgRoles(ctx, current.User.ID)
 	if err != nil {
-		return nil, err
+		return apigen.CurrentUser{}, "", err
 	}
-	return apigen.GetCurrentUser200JSONResponse{Body: apigen.CurrentUser{
+	return apigen.CurrentUser{
 		Id:             &uid,
 		Email:          types.Email(current.User.EmailNormalized),
 		DisplayName:    current.User.DisplayName,
 		CurrentSession: sessionBody(current.Session),
 		OrgRoles:       &roles,
-	}}, nil
+	}, conditional.ETag(userRevision(current.User)), nil
 }
 
 // orgRoles lists the organization-level role of the user in each organization it belongs to; an
@@ -201,4 +307,48 @@ func sessionBody(rec identity.SessionRecord) apigen.Session {
 // its start. A cookie outliving the session is harmless; the server checks both.
 func maxAge(rec identity.SessionRecord) int {
 	return int(rec.ExpiresAt.Sub(rec.CreatedAt) / time.Second)
+}
+
+// sessionQuery is what a page token is bound to: a token issued for another page size is refused.
+type sessionQuery struct {
+	Limit int `json:"l"`
+}
+
+// sessionCursor is the position of the last session of a page: (start instant, id).
+type sessionCursor struct {
+	Created int64        `json:"c"`
+	ID      string       `json:"i"`
+	Query   sessionQuery `json:"q"`
+}
+
+// before reports whether rec comes after the cursor in the newest-first (start, id) order.
+func (c sessionCursor) before(rec identity.SessionRecord) bool {
+	created := rec.CreatedAt.UnixMicro()
+	if created != c.Created {
+		return created < c.Created
+	}
+	return rec.ID.String() < c.ID
+}
+
+// encodeSessionCursor returns the opaque token of the position after rec.
+func encodeSessionCursor(rec identity.SessionRecord, q sessionQuery) (string, error) {
+	raw, err := json.Marshal(sessionCursor{Created: rec.CreatedAt.UnixMicro(), ID: rec.ID.String(), Query: q})
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// decodeSessionCursor reads a page token. A token that does not decode, or that was issued for
+// another page size, is errInvalidPageToken.
+func decodeSessionCursor(token string, q sessionQuery) (sessionCursor, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return sessionCursor{}, errInvalidPageToken
+	}
+	var c sessionCursor
+	if err := json.Unmarshal(raw, &c); err != nil || c.Query != q || c.ID == "" {
+		return sessionCursor{}, errInvalidPageToken
+	}
+	return c, nil
 }

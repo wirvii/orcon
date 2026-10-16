@@ -74,6 +74,16 @@ func (Unavailable) RevokeSession(context.Context, apigen.RevokeSessionRequestObj
 	return nil, errUnavailable
 }
 
+// ListSessions refuses GET /users/me/sessions.
+func (Unavailable) ListSessions(context.Context, apigen.ListSessionsRequestObject) (apigen.ListSessionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// UpdateCurrentUser refuses PATCH /users/me.
+func (Unavailable) UpdateCurrentUser(context.Context, apigen.UpdateCurrentUserRequestObject) (apigen.UpdateCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
 // GetCurrentUser refuses GET /users/me.
 func (Unavailable) GetCurrentUser(context.Context, apigen.GetCurrentUserRequestObject) (apigen.GetCurrentUserResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable

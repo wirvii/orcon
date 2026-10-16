@@ -220,3 +220,83 @@ func caseLockLoginThrottle(ctx context.Context, tb testing.TB, env *Env) {
 		tb.Fatalf("lock of an unknown identifier: %v, want not found", err)
 	}
 }
+
+// caseListLiveSessions: a user lists only its own live sessions, newest first; revoked and expired
+// sessions and the sessions of another user are never listed.
+func caseListLiveSessions(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	live := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-list-live")
+	newer := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-list-newer")
+	newer.CreatedAt = seededAt.Add(time.Minute)
+	revoked := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-list-revoked")
+	expired := sessionOf(env.B.User, fresh[identity.SessionID](env), "b-token-list-expired")
+	expired.ExpiresAt = seededAt.Add(time.Hour)
+	for _, rec := range []*identity.SessionRecord{&live, &newer, &revoked, &expired} {
+		if err := env.Stores.CreateSession(ctx, *rec, audittest.Instance(tb, "login.succeeded")); err != nil {
+			tb.Fatalf("create a session of B: %v", err)
+		}
+	}
+	if err := env.Stores.MarkSessionRevoked(ctx, env.B.User.ID, revoked.ID, seededAt, audittest.Instance(tb, "session.revoked")); err != nil {
+		tb.Fatalf("revoke a session of B: %v", err)
+	}
+	now := seededAt.Add(2 * time.Hour)
+
+	got, err := env.Stores.ListLiveSessions(ctx, env.B.User.ID, now, 50)
+	if err != nil {
+		tb.Fatalf("list the sessions of B: %v", err)
+	}
+	for i := range got {
+		if got[i].ID == revoked.ID || got[i].ID == expired.ID || got[i].UserID != env.B.User.ID {
+			tb.Fatalf("the list holds a session that is not a live session of B: %+v", got[i])
+		}
+	}
+	if len(got) < 2 || got[0].ID != newer.ID {
+		tb.Fatalf("the list = %+v; want the newer session of B first, then the older live ones", got)
+	}
+	if last := got[len(got)-1]; last.ID != live.ID && last.CreatedAt.After(live.CreatedAt) {
+		tb.Fatalf("the list is not newest first: %+v", got)
+	}
+	if one, err := env.Stores.ListLiveSessions(ctx, env.B.User.ID, now, 1); err != nil || len(one) != 1 || one[0].ID != newer.ID {
+		tb.Fatalf("the list with a limit of one = %+v, %v; want the newer session", one, err)
+	}
+	mine, err := env.Stores.ListLiveSessions(ctx, env.A.User.ID, now, 50)
+	if err != nil {
+		tb.Fatalf("list the sessions of A: %v", err)
+	}
+	for i := range mine {
+		if mine[i].UserID != env.A.User.ID {
+			tb.Fatalf("the sessions of A hold a session of another user: %+v", mine[i])
+		}
+	}
+	noLeak(tb, "the sessions of A", mine, nil, &env.B)
+}
+
+// caseChangeDisplayName: the name changes only for the update instant that was read, an unknown
+// user is not found, and a change of one user never touches another.
+func caseChangeDisplayName(ctx context.Context, tb testing.TB, env *Env) {
+	tb.Helper()
+	u := identity.UserRecord{
+		ID: fresh[identity.UserID](env), PrincipalID: fresh[identity.PrincipalID](env),
+		EmailNormalized: "rename-" + env.IDs.New().String() + "@example.test", DisplayName: "Before", Status: identity.UserActive,
+		CreatedAt: seededAt, UpdatedAt: seededAt,
+	}
+	if err := env.Stores.CreateUser(ctx, u); err != nil {
+		tb.Fatalf("create the user to rename: %v", err)
+	}
+	later := seededAt.Add(time.Minute)
+	if err := env.Stores.ChangeDisplayName(ctx, u.ID, "After", seededAt, later, audittest.Instance(tb, "account.renamed")); err != nil {
+		tb.Fatalf("rename the user: %v", err)
+	}
+	got, err := env.Stores.GetUser(ctx, u.ID)
+	if err != nil || got.DisplayName != "After" || !got.UpdatedAt.Equal(later) {
+		tb.Fatalf("the renamed user = %+v, %v; want the new name at the new instant", got, err)
+	}
+	wantErr(tb, "a stale update instant", env.Stores.ChangeDisplayName(ctx, u.ID, "Stale", seededAt, later.Add(time.Minute), audittest.Instance(tb, "account.renamed")), identity.ErrConflict)
+	wantErr(tb, "an unknown user", env.Stores.ChangeDisplayName(ctx, fresh[identity.UserID](env), "Ghost", seededAt, later, audittest.Instance(tb, "account.renamed")), identity.ErrNotFound)
+	if again, err := env.Stores.GetUser(ctx, u.ID); err != nil || again.DisplayName != "After" {
+		tb.Fatalf("a refused rename changed the user: %+v, %v", again, err)
+	}
+	if b, err := env.Stores.GetUser(ctx, env.B.User.ID); err != nil || b.DisplayName != env.B.User.DisplayName {
+		tb.Fatalf("the user of B changed: %+v, %v", b, err)
+	}
+}

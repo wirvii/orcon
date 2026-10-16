@@ -1,6 +1,85 @@
 # SPDX-FileCopyrightText: The Orcon Authors
 # SPDX-License-Identifier: Apache-2.0
 x-orcon-resource: collection
+get:
+  operationId: listSessions
+  summary: List my sessions
+  description: >-
+    Returns the live browser sessions of the signed-in user, the one the request carries included,
+    newest first, one page at a time. A session that was revoked or has expired is not listed. Each item
+    has the id that revokeSession names; the session of the request is the one whose id equals
+    currentSession.id in getCurrentUser. The response never carries a session token. At most 1000 live
+    sessions are read per user.
+  tags:
+    - session
+  x-orcon-permission: authenticated
+  x-orcon-rate-class: read
+  x-orcon-stability: stable
+  x-orcon-audit: none
+  x-orcon-problems:
+    - invalid-page-token
+    - validation-failed
+    - unauthenticated
+    - rate-limited
+    - internal-error
+    - service-unavailable
+  x-orcon-cli:
+    none:
+      category: interactive-session-only
+      reason: Lists browser sessions; the command line signs in with device authorization (ADR-0058).
+  x-orcon-mcp:
+    level: none
+  x-orcon-examples:
+    - name: listMySessions
+      scenario: signed-in-user
+      request:
+        query:
+          limit: 50
+      response:
+        status: 200
+        body: mySessions
+  parameters:
+    - $ref: ../openapi.yaml#/components/parameters/Limit
+    - $ref: ../openapi.yaml#/components/parameters/PageToken
+  responses:
+    '200':
+      description: One page of the live sessions of the signed-in user.
+      headers:
+        Orcon-Request-Id:
+          $ref: ../openapi.yaml#/components/headers/OrconRequestId
+        RateLimit:
+          $ref: ../openapi.yaml#/components/headers/RateLimit
+        RateLimit-Policy:
+          $ref: ../openapi.yaml#/components/headers/RateLimitPolicy
+      content:
+        application/json:
+          schema:
+            $ref: ../openapi.yaml#/components/schemas/SessionList
+          examples:
+            mySessions:
+              summary: Two live sessions, newest first
+              value:
+                items:
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a80
+                    createdAt: '2026-10-14T15:04:05Z'
+                    expiresAt: '2026-11-13T15:04:05Z'
+                    idleExpiresAt: '2026-10-14T23:04:05Z'
+                    assuranceLevel: AAL1
+                  - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a7f
+                    createdAt: '2026-10-12T09:30:00Z'
+                    expiresAt: '2026-11-11T09:30:00Z'
+                    idleExpiresAt: '2026-10-12T17:30:00Z'
+                    assuranceLevel: AAL1
+    '400':
+      $ref: ../openapi.yaml#/components/responses/ValidationFailed
+    '401':
+      $ref: ../openapi.yaml#/components/responses/Unauthenticated
+    '429':
+      $ref: ../openapi.yaml#/components/responses/RateLimited
+    '500':
+      $ref: ../openapi.yaml#/components/responses/InternalError
+    '503':
+      $ref: ../openapi.yaml#/components/responses/ServiceUnavailable
 post:
   operationId: createSession
   summary: Sign in with an email and a password

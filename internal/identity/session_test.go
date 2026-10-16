@@ -6,6 +6,7 @@ package identity
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -221,8 +222,8 @@ func TestRevokeEndsOwnSessionOnly(t *testing.T) {
 	adaSession := f.signIn(t, "ada@example.test", "correct horse battery")
 	bobSession := f.signIn(t, "bob@example.test", "another long password")
 
-	adaPrincipal := Principal{ID: ada.PrincipalID, Kind: PrincipalUser, UserID: ada.ID}
-	bobPrincipal := Principal{ID: bob.PrincipalID, Kind: PrincipalUser, UserID: bob.ID}
+	adaPrincipal := Principal{ID: ada.PrincipalID, Kind: PrincipalUser, UserID: ada.ID, CredentialID: adaSession.Session.ID.String()}
+	bobPrincipal := Principal{ID: bob.PrincipalID, Kind: PrincipalUser, UserID: bob.ID, CredentialID: bobSession.Session.ID.String()}
 
 	if err := f.sessions.Revoke(t.Context(), bobPrincipal, adaSession.Session.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("another user's session: %v, want ErrNotFound", err)
@@ -246,6 +247,104 @@ func TestRevokeEndsOwnSessionOnly(t *testing.T) {
 	}
 	if err := f.sessions.Revoke(t.Context(), bobPrincipal, bobSession.Session.ID); err != nil {
 		t.Errorf("bob's own session: %v", err)
+	}
+}
+
+// TestRevokeAnotherOwnSessionIsAuditedAsRevoked (SPEC-004 R-ID-08): a user ends another live
+// session of their own; the entry is session.revoked, not logout, and the session of the request
+// stays live.
+func TestRevokeAnotherOwnSessionIsAuditedAsRevoked(t *testing.T) {
+	f := newFixture(t)
+	ada := f.account("ada@example.test", "correct horse battery")
+	laptop := f.signIn(t, "ada@example.test", "correct horse battery")
+	phone := f.signIn(t, "ada@example.test", "correct horse battery")
+	principal := Principal{ID: ada.PrincipalID, Kind: PrincipalUser, UserID: ada.ID, CredentialID: laptop.Session.ID.String()}
+
+	if err := f.sessions.Revoke(t.Context(), principal, phone.Session.ID); err != nil {
+		t.Fatalf("revoke the other session: %v", err)
+	}
+	if f.store.sessions[phone.Session.ID].RevokedAt.IsZero() {
+		t.Error("the other session is still live")
+	}
+	if !f.store.sessions[laptop.Session.ID].RevokedAt.IsZero() {
+		t.Error("the session of the request was revoked")
+	}
+	got := f.store.entriesWith("session.revoked")
+	if len(got) != 1 || got[0].Actor.PrincipalID != id.UUID(ada.PrincipalID) || got[0].Actor.Kind != audit.ActorUser {
+		t.Errorf("session.revoked entries = %+v, want one under the user's principal", got)
+	}
+	if n := len(f.store.entriesWith("logout")); n != 0 {
+		t.Errorf("logout entries = %d, want none", n)
+	}
+}
+
+// TestListMineReturnsLiveSessionsNewestFirst (SPEC-004 R-ID-08): only the caller's live sessions
+// are listed, revoked and expired ones are not, and the newest comes first.
+func TestListMineReturnsLiveSessionsNewestFirst(t *testing.T) {
+	f := newFixture(t)
+	ada := f.account("ada@example.test", "correct horse battery")
+	f.account("bob@example.test", "another long password")
+	old := f.signIn(t, "ada@example.test", "correct horse battery")
+	f.clock.Advance(time.Minute)
+	revoked := f.signIn(t, "ada@example.test", "correct horse battery")
+	f.clock.Advance(time.Minute)
+	newest := f.signIn(t, "ada@example.test", "correct horse battery")
+	f.signIn(t, "bob@example.test", "another long password")
+	principal := Principal{ID: ada.PrincipalID, Kind: PrincipalUser, UserID: ada.ID, CredentialID: newest.Session.ID.String()}
+	if err := f.sessions.Revoke(t.Context(), principal, revoked.Session.ID); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+
+	got, err := f.sessions.ListMine(t.Context(), principal)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 2 || got[0].ID != newest.Session.ID || got[1].ID != old.Session.ID {
+		t.Fatalf("listed %v, want the newest then the oldest live session of the user", got)
+	}
+
+	f.clock.Advance(8*time.Hour + time.Minute)
+	got, err = f.sessions.ListMine(t.Context(), principal)
+	if err != nil || len(got) != 0 {
+		t.Errorf("after the idle timeout: %v, %v; want none", got, err)
+	}
+}
+
+// TestRenameChangesTheNameWithItsAuditEntry (SPEC-019 F-04): the new name is stored under the
+// user's principal with an account.renamed entry; a stale revision is a conflict that changes
+// nothing; a blank or oversized name is invalid.
+func TestRenameChangesTheNameWithItsAuditEntry(t *testing.T) {
+	f := newFixture(t)
+	ada := f.account("ada@example.test", "correct horse battery")
+	principal := Principal{ID: ada.PrincipalID, Kind: PrincipalUser, UserID: ada.ID}
+
+	f.clock.Advance(time.Minute)
+	got, err := f.sessions.Rename(t.Context(), principal, "  Ada Lovelace ", ada.UpdatedAt)
+	if err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if got.DisplayName != "Ada Lovelace" || !got.UpdatedAt.After(ada.UpdatedAt) {
+		t.Errorf("renamed user = %+v, want the trimmed name and a later update instant", got)
+	}
+	entries := f.store.entriesWith("account.renamed")
+	if len(entries) != 1 || entries[0].Actor.PrincipalID != id.UUID(ada.PrincipalID) || entries[0].Actor.Kind != audit.ActorUser {
+		t.Fatalf("account.renamed entries = %+v, want one under the user's principal", entries)
+	}
+
+	if _, err := f.sessions.Rename(t.Context(), principal, "Someone Else", ada.UpdatedAt); !errors.Is(err, ErrConflict) {
+		t.Errorf("stale revision: %v, want ErrConflict", err)
+	}
+	if f.store.users[ada.ID].DisplayName != "Ada Lovelace" || len(f.store.entriesWith("account.renamed")) != 1 {
+		t.Error("a stale rename changed the name or wrote an entry")
+	}
+	for _, bad := range []string{"", "   ", strings.Repeat("x", MaxDisplayNameLength+1)} {
+		if _, err := f.sessions.Rename(t.Context(), principal, bad, got.UpdatedAt); !errors.Is(err, ErrInvalidInput) {
+			t.Errorf("name %q: %v, want ErrInvalidInput", bad, err)
+		}
+	}
+	other := Principal{ID: PrincipalID(f.ids.New()), Kind: PrincipalUser, UserID: UserID(f.ids.New())}
+	if _, err := f.sessions.Rename(t.Context(), other, "Ghost", got.UpdatedAt); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown user: %v, want ErrNotFound", err)
 	}
 }
 

@@ -5,12 +5,14 @@ parameters:
   - $ref: ../openapi.yaml#/components/parameters/SessionId
 post:
   operationId: revokeSession
-  summary: Sign out of the current browser session
+  summary: Revoke one of my browser sessions
   description: >-
-    Revokes the session the request carries and clears its cookies. Only the current session can be
-    revoked here; any other session id is not found, so the response never reveals another session. A
-    later request with the same token gets 401 unauthenticated. API keys are revoked with the API key
-    operations instead.
+    Revokes one live session of the signed-in user. Revoking the session the request carries signs out:
+    the response clears both cookies and a later request with the same token gets 401 unauthenticated;
+    that is audited as logout. Revoking another session of the same user ends it at once, leaves the
+    cookies of this request alone and is audited as session.revoked. The id of a session that belongs to
+    another user, that is already revoked or that does not exist is not found, so the response never
+    reveals another user's session. API keys are revoked with the API key operations instead.
   tags:
     - session
   x-orcon-permission: authenticated
@@ -46,7 +48,7 @@ post:
     - $ref: ../openapi.yaml#/components/parameters/IdempotencyKey
   responses:
     '204':
-      description: The session was revoked; the cookies are cleared.
+      description: The session was revoked. When it was the session of the request the cookies are cleared.
       headers:
         Orcon-Request-Id:
           $ref: ../openapi.yaml#/components/headers/OrconRequestId

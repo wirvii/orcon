@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -505,12 +506,30 @@ func (s *Sessions) Current(ctx context.Context, principal Principal) (CurrentUse
 	return CurrentUser{User: user, Session: sess}, nil
 }
 
-// Revoke ends one session of the user, the sign-out of SPEC-016 R-SH-SES-04. An
-// unknown or already revoked session is [ErrNotFound].
-// Revoke ends one session of the user who acts; the logout entry records the principal
-// that asked for it (Annex B, auth).
+// MaxListedSessions bounds how many live sessions of one user a listing reads.
+const MaxListedSessions = 1000
+
+// ListMine returns the live sessions of the user who acts, newest first, at most
+// [MaxListedSessions] (SPEC-004 R-ID-08). A revoked or expired session is not listed.
+func (s *Sessions) ListMine(ctx context.Context, actor Principal) ([]SessionRecord, error) {
+	out, err := s.sessions.ListLiveSessions(ctx, actor.UserID, s.instant(), MaxListedSessions)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions: %w", err)
+	}
+	return out, nil
+}
+
+// Revoke ends one live session of the user who acts (SPEC-016 R-SH-SES-04, SPEC-004 R-ID-08).
+// The session the request carries ends with the logout entry, any other session of the same user
+// with session.revoked; both record the principal that asked for it (Annex B, auth). A session
+// of another user, an unknown one and one that is already revoked are [ErrNotFound]. The audit
+// entry is stored in the transaction of the revocation.
 func (s *Sessions) Revoke(ctx context.Context, actor Principal, session SessionID) error {
-	e, err := s.entry(userActor(actor.ID), "logout", audit.OutcomeSuccess, jsonvalue.Value{})
+	action := "session.revoked"
+	if session.String() == actor.CredentialID {
+		action = "logout"
+	}
+	e, err := s.entry(userActor(actor.ID), action, audit.OutcomeSuccess, jsonvalue.Value{})
 	if err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
@@ -518,6 +537,50 @@ func (s *Sessions) Revoke(ctx context.Context, actor Principal, session SessionI
 		return fmt.Errorf("revoke session: %w", err)
 	}
 	return nil
+}
+
+// MaxDisplayNameLength is the longest display name, in characters (the column's check).
+const MaxDisplayNameLength = 200
+
+// ValidateDisplayName checks a display name: not blank and at most [MaxDisplayNameLength]
+// characters. It returns the name without the spaces around it.
+func ValidateDisplayName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	n := utf8.RuneCountInString(name)
+	if n == 0 || n > MaxDisplayNameLength {
+		return "", fmt.Errorf("%w: the display name must have between 1 and %d characters", ErrInvalidInput, MaxDisplayNameLength)
+	}
+	return name, nil
+}
+
+// Rename changes the display name of the user who acts, only when the user still has the update
+// instant the caller read (the revision behind the ETag). A user changed since it was read is
+// [ErrConflict]. The account.renamed entry is stored in the same transaction.
+func (s *Sessions) Rename(ctx context.Context, actor Principal, displayName string, expected time.Time) (UserRecord, error) {
+	name, err := ValidateDisplayName(displayName)
+	if err != nil {
+		return UserRecord{}, err
+	}
+	details, err := jsonvalue.Object(jsonvalue.Member{Key: "userId", Value: jsonvalue.String(actor.UserID.String())})
+	if err != nil {
+		return UserRecord{}, fmt.Errorf("rename: %w", err)
+	}
+	now := s.instant()
+	e, err := audit.NewEntry(audit.EntryParams{
+		ID: s.ids.New(), Chain: audit.InstanceChain(), OccurredAt: now, Actor: userActor(actor.ID),
+		Action: "account.renamed", Outcome: audit.OutcomeSuccess, Details: details,
+	})
+	if err != nil {
+		return UserRecord{}, fmt.Errorf("rename: audit: %w", err)
+	}
+	if err := s.users.ChangeDisplayName(ctx, actor.UserID, name, expected, now, e); err != nil {
+		return UserRecord{}, fmt.Errorf("rename: %w", err)
+	}
+	user, err := s.users.GetUser(ctx, actor.UserID)
+	if err != nil {
+		return UserRecord{}, fmt.Errorf("rename: %w", err)
+	}
+	return user, nil
 }
 
 // instant reads the clock at the precision the database keeps (microseconds), so the
