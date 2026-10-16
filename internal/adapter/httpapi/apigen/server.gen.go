@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Orcon Authors
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build go1.22
 
 // Package apigen provides primitives to interact with the openapi HTTP API.
