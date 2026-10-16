@@ -1,13 +1,5 @@
 {
-  "canvas.controls.level": "acronym or symbol",
-  "canvas.palette.key.escape": "acronym or symbol",
-  "canvas.sticky.colorOption": "word spelled the same in both languages",
-  "common.banner.danger": "word spelled the same in both languages",
-  "common.field.errorPrefix": "word spelled the same in both languages",
   "editor.catalog.group.apps": "word spelled the same in both languages",
-  "editor.data.fileSize": "unit",
-  "editor.data.view.json": "acronym or symbol",
-  "editor.details.executeKey": "acronym or symbol",
   "editor.logs.ms": "unit",
   "editor.logs.seconds": "unit",
   "editor.logs.tokens": "word spelled the same in both languages",
