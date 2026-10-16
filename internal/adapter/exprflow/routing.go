@@ -22,6 +22,7 @@ import (
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/expr"
 	"github.com/wirvii/orcon/internal/flow"
+	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
 // IfNodeType is the item-routing node that routes items by a condition.
@@ -114,6 +115,32 @@ func (r *Routing) RouteItems(ctx context.Context, call execution.RouteCall) ([][
 		}
 	}
 	return out, nil
+}
+
+// EvalValue evaluates an expression template for one item and returns its value:
+// the typed value of a template that is a single {{ }} segment, or the text of
+// any other template (ADR-0018 section 1). The item is $json and the only item
+// of $input; the environment is the recorded one of the activation, so $now and
+// Math.random() give the recorded values again when the activation is
+// recomputed. An expression that evaluates to undefined has the value null.
+func (r *Routing) EvalValue(ctx context.Context, template string, item jsonvalue.Value, env execution.NodeEnv) (jsonvalue.Value, error) {
+	prog, err := r.program(template)
+	if err != nil {
+		return jsonvalue.Value{}, err
+	}
+	sess := r.ev.Open()
+	defer func() { _ = sess.Close(ctx) }()
+	res, err := sess.Eval(ctx, prog, &expr.Env{
+		Input: []expr.Item{{JSON: item}}, ItemIndex: 0,
+		Activation: expr.NewActivation(env.Time, seedOf(env.Seed)),
+	})
+	if err != nil {
+		return jsonvalue.Value{}, err
+	}
+	if res.Undefined {
+		return jsonvalue.Null(), nil
+	}
+	return res.Value, nil
 }
 
 // verdict evaluates one program in a fresh session and reads its boolean.

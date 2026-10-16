@@ -1,0 +1,57 @@
+{
+  "name": "Filter, Sort and Limit",
+  "active": false,
+  "nodes": [
+    {"id": "n1", "name": "Start", "type": "n8n-nodes-base.manualTrigger", "typeVersion": 1, "position": [0, 0], "parameters": {}},
+    {
+      "id": "n2", "name": "Adults", "type": "n8n-nodes-base.filter", "typeVersion": 2.2, "position": [200, 0],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {"id": "c1", "leftValue": "={{ $json.age }}", "rightValue": 18, "operator": {"type": "number", "operation": "gte"}},
+            {"id": "c2", "leftValue": "={{ $json.country }}", "rightValue": "co", "operator": {"type": "string", "operation": "equals"}}
+          ],
+          "combinator": "and"
+        },
+        "options": {"ignoreCase": true}
+      }
+    },
+    {
+      "id": "n3", "name": "Old filter", "type": "n8n-nodes-base.filter", "typeVersion": 1, "position": [400, 0],
+      "parameters": {"conditions": {"string": [{"value1": "={{ $json.a }}", "value2": "x"}]}}
+    },
+    {
+      "id": "n4", "name": "Odd option", "type": "n8n-nodes-base.filter", "typeVersion": 2, "position": [600, 0],
+      "parameters": {
+        "conditions": {"conditions": [{"id": "c1", "leftValue": "={{ $json.a }}", "rightValue": "x", "operator": {"type": "string", "operation": "equals"}}], "combinator": "and"},
+        "options": {"keepDiscarded": true}
+      }
+    },
+    {
+      "id": "n5", "name": "Newest first", "type": "n8n-nodes-base.sort", "typeVersion": 1, "position": [800, 0],
+      "parameters": {
+        "type": "simple",
+        "sortFieldsUi": {"sortField": [
+          {"fieldName": "created.at", "order": "descending"},
+          {"fieldName": "name"}
+        ]},
+        "options": {"disableDotNotation": true}
+      }
+    },
+    {"id": "n6", "name": "Shuffle", "type": "n8n-nodes-base.sort", "typeVersion": 1, "position": [1000, 0], "parameters": {"type": "random"}},
+    {"id": "n7", "name": "Sort by code", "type": "n8n-nodes-base.sort", "typeVersion": 1, "position": [1200, 0], "parameters": {"type": "code", "code": "return items;"}},
+    {
+      "id": "n8", "name": "Sort twice", "type": "n8n-nodes-base.sort", "typeVersion": 1, "position": [1400, 0],
+      "parameters": {"sortFieldsUi": {"sortField": [{"fieldName": "a"}, {"fieldName": "a", "order": "descending"}]}}
+    },
+    {"id": "n9", "name": "Last five", "type": "n8n-nodes-base.limit", "typeVersion": 1, "position": [1600, 0], "parameters": {"maxItems": 5, "keep": "lastItems"}},
+    {"id": "n10", "name": "First one", "type": "n8n-nodes-base.limit", "typeVersion": 1, "position": [1800, 0], "parameters": {}},
+    {"id": "n11", "name": "Dynamic limit", "type": "n8n-nodes-base.limit", "typeVersion": 1, "position": [2000, 0], "parameters": {"maxItems": "={{ $json.n }}"}}
+  ],
+  "connections": {
+    "Start": {"main": [[{"node": "Adults", "type": "main", "index": 0}]]},
+    "Adults": {"main": [[{"node": "Newest first", "type": "main", "index": 0}]]},
+    "Newest first": {"main": [[{"node": "Last five", "type": "main", "index": 0}]]}
+  }
+}

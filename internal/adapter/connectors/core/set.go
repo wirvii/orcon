@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 )
 
@@ -47,6 +48,18 @@ type SetParams struct {
 // another package; this port lets the Set node run without knowing it.
 type Evaluator interface {
 	Evaluate(ctx context.Context, template string, item jsonvalue.Value) (jsonvalue.Value, error)
+}
+
+// ActivationEvaluator is an [Evaluator] that depends on the recorded
+// nondeterminism of one activation (ADR-0013 section 7, ADR-0018 section 5):
+// the runner binds it to the environment of the activation before it
+// evaluates, so `$now` and `Math.random()` give the recorded values again when
+// the activation is recomputed.
+type ActivationEvaluator interface {
+	Evaluator
+	// Bind returns the evaluator of one activation. It is safe to call per
+	// activation and its result is used by that activation only.
+	Bind(env execution.NodeEnv) Evaluator
 }
 
 // ParseSet reads the parameters of orcon.set@1 and reports the first problem.

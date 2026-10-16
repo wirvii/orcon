@@ -27,6 +27,11 @@ const (
 	DispUnsupported Disposition = "UNSUPPORTED"
 )
 
+// NamedTemplate is the Orcon column of a row whose types each become the
+// Orcon node of the same short name: Sort is orcon.sort@1, Split Out is
+// orcon.splitOut@1 (SPEC-003 Annex B).
+const NamedTemplate = "orcon.<name>@1"
+
 // CoreNode is one row of the core table: n8n node types that share one
 // counterpart in Orcon.
 type CoreNode struct {
@@ -57,8 +62,8 @@ var coreNodes = []CoreNode{
 	{[]string{"httpRequest"}, "orcon.http@1", "SPEC-003 CN3", DispNode, "GET and HEAD are READ; every other method is UNSAFE unless a key is declared"},
 	{[]string{"set"}, "orcon.set@1", "SPEC-003 CN13", DispNode, "Edit Fields"},
 	{[]string{"aggregate", "splitOut", "summarize", "sort", "limit", "filter", "renameKeys", "removeDuplicates", "compareDatasets", "itemLists"},
-		"orcon.<name>@1", "SPEC-003 CN13", DispNode, "Remove Duplicates across executions uses flow data"},
-	{[]string{"dateTime", "crypto", "jwt", "totp", "xml", "html", "markdown"}, "orcon.<name>@1", "SPEC-003 CN13", DispNode, "pure native nodes"},
+		NamedTemplate, "SPEC-003 CN13", DispNode, "Remove Duplicates across executions uses flow data"},
+	{[]string{"dateTime", "crypto", "jwt", "totp", "xml", "html", "markdown"}, NamedTemplate, "SPEC-003 CN13", DispNode, "pure native nodes"},
 	{[]string{"convertToFile", "extractFromFile", "compression", "editImage", "moveBinaryData", "spreadsheetFile"},
 		"orcon.file.*@1", "SPEC-003 CN13", DispNode, "streaming native nodes (ADR-0016)"},
 	{[]string{"executionData", "debugHelper"}, "orcon.executionData@1, orcon.debug@1", "SPEC-003 CN13", DispNode, ""},

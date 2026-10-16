@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/wirvii/orcon/internal/adapter/connectors/core"
 	"github.com/wirvii/orcon/internal/adapter/egress"
 	"github.com/wirvii/orcon/internal/adapter/exprflow"
 	"github.com/wirvii/orcon/internal/connector/declarative"
@@ -127,7 +128,12 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("wire orcon.http@1: %w", err)
 	}
-	runner := logFailures{next: httpdispatch.NewRouter(map[string]execution.NodeRunner{httpdispatch.HTTPNodeType: httpNode}), logger: opts.logger}
+	runners := map[string]execution.NodeRunner{httpdispatch.HTTPNodeType: httpNode}
+	coreRunner := core.NewRunner(coreEvaluator{routing: routing})
+	for _, typ := range core.Types() {
+		runners[typ] = coreRunner
+	}
+	runner := logFailures{next: httpdispatch.NewRouter(runners), logger: opts.logger}
 
 	workers := opts.role == config.RoleStandalone
 	cfg := durable.Config{
