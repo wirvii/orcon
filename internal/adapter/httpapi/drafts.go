@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/oapi-codegen/runtime/types"
 
@@ -125,6 +126,9 @@ func (d *Drafts) save(ctx context.Context, flowID types.UUID, ifMatch string, bu
 	principal, ok := middleware.PrincipalFrom(ctx)
 	if !ok || principal.UserID.IsZero() {
 		return flow.Record{}, identity.ErrUnauthenticated
+	}
+	if strings.TrimSpace(ifMatch) == "" {
+		return flow.Record{}, conditional.ErrRequired
 	}
 	expected, err := conditional.Parse(ifMatch)
 	if err != nil {

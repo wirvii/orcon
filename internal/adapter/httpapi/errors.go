@@ -70,6 +70,13 @@ func (h errorHandler) request(w http.ResponseWriter, r *http.Request, err error)
 		problem.Write(w, r, problem.PreconditionRequired)
 		return
 	}
+	// The generated binder refuses an empty header as a bad format before the handler runs; for
+	// If-Match that is the same as a missing one.
+	var badFormat *apigen.InvalidParamFormatError
+	if errors.As(err, &badFormat) && strings.EqualFold(badFormat.ParamName, "If-Match") {
+		problem.Write(w, r, problem.PreconditionRequired)
+		return
+	}
 	if field, ok := invalidField(err); ok {
 		problem.Write(w, r, problem.ValidationFailed, problem.Fields(field))
 		return

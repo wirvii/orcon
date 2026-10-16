@@ -32,7 +32,7 @@ func applyJSONPatch(document []byte, patch apigen.JsonPatch) ([]byte, error) {
 	if err := dec.Decode(&root); err != nil {
 		return nil, fmt.Errorf("read the stored draft: %w", err)
 	}
-	budget := &patchBudget{left: documentBodyLimit}
+	budget := &patchBudget{left: documentBodyLimit, moves: maxPatchMoves}
 	for i := range patch {
 		next, err := applyPatchOp(root, &patch[i], budget)
 		if err != nil {
@@ -60,7 +60,29 @@ var errPatchTooLarge = fmt.Errorf("%w: the patched document is larger than %d Mi
 
 // patchBudget bounds the bytes a patch may copy. A copy of the root, repeated, doubles the
 // document each time, so the total of every value a patch clones is capped before it is decoded.
-type patchBudget struct{ left int }
+type patchBudget struct {
+	left int
+	// moves is how many array elements the inserts and removals of the patch may still shift.
+	moves int
+}
+
+// maxPatchMoves is the most array elements a whole patch may shift. An insert or a removal at
+// index i shifts the elements after i, so a large array with many operations at its start costs
+// quadratic time that the operation count alone does not bound.
+const maxPatchMoves = 16 << 20
+
+// shift spends n element moves, or fails when the patch has asked for more work than it may.
+func (b *patchBudget) shift(n int) error {
+	if n > b.moves {
+		b.moves = 0
+		return errPatchTooCostly
+	}
+	b.moves -= n
+	return nil
+}
+
+// errPatchTooCostly is the failure of a patch whose array inserts and removals shift too many elements.
+var errPatchTooCostly = fmt.Errorf("%w: the array inserts and removals move more than %d elements", errPatch, maxPatchMoves)
 
 // take spends n bytes of the budget, or fails when the patch has copied more than a document may hold.
 func (b *patchBudget) take(n int) error {
@@ -84,14 +106,14 @@ func applyPatchOp(root any, op *apigen.JsonPatchOperation, budget *patchBudget) 
 		if err != nil {
 			return nil, err
 		}
-		return addAt(root, path, value)
+		return addAt(root, path, value, budget)
 	case apigen.Remove:
-		next, _, err := removeAt(root, path)
+		next, _, err := removeAt(root, path, budget)
 		return next, err
 	case apigen.Replace:
 		return replaceAt(root, path, op, budget)
 	case apigen.Move:
-		return moveAt(root, path, op)
+		return moveAt(root, path, op, budget)
 	case apigen.Copy:
 		return copyAt(root, path, op, budget)
 	case apigen.Test:
@@ -113,15 +135,15 @@ func replaceAt(root any, path []string, op *apigen.JsonPatchOperation, budget *p
 	if len(path) == 0 {
 		return value, nil
 	}
-	next, _, err := removeAt(root, path)
+	next, _, err := removeAt(root, path, budget)
 	if err != nil {
 		return nil, err
 	}
-	return addAt(next, path, value)
+	return addAt(next, path, value, budget)
 }
 
 // moveAt implements the move operation: remove at from, then add at path.
-func moveAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error) {
+func moveAt(root any, path []string, op *apigen.JsonPatchOperation, budget *patchBudget) (any, error) {
 	from, err := fromPointer(op)
 	if err != nil {
 		return nil, err
@@ -129,11 +151,11 @@ func moveAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error)
 	if len(from) < len(path) && hasPrefix(path, from) {
 		return nil, fmt.Errorf("%w: a value cannot be moved into itself", errPatch)
 	}
-	next, moved, err := removeAt(root, from)
+	next, moved, err := removeAt(root, from, budget)
 	if err != nil {
 		return nil, err
 	}
-	return addAt(next, path, moved)
+	return addAt(next, path, moved, budget)
 }
 
 // copyAt implements the copy operation: add at path a copy of the value at from.
@@ -150,7 +172,7 @@ func copyAt(root any, path []string, op *apigen.JsonPatchOperation, budget *patc
 	if err != nil {
 		return nil, err
 	}
-	return addAt(root, path, copied)
+	return addAt(root, path, copied, budget)
 }
 
 // testAt implements the test operation: the value at path must equal the value of the operation.
@@ -276,7 +298,7 @@ func getAt(root any, path []string) (any, error) {
 }
 
 // addAt inserts value at path and returns the new root (RFC 6902 section 4.1).
-func addAt(root any, path []string, value any) (any, error) {
+func addAt(root any, path []string, value any, budget *patchBudget) (any, error) {
 	if len(path) == 0 {
 		return value, nil
 	}
@@ -293,6 +315,9 @@ func addAt(root any, path []string, value any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := budget.shift(len(node) - i); err != nil {
+			return nil, err
+		}
 		return setAt(root, path[:len(path)-1], slices.Insert(node, i, value))
 	default:
 		return nil, fmt.Errorf("%w: %q is below a value that has no members", errPatch, clip(last, 64))
@@ -301,7 +326,7 @@ func addAt(root any, path []string, value any) (any, error) {
 }
 
 // removeAt deletes the value at path and returns the new root and the removed value.
-func removeAt(root any, path []string) (next, removed any, err error) {
+func removeAt(root any, path []string, budget *patchBudget) (next, removed any, err error) {
 	if len(path) == 0 {
 		return nil, root, nil
 	}
@@ -321,6 +346,9 @@ func removeAt(root any, path []string) (next, removed any, err error) {
 	case []any:
 		i, err := arrayIndex(last, len(node), false)
 		if err != nil {
+			return nil, nil, err
+		}
+		if err := budget.shift(len(node) - i); err != nil {
 			return nil, nil, err
 		}
 		old := node[i]

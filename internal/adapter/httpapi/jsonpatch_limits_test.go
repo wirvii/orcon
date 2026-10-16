@@ -62,3 +62,22 @@ func TestApplyJSONPatchKeepsNormalCopies(t *testing.T) {
 		t.Fatalf("patched = %s, want %s", got, want)
 	}
 }
+
+func TestApplyJSONPatchBoundsArrayShifting(t *testing.T) {
+	// 100k elements and 1000 inserts and removals at index 0: each one shifts the whole array, so
+	// the total work is far past the budget even though the operation count is within its cap.
+	doc := []byte(`{"a":[` + strings.Repeat("0,", 99999) + `0]}`)
+	var patch apigen.JsonPatch
+	for range 500 {
+		patch = append(patch, op(apigen.Add, "/a/0", 1), op(apigen.Remove, "/a/0", nil))
+	}
+	_, err := applyJSONPatch(doc, patch)
+	var issues *documentIssuesError
+	if !errors.As(err, &issues) || issues.fields[0].Code != "patch-failed" {
+		t.Fatalf("costly patch error = %v, want a patch-failed field error", err)
+	}
+	moved := apigen.JsonPatch{from(apigen.Move, "/a/0", "/a/-")}
+	if _, err := applyJSONPatch(doc, moved); err != nil {
+		t.Fatalf("one move in a large array: %v", err)
+	}
+}

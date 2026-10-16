@@ -33,6 +33,12 @@ type flowRig struct {
 
 func newFlowRig(t *testing.T) *flowRig {
 	t.Helper()
+	return newFlowRigWith(t, func(src trigger.FlowSource) trigger.FlowSource { return src })
+}
+
+// newFlowRigWith is newFlowRig with the flow source of the trigger service wrapped by wrap.
+func newFlowRigWith(t *testing.T, wrap func(trigger.FlowSource) trigger.FlowSource) *flowRig {
+	t.Helper()
 	r := newDraftRig(t)
 	mem := r.grants.Memory
 	ids := id.NewSequence()
@@ -40,7 +46,7 @@ func newFlowRig(t *testing.T) *flowRig {
 		ids.New() // keep the identities of the service apart from those the rig created
 	}
 	svc, err := trigger.New(trigger.Config{
-		Store: mem, Flows: mem, Catalog: triggertest.DefaultCatalog(), Credentials: &triggertest.Credentials{}, Clock: r.clk, IDs: ids,
+		Store: mem, Flows: wrap(mem), Catalog: triggertest.DefaultCatalog(), Credentials: &triggertest.Credentials{}, Clock: r.clk, IDs: ids,
 	})
 	if err != nil {
 		t.Fatal(err)
