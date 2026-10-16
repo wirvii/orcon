@@ -33,6 +33,8 @@ tags:
     description: Executions of flows and the actions that finish or repeat them.
   - name: node-types
     description: The node types a project can use in its flows.
+  - name: credentials
+    description: Secret settings a project keeps for outside services; secret values are write-only.
 paths:
   /users/me:
     x-orcon-resource: singleton
@@ -4275,6 +4277,768 @@ paths:
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /projects/{projectId}/credentials:
+    x-orcon-resource: collection
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listCredentials
+      summary: List the credentials of a project
+      description: Returns the credentials the project owns and the ones other projects of the organization shared with it, one page at a time, ordered by name. Secret values are never returned; each item tells whether a secret is set. Items do not carry public fields; read one credential to get them.
+      tags:
+        - credentials
+      x-orcon-permission: credential:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials list
+      x-orcon-mcp:
+        level: read
+        tool: list_credentials
+        description: List the credentials a project owns or may use, without secret values.
+      x-orcon-examples:
+        - name: firstPageOfCredentials
+          scenario: project-with-flows
+          request:
+            pathParams:
+              projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+            query:
+              limit: 50
+          response:
+            status: 200
+            body: firstPageOfCredentials
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: One page of credentials, without public fields.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialList'
+              examples:
+                firstPageOfCredentials:
+                  summary: Two credentials, one owned and one shared with the project
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                        owned: true
+                        name: Slack notifications
+                        type: orcon.http@1
+                        status: OK
+                        allowedHosts:
+                          - hooks.slack.com
+                        versionCount: 2
+                        secret:
+                          set: true
+                          updatedAt: '2026-10-12T15:04:05Z'
+                          updatedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+                        createdAt: '2026-10-12T15:04:05Z'
+                        updatedAt: '2026-10-12T15:04:05Z'
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a92
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a77
+                        owned: false
+                        name: Shared CRM token
+                        type: orcon.http@1
+                        status: NEEDS_SECRET
+                        allowedHosts:
+                          - api.crm.example.com
+                        versionCount: 1
+                        secret:
+                          set: false
+                        createdAt: '2026-10-12T15:04:05Z'
+                        updatedAt: '2026-10-12T15:04:05Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createCredential
+      summary: Create a credential in a project
+      description: 'Creates a credential owned by the project and stores its secret fields encrypted. The response never contains the secret values: read secret.set to know whether one is stored. Request body limit: 1 MiB.'
+      tags:
+        - credentials
+      x-orcon-permission: credential:create
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-idempotency: optional
+      x-orcon-audit: credential.created
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - forbidden
+        - not-found
+        - conflict
+        - idempotency-in-progress
+        - payload-too-large
+        - unsupported-media-type
+        - idempotency-key-reused
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials create
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: createSlackCredential
+          scenario: empty-project
+          request:
+            pathParams:
+              projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+            body: createSlackCredential
+          response:
+            status: 201
+            body: createSlackCredential
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCredentialRequest'
+            examples:
+              createSlackCredential:
+                summary: A header credential that may only reach the Slack hook
+                value:
+                  name: Slack notifications
+                  type: orcon.http@1
+                  allowedHosts:
+                    - hooks.slack.com
+                  publicFields:
+                    header: Authorization
+                  secretFields:
+                    token: example-secret-1
+      responses:
+        '201':
+          description: The created credential, without its secret values.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+              examples:
+                createSlackCredential:
+                  summary: The new credential with its secret set
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    owned: true
+                    name: Slack notifications
+                    type: orcon.http@1
+                    status: OK
+                    allowedHosts:
+                      - hooks.slack.com
+                    versionCount: 1
+                    secret:
+                      set: true
+                      updatedAt: '2026-10-12T15:04:05Z'
+                      updatedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+                    publicFields:
+                      header: Authorization
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:04:05Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /credentials/{credentialId}:
+    x-orcon-resource: item
+    parameters:
+      - $ref: '#/components/parameters/CredentialId'
+    get:
+      operationId: getCredential
+      summary: Get a credential
+      description: Returns one credential with its public fields and the state of its secret. The secret value is never returned. The response carries the ETag to send in If-Match when you change the credential.
+      tags:
+        - credentials
+      x-orcon-permission: credential:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials get
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: getSlackCredential
+          scenario: empty-project
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+          response:
+            status: 200
+            body: getSlackCredential
+      responses:
+        '200':
+          description: The credential, without its secret values.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+              examples:
+                getSlackCredential:
+                  summary: The credential with its public fields
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    owned: true
+                    name: Slack notifications
+                    type: orcon.http@1
+                    status: OK
+                    allowedHosts:
+                      - hooks.slack.com
+                    versionCount: 2
+                    secret:
+                      set: true
+                      updatedAt: '2026-10-12T15:04:05Z'
+                      updatedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+                    publicFields:
+                      header: Authorization
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:04:05Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    patch:
+      operationId: updateCredential
+      summary: Update the name or the allowed hosts of a credential
+      description: 'Changes the fields you send and leaves the others as they are (JSON Merge Patch). Only the owning project may change a credential. Changing the secret is a different operation, replaceCredentialSecret. Send the ETag you read in If-Match; a stale ETag is refused. Request body limit: 1 MiB.'
+      tags:
+        - credentials
+      x-orcon-permission: credential:update
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-audit: credential.updated
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - forbidden
+        - not-found
+        - conflict
+        - precondition-failed
+        - payload-too-large
+        - unsupported-media-type
+        - precondition-required
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials update
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: renameSlackCredential
+          scenario: empty-project
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+            headers:
+              If-Match: '"2-1"'
+            body: renameSlackCredential
+          response:
+            status: 200
+            body: renameSlackCredential
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateCredentialRequest'
+            examples:
+              renameSlackCredential:
+                summary: Rename the credential
+                value:
+                  name: Slack alerts
+      responses:
+        '200':
+          description: The updated credential, without its secret values.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+              examples:
+                renameSlackCredential:
+                  summary: The credential with its new name
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    owned: true
+                    name: Slack alerts
+                    type: orcon.http@1
+                    status: OK
+                    allowedHosts:
+                      - hooks.slack.com
+                    versionCount: 2
+                    secret:
+                      set: true
+                      updatedAt: '2026-10-12T15:04:05Z'
+                      updatedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+                    publicFields:
+                      header: Authorization
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:10:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteCredential
+      summary: Delete a credential
+      description: Deletes the credential with its versions and every share with other projects. Flows that used it fail their next dispatch with a clear error. Send the ETag you read in If-Match.
+      tags:
+        - credentials
+      x-orcon-permission: credential:delete
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-audit: credential.deleted
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - precondition-failed
+        - precondition-required
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials delete
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: deleteSlackCredential
+          scenario: empty-project
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+            headers:
+              If-Match: '"2-1"'
+          response:
+            status: 204
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: The credential was deleted.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /credentials/{credentialId}/secret:
+    x-orcon-resource: singleton
+    parameters:
+      - $ref: '#/components/parameters/CredentialId'
+    put:
+      operationId: replaceCredentialSecret
+      summary: Replace the secret of a credential
+      description: 'Stores a new version of the secret and makes it current; earlier versions are kept. The new secret is write-only: the response shows only that a secret is set, when it was written and by whom. Send the ETag you read in If-Match; a stale ETag is refused so a concurrent rotation is never overwritten. Request body limit: 1 MiB.'
+      tags:
+        - credentials
+      x-orcon-permission: credential:update
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-audit: credential.updated
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - forbidden
+        - not-found
+        - precondition-failed
+        - payload-too-large
+        - unsupported-media-type
+        - precondition-required
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials replace-secret
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: rotateSlackToken
+          scenario: empty-project
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+            headers:
+              If-Match: '"2-1"'
+            body: rotateSlackToken
+          response:
+            status: 200
+            body: rotateSlackToken
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceCredentialSecretRequest'
+            examples:
+              rotateSlackToken:
+                summary: Store a rotated token
+                value:
+                  secretFields:
+                    token: example-secret-2
+      responses:
+        '200':
+          description: The credential with its new version, without the secret values.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+              examples:
+                rotateSlackToken:
+                  summary: The credential with version 3 current
+                  value:
+                    id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+                    projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                    owned: true
+                    name: Slack notifications
+                    type: orcon.http@1
+                    status: OK
+                    allowedHosts:
+                      - hooks.slack.com
+                    versionCount: 3
+                    secret:
+                      set: true
+                      updatedAt: '2026-10-12T15:20:00Z'
+                      updatedBy: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+                    publicFields:
+                      header: Authorization
+                    createdAt: '2026-10-12T15:04:05Z'
+                    updatedAt: '2026-10-12T15:20:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /credentials/{credentialId}/shares:
+    x-orcon-resource: collection
+    parameters:
+      - $ref: '#/components/parameters/CredentialId'
+    post:
+      operationId: createCredentialShare
+      summary: Let another project use a credential
+      description: 'Lets a project of the same organization use the credential in its flows, without reading it. Only the owning project may share it. Sharing with the owning project itself is refused. Request body limit: 1 MiB.'
+      tags:
+        - credentials
+      x-orcon-permission: credential:share
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-idempotency: optional
+      x-orcon-audit: credential.shared
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - forbidden
+        - not-found
+        - conflict
+        - idempotency-in-progress
+        - payload-too-large
+        - unsupported-media-type
+        - idempotency-key-reused
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials share
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: shareWithProject
+          scenario: organization-with-projects
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+            body: shareWithProject
+          response:
+            status: 204
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareCredentialRequest'
+            examples:
+              shareWithProject:
+                summary: Let the Operations project use the credential
+                value:
+                  projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a77
+      responses:
+        '204':
+          description: The credential is shared with the project.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /credentials/{credentialId}/shares/{projectId}:
+    x-orcon-resource: item
+    parameters:
+      - $ref: '#/components/parameters/CredentialId'
+      - $ref: '#/components/parameters/ProjectId'
+    delete:
+      operationId: deleteCredentialShare
+      summary: Stop sharing a credential with a project
+      description: Removes the share, so the project can no longer use the credential. Its next dispatch fails with a clear error; runs already in progress are not interrupted. Only the owning project may unshare. Send the ETag of the credential you read in If-Match; a stale ETag is refused, so an unshare never acts on a credential that changed underneath you.
+      tags:
+        - credentials
+      x-orcon-permission: credential:share
+      x-orcon-rate-class: write
+      x-orcon-stability: stable
+      x-orcon-audit: credential.unshared
+      x-orcon-problems:
+        - validation-failed
+        - unauthenticated
+        - csrf-check-failed
+        - forbidden
+        - not-found
+        - precondition-failed
+        - precondition-required
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: credentials unshare
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: unshareFromProject
+          scenario: organization-with-projects
+          request:
+            pathParams:
+              credentialId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+              projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a77
+            headers:
+              If-Match: '"2-1"'
+          response:
+            status: 204
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: The share was removed.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     bearer:
@@ -4357,6 +5121,16 @@ components:
         format: uuid
         examples:
           - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a67
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      description: Id of the credential.
+      schema:
+        type: string
+        format: uuid
+        examples:
+          - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
     HumanTaskId:
       name: humanTaskId
       in: path
@@ -6478,6 +7252,248 @@ components:
           examples:
             - example-page-token-2
           maxLength: 1024
+    Credential:
+      type: object
+      description: 'A credential: the secret settings a project keeps to call an outside service. Secret fields are never returned; the secret object tells whether one is set and when and by whom it was last written.'
+      required:
+        - id
+        - projectId
+        - owned
+        - name
+        - type
+        - status
+        - allowedHosts
+        - versionCount
+        - secret
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the credential.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a90
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+          description: Id of the project that owns the credential.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        owned:
+          type: boolean
+          description: Whether the project the list belongs to owns the credential. A credential shared with the project can be used by its flows but only the owning project can change it.
+        name:
+          type: string
+          description: Name of the credential, unique inside the owning project.
+          examples:
+            - Slack notifications
+          maxLength: 100
+        type:
+          type: string
+          description: Connector reference of the credential type, for example the connector the secret serves.
+          examples:
+            - orcon.http@1
+          maxLength: 255
+        status:
+          type: string
+          description: OK when the credential can be used. NEEDS_SECRET means a value is missing, NEEDS_REAUTH means an OAuth grant must be given again, DISABLED means the owner switched it off.
+          enum:
+            - OK
+            - NEEDS_SECRET
+            - NEEDS_REAUTH
+            - DISABLED
+          x-orcon-enum-kind: identifier
+          examples:
+            - OK
+        allowedHosts:
+          type: array
+          description: Hosts the secret may be sent to. A request to any other host never receives the secret. An entry may start with one wildcard label, for example *.example.com.
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 253
+            examples:
+              - hooks.slack.com
+        versionCount:
+          type: integer
+          description: Number of versions of the secret. Replacing the secret adds one.
+          minimum: 1
+          examples:
+            - 2
+        secret:
+          $ref: '#/components/schemas/CredentialSecret'
+        publicFields:
+          type: object
+          description: Non-secret fields of the current version, by field name. Present when a single credential is returned; absent from list items.
+          additionalProperties:
+            type: string
+            maxLength: 4096
+          examples:
+            - region: eu-west-1
+        createdAt:
+          type: string
+          format: date-time
+          description: When the credential was created, in UTC.
+          examples:
+            - '2026-10-12T15:04:05Z'
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the credential last changed, in UTC. Changing the secret also changes it.
+          examples:
+            - '2026-10-12T15:04:05Z'
+          readOnly: true
+    CredentialSecret:
+      type: object
+      description: What a reader learns about the secret of a credential. The value itself is never returned, to anyone.
+      required:
+        - set
+      properties:
+        set:
+          type: boolean
+          description: Whether a secret value is stored.
+          examples:
+            - true
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the secret was last written, in UTC; absent when no secret is set.
+          examples:
+            - '2026-10-12T15:04:05Z'
+        updatedBy:
+          type: string
+          format: uuid
+          description: Id of the principal that last wrote the secret; absent when no secret is set.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a91
+    CredentialList:
+      type: object
+      description: One page of credentials.
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: The items of this page.
+          items:
+            $ref: '#/components/schemas/Credential'
+        nextPageToken:
+          type: string
+          description: Token for the next page; absent on the last page.
+          examples:
+            - example-page-token-2
+          maxLength: 1024
+    CreateCredentialRequest:
+      type: object
+      description: Fields of a new credential. Secret field values are stored and never returned.
+      required:
+        - name
+        - type
+        - secretFields
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Name of the credential, unique inside the project.
+          examples:
+            - Slack notifications
+          maxLength: 100
+        type:
+          type: string
+          description: Connector reference of the credential type.
+          examples:
+            - orcon.http@1
+          maxLength: 255
+        allowedHosts:
+          type: array
+          description: Hosts the secret may be sent to; empty means none until you add some.
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 253
+            examples:
+              - hooks.slack.com
+        publicFields:
+          type: object
+          description: Non-secret fields, by field name.
+          maxProperties: 64
+          additionalProperties:
+            type: string
+            maxLength: 4096
+          examples:
+            - region: eu-west-1
+        secretFields:
+          type: object
+          description: 'Secret fields, by field name. Write-only: they are stored encrypted and never returned. At least one field is required.'
+          minProperties: 1
+          maxProperties: 64
+          additionalProperties:
+            type: string
+            maxLength: 65536
+          examples:
+            - token: xoxb-example-value
+    UpdateCredentialRequest:
+      type: object
+      description: Fields of a credential to change (JSON Merge Patch). The secret is changed with replaceCredentialSecret.
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: New name of the credential.
+          examples:
+            - Slack alerts
+          maxLength: 100
+        allowedHosts:
+          type: array
+          description: New list of hosts the secret may be sent to; replaces the previous list.
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 253
+            examples:
+              - hooks.slack.com
+    ReplaceCredentialSecretRequest:
+      type: object
+      description: 'The new version of a credential: its secret fields and, optionally, its public fields. The new version becomes current; earlier versions are kept. When publicFields is absent the public fields of the current version are kept.'
+      required:
+        - secretFields
+      additionalProperties: false
+      properties:
+        publicFields:
+          type: object
+          description: Non-secret fields of the new version, by field name.
+          maxProperties: 64
+          additionalProperties:
+            type: string
+            maxLength: 4096
+          examples:
+            - region: eu-west-1
+        secretFields:
+          type: object
+          description: Secret fields of the new version. Write-only, as in the creation.
+          minProperties: 1
+          maxProperties: 64
+          additionalProperties:
+            type: string
+            maxLength: 65536
+          examples:
+            - token: xoxb-rotated-example-value
+    ShareCredentialRequest:
+      type: object
+      description: The project that may use the credential. Sharing gives use without read.
+      required:
+        - projectId
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+          description: Id of the project that may use the credential; it must belong to the same organization.
+          examples:
+            - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a77
   responses:
     ValidationFailed:
       description: A parameter or the body is invalid.

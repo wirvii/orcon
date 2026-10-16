@@ -6,10 +6,13 @@ package storetest_test
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/wirvii/orcon/internal/adapter/storetest"
+	"github.com/wirvii/orcon/internal/audit"
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/identity"
@@ -50,7 +53,7 @@ func TestCredentialStoreRoundTrip(t *testing.T) {
 		svc := credentialFixture(t, f)
 		scopeA := scopeOf(f.orgA)
 		projA2 := f.project(f.orgA, "beta")
-		owner := f.user("owner-credential@example.com").PrincipalID
+		owner := audit.Actor{PrincipalID: id.UUID(f.user("owner-credential@example.com").PrincipalID), Kind: audit.ActorUser}
 
 		const hiddenValue = "https://hooks.example.com/services/T000/B000/SECRET-ROUND-TRIP"
 		created, err := svc.Create(ctx, scopeA, f.projA, credential.Input{
@@ -108,7 +111,7 @@ func TestCredentialStoreRoundTrip(t *testing.T) {
 			t.Errorf("share to a project of another organization = %v, want ErrNotFound", err)
 		}
 
-		if err := svc.Unshare(ctx, scopeA, f.projA, created.ID, projA2); err != nil {
+		if err := svc.Unshare(ctx, scopeA, f.projA, created.ID, projA2, owner); err != nil {
 			t.Fatalf("unshare: %v", err)
 		}
 		if _, err := svc.Resolve(ctx, scopeA, projA2, created.ID); !errors.Is(err, credential.ErrNotUsable) {
@@ -126,28 +129,50 @@ func TestCredentialStoreRejectsStaleAndDuplicate(t *testing.T) {
 		ctx := f.ctx()
 		svc := credentialFixture(t, f)
 		scopeA := scopeOf(f.orgA)
-		owner := f.user("owner-stale@example.com").PrincipalID
+		owner := audit.Actor{PrincipalID: id.UUID(f.user("owner-stale@example.com").PrincipalID), Kind: audit.ActorUser}
 		in := credential.Input{Name: "Token", ConnectorReference: "http", AllowedHosts: []string{"api.example.com"},
 			Secret: map[string]string{"token": "first"}}
 		created, err := svc.Create(ctx, scopeA, f.projA, in, owner)
 		if err != nil {
 			t.Fatalf("create: %v", err)
 		}
+		// The audit entry of the creation is written with the credential (R-AUD-02); a refused creation leaves none.
+		pendingBefore := pendingAuditActions(t, f, scopeA)
+		if !slices.Contains(pendingBefore, "credential.created") {
+			t.Errorf("the creation left no credential.created entry: %v", pendingBefore)
+		}
 		if _, err := svc.Create(ctx, scopeA, f.projA, in, owner); !errors.Is(err, credential.ErrConflict) {
 			t.Errorf("the same name twice = %v, want ErrConflict", err)
 		}
+		if got := pendingAuditActions(t, f, scopeA); len(got) != len(pendingBefore) {
+			t.Errorf("a refused creation left audit entries: %v, before %v", got, pendingBefore)
+		}
 
 		first := credentialVersion(f, scopeA, created.ID, 2)
-		if err := f.s.AddVersion(ctx, scopeA, created.ID, 0, first, credential.StatusOK, base); !errors.Is(err, credential.ErrConflict) {
+		if err := f.s.AddVersion(ctx, scopeA, created.ID, 0, first, credential.StatusOK, base, audittest.Org(t, scopeA.UUID(), "credential.updated")); !errors.Is(err, credential.ErrConflict) {
 			t.Errorf("a version written on a stale current version = %v, want ErrConflict", err)
 		}
-		if err := f.s.AddVersion(ctx, scopeA, created.ID, 1, first, credential.StatusOK, base); err != nil {
+		if err := f.s.AddVersion(ctx, scopeA, created.ID, 1, first, credential.StatusOK, base, audittest.Org(t, scopeA.UUID(), "credential.updated")); err != nil {
 			t.Fatalf("the version on the current pointer: %v", err)
 		}
-		if err := f.s.AddVersion(ctx, scopeA, created.ID, 1, credentialVersion(f, scopeA, created.ID, 2), credential.StatusOK, base); err == nil {
+		if err := f.s.AddVersion(ctx, scopeA, created.ID, 1, credentialVersion(f, scopeA, created.ID, 2), credential.StatusOK, base, audittest.Org(t, scopeA.UUID(), "credential.updated")); err == nil {
 			t.Error("two versions both claimed version 2")
 		}
 	})
+}
+
+// pendingAuditActions returns the actions of the organization's audit entries that wait to be sealed.
+func pendingAuditActions(t *testing.T, f *fixture, org orgscope.Org) []string {
+	t.Helper()
+	entries, err := f.s.ListPending(f.ctx(), audit.OrganizationChain(org.UUID()), 1000)
+	if err != nil {
+		t.Fatalf("list pending audit entries: %v", err)
+	}
+	out := make([]string, 0, len(entries))
+	for i := range entries {
+		out = append(out, entries[i].Action)
+	}
+	return out
 }
 
 // credentialVersion is a version row for the store tests; the store never opens the ciphertext.

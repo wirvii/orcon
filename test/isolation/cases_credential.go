@@ -9,6 +9,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/wirvii/orcon/internal/audit/audittest"
 	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -53,7 +54,7 @@ func credentialOf(ctx context.Context, tb testing.TB, env *Env, o *Org) (credent
 		CreatedAt: seededAt, UpdatedAt: seededAt,
 	}
 	v := versionOf(env, o, rec, 1)
-	if err := env.Stores.CreateCredential(ctx, o.Scope, rec, v); err != nil {
+	if err := env.Stores.CreateCredential(ctx, o.Scope, rec, v, audittest.Org(tb, o.Scope.UUID(), "credential.created")); err != nil {
 		tb.Fatalf("create a credential of %s: %v", o.ID, err)
 	}
 	return rec, v
@@ -73,10 +74,10 @@ func versionOf(env *Env, o *Org, rec credential.Record, number int) credential.V
 func caseCreateCredential(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec, v := credentialOf(ctx, tb, env, &env.A)
-	if err := env.Stores.CreateCredential(ctx, env.B.Scope, rec, versionOf(env, &env.A, rec, 1)); err == nil {
+	if err := env.Stores.CreateCredential(ctx, env.B.Scope, rec, versionOf(env, &env.A, rec, 1), audittest.Org(tb, env.B.Scope.UUID(), "credential.created")); err == nil {
 		tb.Fatal("B stored a credential under the organization of A")
 	}
-	if err := env.Stores.CreateCredential(ctx, env.A.Scope, rec, v); err == nil {
+	if err := env.Stores.CreateCredential(ctx, env.A.Scope, rec, v, audittest.Org(tb, env.A.Scope.UUID(), "credential.created")); err == nil {
 		tb.Fatal("a second credential with the same identity was stored")
 	}
 }
@@ -123,7 +124,7 @@ func caseAddVersion(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec, _ := credentialOf(ctx, tb, env, &env.A)
 	bad := versionOf(env, &env.B, rec, 2)
-	if err := env.Stores.AddVersion(ctx, env.B.Scope, rec.ID, 1, bad, credential.StatusOK, seededAt); err == nil {
+	if err := env.Stores.AddVersion(ctx, env.B.Scope, rec.ID, 1, bad, credential.StatusOK, seededAt, audittest.Org(tb, env.B.Scope.UUID(), "credential.updated")); err == nil {
 		tb.Fatal("B added a version to the credential of A")
 	}
 	got, err := env.Stores.GetCredential(ctx, env.A.Scope, rec.ID)
@@ -139,7 +140,7 @@ func caseUpdateCredential(ctx context.Context, tb testing.TB, env *Env) {
 	forged := rec
 	forged.OrgID = identity.OrgIDOf(env.B.Scope)
 	forged.Name = env.B.Sentinel("renamed")
-	if err := env.Stores.UpdateCredential(ctx, env.B.Scope, forged); err == nil {
+	if err := env.Stores.UpdateCredential(ctx, env.B.Scope, forged, audittest.Org(tb, env.B.Scope.UUID(), "credential.updated")); err == nil {
 		tb.Fatal("B updated the credential of A")
 	}
 	got, err := env.Stores.GetCredential(ctx, env.A.Scope, rec.ID)
@@ -152,7 +153,7 @@ func caseUpdateCredential(ctx context.Context, tb testing.TB, env *Env) {
 func caseDeleteCredential(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec, _ := credentialOf(ctx, tb, env, &env.A)
-	wantErr(tb, "B deletes the credential of A", env.Stores.DeleteCredential(ctx, env.B.Scope, env.A.Project.ID, rec.ID), credential.ErrNotFound)
+	wantErr(tb, "B deletes the credential of A", env.Stores.DeleteCredential(ctx, env.B.Scope, env.A.Project.ID, rec.ID, audittest.Org(tb, env.B.Scope.UUID(), "credential.deleted")), credential.ErrNotFound)
 	if _, err := env.Stores.GetCredential(ctx, env.A.Scope, rec.ID); err != nil {
 		tb.Fatalf("A lost its credential after B's attempt: %v", err)
 	}
@@ -172,13 +173,13 @@ func caseCreateShare(ctx context.Context, tb testing.TB, env *Env) {
 	rec, _ := credentialOf(ctx, tb, env, &env.A)
 	toB := credential.Share{ID: fresh[id.UUID](env), OrgID: identity.OrgIDOf(env.A.Scope), CredentialID: rec.ID,
 		ProjectID: env.B.Project.ID, CreatedAt: seededAt}
-	if err := env.Stores.CreateShare(ctx, env.A.Scope, toB); err == nil {
+	if err := env.Stores.CreateShare(ctx, env.A.Scope, toB, audittest.Org(tb, env.A.Scope.UUID(), "credential.shared")); err == nil {
 		tb.Fatal("A shared its credential with a project of B")
 	}
 	fromB := toB
 	fromB.OrgID = identity.OrgIDOf(env.B.Scope)
 	fromB.ProjectID = env.B.Project.ID
-	if err := env.Stores.CreateShare(ctx, env.B.Scope, fromB); err == nil {
+	if err := env.Stores.CreateShare(ctx, env.B.Scope, fromB, audittest.Org(tb, env.B.Scope.UUID(), "credential.shared")); err == nil {
 		tb.Fatal("B shared a credential of A")
 	}
 	if _, err := env.Stores.GetShare(ctx, env.A.Scope, rec.ID, env.B.Project.ID); !errors.Is(err, credential.ErrNotFound) {
@@ -190,5 +191,5 @@ func caseCreateShare(ctx context.Context, tb testing.TB, env *Env) {
 func caseDeleteShare(ctx context.Context, tb testing.TB, env *Env) {
 	tb.Helper()
 	rec, _ := credentialOf(ctx, tb, env, &env.A)
-	wantErr(tb, "B removes a share of A", env.Stores.DeleteShare(ctx, env.B.Scope, rec.ID, env.A.Project.ID), credential.ErrNotFound)
+	wantErr(tb, "B removes a share of A", env.Stores.DeleteShare(ctx, env.B.Scope, rec.ID, env.A.Project.ID, audittest.Org(tb, env.B.Scope.UUID(), "credential.unshared")), credential.ErrNotFound)
 }

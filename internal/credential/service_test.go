@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/clock"
@@ -30,6 +31,14 @@ type memStore struct {
 	creds    map[id.UUID]Record
 	versions map[id.UUID]map[int]Version
 	shares   map[string]Share
+	entries  []audit.Entry
+}
+
+// record keeps the audit entry a mutator was given, so a test can check what the store was asked to write.
+func (m *memStore) record(e audit.Entry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.entries = append(m.entries, e)
 }
 
 func newMemStore() *memStore {
@@ -57,7 +66,8 @@ func (m *memStore) owned(org orgscope.Org, cred id.UUID) (Record, bool) {
 	return rec, ok && !org.IsZero() && rec.OrgID == identity.OrgIDOf(org)
 }
 
-func (m *memStore) CreateCredential(_ context.Context, org orgscope.Org, rec Record, first Version) error {
+func (m *memStore) CreateCredential(_ context.Context, org orgscope.Org, rec Record, first Version, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if org.IsZero() || rec.OrgID != identity.OrgIDOf(org) {
@@ -113,7 +123,8 @@ func (m *memStore) GetCredentialVersion(_ context.Context, org orgscope.Org, cre
 	return v, nil
 }
 
-func (m *memStore) AddVersion(_ context.Context, org orgscope.Org, cred id.UUID, expected int, v Version, status Status, at time.Time) error {
+func (m *memStore) AddVersion(_ context.Context, org orgscope.Org, cred id.UUID, expected int, v Version, status Status, at time.Time, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.owned(org, cred)
@@ -133,7 +144,8 @@ func (m *memStore) AddVersion(_ context.Context, org orgscope.Org, cred id.UUID,
 	return nil
 }
 
-func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Record) error {
+func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Record, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cur, ok := m.owned(org, rec.ID)
@@ -151,7 +163,8 @@ func (m *memStore) UpdateCredential(_ context.Context, org orgscope.Org, rec Rec
 	return nil
 }
 
-func (m *memStore) DeleteCredential(_ context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID) error {
+func (m *memStore) DeleteCredential(_ context.Context, org orgscope.Org, project identity.ProjectID, cred id.UUID, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	rec, ok := m.owned(org, cred)
@@ -181,7 +194,8 @@ func (m *memStore) GetShare(_ context.Context, org orgscope.Org, cred id.UUID, p
 	return s, nil
 }
 
-func (m *memStore) CreateShare(_ context.Context, org orgscope.Org, s Share) error {
+func (m *memStore) CreateShare(_ context.Context, org orgscope.Org, s Share, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.owned(org, s.CredentialID); !ok {
@@ -198,7 +212,8 @@ func (m *memStore) CreateShare(_ context.Context, org orgscope.Org, s Share) err
 	return nil
 }
 
-func (m *memStore) DeleteShare(_ context.Context, org orgscope.Org, cred id.UUID, project identity.ProjectID) error {
+func (m *memStore) DeleteShare(_ context.Context, org orgscope.Org, cred id.UUID, project identity.ProjectID, entry audit.Entry) error {
+	m.record(entry)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := shareKey(cred, project)
@@ -259,7 +274,7 @@ type fixture struct {
 	projA1 identity.ProjectID
 	projA2 identity.ProjectID
 	projB1 identity.ProjectID
-	by     identity.PrincipalID
+	actor  audit.Actor
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -277,7 +292,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{
 		t: t, store: st, orgA: a, orgB: b,
 		projA1: identity.ProjectID(ids.New()), projA2: identity.ProjectID(ids.New()), projB1: identity.ProjectID(ids.New()),
-		by: identity.PrincipalID(ids.New()),
+		actor: audit.Actor{PrincipalID: ids.New(), Kind: audit.ActorUser},
 	}
 	st.addProject(identity.OrgIDOf(a), f.projA1)
 	st.addProject(identity.OrgIDOf(a), f.projA2)
@@ -302,7 +317,7 @@ func basicInput(secret string) Input {
 
 func (f *fixture) mustCreate(in Input) Summary {
 	f.t.Helper()
-	s, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, in, f.by)
+	s, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, in, f.actor)
 	if err != nil {
 		f.t.Fatalf("create: %v", err)
 	}
@@ -356,7 +371,7 @@ func TestSecretFieldsNeverReturned(t *testing.T) {
 	_, err = f.svc.Create(f.t.Context(), f.orgA, f.projA1, Input{
 		Name: "bad", ConnectorReference: "whatsapp", AllowedHosts: []string{"https://x.example.com"},
 		Secret: map[string]string{"k": sentinelValue},
-	}, f.by)
+	}, f.actor)
 	if err == nil || strings.Contains(err.Error(), sentinelValue) {
 		t.Errorf("an invalid input error = %v; want an error that does not carry the value", err)
 	}
@@ -369,7 +384,7 @@ func TestReplaceCreatesVersion(t *testing.T) {
 	created := f.mustCreate(basicInput("first-value"))
 
 	next := basicInput("second-value")
-	after, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, next, f.by)
+	after, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, next, f.actor)
 	if err != nil {
 		t.Fatalf("replace: %v", err)
 	}
@@ -391,10 +406,10 @@ func TestReplaceCreatesVersion(t *testing.T) {
 		t.Fatalf("version 1 after a replace = %v, %v; want it kept", old.Number, err)
 	}
 	// A replacement that is not the owner's is refused and changes nothing.
-	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA2, created.ID, next, f.by); !errors.Is(err, ErrNotFound) {
+	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA2, created.ID, next, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("replace by an unrelated project = %v; want ErrNotFound", err)
 	}
-	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, Input{Public: map[string]string{"k": "v"}}, f.by); !errors.Is(err, ErrInvalid) {
+	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, Input{Public: map[string]string{"k": "v"}}, f.actor); !errors.Is(err, ErrInvalid) {
 		t.Errorf("replace without a secret = %v; want ErrInvalid", err)
 	}
 }
@@ -444,7 +459,7 @@ func TestHostBindingBlocksOtherHosts(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{"https://api.example.com", "*", "localhost:8080/x", "bad_name.example.com"} {
-		if _, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, withHosts(basicInput("v"), bad), f.by); !errors.Is(err, ErrInvalid) {
+		if _, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, withHosts(basicInput("v"), bad), f.actor); !errors.Is(err, ErrInvalid) {
 			t.Errorf("an allowed host %q = %v; want ErrInvalid", bad, err)
 		}
 	}
@@ -461,7 +476,7 @@ func withHosts(in Input, hosts ...string) Input {
 func TestShareUseWithoutRead(t *testing.T) {
 	f := newFixture(t)
 	created := f.mustCreate(basicInput("shared-value"))
-	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.by); err != nil {
+	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
 		t.Fatalf("share: %v", err)
 	}
 
@@ -479,13 +494,13 @@ func TestShareUseWithoutRead(t *testing.T) {
 	if seen.Owned || !seen.Secret.Set {
 		t.Errorf("shared view = owned %v, secret %+v; want not owned, secret set", seen.Owned, seen.Secret)
 	}
-	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA2, created.ID, basicInput("x"), f.by); !errors.Is(err, ErrNotOwner) {
+	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA2, created.ID, basicInput("x"), f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("replace by the shared project = %v; want ErrNotOwner", err)
 	}
-	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA2, created.ID); !errors.Is(err, ErrNotOwner) {
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA2, created.ID, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("delete by the shared project = %v; want ErrNotOwner", err)
 	}
-	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA2, created.ID, f.projA1, f.by); !errors.Is(err, ErrNotOwner) {
+	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA2, created.ID, f.projA1, f.actor); !errors.Is(err, ErrNotOwner) {
 		t.Errorf("share by the shared project = %v; want ErrNotOwner", err)
 	}
 }
@@ -495,13 +510,13 @@ func TestShareUseWithoutRead(t *testing.T) {
 func TestUnshareStopsNextDispatch(t *testing.T) {
 	f := newFixture(t)
 	created := f.mustCreate(basicInput("revocable"))
-	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.by); err != nil {
+	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
 		t.Fatalf("share: %v", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA2, created.ID); err != nil {
 		t.Fatalf("before the unshare: %v", err)
 	}
-	if err := f.svc.Unshare(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2); err != nil {
+	if err := f.svc.Unshare(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
 		t.Fatalf("unshare: %v", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA2, created.ID); !errors.Is(err, ErrNotUsable) {
@@ -517,10 +532,10 @@ func TestUnshareStopsNextDispatch(t *testing.T) {
 func TestShareNeverCrossOrg(t *testing.T) {
 	f := newFixture(t)
 	created := f.mustCreate(basicInput("tenant-a"))
-	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projB1, f.by); !errors.Is(err, ErrNotFound) {
+	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projB1, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("share to a project of another organization = %v; want ErrNotFound", err)
 	}
-	if err := f.svc.Share(f.t.Context(), f.orgB, f.projB1, created.ID, f.projA2, f.by); !errors.Is(err, ErrNotFound) {
+	if err := f.svc.Share(f.t.Context(), f.orgB, f.projB1, created.ID, f.projA2, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("share from another organization = %v; want ErrNotFound", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgB, f.projB1, created.ID); !errors.Is(err, ErrNotFound) {
@@ -532,20 +547,20 @@ func TestShareNeverCrossOrg(t *testing.T) {
 func TestCredentialLifecycle(t *testing.T) {
 	f := newFixture(t)
 	first := f.mustCreate(basicInput("one"))
-	if _, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, basicInput("two"), f.by); !errors.Is(err, ErrConflict) {
+	if _, err := f.svc.Create(f.t.Context(), f.orgA, f.projA1, basicInput("two"), f.actor); !errors.Is(err, ErrConflict) {
 		t.Errorf("the same name twice = %v; want ErrConflict", err)
 	}
-	upd, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, first.ID, Settings{Name: "Renamed", AllowedHosts: []string{"graph.facebook.com", "graph.facebook.com"}})
+	upd, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, first.ID, Settings{Name: "Renamed", AllowedHosts: []string{"graph.facebook.com", "graph.facebook.com"}}, f.actor)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	if upd.Name != "Renamed" || len(upd.AllowedHosts) != 1 {
 		t.Errorf("update = name %q hosts %v; want the new name and one host", upd.Name, upd.AllowedHosts)
 	}
-	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA2, first.ID, Settings{Name: "x", AllowedHosts: []string{"a.example.com"}}); !errors.Is(err, ErrNotFound) {
+	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA2, first.ID, Settings{Name: "x", AllowedHosts: []string{"a.example.com"}}, f.actor); !errors.Is(err, ErrNotFound) {
 		t.Errorf("update by an unrelated project = %v; want ErrNotFound", err)
 	}
-	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, first.ID); err != nil {
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, first.ID, f.actor); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA1, first.ID); !errors.Is(err, ErrNotFound) {
@@ -564,7 +579,7 @@ func TestNeedsSecretBecomesOKOnReplace(t *testing.T) {
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA1, created.ID); !errors.Is(err, ErrNotUsable) {
 		t.Errorf("resolve while NEEDS_SECRET = %v; want ErrNotUsable", err)
 	}
-	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, basicInput("supplied"), f.by); err != nil {
+	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, basicInput("supplied"), f.actor); err != nil {
 		t.Fatalf("replace: %v", err)
 	}
 	if _, err := f.svc.Resolve(f.t.Context(), f.orgA, f.projA1, created.ID); err != nil {
@@ -576,5 +591,72 @@ func TestNeedsSecretBecomesOKOnReplace(t *testing.T) {
 func TestNewRequiresCollaborators(t *testing.T) {
 	if _, err := New(Config{}); err == nil {
 		t.Error("New with no collaborators succeeded")
+	}
+}
+
+// TestMutationsAuditEveryChangeWithoutValues (SPEC-004 R-AUD-02, R-AUD-08, Annex B): each change hands the store
+// exactly one entry of the right action, by the caller, in the organization's chain, and no entry carries a secret
+// value or a field name that a secret could be read from.
+func TestMutationsAuditEveryChangeWithoutValues(t *testing.T) {
+	f := newFixture(t)
+	const secret = "probe-secret-value-7f3a"
+	created := f.mustCreate(basicInput(secret))
+	if _, err := f.svc.Replace(f.t.Context(), f.orgA, f.projA1, created.ID, Input{Secret: map[string]string{"accessToken": "rotated-" + secret}}, f.actor); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	if _, err := f.svc.Update(f.t.Context(), f.orgA, f.projA1, created.ID, Settings{Name: "Renamed", AllowedHosts: created.AllowedHosts}, f.actor); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if err := f.svc.Share(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
+		t.Fatalf("share: %v", err)
+	}
+	if err := f.svc.Unshare(f.t.Context(), f.orgA, f.projA1, created.ID, f.projA2, f.actor); err != nil {
+		t.Fatalf("unshare: %v", err)
+	}
+	if err := f.svc.Delete(f.t.Context(), f.orgA, f.projA1, created.ID, f.actor); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	want := []string{ActionCreated, ActionUpdated, ActionUpdated, ActionShared, ActionUnshared, ActionDeleted}
+	if len(f.store.entries) != len(want) {
+		t.Fatalf("%d audit entries, want %d", len(f.store.entries), len(want))
+	}
+	for i, e := range f.store.entries {
+		if e.Action != want[i] {
+			t.Errorf("entry %d action = %s, want %s", i, e.Action, want[i])
+		}
+		if e.Actor.PrincipalID != f.actor.PrincipalID || e.Actor.Kind != f.actor.Kind {
+			t.Errorf("entry %d actor = %+v, want %+v", i, e.Actor, f.actor)
+		}
+		if e.Chain.Org() != f.orgA.UUID() {
+			t.Errorf("entry %d is in the chain of another organization", i)
+		}
+		for _, v := range []string{secret, "rotated-" + secret, "accessToken", "phoneNumberId"} {
+			if bytes.Contains(e.Body, []byte(v)) {
+				t.Errorf("entry %d (%s) carries %q", i, e.Action, v)
+			}
+		}
+	}
+	if !bytes.Contains(f.store.entries[1].Body, []byte(`"version":2`)) || !bytes.Contains(f.store.entries[1].Body, []byte(`"secret"`)) {
+		t.Errorf("the replacement entry does not name the secret change and version 2: %s", f.store.entries[1].Body)
+	}
+	if !bytes.Contains(f.store.entries[2].Body, []byte(`"name"`)) {
+		t.Errorf("the update entry does not name the changed field: %s", f.store.entries[2].Body)
+	}
+}
+
+// TestOwnerProjectIsOrgScoped: the resolver that authorizes a request naming a credential answers with the owning
+// project inside the organization, and with not found for another organization or a malformed identifier.
+func TestOwnerProjectIsOrgScoped(t *testing.T) {
+	f := newFixture(t)
+	created := f.mustCreate(basicInput("v"))
+	owner, err := f.svc.OwnerProject(f.t.Context(), f.orgA, created.ID.String())
+	if err != nil || owner != f.projA1 {
+		t.Fatalf("owner = %v, %v; want %v", owner, err, f.projA1)
+	}
+	if _, err := f.svc.OwnerProject(f.t.Context(), f.orgB, created.ID.String()); !errors.Is(err, identity.ErrNotFound) {
+		t.Errorf("another organization = %v, want identity.ErrNotFound", err)
+	}
+	if _, err := f.svc.OwnerProject(f.t.Context(), f.orgA, "not-a-credential"); !errors.Is(err, identity.ErrNotFound) {
+		t.Errorf("malformed identifier = %v, want identity.ErrNotFound", err)
 	}
 }

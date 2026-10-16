@@ -78,6 +78,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			),
 			activity:      httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
 			orgExecutions: httpapi.NewOrgExecutions(sec.evaluator, sec.store, sec.store, sec.pageCodec),
+			credentials:   httpapi.NewCredentials(sec.credentials),
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -103,6 +104,8 @@ type productServer struct {
 	// orgExecutions serves the executions of an organization.
 	orgExecutions *httpapi.OrgExecutions
 	flows         *httpapi.Flows
+	// credentials serves the credential operations.
+	credentials *httpapi.Credentials
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -195,6 +198,38 @@ func (s productServer) ValidateDraft(ctx context.Context, req apigen.ValidateDra
 
 func (s productServer) UpdateDraft(ctx context.Context, req apigen.UpdateDraftRequestObject) (apigen.UpdateDraftResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.drafts.UpdateDraft(ctx, req)
+}
+
+func (s productServer) ListCredentials(ctx context.Context, req apigen.ListCredentialsRequestObject) (apigen.ListCredentialsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.ListCredentials(ctx, req)
+}
+
+func (s productServer) CreateCredential(ctx context.Context, req apigen.CreateCredentialRequestObject) (apigen.CreateCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.CreateCredential(ctx, req)
+}
+
+func (s productServer) GetCredential(ctx context.Context, req apigen.GetCredentialRequestObject) (apigen.GetCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.GetCredential(ctx, req)
+}
+
+func (s productServer) UpdateCredential(ctx context.Context, req apigen.UpdateCredentialRequestObject) (apigen.UpdateCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.UpdateCredential(ctx, req)
+}
+
+func (s productServer) ReplaceCredentialSecret(ctx context.Context, req apigen.ReplaceCredentialSecretRequestObject) (apigen.ReplaceCredentialSecretResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.ReplaceCredentialSecret(ctx, req)
+}
+
+func (s productServer) DeleteCredential(ctx context.Context, req apigen.DeleteCredentialRequestObject) (apigen.DeleteCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.DeleteCredential(ctx, req)
+}
+
+func (s productServer) CreateCredentialShare(ctx context.Context, req apigen.CreateCredentialShareRequestObject) (apigen.CreateCredentialShareResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.CreateCredentialShare(ctx, req)
+}
+
+func (s productServer) DeleteCredentialShare(ctx context.Context, req apigen.DeleteCredentialShareRequestObject) (apigen.DeleteCredentialShareResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.credentials.DeleteCredentialShare(ctx, req)
 }
 
 func (s productServer) CreateSession(ctx context.Context, req apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it

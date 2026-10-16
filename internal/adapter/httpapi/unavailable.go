@@ -24,6 +24,46 @@ type Unavailable struct{}
 
 var _ apigen.StrictServerInterface = Unavailable{}
 
+// ListCredentials refuses GET /projects/{projectId}/credentials.
+func (Unavailable) ListCredentials(context.Context, apigen.ListCredentialsRequestObject) (apigen.ListCredentialsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// CreateCredential refuses POST /projects/{projectId}/credentials.
+func (Unavailable) CreateCredential(context.Context, apigen.CreateCredentialRequestObject) (apigen.CreateCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// GetCredential refuses GET /credentials/{credentialId}.
+func (Unavailable) GetCredential(context.Context, apigen.GetCredentialRequestObject) (apigen.GetCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// UpdateCredential refuses PATCH /credentials/{credentialId}.
+func (Unavailable) UpdateCredential(context.Context, apigen.UpdateCredentialRequestObject) (apigen.UpdateCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// DeleteCredential refuses DELETE /credentials/{credentialId}.
+func (Unavailable) DeleteCredential(context.Context, apigen.DeleteCredentialRequestObject) (apigen.DeleteCredentialResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// ReplaceCredentialSecret refuses PUT /credentials/{credentialId}/secret.
+func (Unavailable) ReplaceCredentialSecret(context.Context, apigen.ReplaceCredentialSecretRequestObject) (apigen.ReplaceCredentialSecretResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// CreateCredentialShare refuses POST /credentials/{credentialId}/shares.
+func (Unavailable) CreateCredentialShare(context.Context, apigen.CreateCredentialShareRequestObject) (apigen.CreateCredentialShareResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
+// DeleteCredentialShare refuses DELETE /credentials/{credentialId}/shares/{projectId}.
+func (Unavailable) DeleteCredentialShare(context.Context, apigen.DeleteCredentialShareRequestObject) (apigen.DeleteCredentialShareResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return nil, errUnavailable
+}
+
 // CreateSession refuses POST /users/me/sessions.
 func (Unavailable) CreateSession(context.Context, apigen.CreateSessionRequestObject) (apigen.CreateSessionResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return nil, errUnavailable

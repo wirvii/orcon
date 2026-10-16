@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/wirvii/orcon/internal/audit"
 	"github.com/wirvii/orcon/internal/credential/envelope"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
@@ -21,7 +22,7 @@ import (
 //nolint:interfacebloat // the store is one port with one method per row operation of the credential tables (ADR-0043)
 type Store interface {
 	// CreateCredential stores a credential and its first version in one transaction.
-	CreateCredential(ctx context.Context, org orgscope.Org, rec Record, first Version) error
+	CreateCredential(ctx context.Context, org orgscope.Org, rec Record, first Version, entry audit.Entry) error
 	// GetCredential returns one credential of the organization, with the author and time of its current secret.
 	GetCredential(ctx context.Context, org orgscope.Org, credential id.UUID) (Record, error)
 	// ListCredentials returns the credentials a project owns or holds a share of, without the secrets.
@@ -31,17 +32,17 @@ type Store interface {
 	// AddVersion stores a new version, makes it current and sets the status of the credential, all in one transaction,
 	// and only while the current version is still expectedCurrent (otherwise [ErrConflict]). v.Number is
 	// expectedCurrent+1.
-	AddVersion(ctx context.Context, org orgscope.Org, credential id.UUID, expectedCurrent int, v Version, status Status, at time.Time) error
+	AddVersion(ctx context.Context, org orgscope.Org, credential id.UUID, expectedCurrent int, v Version, status Status, at time.Time, entry audit.Entry) error
 	// UpdateCredential stores the name and the allowed hosts of a credential.
-	UpdateCredential(ctx context.Context, org orgscope.Org, rec Record) error
+	UpdateCredential(ctx context.Context, org orgscope.Org, rec Record, entry audit.Entry) error
 	// DeleteCredential removes a credential owned by the project, with its versions and shares.
-	DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID) error
+	DeleteCredential(ctx context.Context, org orgscope.Org, project identity.ProjectID, credential id.UUID, entry audit.Entry) error
 	// GetShare returns the share of a credential with a project, or [ErrNotFound].
 	GetShare(ctx context.Context, org orgscope.Org, credential id.UUID, project identity.ProjectID) (Share, error)
 	// CreateShare stores a share; [ErrConflict] when the project already holds one.
-	CreateShare(ctx context.Context, org orgscope.Org, s Share) error
+	CreateShare(ctx context.Context, org orgscope.Org, s Share, entry audit.Entry) error
 	// DeleteShare removes a share, or returns [ErrNotFound].
-	DeleteShare(ctx context.Context, org orgscope.Org, credential id.UUID, project identity.ProjectID) error
+	DeleteShare(ctx context.Context, org orgscope.Org, credential id.UUID, project identity.ProjectID, entry audit.Entry) error
 }
 
 // DataKeys is the key service the credential service consumes. The envelope keyring implements it (ADR-0042): it
