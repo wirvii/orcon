@@ -19,5 +19,8 @@ func BuildRegistry() *Registry {
 	if err := addCredentialCases(r); err != nil {
 		panic("isolation: " + err.Error())
 	}
+	if err := addAICases(r); err != nil {
+		panic("isolation: " + err.Error())
+	}
 	return r
 }

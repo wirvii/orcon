@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl-rec-003",
+  "object": "chat.completion",
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": null, "refusal": "No puedo ayudar con eso."},
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 50, "completion_tokens": 7, "total_tokens": 57}
+}

@@ -1,0 +1,19 @@
+{
+  "id": "chatcmpl-rec-001",
+  "object": "chat.completion",
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": "Tu pedido sale hoy.", "refusal": null},
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 9,
+    "total_tokens": 129,
+    "prompt_tokens_details": {"cached_tokens": 100},
+    "completion_tokens_details": {"reasoning_tokens": 0}
+  }
+}
