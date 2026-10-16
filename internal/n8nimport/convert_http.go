@@ -40,9 +40,9 @@ func (c *converter) convertHTTP(n *Node) convResult {
 		return c.unsupported(n, nil, flow.ElementServiceTask)
 	}
 	p := params(n)
-	if opts, ok := p.Get("options"); ok && opts.Kind() == jsonvalue.KindObject && len(opts.Members()) > 0 {
-		return c.unsupported(n, []Finding{paramFinding(n, "parameters.options",
-			"the HTTP Request options (timeout, redirects, response format, proxy) are not converted")}, flow.ElementServiceTask)
+	format, problem := httpOptions(n, p)
+	if problem != nil {
+		return c.unsupported(n, []Finding{*problem}, flow.ElementServiceTask)
 	}
 
 	method, problem := httpMethod(n, p)
@@ -87,6 +87,9 @@ func (c *converter) convertHTTP(n *Node) convResult {
 	if credential != "" {
 		members = append(members, jsonvalue.Member{Key: "credential", Value: jsonvalue.String(credential)})
 	}
+	if format != "" {
+		members = append(members, jsonvalue.Member{Key: "responseFormat", Value: jsonvalue.String(format)})
+	}
 	parameters, err := jsonvalue.Object(members...)
 	if err != nil {
 		return c.unsupported(n, []Finding{paramFinding(n, "parameters", err.Error())}, flow.ElementServiceTask)
@@ -105,6 +108,57 @@ func (c *converter) convertHTTP(n *Node) convResult {
 		orconType: typeOrconHTTP,
 		findings:  findings,
 	}
+}
+
+// httpOptions reads the options collection of the node. The only option that
+// converts is the response format (options.response.response.responseFormat:
+// autodetect, json, text or file), which becomes the responseFormat parameter;
+// it returns "" when the option is not set, because autodetect is the default of
+// both nodes. An output property name other than "data" does not convert (the
+// node always names it data), and every other option (timeout, redirects,
+// proxy, full response and never error among them) leaves the node unsupported.
+func httpOptions(n *Node, p jsonvalue.Value) (string, *Finding) {
+	opts, ok := p.Get("options")
+	if !ok || opts.Kind() != jsonvalue.KindObject || len(opts.Members()) == 0 {
+		return "", nil
+	}
+	format := ""
+	for _, m := range opts.Members() {
+		if m.Key != "response" {
+			f := paramFinding(n, "parameters.options",
+				"the HTTP Request option "+m.Key+" is not converted; only the response format is")
+			return "", &f
+		}
+		inner, ok := m.Value.Get("response")
+		if !ok || inner.Kind() != jsonvalue.KindObject || len(m.Value.Members()) != 1 {
+			f := paramFinding(n, "parameters.options.response", "the response option must hold one response collection")
+			return "", &f
+		}
+		for _, o := range inner.Members() {
+			text, isStr := o.Value.Str()
+			switch {
+			case o.Key == "responseFormat" && isStr && !strings.HasPrefix(text, "="):
+				switch text {
+				case "autodetect", "json", "text", "file":
+					format = text
+				default:
+					f := paramFinding(n, "parameters.options.response.response.responseFormat",
+						"the response format "+text+" is not converted; autodetect, json, text and file are")
+					return "", &f
+				}
+			case o.Key == "outputPropertyName" && isStr && text == "data":
+				// The node names its output property data.
+			default:
+				f := paramFinding(n, "parameters.options.response.response."+o.Key,
+					"the response option "+o.Key+" is not converted; only a literal response format is")
+				return "", &f
+			}
+		}
+	}
+	if format == "autodetect" {
+		return "", nil
+	}
+	return format, nil
 }
 
 func isReadMethod(method string) bool { return method == "GET" || method == "HEAD" }

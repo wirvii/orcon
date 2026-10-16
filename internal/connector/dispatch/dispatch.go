@@ -139,6 +139,8 @@ type request struct {
 	hasBody    bool
 	credential string
 	idempotent bool
+	// format is how the body of a successful response becomes an item.
+	format ResponseFormat
 	// org and bucket locate the rate bucket the send draws from; they are set
 	// by Execute before any send.
 	org    identity.OrgID
@@ -184,6 +186,13 @@ func parse(node *flow.Node) (request, error) {
 		r.hasBody = true
 	}
 	r.credential, _ = stringParam(p, "credential")
+	r.format = FormatAutodetect
+	if v, ok := stringParam(p, "responseFormat"); ok && v != "" {
+		r.format = ResponseFormat(v)
+		if !r.format.Valid() {
+			return r, errors.New("orcon.http@1 responseFormat must be autodetect, json, text or file")
+		}
+	}
 	if v, ok := p.Get("idempotent"); ok {
 		if b, isBool := v.Bool(); isBool {
 			r.idempotent = b
@@ -524,7 +533,11 @@ func bodyOf(req request, item jsonvalue.Value) (string, error) {
 // sendOnce runs the one-operation connector and returns its items.
 func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, key, body string) ([]jsonvalue.Value, error) {
 	def := req.definition(cred.Auth)
-	in, err := declarative.New(def, declarative.Options{Sender: n.cfg.SenderFor(req.target), Now: n.cfg.Clock.Now})
+	mask := newMasker(cred)
+	in, err := declarative.New(def, declarative.Options{
+		Sender: n.cfg.SenderFor(req.target), Now: n.cfg.Clock.Now,
+		Decode: decoder{format: req.format, mask: mask}.decode,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("dispatch: %w", err)
 	}
@@ -533,7 +546,7 @@ func (n *HTTPNode) sendOnce(ctx context.Context, req request, cred Credential, k
 		n.honorRetryAfter(ctx, req, err)
 		return nil, describe(err)
 	}
-	return newMasker(cred).items(res.Items), nil
+	return mask.items(res.Items), nil
 }
 
 // honorRetryAfter blocks the shared bucket until the instant the provider asked

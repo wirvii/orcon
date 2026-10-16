@@ -183,3 +183,53 @@ func marshalParams(t *testing.T, v jsonvalue.Value) string {
 	}
 	return string(b)
 }
+
+// TestConvertHTTPResponseFormat checks that the response format option of n8n
+// becomes the responseFormat parameter, and that what cannot be kept leaves the
+// node unsupported.
+func TestConvertHTTPResponseFormat(t *testing.T) {
+	node := func(options string) []byte {
+		return []byte(`{"name":"Format","nodes":[
+		{"id":"a","name":"Page","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,
+		 "parameters":{"method":"GET","url":"https://example.test/page","options":` + options + `}}],"connections":{}}`)
+	}
+	response := func(inner string) string { return `{"response":{"response":` + inner + `}}` }
+	tests := []struct {
+		name    string
+		options string
+		want    string
+		field   string
+	}{
+		{"json", response(`{"responseFormat":"json"}`), `{"method":"GET","url":"https://example.test/page","responseFormat":"json"}`, ""},
+		{"text", response(`{"responseFormat":"text"}`), `{"method":"GET","url":"https://example.test/page","responseFormat":"text"}`, ""},
+		{"file", response(`{"responseFormat":"file","outputPropertyName":"data"}`), `{"method":"GET","url":"https://example.test/page","responseFormat":"file"}`, ""},
+		{"autodetect is the default", response(`{"responseFormat":"autodetect"}`), `{"method":"GET","url":"https://example.test/page"}`, ""},
+		{"no options", `{}`, `{"method":"GET","url":"https://example.test/page"}`, ""},
+		{"other property name", response(`{"responseFormat":"file","outputPropertyName":"report"}`), "", "parameters.options.response.response.outputPropertyName"},
+		{"never error", response(`{"neverError":true}`), "", "parameters.options.response.response.neverError"},
+		{"expression format", response(`{"responseFormat":"={{ $json.f }}"}`), "", "parameters.options.response.response.responseFormat"},
+		{"unknown format", response(`{"responseFormat":"xml"}`), "", "parameters.options.response.response.responseFormat"},
+		{"timeout beside the format", `{"timeout":5000,"response":{"response":{"responseFormat":"text"}}}`, "", "parameters.options"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conv, err := ConvertWorkflow(node(tt.options), testFlowID, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			o := outcomeOf(t, conv, "Page")
+			if tt.field != "" {
+				if o.Outcome != OutcomeUnsupported || strings.Join(fieldsOf(o.Findings), "|") != tt.field {
+					t.Fatalf("outcome %s with fields %v, want UNSUPPORTED at %s", o.Outcome, fieldsOf(o.Findings), tt.field)
+				}
+				return
+			}
+			if o.Outcome != OutcomeConverted {
+				t.Fatalf("outcome %s, want CONVERTED (%v)", o.Outcome, fieldsOf(o.Findings))
+			}
+			if got := marshalParams(t, nodeParams(t, conv, "Page")); got != tt.want {
+				t.Errorf("parameters\n got %s\nwant %s", got, tt.want)
+			}
+		})
+	}
+}
