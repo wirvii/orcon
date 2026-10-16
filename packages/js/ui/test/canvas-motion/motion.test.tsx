@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { cleanup, render, waitFor } from '@testing-library/react';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import '../../src/styles/index.css';
