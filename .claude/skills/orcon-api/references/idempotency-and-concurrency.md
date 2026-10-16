@@ -19,3 +19,4 @@ Precedence: accepted ADRs, then accepted `orcon-go` rules, then the API ADRs (AD
 
 - **IDEM-5** Editable resources return a strong `ETag`; `PUT`, `PATCH`, `DELETE` and state-guarded actions require `If-Match` (missing 428, mismatch 412 with the current ETag); `If-None-Match: *` creates only if absent. [`concurrency`]
 - **IDEM-6** Draft `PATCH` takes JSON Patch (RFC 6902, with `test`); other `PATCH` take JSON Merge Patch (RFC 7396). [`concurrency`]
+- **IDEM-7** Prove `If-Match`, `Idempotency-Key` and the other header rules over HTTP through the real router (`orcon-go` GS-T12), because the generated binder can reject a request before the handler runs. Incident: the `428` for an empty `If-Match` passed handler tests but could not occur over HTTP (#168, fixed in #180).

@@ -31,3 +31,4 @@ Precedence: accepted ADRs > accepted `orcon-go` rules > `orcon-ui` rules for any
 ## Documentation
 
 - **TS-9** Exported functions of packages have TSDoc; comments explain why; wording follows `dependencies.md` DP-7.
+- **TS-10** A comment never claims more than the code or its tests guarantee, and it changes in the same commit as the code it describes (same rule as `orcon-go` GS-D7). Incidents: pull requests 168 and 165.

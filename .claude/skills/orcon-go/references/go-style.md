@@ -74,6 +74,8 @@ This document defines how Orcon Go code is written. It applies to every `.go` fi
 - **GS-T9** Slow suites run behind `testing.Short()`, the PostgreSQL target or the nightly target. A test is never skipped silently; `t.Skip` states the reason.
 - **GS-T10** Use `t.Parallel()` where tests share no state; parallel subtests call it too (`tparallel`).
 - **GS-T11** Examples that document behavior are `Example` functions with an `// Output:` comment so they run as tests (`testableexamples`).
+- **GS-T12** Test observable behavior through the real router or HTTP stack (`httptest.Server` over the generated router and its middleware), not by calling a handler or an area service directly. A handler-level test can pass for a response that can never happen over HTTP. Incident: the `428` for an empty `If-Match` passed handler tests but could not occur over HTTP, because the generated binder rejected the request first (#168, fixed in #180).
+- **GS-T13** Every capability built in a package is proven wired at startup: a test goes through the real `cmd/orcon` wiring and asserts the capability takes effect. A package test proves the code works, not that it is used. Incidents: secret masking existed but was never called (#165); agent prices and budgets were never passed to the agent (#132); the official packages were never registered, so WhatsApp was missing from the catalog (#181).
 
 ## Documentation and license headers
 
@@ -90,7 +92,12 @@ This document defines how Orcon Go code is written. It applies to every `.go` fi
 
   In Markdown with frontmatter the header follows the frontmatter. `make spdx` checks it and `make spdx-fix` writes it.
 - **GS-D6** Deprecated identifiers carry a paragraph starting with `Deprecated:` that names the replacement.
+- **GS-D7** A comment never claims more than the code or its tests guarantee: no "always", "never", "validated" or "safe" unless code and a test enforce it, and a comment changes in the same commit as the code or query it describes. Incidents: the `guardActive` comment (#168), the IP literals comment in `hosts.go` (#165), stale query comments (#165).
 - **GS-D-PROV Provenance.** Code comments, commit messages, pull request text and documentation describe the change. They never name the AI assistants used to build Orcon and never carry AI authorship trailers (`Co-Authored-By` naming an AI, lines starting with `Generated with`, `<assistant>-Session:`). The terms are defined in tooling.md, "Provenance check", and enforced by `make provenance`, the `commit-msg` hook and the CI `provenance` job. mneme is a project tool and is named openly wherever it is relevant: documentation, commit messages and pull request text. Product AI features may name model providers only in the paths listed in `.provenance-allow`.
+
+## Product rules
+
+- **GS-R1** One product rule, one implementation. A rule that two code paths need (get and list, two adapters, two commands) is computed by one function that both call, and its inputs come from one source. Incidents: `hasUnpublishedChanges` was computed differently in get and in list (#166, #170); the organization came from two sources (BL-152).
 
 ## Performance practice
 
