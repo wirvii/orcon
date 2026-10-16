@@ -41,7 +41,7 @@ func (StoreSurface) StoreMethods() []string {
 var UncoveredStoreMethods = []string{
 	"Atomic", "ClaimOutbox", "ClaimTokens", "FindGrant", "FireDueTimers",
 	"GetExecution", "GetExternalOperation", "GetJoinInstance", "GetPackage", "GetPackageByID", "GetTimer",
-	"GetToken", "InTx", "InsertGrant", "InsertPackage", "ListAttentionRequests",
+	"GetToken", "InsertGrant", "InsertPackage", "ListAttentionRequests",
 	"ListDraftConnectorReferences", "ListExecutionEvents", "ListExecutions", "ListExternalOperations",
 	"ListPackageVersions", "ListPackages", "ListVersionConnectorReferences", "Read", "ReleaseExpiredLeases",
 	"ReleaseWorkerLeases", "RenewLeases", "ResolveWaitSecret",

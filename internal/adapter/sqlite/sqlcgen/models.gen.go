@@ -260,6 +260,18 @@ type ExecutionEvent struct {
 	CreatedAt               int64
 }
 
+type ExecutionHourCount struct {
+	ID             []byte
+	OrgID          []byte
+	ProjectID      []byte
+	HourStartedAt  int64
+	Mode           string
+	Status         string
+	ExecutionCount int64
+	CreatedAt      int64
+	UpdatedAt      int64
+}
+
 type ExternalOperation struct {
 	ID                    []byte
 	OrgID                 []byte
@@ -666,14 +678,15 @@ type OperationalAlert struct {
 }
 
 type Org struct {
-	ID                  []byte
-	Name                string
-	Slug                string
-	Status              string
-	DeletionScheduledAt sql.NullInt64
-	CreatedAt           int64
-	UpdatedAt           int64
-	AuthorizationEpoch  int64
+	ID                           []byte
+	Name                         string
+	Slug                         string
+	Status                       string
+	DeletionScheduledAt          sql.NullInt64
+	CreatedAt                    int64
+	UpdatedAt                    int64
+	AuthorizationEpoch           int64
+	TimeSavedMinutesPerExecution int64
 }
 
 type OrgKey struct {

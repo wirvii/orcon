@@ -51,6 +51,8 @@ paths:
     $ref: ./paths/org-projects.yaml
   /orgs/{orgId}/flows:
     $ref: ./paths/org-flows.yaml
+  /orgs/{orgId}/activity-summary:
+    $ref: ./paths/org-activity-summary.yaml
   /projects/{projectId}:
     $ref: ./paths/project.yaml
   /projects/{projectId}/flows:
@@ -318,6 +320,12 @@ components:
       $ref: ./schemas/session.yaml#/CurrentUser
     OrgRole:
       $ref: ./schemas/session.yaml#/OrgRole
+    ActivitySummary:
+      $ref: ./schemas/activity.yaml#/ActivitySummary
+    ActivityExecutionCounts:
+      $ref: ./schemas/activity.yaml#/ActivityExecutionCounts
+    ActivityTimeSaved:
+      $ref: ./schemas/activity.yaml#/ActivityTimeSaved
     Organization:
       $ref: ./schemas/session.yaml#/Organization
     OrganizationList:

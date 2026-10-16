@@ -51,6 +51,35 @@ SELECT COUNT(*)
 FROM flow
 WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND deleted_at IS NULL;
 
+-- name: CountActiveFlows :one
+-- orcon:scope org
+SELECT COUNT(*)
+FROM flow
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND activation_state = 'ACTIVE' AND deleted_at IS NULL;
+
+-- name: CountUncertainExecutions :one
+-- orcon:scope org
+-- orcon:hot
+SELECT COUNT(*)
+FROM (SELECT DISTINCT o.execution_id FROM external_operation AS o WHERE o.org_id = sqlc.arg(org_id) AND o.state = 'UNCERTAIN') AS u
+JOIN execution AS e ON e.org_id = sqlc.arg(org_id) AND e.id = u.execution_id
+WHERE e.project_id = sqlc.arg(project_id) AND e.created_at >= sqlc.arg(since_at);
+
+-- name: ListExecutionHourCounts :many
+-- orcon:scope org
+-- orcon:hot
+SELECT hour_started_at, mode, status, execution_count
+FROM execution_hour_count
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND hour_started_at >= sqlc.arg(since_at)
+LIMIT 1000;
+
+-- name: CountSucceededTriggerExecutions :one
+-- orcon:scope org
+-- orcon:hot
+SELECT CAST(COALESCE(SUM(execution_count), 0) AS bigint) AS succeeded
+FROM execution_hour_count
+WHERE org_id = sqlc.arg(org_id) AND project_id = sqlc.arg(project_id) AND status = 'SUCCEEDED' AND mode = 'TRIGGER' AND hour_started_at >= sqlc.arg(since_at);
+
 -- name: UpdateFlowDraft :execrows
 -- orcon:scope org
 UPDATE flow

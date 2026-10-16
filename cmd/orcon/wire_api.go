@@ -60,6 +60,7 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			sessions:              httpapi.NewSessions(sec.sessions, middleware.DefaultAuthConfig(), sec.publicOrigin, sec.store, sec.evaluator),
 			orgs:                  httpapi.NewOrgs(sec.store),
 			projects:              projects,
+			activity:              httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -76,6 +77,7 @@ type productServer struct {
 	sessions *httpapi.Sessions
 	orgs     *httpapi.Orgs
 	projects *httpapi.Projects
+	activity *httpapi.Activity
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -108,6 +110,10 @@ func (s productServer) GetCurrentUser(ctx context.Context, req apigen.GetCurrent
 
 func (s productServer) ListOrgFlows(ctx context.Context, req apigen.ListOrgFlowsRequestObject) (apigen.ListOrgFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.ListOrgFlows(ctx, req)
+}
+
+func (s productServer) GetOrgActivitySummary(ctx context.Context, req apigen.GetOrgActivitySummaryRequestObject) (apigen.GetOrgActivitySummaryResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.activity.GetOrgActivitySummary(ctx, req)
 }
 
 func (s productServer) ListOrgs(ctx context.Context, req apigen.ListOrgsRequestObject) (apigen.ListOrgsResponseObject, error) { //nolint:ireturn // the generated interface requires it
