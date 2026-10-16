@@ -39,7 +39,7 @@ These pages exist in English and Spanish, together with `support-matrix.yaml`:
 - Configuration: `configuration/overview.md`, `configuration/secrets.md`, `configuration/first-run.md`, `configuration/master-key-and-kms.md`, `configuration/tls-and-reverse-proxy.md` and `configuration/network-connections.md`.
 - Operations: `operations/upgrade-and-rollback.md`, `operations/backup-and-restore.md` and `operations/alerts.md`.
 - Security: `security/overview.md`, `security/authentication-and-sso.md`, `security/authorization.md`, `security/credentials-and-secret-stores.md`, `security/encryption-and-keys.md`, `security/multi-organization.md`, `security/audit-and-siem.md`, `security/connector-trust.md`, `security/hardening-checklist.md` and `security/reporting-vulnerabilities.md`.
-- Building flows: `building-flows/editor.md`.
+- Building flows: `building-flows/editor.md` and `building-flows/ai-prices.md`.
 - Migrating from n8n: `migrating-from-n8n/overview.md`.
 - Support: `support/matrix.md`, `support/versioning-policy.md` and `support/getting-help.md`.
 

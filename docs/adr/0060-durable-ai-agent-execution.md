@@ -3,7 +3,7 @@
 <img src="../../brand/exports/mascot-crossed-arms.png" alt="Orcon mascot" width="120" align="right">
 # ADR-0060 — Durable AI agent execution: stepped agent runs on the token engine
 
-Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: table names per ADR-0077; UPPER_SNAKE values per ADR-0080 §3) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2)
+Status: **Accepted** | Date: 2026-10-11 (amended 2026-10-12: table names per ADR-0077; UPPER_SNAKE values per ADR-0080 §3) (amended 2026-10-13: stored enumerated values are UPPER_SNAKE, ADR-0015 §2) (amended 2026-10-16: caps, SPEC-020)
 
 Accepted by the owner on 2026-10-12 via SPEC-006.
 
@@ -70,3 +70,10 @@ Agents share leases, fencing, checkpoints, journal, waits and cancellation with 
 Changes applied after acceptance; each entry names its source.
 
 - **SPEC-009 K19 (2026-10-13, owner decision).** §2, §3, §4, §6 and §10 (`ai_agent_step.kind`, `ai_model_call.cost_status`, `human_task.kind` `TOOL_APPROVAL`): enumerated columns store the same UPPER_SNAKE values the API exposes (ADR-0015 §2 applies to every table); no adapter translates an enumerated value between the database and the API.
+- **SPEC-020 (2026-10-16, owner approval of the spec).** Additive amendments to §2, §3 and §5.
+  1. **`maxSpend` by reservation.** Before each model call the runner refuses the call with `AgentLimitExceeded{kind=spend}` when the amount spent plus the reservation of the call (ADR-0062 §5) is above `maxSpend`. The cap can no longer be passed by the value of one call. The last call can be refused although its real cost would have fitted, because the reservation assumes the maximum output.
+  2. **No price.** A call with `maxSpend` whose model has no price fails before the model is called with the permanent error `AI_PRICE_UNKNOWN` (ADR-0062 amendment).
+  3. **`maxActiveTime`.** The parameter is an ISO 8601 duration, default `PT10M`, and must be greater than zero; an invalid value is `AI_NODE_INVALID` and a publication error. The active time of a run is the sum, for each stretch in which the runner works the run, of the clock time between the start of the stretch (entry to the item or the previous commit) and each step commit. It is stored in `ai_agent_run.active_milliseconds` in the same transaction as the step commit. Waits are not counted. Resuming a run starts from the stored value and repeating a step does not add it twice.
+  4. **Check points.** The runner compares the active time with `maxActiveTime` before each model call and before dispatching tools; when it is reached it raises `AgentLimitExceeded{kind=activeTime}` (`AI_AGENT_LIMIT_EXCEEDED`, permanent).
+  5. **Call in flight.** The context of a model call carries a deadline equal to the active time that remains. When the deadline passes, the call is aborted, recorded with cost status `POSSIBLY_BILLED` and its reservation, and the run ends with `AgentLimitExceeded{kind=activeTime}`. Tool calls in flight are not cut, because they can have effects; the cap applies at the next check point.
+  6. **Crash.** The time from the last commit to a crash is not counted, so the active time can be under-counted by at most one step (as in ADR-0011 §5).
