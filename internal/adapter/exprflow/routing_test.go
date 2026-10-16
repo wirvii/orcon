@@ -80,3 +80,31 @@ func TestRouteItemsRefusesOtherNodeTypes(t *testing.T) {
 		t.Fatalf("err = %v, want ErrUnsupportedNode", err)
 	}
 }
+
+func TestEvalValueGivesTypedValuesAndText(t *testing.T) {
+	r := New(expr.New(expr.Options{}))
+	item, err := jsonvalue.Parse([]byte(`{"name":"Ana","age":30}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct{ template, want string }{
+		{"={{ $json.age >= 18 }}", `true`},
+		{"={{ $json.age }}", `30`},
+		{"=Hello {{ $json.name }}", `"Hello Ana"`},
+		{"={{ $json.missing }}", `null`},
+		{"={{ $json.age > 18 && $json.name === 'Ana' }}", `true`},
+	}
+	for _, tt := range tests {
+		got, err := r.EvalValue(t.Context(), tt.template, item, execution.NodeEnv{})
+		if err != nil {
+			t.Fatalf("EvalValue(%s): %v", tt.template, err)
+		}
+		text, err := jsonvalue.Marshal(got)
+		if err != nil || string(text) != tt.want {
+			t.Errorf("EvalValue(%s) = %s, %v; want %s", tt.template, text, err, tt.want)
+		}
+	}
+	if _, err := r.EvalValue(t.Context(), "={{ ( }}", item, execution.NodeEnv{}); err == nil {
+		t.Error("EvalValue accepted a template that does not compile")
+	}
+}

@@ -51,6 +51,12 @@ func (c *converter) convertCore(n *Node, row CoreNode) convResult {
 		return c.convertSet(n)
 	case basePrefix + "httpRequest":
 		return c.convertHTTP(n)
+	case basePrefix + "filter":
+		return c.convertFilter(n)
+	case basePrefix + "sort":
+		return c.convertSort(n)
+	case basePrefix + "limit":
+		return c.convertLimit(n)
 	}
 	element := flow.ElementTask
 	if row.Disposition == DispTrigger {

@@ -145,7 +145,7 @@ func mapCore(n *Node, typ string, row CoreNode, m *Mapped, report func(FindingCo
 	}
 	short := strings.TrimPrefix(typ, basePrefix)
 	switch {
-	case row.Orcon == "orcon.<name>@1":
+	case row.Orcon == NamedTemplate:
 		m.OrconType = "orcon." + short + "@1"
 	case strings.HasPrefix(row.Orcon, "orcon.") && strings.HasSuffix(row.Orcon, "@1") && !strings.ContainsAny(row.Orcon, "*<, "):
 		m.OrconType = row.Orcon
