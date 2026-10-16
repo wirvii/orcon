@@ -148,6 +148,7 @@ func (s *Service) Publish(ctx context.Context, cmd PublishCommand) (Published, e
 		org: cmd.Org, flowID: cmd.Flow, by: cmd.By, rec: rec, content: draft,
 		draftRevision: rec.DraftRevision, allowImported: cmd.AllowImportedAddressChange,
 		event: EventFlowPublished, actor: cmd.Actor, note: cmd.Note,
+		guardActive: cmd.ExpectedDraftRevision != nil, activeAtRead: rec.ActiveVersionID,
 	})
 }
 
@@ -192,6 +193,11 @@ type publication struct {
 	expectedRevision *int64
 	actor            audit.Actor
 	note             string
+	// guardActive makes the publication fail with flow.ErrDraftConflict when another publication
+	// changed the live version after the flow was read: a conditional publication is consumed by
+	// the first one that lands, so two requests with the same If-Match never make two versions.
+	guardActive  bool
+	activeAtRead flow.FlowVersionID
 }
 
 // prepared is a draft that passed every check that needs no transaction.
@@ -273,7 +279,7 @@ func (s *Service) publishTx(ctx context.Context, tx Tx, p *publication, pre *pre
 	if p.expectedRevision != nil && *p.expectedRevision != state.Revision {
 		return Published{}, fmt.Errorf("flow %s at revision %d: %w", p.flowID, *p.expectedRevision, flow.ErrRevisionConflict)
 	}
-	if state.DraftRevision != p.draftRevision {
+	if state.DraftRevision != p.draftRevision || (p.guardActive && state.ActiveVersionID != p.activeAtRead) {
 		return Published{}, fmt.Errorf("flow %s: %w", p.flowID, flow.ErrDraftConflict)
 	}
 	routeIssues, err := s.routeIssues(ctx, tx, &routeCheck{flowID: p.flowID, doc: &pre.doc, specs: pre.specs, now: now, lock: true})

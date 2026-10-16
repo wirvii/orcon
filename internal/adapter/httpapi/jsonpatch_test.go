@@ -61,7 +61,7 @@ func TestApplyJSONPatchFollowsRFC6902(t *testing.T) {
 
 func mustDecode(t *testing.T, raw []byte) any {
 	t.Helper()
-	v, err := cloneJSON(json.RawMessage(raw))
+	v, err := cloneJSON(json.RawMessage(raw), &patchBudget{left: documentBodyLimit})
 	if err != nil {
 		t.Fatal(err)
 	}

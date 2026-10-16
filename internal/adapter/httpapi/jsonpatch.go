@@ -32,8 +32,9 @@ func applyJSONPatch(document []byte, patch apigen.JsonPatch) ([]byte, error) {
 	if err := dec.Decode(&root); err != nil {
 		return nil, fmt.Errorf("read the stored draft: %w", err)
 	}
+	budget := &patchBudget{left: documentBodyLimit}
 	for i := range patch {
-		next, err := applyPatchOp(root, &patch[i])
+		next, err := applyPatchOp(root, &patch[i], budget)
 		if err != nil {
 			return nil, &documentIssuesError{fields: []problem.FieldError{{
 				Pointer: "/" + strconv.Itoa(i), Code: "patch-failed", Message: err.Error(),
@@ -45,18 +46,41 @@ func applyJSONPatch(document []byte, patch apigen.JsonPatch) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encode the patched draft: %w", err)
 	}
+	if len(out) > documentBodyLimit {
+		return nil, &documentIssuesError{fields: []problem.FieldError{{
+			Pointer: "/", Code: "patch-failed", Message: errPatchTooLarge.Error(),
+		}}}
+	}
 	return out, nil
 }
 
+// errPatchTooLarge is the failure of a patch that grows the document past the size a document may
+// have (the body limit of the document operations).
+var errPatchTooLarge = fmt.Errorf("%w: the patched document is larger than %d MiB", errPatch, documentBodyLimit/mebibyte)
+
+// patchBudget bounds the bytes a patch may copy. A copy of the root, repeated, doubles the
+// document each time, so the total of every value a patch clones is capped before it is decoded.
+type patchBudget struct{ left int }
+
+// take spends n bytes of the budget, or fails when the patch has copied more than a document may hold.
+func (b *patchBudget) take(n int) error {
+	if n > b.left {
+		b.left = 0
+		return errPatchTooLarge
+	}
+	b.left -= n
+	return nil
+}
+
 // applyPatchOp applies one operation and returns the new root.
-func applyPatchOp(root any, op *apigen.JsonPatchOperation) (any, error) {
+func applyPatchOp(root any, op *apigen.JsonPatchOperation, budget *patchBudget) (any, error) {
 	path, err := parsePointer(op.Path)
 	if err != nil {
 		return nil, fmt.Errorf("path: %w", err)
 	}
 	switch op.Op {
 	case apigen.Add:
-		value, err := patchValue(op)
+		value, err := patchValue(op, budget)
 		if err != nil {
 			return nil, err
 		}
@@ -65,21 +89,21 @@ func applyPatchOp(root any, op *apigen.JsonPatchOperation) (any, error) {
 		next, _, err := removeAt(root, path)
 		return next, err
 	case apigen.Replace:
-		return replaceAt(root, path, op)
+		return replaceAt(root, path, op, budget)
 	case apigen.Move:
 		return moveAt(root, path, op)
 	case apigen.Copy:
-		return copyAt(root, path, op)
+		return copyAt(root, path, op, budget)
 	case apigen.Test:
-		return root, testAt(root, path, op)
+		return root, testAt(root, path, op, budget)
 	default:
 		return nil, fmt.Errorf("%w: unknown operation %q", errPatch, op.Op)
 	}
 }
 
 // replaceAt implements the replace operation: the target must exist.
-func replaceAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error) {
-	value, err := patchValue(op)
+func replaceAt(root any, path []string, op *apigen.JsonPatchOperation, budget *patchBudget) (any, error) {
+	value, err := patchValue(op, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +137,7 @@ func moveAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error)
 }
 
 // copyAt implements the copy operation: add at path a copy of the value at from.
-func copyAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error) {
+func copyAt(root any, path []string, op *apigen.JsonPatchOperation, budget *patchBudget) (any, error) {
 	from, err := fromPointer(op)
 	if err != nil {
 		return nil, err
@@ -122,7 +146,7 @@ func copyAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error)
 	if err != nil {
 		return nil, err
 	}
-	copied, err := cloneJSON(value)
+	copied, err := cloneJSON(value, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +154,8 @@ func copyAt(root any, path []string, op *apigen.JsonPatchOperation) (any, error)
 }
 
 // testAt implements the test operation: the value at path must equal the value of the operation.
-func testAt(root any, path []string, op *apigen.JsonPatchOperation) error {
-	value, err := patchValue(op)
+func testAt(root any, path []string, op *apigen.JsonPatchOperation, budget *patchBudget) error {
+	value, err := patchValue(op, budget)
 	if err != nil {
 		return err
 	}
@@ -146,18 +170,23 @@ func testAt(root any, path []string, op *apigen.JsonPatchOperation) error {
 }
 
 // patchValue is the value of an operation in the form of the document: numbers keep their text.
-func patchValue(op *apigen.JsonPatchOperation) (any, error) {
+func patchValue(op *apigen.JsonPatchOperation, budget *patchBudget) (any, error) {
 	raw, err := json.Marshal(op.Value)
 	if err != nil {
 		return nil, fmt.Errorf("%w: the value cannot be read", errPatch)
 	}
-	return cloneJSON(json.RawMessage(raw))
+	return cloneJSON(json.RawMessage(raw), budget)
 }
 
-func cloneJSON(v any) (any, error) {
+// cloneJSON copies a value through its encoding, spending its size from the budget before the
+// copy is decoded.
+func cloneJSON(v any, budget *patchBudget) (any, error) {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("%w: the value cannot be copied", errPatch)
+	}
+	if err := budget.take(len(raw)); err != nil {
+		return nil, err
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
