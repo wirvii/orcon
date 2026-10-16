@@ -20,5 +20,6 @@
   "runs.mode.webhook": "proper noun",
   "settings.appearance.language.en": "proper noun",
   "settings.appearance.language.es": "proper noun",
+  "settings.members.role.editor": "word spelled the same in both languages",
   "settings.nav.general": "word spelled the same in both languages"
 }
