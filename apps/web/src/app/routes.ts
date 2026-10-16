@@ -19,7 +19,10 @@ export const routes = rootRoute('shell/RootLayout.tsx', [
       route('/projects', '../features/projects/routes/projects.tsx'),
       route('/templates', '../features/templates/routes/templates.tsx'),
       route('/credentials', '../features/credentials/routes/org-credentials.tsx'),
-      route('/executions', '../features/executions/routes/org-executions.tsx'),
+      route('/executions', '../features/executions/routes/org-executions.tsx', [
+        index('../features/executions/routes/org-executions-index.tsx'),
+        route('/$executionId', '../features/executions/routes/org-execution.tsx'),
+      ]),
       // Settings live inside the organization, so the frame (sidebar and account menu) stays (SPEC-019 Q4).
       route('/settings', '../features/settings/routes/settings.tsx', [
         index('../features/settings/routes/settings-index.tsx'),

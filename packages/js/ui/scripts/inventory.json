@@ -10,7 +10,7 @@
   "CanvasNode", "NodeStatusBadge", "NodeStatusChip", "PinnedBadge", "NodePort", "PortAddButton", "OutputStub", "CanvasEdge", "EdgeLabel",
   "EdgeActions", "NodeToolbar", "StickyNote", "CanvasControls", "CanvasMinimap", "AddFirstStep", "AiBlock", "NodePalettePanel", "CanvasOutline",
   "WorkflowCanvas", "NodeDetailsView", "PaneSplitter", "DataPane", "DataTableView", "JsonTreeView", "SchemaView",
-  "UncertainResolutionPanel",
+  "UncertainResolutionPanel", "ExecutionTimeline", "PlainError",
   "WelcomeScreen", "FlowListScreen", "FlowEditorScreen", "ExecutionListScreen", "ExecutionDetailScreen", "AttentionInboxScreen",
   "ApprovalScreen", "EmptyStatesScreen", "NotFoundScreen", "ErrorPageScreen", "AppearanceSettingsScreen"
 ]

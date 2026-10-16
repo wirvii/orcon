@@ -9,6 +9,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockDraftApi } from '../../test/draft-api';
 import { account, installApiDouble, org } from '../journeys/api-double';
 
+import { mockExecutions } from './executions-double';
+
 const EDITOR_FLOW = '/orgs/acme/projects/ventas/flows/01930000-0000-7000-8000-00000000ed5a';
 
 // Visual evidence for a pull request (SPEC-019 §8): the screens of the product at 1440x900 and 390x844, in the
@@ -363,6 +365,37 @@ const screens: Screen[] = [
       await signIn(page);
       await page.goto(`/orgs/${org.slug}/projects/operaciones/flows`);
       await expect(page.locator('[data-mascot-pose="thinking"]')).toBeVisible();
+    },
+  },
+  {
+    name: 'executions-list',
+    mockup: { id: 'executions' },
+    product: async (page) => {
+      await signIn(page);
+      await mockExecutions(page);
+      await page.goto(`/orgs/${org.slug}/executions`);
+      await expect(page.getByRole('list', { name: /^(Runs|Ejecuciones)$/ })).toBeVisible();
+    },
+  },
+  {
+    name: 'executions-failed',
+    mockup: { id: 'executions' },
+    product: async (page) => {
+      await signIn(page);
+      const runs = await mockExecutions(page);
+      await page.goto(`/orgs/${org.slug}/executions/${runs.failedId}`);
+      await expect(page.getByRole('list', { name: /^(Steps of the run|Pasos de la ejecución)$/ })).toBeVisible();
+      await expect(page.locator('[data-plain-error]')).toBeVisible();
+    },
+  },
+  {
+    name: 'executions-review',
+    mockup: { id: 'executions' },
+    product: async (page) => {
+      await signIn(page);
+      const runs = await mockExecutions(page);
+      await page.goto(`/orgs/${org.slug}/executions/${runs.reviewId}`);
+      await expect(page.locator('[data-uncertain-panel]')).toBeVisible();
     },
   },
   {

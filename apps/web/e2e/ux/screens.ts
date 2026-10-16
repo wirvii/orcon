@@ -6,6 +6,8 @@ import { expect, type Page } from '@playwright/test';
 import { mockDraftApi } from '../../test/draft-api';
 import { account, installApiDouble, org } from '../journeys/api-double';
 
+import { mockExecutions } from './executions-double';
+
 /**
  * The screens of the product that the UX checks walk (SPEC-019). Each one opens a page of the production build against
  * a stand-in API and waits until it shows its heading, so a check runs on a real, settled page.
@@ -86,6 +88,25 @@ export const screens: ProductScreen[] = [
       const { projectHandle } = await seed(page);
       await page.goto(`/orgs/${org.slug}/projects/${projectHandle}/executions`);
       await heading(page, 2, /^(Executions|Ejecuciones|Runs)/);
+    },
+  },
+  {
+    name: 'executions-failed',
+    open: async (page) => {
+      await seed(page);
+      const runs = await mockExecutions(page);
+      await page.goto(`/orgs/${org.slug}/executions/${runs.failedId}`);
+      await heading(page, 2, /Run #/);
+      await expect(page.getByRole('list', { name: 'Steps of the run' })).toBeVisible();
+    },
+  },
+  {
+    name: 'executions-review',
+    open: async (page) => {
+      await seed(page);
+      const runs = await mockExecutions(page);
+      await page.goto(`/orgs/${org.slug}/executions/${runs.reviewId}`);
+      await expect(page.getByRole('heading', { name: 'Review before continuing' })).toBeVisible();
     },
   },
   {

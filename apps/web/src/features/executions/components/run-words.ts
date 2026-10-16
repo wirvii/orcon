@@ -16,15 +16,3 @@ export const modeMessages: Record<string, MessageDescriptor> = {
   RETRY: runMessages.modeRetry,
   EVALUATION: runMessages.modeEvaluation,
 };
-
-/** Milliseconds from start to finish, or undefined while the run has not finished or has not started. */
-export function durationOf(startedAt: string | undefined, finishedAt: string | undefined): number | undefined {
-  if (startedAt === undefined || finishedAt === undefined) return undefined;
-  const ms = Date.parse(finishedAt) - Date.parse(startedAt);
-  return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
-}
-
-/** The short form of a run identifier, enough to tell runs apart on screen. */
-export function shortId(id: string): string {
-  return id.slice(0, 8);
-}
