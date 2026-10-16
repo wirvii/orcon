@@ -44,3 +44,20 @@ VALUES (sqlc.arg(id), sqlc.arg(org_id), sqlc.arg(scope_kind), sqlc.narg(project_
 UPDATE org
 SET authorization_epoch = authorization_epoch + 1
 WHERE id = sqlc.arg(id);
+
+-- name: GetResourceProject :one
+-- orcon:scope engine
+-- Reads across organizations on purpose: a flow, execution, external operation or human task of another organization
+-- must be hidden, so its owner is resolved before any organization scope exists (ADR-0041 section 6).
+SELECT f.org_id AS org_id, f.project_id AS project_id FROM flow f
+WHERE sqlc.arg(kind) = 'flow' AND f.id = sqlc.arg(id) AND f.deleted_at IS NULL
+UNION ALL
+SELECT e.org_id, e.project_id FROM execution e
+WHERE sqlc.arg(kind) = 'execution' AND e.id = sqlc.arg(id)
+UNION ALL
+SELECT e.org_id, e.project_id FROM external_operation o JOIN execution e ON e.org_id = o.org_id AND e.id = o.execution_id
+WHERE sqlc.arg(kind) = 'externalOperation' AND o.id = sqlc.arg(id)
+UNION ALL
+SELECT e.org_id, e.project_id FROM human_task h JOIN execution e ON e.org_id = h.org_id AND e.id = h.execution_id
+WHERE sqlc.arg(kind) = 'humanTask' AND h.id = sqlc.arg(id)
+LIMIT 1;

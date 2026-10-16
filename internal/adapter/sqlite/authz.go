@@ -110,3 +110,29 @@ func bytesToUUID(b []byte) id.UUID {
 	copy(u[:], b)
 	return u
 }
+
+// ResourceProject implements [authz.Store]: the organization and the project of a flow, execution,
+// external operation or human task, across organizations (the engine plane).
+func (s *Store) ResourceProject(ctx context.Context, kind, resource string) (identity.OrgID, string, error) {
+	rid, err := id.Parse(resource)
+	if err != nil {
+		return identity.OrgID{}, "", fmt.Errorf("%w: %s identifier", identity.ErrNotFound, kind)
+	}
+	var org identity.OrgID
+	var project id.UUID
+	err = s.read(ctx, "get resource project", func(ctx context.Context, q *sqlcgen.Queries) error {
+		row, err := q.GetResourceProject(ctx, kind, rid.Bytes())
+		if err != nil {
+			return err
+		}
+		if org, err = uuidOf[identity.OrgID](row.OrgID); err != nil {
+			return err
+		}
+		project = bytesToUUID(row.ProjectID)
+		return nil
+	})
+	if isNoRows(err) {
+		return identity.OrgID{}, "", identity.ErrNotFound
+	}
+	return org, project.String(), err
+}
