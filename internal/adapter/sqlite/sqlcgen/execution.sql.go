@@ -1157,104 +1157,6 @@ func (q *Queries) ListExecutionEvents(ctx context.Context, arg ListExecutionEven
 	return items, nil
 }
 
-const listExecutions = `-- name: ListExecutions :many
-SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
-       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
-       suspended_count, started_at, finished_at, created_at, updated_at
-FROM execution
-WHERE org_id = ?1 AND project_id = ?2
-  AND (created_at, id) < (?3, CAST(?4 AS BLOB))
-ORDER BY created_at DESC, id DESC
-LIMIT ?5
-`
-
-type ListExecutionsParams struct {
-	OrgID           []byte
-	ProjectID       []byte
-	BeforeCreatedAt int64
-	BeforeID        []byte
-	PageSize        int64
-}
-
-type ListExecutionsRow struct {
-	ID                []byte
-	OrgID             []byte
-	ProjectID         []byte
-	FlowID            []byte
-	FlowVersionID     []byte
-	FlowSnapshotID    []byte
-	Status            string
-	Mode              string
-	Priority          int64
-	ParentExecutionID []byte
-	RootExecutionID   []byte
-	CallDepth         int64
-	RunGeneration     int64
-	CancelRequestedAt sql.NullInt64
-	RunnableCount     int64
-	LeasedCount       int64
-	WaitingCount      int64
-	SuspendedCount    int64
-	StartedAt         sql.NullInt64
-	FinishedAt        sql.NullInt64
-	CreatedAt         int64
-	UpdatedAt         int64
-}
-
-// orcon:scope org
-// orcon:hot
-func (q *Queries) ListExecutions(ctx context.Context, arg ListExecutionsParams) ([]ListExecutionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listExecutions,
-		arg.OrgID,
-		arg.ProjectID,
-		arg.BeforeCreatedAt,
-		arg.BeforeID,
-		arg.PageSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListExecutionsRow{}
-	for rows.Next() {
-		var i ListExecutionsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.ProjectID,
-			&i.FlowID,
-			&i.FlowVersionID,
-			&i.FlowSnapshotID,
-			&i.Status,
-			&i.Mode,
-			&i.Priority,
-			&i.ParentExecutionID,
-			&i.RootExecutionID,
-			&i.CallDepth,
-			&i.RunGeneration,
-			&i.CancelRequestedAt,
-			&i.RunnableCount,
-			&i.LeasedCount,
-			&i.WaitingCount,
-			&i.SuspendedCount,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listExecutionsByStatus = `-- name: ListExecutionsByStatus :many
 SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
        root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
@@ -1751,6 +1653,232 @@ func (q *Queries) ListNodeOutputsByExecution(ctx context.Context, arg ListNodeOu
 			&i.ItemCount,
 			&i.InlineDocument,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectExecutions = `-- name: ListProjectExecutions :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at
+FROM execution
+WHERE org_id = ?1 AND project_id = ?2
+  AND (?3 = 1 OR flow_id = ?4)
+  AND (?5 = 1 OR status = ?6)
+  AND created_at > ?7 AND created_at < ?8
+  AND (created_at, id) < (?9, CAST(?10 AS BLOB))
+ORDER BY created_at DESC, id DESC
+LIMIT ?11
+`
+
+type ListProjectExecutionsParams struct {
+	OrgID           []byte
+	ProjectID       []byte
+	AnyFlow         interface{}
+	FlowID          []byte
+	AnyStatus       interface{}
+	Status          string
+	CreatedAfter    int64
+	CreatedBefore   int64
+	BeforeCreatedAt int64
+	BeforeID        []byte
+	PageSize        int64
+}
+
+type ListProjectExecutionsRow struct {
+	ID                []byte
+	OrgID             []byte
+	ProjectID         []byte
+	FlowID            []byte
+	FlowVersionID     []byte
+	FlowSnapshotID    []byte
+	Status            string
+	Mode              string
+	Priority          int64
+	ParentExecutionID []byte
+	RootExecutionID   []byte
+	CallDepth         int64
+	RunGeneration     int64
+	CancelRequestedAt sql.NullInt64
+	RunnableCount     int64
+	LeasedCount       int64
+	WaitingCount      int64
+	SuspendedCount    int64
+	StartedAt         sql.NullInt64
+	FinishedAt        sql.NullInt64
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListProjectExecutions(ctx context.Context, arg ListProjectExecutionsParams) ([]ListProjectExecutionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProjectExecutions,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.AnyFlow,
+		arg.FlowID,
+		arg.AnyStatus,
+		arg.Status,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectExecutionsRow{}
+	for rows.Next() {
+		var i ListProjectExecutionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectExecutionsAsc = `-- name: ListProjectExecutionsAsc :many
+SELECT id, org_id, project_id, flow_id, flow_version_id, flow_snapshot_id, status, mode, priority, parent_execution_id,
+       root_execution_id, call_depth, run_generation, cancel_requested_at, runnable_count, leased_count, waiting_count,
+       suspended_count, started_at, finished_at, created_at, updated_at
+FROM execution
+WHERE org_id = ?1 AND project_id = ?2
+  AND (?3 = 1 OR flow_id = ?4)
+  AND (?5 = 1 OR status = ?6)
+  AND created_at > ?7 AND created_at < ?8
+  AND (created_at, id) > (?9, CAST(?10 AS BLOB))
+ORDER BY created_at ASC, id ASC
+LIMIT ?11
+`
+
+type ListProjectExecutionsAscParams struct {
+	OrgID          []byte
+	ProjectID      []byte
+	AnyFlow        interface{}
+	FlowID         []byte
+	AnyStatus      interface{}
+	Status         string
+	CreatedAfter   int64
+	CreatedBefore  int64
+	AfterCreatedAt int64
+	AfterID        []byte
+	PageSize       int64
+}
+
+type ListProjectExecutionsAscRow struct {
+	ID                []byte
+	OrgID             []byte
+	ProjectID         []byte
+	FlowID            []byte
+	FlowVersionID     []byte
+	FlowSnapshotID    []byte
+	Status            string
+	Mode              string
+	Priority          int64
+	ParentExecutionID []byte
+	RootExecutionID   []byte
+	CallDepth         int64
+	RunGeneration     int64
+	CancelRequestedAt sql.NullInt64
+	RunnableCount     int64
+	LeasedCount       int64
+	WaitingCount      int64
+	SuspendedCount    int64
+	StartedAt         sql.NullInt64
+	FinishedAt        sql.NullInt64
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
+// orcon:scope org
+// orcon:hot
+func (q *Queries) ListProjectExecutionsAsc(ctx context.Context, arg ListProjectExecutionsAscParams) ([]ListProjectExecutionsAscRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProjectExecutionsAsc,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.AnyFlow,
+		arg.FlowID,
+		arg.AnyStatus,
+		arg.Status,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectExecutionsAscRow{}
+	for rows.Next() {
+		var i ListProjectExecutionsAscRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ProjectID,
+			&i.FlowID,
+			&i.FlowVersionID,
+			&i.FlowSnapshotID,
+			&i.Status,
+			&i.Mode,
+			&i.Priority,
+			&i.ParentExecutionID,
+			&i.RootExecutionID,
+			&i.CallDepth,
+			&i.RunGeneration,
+			&i.CancelRequestedAt,
+			&i.RunnableCount,
+			&i.LeasedCount,
+			&i.WaitingCount,
+			&i.SuspendedCount,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

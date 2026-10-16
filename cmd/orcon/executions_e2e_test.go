@@ -56,7 +56,11 @@ func checkExecutionReads(t *testing.T, env *storetest.EngineEnv, st engineStore,
 	if !ok {
 		t.Fatalf("the %s store does not implement the execution reads", env.Kind)
 	}
-	h := httpapi.NewExecutions(reader, st, flowReader{}, allowAll{}, log, env.Clock, env.IDs, codec)
+	packages, ok := env.Store.(httpapi.ConnectorPackages)
+	if !ok {
+		t.Fatalf("the %s store does not implement the connector package reads", env.Kind)
+	}
+	h := httpapi.NewExecutions(reader, st, flowReader{}, packages, allowAll{}, log, env.Clock, env.IDs, codec)
 	scope := storetest.ScopeOf(env.Org)
 	principal := identity.Principal{ID: identity.PrincipalID(env.IDs.New()), Kind: identity.PrincipalUser, UserID: identity.UserID(env.IDs.New()), CredentialType: identity.CredentialSession}
 	ctx := authz.WithOrgScope(middleware.WithPrincipal(t.Context(), principal), scope)

@@ -167,6 +167,26 @@ func executionsCase(t *testing.T, newStore Factory) { //nolint:gocognit // a con
 			}
 		}
 	}
+	// A project narrowed by flow, status and a creation window is filtered by the store, in both
+	// directions, and every page is full until the last.
+	window := store.ExecutionFilter{ProjectID: e.projA, FlowID: e.flow.ID, Status: "QUEUED", CreatedAfter: created[0].CreatedAt, CreatedBefore: created[4].CreatedAt}
+	rows := page(window)
+	if len(rows) != 3 || rows[0].ID != created[3].ID || rows[2].ID != created[1].ID {
+		t.Fatalf("window newest first = %d rows %+v", len(rows), rows)
+	}
+	window.Oldest = true
+	rows = page(window)
+	if len(rows) != 3 || rows[0].ID != created[1].ID || rows[2].ID != created[3].ID {
+		t.Fatalf("window oldest first = %d rows %+v", len(rows), rows)
+	}
+	if rows := page(store.ExecutionFilter{ProjectID: e.projA, Status: "RUNNING"}); len(rows) != 0 {
+		t.Fatalf("project and another status listed %d executions", len(rows))
+	}
+	if rows := page(store.ExecutionFilter{ProjectID: e.projA, FlowID: next[flow.FlowID](e.ids)}); len(rows) != 0 {
+		t.Fatalf("project and another flow listed %d executions", len(rows))
+	}
+	_, err = e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "QUEUED", Oldest: true}, store.Cursor{}, 10)
+	wantErr(t, "an order without a project", err, flow.ErrInvalidRecord)
 	if rows, err := e.s.ListExecutions(e.ctx(), e.scopeA, store.ExecutionFilter{Status: "RUNNING"}, store.Cursor{}, 10); err != nil || len(rows) != 0 {
 		t.Fatalf("running executions = %d, %v", len(rows), err)
 	}
