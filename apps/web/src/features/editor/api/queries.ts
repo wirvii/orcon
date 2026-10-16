@@ -8,6 +8,7 @@ import { EXAMPLE_FLOW_ID, exampleFlowDocument, PERF_FLOW_ID, SAMPLE_SUBFLOWS, su
 import type { CredentialSource } from './credential-source';
 import type { DraftSource } from './draft-source';
 import { getFlow } from './flow-operations';
+import { getVersionDocument } from './operations';
 import type { FlowTargetSource } from './flow-target-source';
 import { createLocalCredentialSource } from './local-credential-source';
 import { createLocalDraftSource, type DraftSeed } from './local-draft-source';
@@ -26,6 +27,8 @@ export const editorKeys = {
   credentials: (organizationId: string) => [organizationId, 'editor', 'credentials'] as const,
   flowTargets: (organizationId: string) => [organizationId, 'editor', 'flow-targets'] as const,
   flow: (organizationId: string, flowId: string) => [organizationId, 'editor', 'flow', flowId] as const,
+  runs: (organizationId: string, flowId: string, part: 'last' | 'nodes' | 'data', id: string) => [organizationId, 'editor', 'runs', flowId, part, id] as const,
+  version: (organizationId: string, flowId: string, version: number) => [organizationId, 'editor', 'version', flowId, version] as const,
 };
 
 const seeds = new Map<string, DraftSeed>([
@@ -95,5 +98,15 @@ export function flowQueryOptions(flowId: string) {
     queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId),
     queryFn: () => getFlow(flowId),
     staleTime: 0,
+  });
+}
+
+/** The document of one published version. It never changes, so it is read once. */
+export function versionDocumentQueryOptions(flowId: string, version: number) {
+  return queryOptions({
+    queryKey: editorKeys.version(LOCAL_ORGANIZATION, flowId, version),
+    queryFn: () => getVersionDocument(flowId, version),
+    staleTime: Infinity,
+    retry: false,
   });
 }

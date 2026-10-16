@@ -40,6 +40,8 @@ export function useSaveDraft(flowId: string): (input: SaveDraftInput) => Promise
     onSuccess: (result, input) => {
       if (result.kind === 'saved') {
         queryClient.setQueryData<LoadedDraft>(editorKeys.draft(LOCAL_ORGANIZATION, flowId), { document: input.document, revision: result.revision });
+        // The flow now has unpublished changes the server knows about: the publish controls read it again.
+        void queryClient.invalidateQueries({ queryKey: editorKeys.flow(LOCAL_ORGANIZATION, flowId) });
       }
     },
   });

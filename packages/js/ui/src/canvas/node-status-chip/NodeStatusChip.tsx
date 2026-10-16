@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Orcon Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Ban, CircleHelp, Minus, PenLine, Pin, Plus, ShieldQuestion } from 'lucide-react';
+import { Ban, CircleHelp, Minus, PenLine, Pin, Plus, ShieldCheck, ShieldQuestion } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useIntl } from 'react-intl';
 
@@ -10,7 +10,7 @@ import { cn } from '../../lib/cn';
 import { canvasMessages } from '../messages';
 import { familyClasses } from '../state';
 
-export type ChipKind = 'pinned' | 'disabled' | 'not-supported' | 'added' | 'changed' | 'removed' | 'uncertain-items';
+export type ChipKind = 'pinned' | 'disabled' | 'not-supported' | 'added' | 'changed' | 'removed' | 'uncertain-items' | 'never-twice';
 
 export interface NodeStatusChipProps {
   /** An execution state. The chip shows its icon and label. */
@@ -38,6 +38,7 @@ const kindLooks: Record<ChipKind, ChipLook> = {
   changed: { family: 'warning', icon: PenLine },
   removed: { family: 'danger', icon: Minus },
   'uncertain-items': { family: 'attention', icon: ShieldQuestion },
+  'never-twice': { family: 'success', icon: ShieldCheck },
 };
 
 /**
@@ -59,6 +60,7 @@ export function NodeStatusChip({ status, code, kind, count = 0, className }: Nod
       changed: intl.formatMessage(canvasMessages.chipChanged),
       removed: intl.formatMessage(canvasMessages.chipRemoved),
       'uncertain-items': intl.formatMessage(canvasMessages.chipUncertainItems, { count }),
+      'never-twice': intl.formatMessage(canvasMessages.chipNeverTwice),
     }[kind];
   } else if (status) {
     const entry = statusMap[status];

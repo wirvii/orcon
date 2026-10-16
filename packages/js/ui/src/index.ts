@@ -179,7 +179,7 @@ export type { AddFirstStepProps } from './canvas/add-first-step/AddFirstStep';
 export { AiBlock } from './canvas/ai-block/AiBlock';
 export type { AiBlockProps } from './canvas/ai-block/AiBlock';
 export { NodePalettePanel } from './canvas/node-palette-panel/NodePalettePanel';
-export type { NodePalettePanelProps } from './canvas/node-palette-panel/NodePalettePanel';
+export type { NodePalettePanelProps, PaletteSuggestions } from './canvas/node-palette-panel/NodePalettePanel';
 export { CanvasOutline } from './canvas/canvas-outline/CanvasOutline';
 export type { CanvasOutlineProps } from './canvas/canvas-outline/CanvasOutline';
 export { WorkflowCanvas } from './canvas/WorkflowCanvas';

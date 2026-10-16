@@ -51,3 +51,17 @@ export async function replaceDraft(flowId: string, document: FlowDocument, ifMat
   if (etag === undefined) throw new ContractError(source, []);
   return etag;
 }
+
+/**
+ * The document of a published version (`getFlowVersion`). A version never changes, so the answer for a number is
+ * always the same; the editor compares the draft with it to count the changes the next publication would carry.
+ */
+export async function getVersionDocument(flowId: string, version: number): Promise<FlowDocument> {
+  const { value } = await apiCall({
+    method: 'GET',
+    path: `/flows/${encodeURIComponent(flowId)}/versions/${String(version)}`,
+    schema: z.looseObject({ version: z.number().int().min(1), document: flowDocumentSchema }),
+    source: 'response of GET /flows/{flowId}/versions/{version}',
+  });
+  return value.document;
+}

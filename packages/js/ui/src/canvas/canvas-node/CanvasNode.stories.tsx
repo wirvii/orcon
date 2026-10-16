@@ -56,6 +56,12 @@ export const Canceled: Story = { args: { node: { ...plain, status: 'CANCELED' } 
 export const NotRun: Story = { args: { node: { ...plain, status: 'NOT_RUN' } } };
 export const Disabled: Story = { args: { node: { ...plain, disabled: true } } };
 export const Pinned: Story = { args: { node: { ...plain, status: 'SUCCEEDED', pinned: true } } };
+export const NeverSendsTwice: Story = {
+  args: { node: { ...connector, neverTwice: true } },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('Never sends twice')).toBeVisible();
+  },
+};
 export const Compare: Story = { args: { node: { ...plain, diff: 'changed' } } };
 
 const gallery: Record<(typeof states)[number], CanvasNodeProps> = {

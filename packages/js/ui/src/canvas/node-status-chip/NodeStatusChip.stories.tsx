@@ -31,6 +31,12 @@ export const NotRun: Story = { args: { status: 'NOT_RUN' } };
 export const Pinned: Story = { args: { status: undefined, kind: 'pinned' } };
 export const Disabled: Story = { args: { status: undefined, kind: 'disabled' } };
 export const NotSupported: Story = { args: { status: undefined, kind: 'not-supported' } };
+export const NeverSendsTwice: Story = {
+  args: { status: undefined, kind: 'never-twice' },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('Never sends twice')).toBeVisible();
+  },
+};
 export const Compare: Story = { args: { status: undefined, kind: 'changed' } };
 
 const chips: [string, NodeStatusChipProps][] = [
@@ -46,6 +52,7 @@ const chips: [string, NodeStatusChipProps][] = [
   ['Pinned', { kind: 'pinned' }],
   ['Disabled', { kind: 'disabled' }],
   ['Not supported', { kind: 'not-supported' }],
+  ['Never sends twice', { kind: 'never-twice' }],
   ['Added', { kind: 'added' }],
   ['Changed', { kind: 'changed' }],
   ['Removed', { kind: 'removed' }],
