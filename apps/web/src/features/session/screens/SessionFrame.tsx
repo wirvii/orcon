@@ -21,9 +21,21 @@ const messages = defineMessages({
   owner: { id: 'session.role.owner', defaultMessage: 'Owner', description: 'The role of a person who owns an organization.' },
   admin: { id: 'session.role.admin', defaultMessage: 'Administrator', description: 'The role of a person who administers an organization.' },
   member: { id: 'session.role.member', defaultMessage: 'Member', description: 'The role of an ordinary member of an organization.' },
+  projectAdmin: { id: 'session.role.projectAdmin', defaultMessage: 'Project administrator', description: 'The role of a person who administers some projects of an organization.' },
+  editor: { id: 'session.role.editor', defaultMessage: 'Editor', description: 'The role of a person who builds and changes flows.' },
+  operator: { id: 'session.role.operator', defaultMessage: 'Operator', description: 'The role of a person who runs flows and reviews their executions.' },
+  viewer: { id: 'session.role.viewer', defaultMessage: 'Viewer', description: 'The role of a person who can only look at flows and executions.' },
 });
 
-const roleMessages = { OWNER: messages.owner, ADMIN: messages.admin, MEMBER: messages.member } as const satisfies Record<OrganizationRole, unknown>;
+const roleMessages = {
+  Owner: messages.owner,
+  Admin: messages.admin,
+  Member: messages.member,
+  'Project Admin': messages.projectAdmin,
+  Editor: messages.editor,
+  Operator: messages.operator,
+  Viewer: messages.viewer,
+} as const satisfies Record<OrganizationRole, unknown>;
 
 /**
  * The frame of the signed-in pages, with its data: the person, their organizations, the projects of the one being
