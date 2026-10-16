@@ -23,6 +23,9 @@ export const currentUser = {
   },
 } as const;
 
+/** The entity tag `getCurrentUser` sends; `updateCurrentUser` expects it in `If-Match`. */
+export const userEtag = '"1760454245000000"';
+
 export const acme = { id: '0195f1a0-0000-7000-8000-0000000000c1', slug: 'acme', name: 'Acme' } as const;
 export const globex = { id: '0195f1a0-0000-7000-8000-0000000000c2', slug: 'globex', name: 'Globex' } as const;
 
@@ -36,7 +39,7 @@ export function problem(status: number, title: string, code?: string, extra: Rec
 }
 
 export const signedIn = {
-  currentUser: http.get('/api/v1/users/me', () => HttpResponse.json(currentUser)),
+  currentUser: http.get('/api/v1/users/me', () => HttpResponse.json(currentUser, { headers: { ETag: userEtag } })),
   /** Answers `listOrgs`, filtering by `slug` the way the server does. */
   organizations: (items: readonly { id: string; slug: string; name: string }[]) =>
     http.get('/api/v1/orgs', ({ request }) => {

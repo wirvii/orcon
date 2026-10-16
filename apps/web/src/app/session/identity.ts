@@ -15,6 +15,12 @@ function capitalize(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
+/** True when the account has a name of its own: not empty and not the server's placeholder ("Owner"). */
+export function hasDisplayName(user: { displayName: string }): boolean {
+  const name = user.displayName.trim();
+  return name !== '' && !PLACEHOLDER_NAMES.has(name.toLowerCase());
+}
+
 /**
  * Who to show for the signed-in person. The account name wins; an empty name or the server's placeholder
  * ("Owner") counts as unset, and the name is then derived from the email: `ana.ruiz@x` is "Ana Ruiz" (AR),
@@ -22,7 +28,7 @@ function capitalize(word: string): string {
  */
 export function identityOf(user: { displayName: string; email: string }): Identity {
   const name = user.displayName.trim();
-  if (name !== '' && !PLACEHOLDER_NAMES.has(name.toLowerCase())) {
+  if (hasDisplayName(user)) {
     return { name, initials: initialsOf(name.split(/\s+/)) };
   }
   const local = (user.email.split('@')[0] ?? '').trim();
