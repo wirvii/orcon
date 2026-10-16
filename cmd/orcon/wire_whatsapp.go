@@ -12,9 +12,7 @@ import (
 	"github.com/wirvii/orcon/internal/adapter/codec/declarativejson"
 	"github.com/wirvii/orcon/internal/adapter/connectors/whatsapp"
 	"github.com/wirvii/orcon/internal/connector/declarative"
-	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/flow"
-	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/jsonvalue"
 	"github.com/wirvii/orcon/internal/trigger"
 )
@@ -26,16 +24,12 @@ const whatsappTriggerType = "orcon.whatsapp.whatsappTrigger@1"
 // whatsappTriggerName is the key of the trigger in the connector body.
 const whatsappTriggerName = "whatsappTrigger"
 
-// whatsappCredential names the credential of the WhatsApp connector. Its field
-// appSecret checks the signature of every inbound request, its field
-// verifyToken answers the subscription handshake, and its field token is the
-// bearer token of the outgoing messages.
-const whatsappCredential = "whatsapp"
-
-// credentialResolver returns the credential a node or trigger names, for one
-// organization. The credential store implements it; until it exists the
-// composition root refuses every name.
-type credentialResolver func(ctx context.Context, org identity.OrgID, credentialID string) (httpdispatch.Credential, error)
+// credentialParameter is the parameter of the trigger node that names the stored
+// credential of the connector, by identifier, as the HTTP node names its own. Its
+// field appSecret checks the signature of every inbound request and its field
+// verifyToken answers the subscription handshake; the field token of the same
+// credential is the bearer token of the outgoing messages.
+const credentialParameter = "credential"
 
 // whatsappVerifier authenticates the public requests of the routes that start
 // flows with the WhatsApp trigger. A route of any other node type is not
@@ -44,14 +38,14 @@ type credentialResolver func(ctx context.Context, org identity.OrgID, credential
 type whatsappVerifier struct {
 	trigger     declarative.Trigger
 	flows       trigger.FlowSource
-	credentials credentialResolver
+	credentials inboundFields
 }
 
 var _ trigger.Verifier = whatsappVerifier{}
 
 // newWhatsAppVerifier reads the declared WhatsApp trigger from the connector
 // package that ships with this build and checks that it is runnable.
-func newWhatsAppVerifier(flows trigger.FlowSource, credentials credentialResolver) (whatsappVerifier, error) {
+func newWhatsAppVerifier(flows trigger.FlowSource, credentials inboundFields) (whatsappVerifier, error) {
 	data, err := fs.ReadFile(whatsapp.Files, "connector.json")
 	if err != nil {
 		return whatsappVerifier{}, fmt.Errorf("read the WhatsApp connector: %w", err)
@@ -75,20 +69,20 @@ func newWhatsAppVerifier(flows trigger.FlowSource, credentials credentialResolve
 // a notification that carries no message (a delivery receipt, for example)
 // starts nothing.
 func (v whatsappVerifier) Admit(ctx context.Context, r trigger.Resolved, req trigger.IngressRequest) ([]byte, bool, error) {
-	nodeType, err := v.nodeType(ctx, r)
+	node, err := v.node(ctx, r)
 	if err != nil {
 		return nil, false, err
 	}
-	if nodeType != whatsappTriggerType {
+	if node.Type != whatsappTriggerType {
 		return req.Body, true, nil
 	}
-	cred, err := v.credentials(ctx, r.Org, whatsappCredential)
+	fields, err := v.fields(ctx, r, node)
 	if err != nil {
 		return nil, false, err
 	}
-	secret := cred.Fields[v.trigger.Verify.Field]
+	secret := fields[v.trigger.Verify.Field]
 	if secret == "" {
-		return nil, false, fmt.Errorf("credential %q has no %s field", whatsappCredential, v.trigger.Verify.Field)
+		return nil, false, fmt.Errorf("the credential of node %s has no %s field", node.ID, v.trigger.Verify.Field)
 	}
 	if err := declarative.VerifySignature(*v.trigger.Verify, req.Headers, req.Body, secret); err != nil {
 		return nil, false, err
@@ -114,40 +108,50 @@ func (v whatsappVerifier) Admit(ctx context.Context, r trigger.Resolved, req tri
 // Challenge implements [trigger.Verifier]: it answers the subscription handshake
 // of a WhatsApp route; every other route declares none and answers [trigger.ErrNoHandshake].
 func (v whatsappVerifier) Challenge(ctx context.Context, r trigger.Resolved, req trigger.IngressRequest) (string, error) {
-	nodeType, err := v.nodeType(ctx, r)
+	node, err := v.node(ctx, r)
 	if err != nil {
 		return "", err
 	}
-	if nodeType != whatsappTriggerType {
+	if node.Type != whatsappTriggerType {
 		return "", trigger.ErrNoHandshake
 	}
-	cred, err := v.credentials(ctx, r.Org, whatsappCredential)
+	fields, err := v.fields(ctx, r, node)
 	if err != nil {
 		return "", err
 	}
-	return declarative.CheckHandshake(*v.trigger.Handshake, req.Query, cred.Fields[v.trigger.Handshake.Field])
+	return declarative.CheckHandshake(*v.trigger.Handshake, req.Query, fields[v.trigger.Handshake.Field])
 }
 
-// nodeType reads the node type of the route from the active version of its flow.
-func (v whatsappVerifier) nodeType(ctx context.Context, r trigger.Resolved) (string, error) {
+// fields reads the stored credential the trigger node names, for the project of the route.
+func (v whatsappVerifier) fields(ctx context.Context, r trigger.Resolved, node *flow.Node) (map[string]string, error) {
+	param, ok := node.Parameters.Get(credentialParameter)
+	name, isText := param.Str()
+	if !ok || !isText || name == "" {
+		return nil, fmt.Errorf("node %s names no %s", node.ID, credentialParameter)
+	}
+	return v.credentials(ctx, r.Org, r.ProjectID, name)
+}
+
+// node reads the trigger node of the route from the active version of its flow.
+func (v whatsappVerifier) node(ctx context.Context, r trigger.Resolved) (*flow.Node, error) {
 	rec, err := v.flows.GetFlow(ctx, r.Scope, r.FlowID)
 	if err != nil {
-		return "", fmt.Errorf("read the flow of the route: %w", err)
+		return nil, fmt.Errorf("read the flow of the route: %w", err)
 	}
 	ver, err := v.flows.GetVersion(ctx, r.Scope, rec.ActiveVersionID)
 	if err != nil {
-		return "", fmt.Errorf("read the live version of the route: %w", err)
+		return nil, fmt.Errorf("read the live version of the route: %w", err)
 	}
 	doc, err := (flowReader{}).Read(ver.Document)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	for i := range doc.Nodes {
 		if doc.Nodes[i].ID == r.NodeID {
-			return doc.Nodes[i].Type, nil
+			return &doc.Nodes[i], nil
 		}
 	}
-	return "", fmt.Errorf("the live version has no node %s", r.NodeID)
+	return nil, fmt.Errorf("the live version has no node %s", r.NodeID)
 }
 
 // triggerCatalog declares the trigger node types of this build: the native

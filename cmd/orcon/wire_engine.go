@@ -78,8 +78,12 @@ type engineOptions struct {
 	// refusing function when there is none either.
 	credentials func(ctx context.Context, req httpdispatch.CredentialRequest) (httpdispatch.Credential, error)
 	// models resolves the model of the AI nodes; nil uses the production
-	// resolver, which reaches each provider through the egress client.
+	// resolver, which reaches each provider through the egress client with the
+	// API key of the stored credential the model names.
 	models chain.Models
+	// modelEndpoint points every model provider at a scripted server in tests;
+	// nil in production. It does not change how the credential is resolved.
+	modelEndpoint *modelEndpoint
 }
 
 // engine is the execution engine of a process: the durable engine that runs the
@@ -114,6 +118,10 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	default:
 		credentials = refuseCredentials
 	}
+	inbound := refuseInbound
+	if opts.resolver != nil {
+		inbound = resolveInbound(opts.resolver, st)
+	}
 	policy := opts.senderPolicy
 	if policy == nil {
 		policy = publicHTTPSPolicy
@@ -135,7 +143,7 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 	}
 	models := opts.models
 	if models == nil {
-		models = modelResolver{client: client, credentials: credentials}
+		models = modelResolver{client: client, credentials: credentials, endpoint: opts.modelEndpoint}
 	}
 	llmNode, err := chain.NewLLM(chain.Config{Models: models})
 	if err != nil {
@@ -177,7 +185,7 @@ func newEngine(st engineStore, opts engineOptions) (*engine, error) {
 		return nil, fmt.Errorf("wire the durable engine: %w", err)
 	}
 
-	verifier, err := newWhatsAppVerifier(st, credentials)
+	verifier, err := newWhatsAppVerifier(st, inbound)
 	if err != nil {
 		return nil, fmt.Errorf("wire the WhatsApp trigger: %w", err)
 	}

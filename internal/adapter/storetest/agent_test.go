@@ -70,7 +70,7 @@ func (s *scripted) Generate(context.Context, provider.Request) (provider.Respons
 
 type resolver struct{ p provider.ModelProvider }
 
-func (r resolver) Model(context.Context, identity.OrgID, flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
+func (r resolver) Model(context.Context, identity.OrgID, identity.ProjectID, flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
 	return r.p, nil
 }
 

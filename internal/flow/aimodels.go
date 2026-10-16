@@ -25,11 +25,13 @@ type ModelNodeTypes interface {
 	ModelCapabilities(ctx context.Context, ref ModelRef) (ModelCaps, bool)
 }
 
-// ModelRef names a model: the provider as the catalog spells it and the model
-// name the provider serves.
+// ModelRef names a model: the provider as the catalog spells it, the model
+// name the provider serves and the credential that holds the provider key
+// (ADR-0061 section 5; empty when the node names none).
 type ModelRef struct {
-	Provider string
-	Name     string
+	Provider   string
+	Name       string
+	Credential string
 }
 
 // ModelCaps are the features a node may require of a model. It mirrors the
@@ -100,7 +102,11 @@ func modelRefOf(v jsonvalue.Value) (ModelRef, bool) {
 	if prov == "" || name == "" {
 		return ModelRef{}, false
 	}
-	return ModelRef{Provider: prov, Name: name}, true
+	var cred string
+	if c, ok := v.Get("credential"); ok {
+		cred, _ = c.Str()
+	}
+	return ModelRef{Provider: prov, Name: name, Credential: cred}, true
 }
 
 // models runs the model rules of SPEC-006 R-PRV-05 on every AI node: the

@@ -170,7 +170,7 @@ func (f *fakeProvider) requestCount() int {
 // fakeModels resolves every model to one fake provider.
 type fakeModels struct{ p provider.ModelProvider }
 
-func (m fakeModels) Model(context.Context, identity.OrgID, flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
+func (m fakeModels) Model(context.Context, identity.OrgID, identity.ProjectID, flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
 	return m.p, nil
 }
 

@@ -10,7 +10,7 @@
       "name": "WhatsApp inbound message",
       "element": "startEvent",
       "type": "orcon.whatsapp.whatsappTrigger@1",
-      "parameters": {},
+      "parameters": { "credential": "REPLACE-WITH-THE-WHATSAPP-CREDENTIAL-ID" },
       "trigger": {
         "family": "WEBHOOK",
         "addresses": [{ "family": "NATIVE", "path": "whatsapp", "methods": ["GET", "POST"] }]
@@ -22,7 +22,7 @@
       "element": "serviceTask",
       "type": "orcon.ai.agent@1",
       "parameters": {
-        "model": { "provider": "openai", "name": "gpt-4o-mini" },
+        "model": { "provider": "openai", "name": "gpt-4o-mini", "credential": "REPLACE-WITH-THE-MODEL-CREDENTIAL-ID" },
         "system": "You are the customer support agent of a small shop. Answer briefly, in the language of the customer.",
         "inputField": "text",
         "conversationField": "from",
@@ -39,7 +39,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://graph.facebook.com/v25.0/106540352242922/messages",
-        "credential": "whatsapp",
+        "credential": "REPLACE-WITH-THE-WHATSAPP-CREDENTIAL-ID",
         "body": {
           "messaging_product": "whatsapp",
           "recipient_type": "individual",

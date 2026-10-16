@@ -249,11 +249,19 @@ func storedCredential(t *testing.T, env *storetest.EngineEnv, providerURL string
 // storedCredentialWith is storedCredential for the secret fields the caller chooses.
 func storedCredentialWith(t *testing.T, env *storetest.EngineEnv, providerURL string, secret map[string]string) (*credential.Service, string) {
 	t.Helper()
-	ctx := t.Context()
 	u, err := url.Parse(providerURL)
 	if err != nil {
 		t.Fatal(err)
 	}
+	svc, owner := credentialServiceOf(t, env)
+	return svc, storeCredential(t, svc, env, owner, "Mock provider", "http", u.Hostname(), secret)
+}
+
+// credentialServiceOf builds the credential service of the environment over its store, with the keys of its
+// organization, and returns it with the principal that owns the credentials a test stores.
+func credentialServiceOf(t *testing.T, env *storetest.EngineEnv) (*credential.Service, audit.Actor) {
+	t.Helper()
+	ctx := t.Context()
 	keys, ok := env.Store.(interface {
 		credential.Store
 		envelope.KeyStore
@@ -278,14 +286,20 @@ func storedCredentialWith(t *testing.T, env *storetest.EngineEnv, providerURL st
 	if err := keys.CreatePrincipal(ctx, identity.PrincipalRecord{ID: owner, Kind: identity.PrincipalUser, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("credential owner: %v", err)
 	}
-	created, err := svc.Create(ctx, storetest.ScopeOf(env.Org), env.Project, credential.Input{
-		Name: "Mock provider", ConnectorReference: "http", AllowedHosts: []string{u.Hostname()},
-		Secret: secret,
-	}, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser})
+	return svc, audit.Actor{PrincipalID: id.UUID(owner), Kind: audit.ActorUser}
+}
+
+// storeCredential keeps one credential in the project of the environment, bound to one host, and returns the
+// identifier a flow names it by.
+func storeCredential(t *testing.T, svc *credential.Service, env *storetest.EngineEnv, owner audit.Actor, name, connector, host string, secret map[string]string) string {
+	t.Helper()
+	created, err := svc.Create(t.Context(), storetest.ScopeOf(env.Org), env.Project, credential.Input{
+		Name: name, ConnectorReference: connector, AllowedHosts: []string{host}, Secret: secret,
+	}, owner)
 	if err != nil {
-		t.Fatalf("create the credential: %v", err)
+		t.Fatalf("create the credential %q: %v", name, err)
 	}
-	return svc, created.ID.String()
+	return created.ID.String()
 }
 
 // mustMasterKey returns a fresh master key for the test keyring.

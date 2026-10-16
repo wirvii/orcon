@@ -13,6 +13,7 @@ import (
 	"github.com/wirvii/orcon/internal/credential"
 	"github.com/wirvii/orcon/internal/execution"
 	"github.com/wirvii/orcon/internal/execution/store"
+	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/id"
 )
 
@@ -74,4 +75,43 @@ func credentialOf(res credential.Resolved) (httpdispatch.Credential, error) {
 		return httpdispatch.Credential{Auth: declarative.Auth{Type: declarative.AuthBearer, Field: "token"}, Fields: fields, Mask: res.SecretValues()}, nil
 	}
 	return httpdispatch.Credential{}, ErrCredentialFields
+}
+
+// inboundFields returns every field of a stored credential, public and secret, for the checks that send no request
+// with it: the signature of an inbound webhook and the subscription handshake of its provider. It runs on every
+// request, for the project of the route, so a removed share or a disabled credential stops the next request
+// (ADR-0043 section 3). No host is checked because nothing is sent. The values never reach a log or an error.
+type inboundFields func(ctx context.Context, org identity.OrgID, project identity.ProjectID, credentialID string) (map[string]string, error)
+
+// resolveInbound is the inbound credential function over the credential service.
+func resolveInbound(r credential.Resolver, scopes store.Scopes) inboundFields {
+	return func(ctx context.Context, org identity.OrgID, project identity.ProjectID, credentialID string) (map[string]string, error) {
+		cid, err := id.Parse(credentialID)
+		if err != nil {
+			return nil, fmt.Errorf("the credential named by the node is not a credential identifier: %w", credential.ErrNotFound)
+		}
+		scope, err := scopes.ScopeOf(org)
+		if err != nil {
+			return nil, fmt.Errorf("credential scope: %w", err)
+		}
+		res, err := r.Resolve(ctx, scope, project, cid)
+		if err != nil {
+			return nil, err
+		}
+		fields := make(map[string]string, len(res.Public))
+		for k, v := range res.Public {
+			fields[k] = v
+		}
+		for _, name := range res.SecretNames() {
+			if v, ok := res.Secret(name); ok {
+				fields[name] = v
+			}
+		}
+		return fields, nil
+	}
+}
+
+// refuseInbound is the inbound credential function of a process that has no credential store.
+func refuseInbound(context.Context, identity.OrgID, identity.ProjectID, string) (map[string]string, error) {
+	return nil, ErrNoCredentialStore
 }

@@ -28,7 +28,7 @@ type resolver struct {
 	providers map[flow.ModelRef]provider.ModelProvider
 }
 
-func (r resolver) Model(_ context.Context, _ identity.OrgID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
+func (r resolver) Model(_ context.Context, _ identity.OrgID, _ identity.ProjectID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
 	p, ok := r.providers[ref]
 	if !ok {
 		return nil, fmt.Errorf("no adapter for %s/%s", ref.Provider, ref.Name)

@@ -40,11 +40,13 @@ const (
 // moves to a fallback instead (SPEC-006 R-PRV-06).
 const DefaultMaxRetryAfter = 10 * time.Second
 
-// Models resolves the model adapter of a model reference for an organization.
-// The composition root implements it: it chooses the adapter, the endpoint and
-// the credential. A nil provider with an error means the model cannot be used.
+// Models resolves the model adapter of a model reference for the project of an
+// execution. The composition root implements it: it chooses the adapter, the
+// endpoint and the credential the reference names, which the project must own
+// or hold a share of. A nil provider with an error means the model cannot be
+// used.
 type Models interface {
-	Model(ctx context.Context, org identity.OrgID, ref flow.ModelRef) (provider.ModelProvider, error)
+	Model(ctx context.Context, org identity.OrgID, project identity.ProjectID, ref flow.ModelRef) (provider.ModelProvider, error)
 }
 
 // Config are the ports and bounds of the chain runner.
@@ -159,7 +161,7 @@ func (l *LLM) Execute(ctx context.Context, call execution.NodeCall) (execution.N
 	}
 	items := make([]execution.Item, 0, call.Input.Len())
 	for i := range call.Input.Len() {
-		out, err := l.answer(ctx, call.Org, params, call.Input.Item(i))
+		out, err := l.answer(ctx, call.Org, call.Project, params, call.Input.Item(i))
 		if err != nil {
 			return execution.NodeOutput{}, err
 		}
@@ -172,7 +174,7 @@ func (l *LLM) Execute(ctx context.Context, call execution.NodeCall) (execution.N
 }
 
 // answer runs one item against the primary model and then the fallbacks.
-func (l *LLM) answer(ctx context.Context, org identity.OrgID, params llmParams, item execution.Item) (jsonvalue.Value, error) {
+func (l *LLM) answer(ctx context.Context, org identity.OrgID, project identity.ProjectID, params llmParams, item execution.Item) (jsonvalue.Value, error) {
 	text, ok := item.JSON.Get(params.inputField)
 	prompt, isText := text.Str()
 	if !ok || !isText {
@@ -185,7 +187,7 @@ func (l *LLM) answer(ctx context.Context, org identity.OrgID, params llmParams, 
 	refs := append([]flow.ModelRef{params.model}, params.fallbacks...)
 	var lastErr error
 	for _, ref := range refs {
-		res, model, err := l.call(ctx, org, ref, params, prompt)
+		res, model, err := l.call(ctx, org, project, ref, params, prompt)
 		if err == nil {
 			return l.output(item, params, res, model)
 		}
@@ -205,8 +207,8 @@ func (l *LLM) answer(ctx context.Context, org identity.OrgID, params llmParams, 
 }
 
 // call performs one answer with one model, structured or plain.
-func (l *LLM) call(ctx context.Context, org identity.OrgID, ref flow.ModelRef, params llmParams, prompt string) (provider.StructuredResult, flow.ModelRef, error) {
-	p, err := l.cfg.Models.Model(ctx, org, ref)
+func (l *LLM) call(ctx context.Context, org identity.OrgID, project identity.ProjectID, ref flow.ModelRef, params llmParams, prompt string) (provider.StructuredResult, flow.ModelRef, error) {
+	p, err := l.cfg.Models.Model(ctx, org, project, ref)
 	if err != nil {
 		return provider.StructuredResult{}, ref, err
 	}
@@ -318,7 +320,7 @@ func refOf(v jsonvalue.Value) (flow.ModelRef, bool) {
 	if prov == "" || name == "" {
 		return flow.ModelRef{}, false
 	}
-	return flow.ModelRef{Provider: prov, Name: name}, true
+	return flow.ModelRef{Provider: prov, Name: name, Credential: stringOf(v, "credential")}, true
 }
 
 func stringOf(p jsonvalue.Value, key string) string {

@@ -8,7 +8,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,17 +18,12 @@ import (
 	"testing"
 
 	"github.com/wirvii/orcon/internal/adapter/egress"
-	"github.com/wirvii/orcon/internal/adapter/llm/openai"
 	"github.com/wirvii/orcon/internal/adapter/storetest"
-	"github.com/wirvii/orcon/internal/ai/provider"
-	"github.com/wirvii/orcon/internal/connector/declarative"
-	httpdispatch "github.com/wirvii/orcon/internal/connector/dispatch"
 	"github.com/wirvii/orcon/internal/execution/store"
 	"github.com/wirvii/orcon/internal/flow"
 	"github.com/wirvii/orcon/internal/identity"
 	"github.com/wirvii/orcon/internal/platform/config"
 	"github.com/wirvii/orcon/internal/platform/id"
-	"github.com/wirvii/orcon/internal/platform/redact"
 	"github.com/wirvii/orcon/internal/trigger"
 	"github.com/wirvii/orcon/test/mockllm"
 	"github.com/wirvii/orcon/test/mockprovider"
@@ -44,6 +38,10 @@ const (
 	whatsappFlowFile = "../../examples/flows/whatsapp-agent.json"
 	whatsappRoute    = "/hooks/engine/whatsapp"
 	graphHost        = "https://graph.facebook.com"
+
+	// The placeholders of the example flow for the identifiers of the credentials an owner stores.
+	whatsappCredentialPlaceholder = "REPLACE-WITH-THE-WHATSAPP-CREDENTIAL-ID"
+	modelCredentialPlaceholder    = "REPLACE-WITH-THE-MODEL-CREDENTIAL-ID"
 )
 
 // TestWhatsAppMessageRunsAgentAndReplies is the first end-to-end run of the
@@ -71,6 +69,19 @@ func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
 	graph := mockprovider.New()
 	graphSrv := httptest.NewServer(graph)
 	t.Cleanup(graphSrv.Close)
+	graphURL, err := url.Parse(graphSrv.URL)
+	if err != nil {
+		t.Fatalf("parse the Graph URL: %v", err)
+	}
+
+	// The three secrets of the flow are stored credentials of its project, bound to the host each one is sent to:
+	// the WhatsApp one carries the bearer token of the sends and the secrets that check the inbound requests,
+	// the model one carries the API key.
+	svc, owner := credentialServiceOf(t, env)
+	whatsappID := storeCredential(t, svc, env, owner, "WhatsApp", "whatsapp", graphURL.Hostname(), map[string]string{
+		"token": mockprovider.Token, "appSecret": testAppSecret, "verifyToken": testVerifyToken,
+	})
+	openAIID := storeCredential(t, svc, env, owner, "OpenAI", "openai", openAIHost, map[string]string{"apiKey": "test-key"})
 
 	llm := mockllm.New(t,
 		mockllm.Reply{Body: chatCompletion("Tu pedido sale hoy.")},
@@ -82,8 +93,8 @@ func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
 		senderPolicy: func(u *url.URL) egress.Policy {
 			return egress.Policy{Domains: []string{u.Hostname()}, Schemes: []string{"http"}, AllowPrivateNetworks: true}
 		},
-		credentials: testWhatsAppCredentials,
-		models:      testModels{baseURL: llm.URL(), client: llm.Client()},
+		resolver:      svc,
+		modelEndpoint: &modelEndpoint{baseURL: llm.URL(), client: llm.Client()},
 	})
 	if err != nil {
 		t.Fatalf("new engine: %v", err)
@@ -98,7 +109,7 @@ func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
 		}
 	})
 
-	publishWhatsAppFlow(t, env, eng, graphSrv.URL)
+	publishWhatsAppFlow(t, env, eng, flowCredentials{graphURL: graphSrv.URL, whatsapp: whatsappID, openAI: openAIID})
 
 	handler, err := newAPIRouterWith(config.RoleStandalone, slog.New(slog.DiscardHandler), nil, eng.ingress())
 	if err != nil {
@@ -157,52 +168,38 @@ func runWhatsAppAgentFlow(t *testing.T, kind storetest.Kind) {
 	}
 }
 
-// testWhatsAppCredentials resolves the one WhatsApp credential the test flow
-// names: a bearer token the mock provider accepts, the app secret that signs
-// the notifications and the verify token of the handshake.
-func testWhatsAppCredentials(_ context.Context, _ identity.OrgID, credentialID string) (httpdispatch.Credential, error) {
-	if credentialID != whatsappCredential {
-		return httpdispatch.Credential{}, errors.New("unknown test credential")
-	}
-	return httpdispatch.Credential{
-		Auth: declarative.Auth{Type: declarative.AuthBearer, Field: "token"},
-		Fields: map[string]string{
-			"token":       mockprovider.Token,
-			"appSecret":   testAppSecret,
-			"verifyToken": testVerifyToken,
-		},
-	}, nil
-}
-
-// testModels reaches the scripted model provider of the test over plain http.
-type testModels struct {
-	baseURL string
-	client  *http.Client
-}
-
-// Model implements [chain.Models]: every model is an OpenAI chat endpoint of the test.
-func (m testModels) Model(_ context.Context, _ identity.OrgID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // the chain port returns the provider interface
-	if ref.Provider != providerOpenAI {
-		return nil, errors.New("the test models serve one provider only")
-	}
-	return openai.New(openai.Config{BaseURL: m.baseURL, APIKey: redact.New("test-key"), HTTPClient: m.client})
+// flowCredentials are what an owner fills in after importing the example flow: the
+// address of the Graph endpoint and the identifiers of the two stored credentials.
+type flowCredentials struct {
+	graphURL string
+	whatsapp string
+	openAI   string
 }
 
 // publishWhatsAppFlow stores the example flow, points its Graph address at the
-// mock provider, publishes it and activates it, through the trigger service the
-// process runs. The example itself is what an owner imports; only its host changes.
-func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, graphURL string) {
+// mock provider and its credential placeholders at the stored credentials,
+// publishes it and activates it, through the trigger service the process runs.
+// The example itself is what an owner imports; only those values change.
+func publishWhatsAppFlow(t *testing.T, env *storetest.EngineEnv, eng *engine, fill flowCredentials) {
 	t.Helper()
 	ctx := t.Context()
 	raw, err := os.ReadFile(whatsappFlowFile)
 	if err != nil {
 		t.Fatalf("read the example flow: %v", err)
 	}
-	draft := []byte(strings.ReplaceAll(string(raw), graphHost, graphURL))
+	draft := string(raw)
+	for placeholder, value := range map[string]string{
+		graphHost: fill.graphURL, whatsappCredentialPlaceholder: fill.whatsapp, modelCredentialPlaceholder: fill.openAI,
+	} {
+		if !strings.Contains(draft, placeholder) {
+			t.Fatalf("the example flow has no %q to fill in", placeholder)
+		}
+		draft = strings.ReplaceAll(draft, placeholder, value)
+	}
 	now := env.Clock.Now()
 	rec := flow.Record{
 		ID: flow.FlowID(env.IDs.New()), OrgID: env.Org, ProjectID: env.Project, Name: "whatsapp-agent",
-		Draft: draft, CreatedAt: now, UpdatedAt: now,
+		Draft: []byte(draft), CreatedAt: now, UpdatedAt: now,
 	}
 	org := storetest.ScopeOf(env.Org)
 	if err := env.Store.CreateFlow(ctx, org, rec); err != nil {

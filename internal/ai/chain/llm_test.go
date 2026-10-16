@@ -50,7 +50,7 @@ func (f *fakeModel) Generate(_ context.Context, req provider.Request) (provider.
 // fakeModels resolves each provider name to one fake model, and refuses the names it does not know.
 type fakeModels map[string]*fakeModel
 
-func (m fakeModels) Model(_ context.Context, _ identity.OrgID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
+func (m fakeModels) Model(_ context.Context, _ identity.OrgID, _ identity.ProjectID, ref flow.ModelRef) (provider.ModelProvider, error) { //nolint:ireturn // implements the chain.Models port
 	f, ok := m[ref.Provider]
 	if !ok {
 		return nil, errors.New("no such provider")

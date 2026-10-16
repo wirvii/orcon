@@ -590,7 +590,7 @@ func resultText(out execution.NodeOutput) string {
 
 // callModel asks the model for its next answer, after the budget admits the call.
 func (r *Runner) callModel(ctx context.Context, run *runState, msgs []provider.Message) (provider.Response, ModelUse, error) {
-	prov, err := r.cfg.Models.Model(ctx, run.org, run.p.model)
+	prov, err := r.cfg.Models.Model(ctx, run.org, run.call.Project, run.p.model)
 	if err != nil {
 		return provider.Response{}, ModelUse{}, transient(err)
 	}
@@ -736,7 +736,7 @@ func refOf(v jsonvalue.Value) (flow.ModelRef, bool) {
 	if prov == "" || name == "" {
 		return flow.ModelRef{}, false
 	}
-	return flow.ModelRef{Provider: prov, Name: name}, true
+	return flow.ModelRef{Provider: prov, Name: name, Credential: stringOf(v, "credential")}, true
 }
 
 // outputOf builds the item the node emits: the input members, the answer, the
