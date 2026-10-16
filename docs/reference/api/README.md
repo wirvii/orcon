@@ -4,7 +4,7 @@
 
 # API operation index
 
-Generated from the API contract: 40 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
+Generated from the API contract: 41 operations and 0 event types. The reference site at `/api/reference` has the full description of each operation.
 
 ## Operations
 
@@ -37,6 +37,7 @@ Generated from the API contract: 40 operations and 0 event types. The reference 
 | POST | `/api/v1/human-tasks/{humanTaskId}/complete` | `completeHumanTask` | Complete a human task | stable | `human-task:resolve` | `orcon human-tasks complete` | none |
 | GET | `/api/v1/orgs` | `listOrgs` | List the organizations of the signed-in user | stable | `authenticated` | `orcon orgs list` | none |
 | GET | `/api/v1/orgs/{orgId}/activity-summary` | `getOrgActivitySummary` | Get the activity summary of an organization | stable | `execution:read` | `orcon orgs activity` | none |
+| GET | `/api/v1/orgs/{orgId}/executions` | `listOrgExecutions` | List the executions of an organization | stable | `execution:read` | `orcon org-executions list` | none |
 | GET | `/api/v1/orgs/{orgId}/flows` | `listOrgFlows` | List the flows of an organization | stable | `flow:read` | `orcon org-flows list` | none |
 | GET | `/api/v1/orgs/{orgId}/projects` | `listProjects` | List the projects of an organization | stable | `org:read` | `orcon projects list` | `list_projects` (read) |
 | POST | `/api/v1/orgs/{orgId}/projects` | `createProject` | Create a project in an organization | stable | `project:create` | `orcon projects create` | none |

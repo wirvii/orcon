@@ -604,9 +604,15 @@ func executionBody(ctx context.Context, rec *store.Execution, hidden bool, versi
 		return apigen.Execution{}, err
 	}
 	eid := types.UUID(rec.ID)
+	var flowVersion *int
+	if number > 0 {
+		flowVersion = &number
+	}
+	uncertain := rec.HasUncertainOperation
 	return apigen.Execution{
-		Id: &eid, FlowId: types.UUID(rec.FlowID), ProjectId: types.UUID(rec.ProjectID), FlowVersion: number,
-		Mode: apigen.ExecutionMode(rec.Mode), Status: apigen.ExecutionStatus(rec.Status), CreatedAt: rec.CreatedAt,
+		Id: &eid, FlowId: types.UUID(rec.FlowID), ProjectId: types.UUID(rec.ProjectID), FlowVersion: flowVersion,
+		HasUncertainOperation: &uncertain,
+		Mode:                  apigen.ExecutionMode(rec.Mode), Status: apigen.ExecutionStatus(rec.Status), CreatedAt: rec.CreatedAt,
 		StartedAt: optionalTime(rec.StartedAt), FinishedAt: optionalTime(rec.FinishedAt), DataHidden: hidden,
 	}, nil
 }

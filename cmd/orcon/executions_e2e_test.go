@@ -71,7 +71,7 @@ func checkExecutionReads(t *testing.T, env *storetest.EngineEnv, st engineStore,
 		t.Fatalf("get execution: %v", err)
 	}
 	body := answer[apigen.GetExecution200JSONResponse](t, got).Body
-	if body.Status != apigen.ExecutionStatusSUCCEEDED || body.FlowVersion != 1 || body.DataHidden || body.FinishedAt == nil || body.StartedAt == nil {
+	if body.Status != apigen.ExecutionStatusSUCCEEDED || body.FlowVersion == nil || *body.FlowVersion != 1 || body.DataHidden || body.FinishedAt == nil || body.StartedAt == nil {
 		t.Fatalf("execution = %+v", body)
 	}
 

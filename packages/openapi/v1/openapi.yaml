@@ -53,6 +53,8 @@ paths:
     $ref: ./paths/org-flows.yaml
   /orgs/{orgId}/activity-summary:
     $ref: ./paths/org-activity-summary.yaml
+  /orgs/{orgId}/executions:
+    $ref: ./paths/org-executions.yaml
   /projects/{projectId}:
     $ref: ./paths/project.yaml
   /projects/{projectId}/flows:

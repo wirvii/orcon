@@ -69,6 +69,7 @@ post:
                 status: CANCELING
                 createdAt: '2026-10-12T15:04:05Z'
                 startedAt: '2026-10-12T15:04:05Z'
+                hasUncertainOperation: false
                 dataHidden: false
     '400':
       $ref: ../openapi.yaml#/components/responses/ValidationFailed

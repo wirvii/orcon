@@ -70,7 +70,8 @@ func newAPIRouterWith(role config.Role, logger *slog.Logger, sec *security, webh
 			executions: httpapi.NewExecutions(
 				sec.store, sec.store, flowReader{}, sec.store, sec.evaluator, sec.store, sec.clock, sec.ids, sec.pageCodec,
 			),
-			activity: httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
+			activity:      httpapi.NewActivity(sec.evaluator, sec.store, sec.store, sec.clock),
+			orgExecutions: httpapi.NewOrgExecutions(sec.evaluator, sec.store, sec.store, sec.pageCodec),
 		}
 	}
 	router, err := httpapi.New(deps)
@@ -93,6 +94,8 @@ type productServer struct {
 	// executions serves the read side of the executions.
 	executions *httpapi.Executions
 	activity   *httpapi.Activity
+	// orgExecutions serves the executions of an organization.
+	orgExecutions *httpapi.OrgExecutions
 }
 
 func (s productServer) ListProjects(ctx context.Context, req apigen.ListProjectsRequestObject) (apigen.ListProjectsResponseObject, error) { //nolint:ireturn // the generated interface requires it
@@ -157,6 +160,10 @@ func (s productServer) GetCurrentUser(ctx context.Context, req apigen.GetCurrent
 
 func (s productServer) ListOrgFlows(ctx context.Context, req apigen.ListOrgFlowsRequestObject) (apigen.ListOrgFlowsResponseObject, error) { //nolint:ireturn // the generated interface requires it
 	return s.projects.ListOrgFlows(ctx, req)
+}
+
+func (s productServer) ListOrgExecutions(ctx context.Context, req apigen.ListOrgExecutionsRequestObject) (apigen.ListOrgExecutionsResponseObject, error) { //nolint:ireturn // the generated interface requires it
+	return s.orgExecutions.ListOrgExecutions(ctx, req)
 }
 
 func (s productServer) GetOrgActivitySummary(ctx context.Context, req apigen.GetOrgActivitySummaryRequestObject) (apigen.GetOrgActivitySummaryResponseObject, error) { //nolint:ireturn // the generated interface requires it

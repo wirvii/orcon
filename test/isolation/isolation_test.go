@@ -161,6 +161,24 @@ func TestIsolationActivitySummary(t *testing.T) {
 	}
 }
 
+// TestIsolationOrgExecutions runs the isolation cases of the organization-wide execution list (SPEC-019
+// UXB3): the executions of a project another organization owns are never listed.
+func TestIsolationOrgExecutions(t *testing.T) {
+	if isolation.RLSOnly {
+		t.Skip("the rls-only mode needs the test hook of the full battery cut (SPEC-004 SE17)")
+	}
+	reg := isolation.BuildRegistry()
+	for _, st := range selectedStores(t) {
+		t.Run(string(st), func(t *testing.T) {
+			newStore := factoryOf(t, st)
+			reg.RunSubjects(t.Context(), t, func(t *testing.T) *isolation.Env {
+				t.Helper()
+				return isolation.Seed(t.Context(), t, newStore(t), st, isolation.RLSOnly)
+			}, isolation.StoreMethod("ListProjectExecutions"))
+		})
+	}
+}
+
 // TestSeededOrganizationsAreIndependent checks the harness itself: what Seed stores for A
 // is invisible under B's scope and the other way round, so the cases start from isolation
 // that already holds for reads they did not write.

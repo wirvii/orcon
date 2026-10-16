@@ -826,6 +826,170 @@ paths:
           $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /orgs/{orgId}/executions:
+    x-orcon-resource: collection
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: listOrgExecutions
+      summary: List the executions of an organization
+      description: Returns the executions of every project of one organization that the caller can read, newest first by default, one page at a time. Filter by project, flow, status, time, identity or uncertain outcome; the list holds metadata only and never execution data. Executions of projects the caller cannot read are left out.
+      tags:
+        - executions
+      x-orcon-permission: execution:read
+      x-orcon-rate-class: read
+      x-orcon-stability: stable
+      x-orcon-audit: none
+      x-orcon-problems:
+        - invalid-page-token
+        - validation-failed
+        - unauthenticated
+        - forbidden
+        - not-found
+        - rate-limited
+        - internal-error
+        - service-unavailable
+      x-orcon-cli:
+        command: org-executions list
+      x-orcon-mcp:
+        level: none
+      x-orcon-examples:
+        - name: uncertainExecutionsOfOrganization
+          scenario: execution-with-uncertain-operation
+          request:
+            pathParams:
+              orgId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a71
+            query:
+              uncertain: true
+          response:
+            status: 200
+            body: uncertainExecutionsOfOrganization
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PageToken'
+        - name: projectId
+          in: query
+          required: false
+          description: Return only executions of this project; a project the caller cannot read gives an empty page.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+        - name: flowId
+          in: query
+          required: false
+          description: Return only executions of this flow.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+        - name: id
+          in: query
+          required: false
+          description: Return only the execution with this identifier.
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+        - name: status
+          in: query
+          required: false
+          description: Return only executions in this status.
+          schema:
+            type: string
+            enum:
+              - QUEUED
+              - RUNNING
+              - WAITING
+              - SUSPENDED
+              - CANCELING
+              - COMPENSATING
+              - SUCCEEDED
+              - FAILED
+              - CANCELED
+        - name: uncertain
+          in: query
+          required: false
+          description: Pass true to return only the executions that have an operation whose outcome is unknown and need a review.
+          schema:
+            type: boolean
+        - name: createdAfter
+          in: query
+          required: false
+          description: Return only executions accepted at or after this instant.
+          schema:
+            type: string
+            format: date-time
+            examples:
+              - '2026-10-12T15:04:05Z'
+        - name: createdBefore
+          in: query
+          required: false
+          description: Return only executions accepted before this instant.
+          schema:
+            type: string
+            format: date-time
+            examples:
+              - '2026-10-12T15:10:00Z'
+        - name: sort
+          in: query
+          required: false
+          description: Sort expression; a leading minus sorts in descending order.
+          x-orcon-sort-default: -createdAt
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - -createdAt
+            x-orcon-enum-kind: identifier
+            default: -createdAt
+      responses:
+        '200':
+          description: One page of executions of the organization.
+          headers:
+            Orcon-Request-Id:
+              $ref: '#/components/headers/OrconRequestId'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionList'
+              examples:
+                uncertainExecutionsOfOrganization:
+                  summary: One execution that needs a review
+                  value:
+                    items:
+                      - id: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                        flowId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a60
+                        projectId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
+                        flowVersion: 1
+                        mode: TRIGGER
+                        status: FAILED
+                        hasUncertainOperation: true
+                        createdAt: '2026-10-12T15:04:05Z'
+                        startedAt: '2026-10-12T15:04:05Z'
+                        finishedAt: '2026-10-12T15:04:09Z'
+                        dataHidden: false
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /projects/{projectId}:
     x-orcon-resource: item
     parameters:
@@ -1399,6 +1563,12 @@ paths:
             format: date-time
             examples:
               - '2026-10-12T15:10:00Z'
+        - name: uncertain
+          in: query
+          required: false
+          description: Pass true to return only the executions that have an operation whose outcome is unknown and need a review.
+          schema:
+            type: boolean
       responses:
         '200':
           description: One page of executions.
@@ -1427,6 +1597,7 @@ paths:
                         createdAt: '2026-10-12T15:04:05Z'
                         startedAt: '2026-10-12T15:04:05Z'
                         finishedAt: '2026-10-12T15:04:09Z'
+                        hasUncertainOperation: false
                         dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3080,6 +3251,7 @@ paths:
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
                     finishedAt: '2026-10-12T15:04:09Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '202':
           description: The execution is still running; read it later from the Location address.
@@ -3107,6 +3279,7 @@ paths:
                     mode: MANUAL
                     status: QUEUED
                     createdAt: '2026-10-12T15:04:05Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3467,6 +3640,7 @@ paths:
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
                     finishedAt: '2026-10-12T15:04:09Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3786,6 +3960,7 @@ paths:
                     status: CANCELING
                     createdAt: '2026-10-12T15:04:05Z'
                     startedAt: '2026-10-12T15:04:05Z'
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -3875,6 +4050,7 @@ paths:
                     status: QUEUED
                     createdAt: '2026-10-12T15:04:05Z'
                     retryOfExecutionId: 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a64
+                    hasUncertainOperation: false
                     dataHidden: false
         '400':
           $ref: '#/components/responses/ValidationFailed'
@@ -5524,10 +5700,10 @@ components:
         - id
         - flowId
         - projectId
-        - flowVersion
         - mode
         - status
         - createdAt
+        - hasUncertainOperation
         - dataHidden
       properties:
         id:
@@ -5551,10 +5727,14 @@ components:
             - 0191f6a2-3c4d-7e8f-9a0b-1c2d3e4f5a70
         flowVersion:
           type: integer
-          description: Number of the flow version the execution runs; it never changes.
+          description: Number of the flow version the execution runs; it never changes. Absent for an execution that runs a snapshot of a draft (a test run), which has no version number.
           examples:
             - 3
           minimum: 1
+        hasUncertainOperation:
+          type: boolean
+          description: True when an external operation of the execution has an outcome that is unknown, so a person must review it (the "Needs review" state).
+          readOnly: true
         mode:
           type: string
           description: How the execution started.
